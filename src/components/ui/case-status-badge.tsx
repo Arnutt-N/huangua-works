@@ -1,4 +1,4 @@
-import { cn } from '@/lib/cn';
+import { cn } from '../../lib/cn';
 
 /**
  * CaseStatusBadge — signature component (DESIGN.md §5 Chips/Status Badge)

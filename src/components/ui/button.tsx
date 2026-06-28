@@ -1,6 +1,6 @@
 import { Slot } from '@radix-ui/react-slot';
 import { forwardRef, type ButtonHTMLAttributes } from 'react';
-import { cn } from '@/lib/cn';
+import { cn } from '../../lib/cn';
 
 /**
  * Button — primitive หลัก (DESIGN.md §5 Buttons)

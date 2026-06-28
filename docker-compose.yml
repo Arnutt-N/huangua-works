@@ -1,0 +1,22 @@
+# docker-compose.yml — รัน อบต.หัวงัว citizen-help บน local ผ่าน Docker
+# ใช้: docker compose up --build   → http://localhost:3000
+# หยุด: docker compose down
+#
+# env: สำหรับ M0 (foundation) หน้า hero render ได้โดยไม่ต้องมี secret
+# เมื่อเข้า P0 (Supabase/Upstash) ให้สร้าง .env.local จาก .env.example
+# แล้ว uncomment บล็อก env_file ด้านล่าง
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: huangua-citizen-help:local
+    container_name: huangua-app
+    ports:
+      - '3000:3000'
+    restart: unless-stopped
+    # env_file:
+    #   - .env.local
+    # environment:
+    #   NODE_ENV: production

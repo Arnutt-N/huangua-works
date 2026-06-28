@@ -2,7 +2,7 @@
 
 import * as ToastPrimitive from '@radix-ui/react-toast';
 import { type ComponentPropsWithoutRef, type ElementRef, forwardRef } from 'react';
-import { cn } from '@/lib/cn';
+import { cn } from '../../lib/cn';
 
 /**
  * Toast (DESIGN.md §5)

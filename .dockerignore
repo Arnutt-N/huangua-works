@@ -1,0 +1,54 @@
+# .dockerignore — ลด build context + กัน secrets/PII เข้า image
+# (สอดคล้อง .gitignore: secrets/ + .claude/settings.local.json + .docx PII ห้ามเข้า image)
+
+# deps / build artifacts
+node_modules
+.next
+out
+dist
+build
+storybook-static
+coverage
+test-results
+playwright-report
+playwright/.cache
+.nyc_output
+*.tsbuildinfo
+.eslintcache
+
+# git / editor
+.git
+.gitignore
+.idea
+.vscode
+*.swp
+
+# 🔒 secrets + credentials (CRITICAL)
+secrets
+.claude
+.env
+.env.*
+!.env.example
+
+# 🛡️ PII source (PDPA)
+*.docx
+unpacked1
+unpacked2
+_unp1
+_unp2
+
+# logs / temp
+*.log
+tmp
+.temp
+
+# docs / planning (ไม่จำเป็นต่อ build)
+docs
+project-log-md
+PRODUCT.md
+DESIGN.md
+
+# docker self
+Dockerfile
+docker-compose.yml
+.dockerignore

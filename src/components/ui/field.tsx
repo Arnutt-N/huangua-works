@@ -2,7 +2,7 @@
 
 import { Label as LabelPrimitive } from '@radix-ui/react-label';
 import { forwardRef, type InputHTMLAttributes, type LabelHTMLAttributes, type TextareaHTMLAttributes } from 'react';
-import { cn } from '@/lib/cn';
+import { cn } from '../../lib/cn';
 
 /**
  * Field primitives (DESIGN.md §5 Inputs/Fields)

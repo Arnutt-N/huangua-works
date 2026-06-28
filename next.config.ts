@@ -7,6 +7,7 @@ import type { NextConfig } from 'next';
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  output: 'standalone',
   // productionBrowserSourceMaps: false (default) — ไม่รั่ว source map สู่ client
   experimental: {
     // optimizePackageImports สำหรับ Radix ลด bundle — เปิดเมื่อ deps ลงเรียบร้อย
