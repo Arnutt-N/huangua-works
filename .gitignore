@@ -1,0 +1,71 @@
+# ============================================================================
+# .gitignore — อบต.หัวงัว citizen-help web app
+# HARD rule: secrets + credentials + PII source ต้องไม่ติด commit
+# ============================================================================
+
+# ---- 🔒 Credentials & secrets (CRITICAL — ห้าม commit เด็ดขาด) ----
+secrets/
+.claude/settings.local.json
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+*.p12
+*.pfx
+
+# ---- 🛡️ PII source documents (PDPA พ.ร.บ. 2562) ----
+# ไฟล์ .docx ต้นฉบับมีข้อมูลจริงของประชาชน (ชื่อ/ที่อยู่/เลขรับ) → เก็บ local เท่านั้น
+# ข้อมูลที่จำเป็นต่อการออกแบบถูกสกัด/สรุปแล้วใน docs/context-package.md
+*.docx
+unpacked1/
+unpacked2/
+_unp1/
+_unp2/
+
+# ---- 📦 Dependencies ----
+node_modules/
+.pnpm-store/
+
+# ---- 🏗️ Build outputs ----
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# ---- 📖 Storybook ----
+storybook-static/
+
+# ---- 🧪 Test artifacts ----
+coverage/
+test-results/
+playwright-report/
+playwright/.cache/
+.nyc_output/
+
+# ---- ☁️ Vercel / platform ----
+.vercel/
+
+# ---- 🖥️ OS / editor ----
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+*.swp
+*.swo
+*~
+
+# ---- 📝 Logs / tmp ----
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+tmp/
+.temp/
+
+# ---- 🔧 TypeScript cache ----
+*.tsbuildinfo
+.eslintcache
