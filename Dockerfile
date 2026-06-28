@@ -4,7 +4,7 @@
 # รัน: docker compose up --build  → http://localhost:3000
 
 # ---- deps: ติดตั้ง dependencies ตาม lockfile ----
-FROM node:20-slim AS deps
+FROM node:22-slim AS deps
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@11.0.8 --activate
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -12,7 +12,7 @@ RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile
 
 # ---- builder: คอมไพล์ Next.js (standalone) ----
-FROM node:20-slim AS builder
+FROM node:22-slim AS builder
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@11.0.8 --activate
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -23,7 +23,7 @@ COPY . .
 RUN pnpm exec next build
 
 # ---- runner: image เล็ก รัน standalone server ----
-FROM node:20-slim AS runner
+FROM node:22-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
