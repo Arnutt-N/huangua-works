@@ -50,6 +50,9 @@
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --duration-fast: 150ms;
   --duration-normal: 250ms;
+
+  /* elevation (overlay เท่านั้น — The Flat-By-Default Rule) */
+  --shadow-overlay: 0 8px 32px oklch(20% 0.02 265 / 0.18);
 }
 
 /* ---------- Dark theme (intentional, ไม่ default — ผู้สูงอายุกลางวัน) ---------- */
@@ -99,6 +102,12 @@
   --radius-md: var(--radius-md);
   --radius-lg: var(--radius-lg);
   --radius-pill: var(--radius-pill);
+
+  --duration-fast: var(--duration-fast);
+  --duration-normal: var(--duration-normal);
+  --ease-out-expo: var(--ease-out-expo);
+
+  --shadow-overlay: var(--shadow-overlay);
 }
 
 /* ---------- Base ---------- */
