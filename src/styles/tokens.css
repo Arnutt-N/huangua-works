@@ -1,0 +1,154 @@
+/* tokens.css — อบต.หัวงัว design tokens (Tailwind v4 CSS-first)
+ * Source of truth = DESIGN.md. ค่า oklch ยืนยันโดยผู้ใช้แล้ว (civic indigo / off-white / Noto Sans Thai).
+ * Runtime theming light/dark ผ่าน [data-theme] ด้วย @theme inline (utilities อ้าง var ตอน runtime). */
+
+@import 'tailwindcss';
+
+/* dark variant = [data-theme="dark"] (intentional, ไม่ default) */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/* ---------- Raw design tokens (light = default) ---------- */
+:root {
+  /* surface (The No-Cream Rule: off-white จริง ไม่ใช่ warm cream) */
+  --color-surface: oklch(98% 0.003 245);
+  --color-surface-raised: oklch(100% 0 0);
+  --color-surface-sunken: oklch(96% 0.004 245);
+
+  /* ink (Warm Ink, contrast ~14:1 บน surface) */
+  --color-ink: oklch(22% 0.02 50);
+  --color-muted: oklch(45% 0.015 50);
+  --color-on-accent: oklch(99% 0.003 245);
+
+  /* hairline */
+  --color-border: oklch(90% 0.01 245);
+  --color-border-strong: oklch(80% 0.015 245);
+
+  /* accent (The One Indigo Rule: ≤10% ของหน้า) */
+  --color-accent: oklch(46% 0.13 245);
+  --color-accent-strong: oklch(36% 0.15 245); /* ปุ่ม primary bg (white ≥7:1) */
+  --color-accent-sunken: oklch(92% 0.03 245);
+
+  /* status (case state machine เท่านั้น ไม่ใช่ decoration) */
+  --color-success: oklch(44% 0.14 145);
+  --color-success-soft: oklch(94% 0.04 145);
+  --color-warning: oklch(66% 0.14 75);
+  --color-warning-soft: oklch(95% 0.05 75);
+  --color-danger: oklch(46% 0.19 25);
+  --color-danger-soft: oklch(95% 0.05 25);
+
+  /* font (Noto Sans Thai self-host ผ่าน next/font; --font-noto ถูก set ที่ <html>) */
+  --font-sans: var(--font-noto), 'Noto Sans Thai', system-ui, -apple-system, sans-serif;
+
+  /* radius (ห้ามเกิน 14px บน card — codex tell) */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 9999px;
+
+  /* touch (C6 enforce) + motion (restrained) */
+  --touch-target-min: 44px;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+}
+
+/* ---------- Dark theme (intentional, ไม่ default — ผู้สูงอายุกลางวัน) ---------- */
+[data-theme='dark'] {
+  --color-surface: oklch(15% 0.006 245);
+  --color-surface-raised: oklch(19% 0.006 245);
+  --color-surface-sunken: oklch(12% 0.005 245);
+  --color-ink: oklch(94% 0.005 50);
+  --color-muted: oklch(68% 0.015 50);
+  --color-on-accent: oklch(99% 0.003 245);
+  --color-border: oklch(30% 0.012 245);
+  --color-border-strong: oklch(42% 0.015 245);
+  --color-accent: oklch(64% 0.13 245);
+  --color-accent-strong: oklch(72% 0.14 245);
+  --color-accent-sunken: oklch(26% 0.04 245);
+  --color-success: oklch(58% 0.15 145);
+  --color-success-soft: oklch(22% 0.04 145);
+  --color-warning: oklch(72% 0.14 75);
+  --color-warning-soft: oklch(22% 0.05 75);
+  --color-danger: oklch(60% 0.19 25);
+  --color-danger-soft: oklch(22% 0.05 25);
+}
+
+/* ---------- Map tokens → Tailwind (inline = utilities อ้าง var ตอน runtime) ---------- */
+@theme inline {
+  --color-surface: var(--color-surface);
+  --color-surface-raised: var(--color-surface-raised);
+  --color-surface-sunken: var(--color-surface-sunken);
+  --color-ink: var(--color-ink);
+  --color-muted: var(--color-muted);
+  --color-on-accent: var(--color-on-accent);
+  --color-border: var(--color-border);
+  --color-border-strong: var(--color-border-strong);
+  --color-accent: var(--color-accent);
+  --color-accent-strong: var(--color-accent-strong);
+  --color-accent-sunken: var(--color-accent-sunken);
+  --color-success: var(--color-success);
+  --color-success-soft: var(--color-success-soft);
+  --color-warning: var(--color-warning);
+  --color-warning-soft: var(--color-warning-soft);
+  --color-danger: var(--color-danger);
+  --color-danger-soft: var(--color-danger-soft);
+
+  --font-sans: var(--font-sans);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-pill: var(--radius-pill);
+}
+
+/* ---------- Base ---------- */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+  body {
+    background-color: var(--color-surface);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: clamp(1.0625rem, 1rem + 0.3vw, 1.125rem); /* ≥17px Elderly Floor */
+    line-height: 1.6;
+    text-wrap: pretty;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  h1, h2, h3 {
+    text-wrap: balance;
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-accent-strong);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+  ::selection {
+    background: var(--color-accent-sunken);
+    color: var(--color-ink);
+  }
+}
+
+/* ---------- Custom utilities ---------- */
+/* C6: touch target ≥44px บังคับทุก interactive */
+@utility min-h-touch {
+  min-height: var(--touch-target-min);
+}
+@utility min-w-touch {
+  min-width: var(--touch-target-min);
+}
+
+/* ---------- Reduced motion (บังคับ — PRODUCT.md + impeccable) ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

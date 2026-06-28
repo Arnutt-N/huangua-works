@@ -69,3 +69,5 @@ tmp/
 # ---- 🔧 TypeScript cache ----
 *.tsbuildinfo
 .eslintcache
+
+project-log-md/
