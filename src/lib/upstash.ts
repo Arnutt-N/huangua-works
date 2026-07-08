@@ -5,13 +5,21 @@
 
 import { Redis } from '@upstash/redis';
 
-if (!process.env.UPSTASH_REDIS_URL || !process.env.UPSTASH_REDIS_TOKEN) {
-  throw new Error('Missing UPSTASH_REDIS_URL or UPSTASH_REDIS_TOKEN');
+// Build time: สร้าง stub instance (ไม่เชื่อมจริง)
+// Runtime: scripts/verify-env.ts จะ fail fast
+const REDIS_URL = process.env.UPSTASH_REDIS_URL || 'http://localhost:6379';
+const REDIS_TOKEN = process.env.UPSTASH_REDIS_TOKEN || 'stub-token';
+
+if (
+  process.env.NODE_ENV === 'production' &&
+  (!process.env.UPSTASH_REDIS_URL || !process.env.UPSTASH_REDIS_TOKEN)
+) {
+  console.warn('[upstash] Upstash not configured — rate limiting disabled');
 }
 
 export const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_URL,
-  token: process.env.UPSTASH_REDIS_TOKEN,
+  url: REDIS_URL,
+  token: REDIS_TOKEN,
 });
 
 /**

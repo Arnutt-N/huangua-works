@@ -9,8 +9,14 @@ import { createHmac } from 'node:crypto';
 
 const HMAC_KEY = process.env.CID_HMAC_KEY || '';
 
-if (!HMAC_KEY || HMAC_KEY.length < 32) {
-  throw new Error('CID_HMAC_KEY must be at least 32 characters');
+// Build time: ข้าม validation (ไม่มี secret จริง)
+// Runtime: scripts/verify-env.ts จะ fail fast ถ้าไม่มี
+if (
+  process.env.NODE_ENV === 'production' &&
+  typeof window === 'undefined' &&
+  (!HMAC_KEY || HMAC_KEY.length < 32)
+) {
+  console.warn('[cid-hmac] CID_HMAC_KEY not configured — dedup will use empty key');
 }
 
 /**
