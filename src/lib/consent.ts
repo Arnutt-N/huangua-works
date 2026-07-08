@@ -6,7 +6,7 @@
 import { getDb } from './db';
 import { consentRecords } from './db/schema';
 import { generateId } from './id';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, desc } from 'drizzle-orm';
 
 export type ConsentType = 'data_collection' | 'data_sharing' | 'marketing';
 
@@ -23,7 +23,7 @@ export interface ConsentGrant {
  * บันทึกความยินยอม
  */
 export async function grantConsent(grant: ConsentGrant): Promise<void> {
-  const db = getDb();
+  const db = await getDb();
 
   await db.insert(consentRecords).values({
     id: generateId(),
@@ -34,7 +34,7 @@ export async function grantConsent(grant: ConsentGrant): Promise<void> {
     grantedAt: new Date(),
     ipAddress: grant.ipAddress,
     userAgent: grant.userAgent,
-    metadata: grant.metadata ? JSON.stringify(grant.metadata) : undefined,
+    metadata: grant.metadata,
   });
 }
 
@@ -46,7 +46,7 @@ export async function revokeConsent(
   consentType: ConsentType,
   metadata?: Record<string, unknown>
 ): Promise<void> {
-  const db = getDb();
+  const db = await getDb();
 
   await db.insert(consentRecords).values({
     id: generateId(),
@@ -55,7 +55,7 @@ export async function revokeConsent(
     version: '1.0', // current version
     isGranted: false,
     revokedAt: new Date(),
-    metadata: metadata ? JSON.stringify(metadata) : undefined,
+    metadata,
   });
 }
 
@@ -66,15 +66,16 @@ export async function hasConsent(
   userId: string,
   consentType: ConsentType
 ): Promise<boolean> {
-  const db = getDb();
+  const db = await getDb();
 
-  const latest = await db
+  const rows = await db
     .select()
     .from(consentRecords)
     .where(and(eq(consentRecords.userId, userId), eq(consentRecords.consentType, consentType)))
-    .orderBy(consentRecords.createdAt)
-    .limit(1)
-    .get();
+    .orderBy(desc(consentRecords.createdAt))
+    .limit(1);
+
+  const latest = rows[0];
 
   return latest?.isGranted === true;
 }
@@ -83,12 +84,11 @@ export async function hasConsent(
  * ดึงประวัติความยินยอมทั้งหมด
  */
 export async function getConsentHistory(userId: string) {
-  const db = getDb();
+  const db = await getDb();
 
   return db
     .select()
     .from(consentRecords)
     .where(eq(consentRecords.userId, userId))
-    .orderBy(consentRecords.createdAt)
-    .all();
+    .orderBy(consentRecords.createdAt);
 }
