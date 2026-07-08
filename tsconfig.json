@@ -44,6 +44,7 @@
     "node_modules",
     ".next",
     "storybook-static",
-    "dist"
+    "dist",
+    "examples"
   ]
 }

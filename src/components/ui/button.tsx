@@ -4,13 +4,13 @@ import { cn } from '../../lib/cn';
 
 /**
  * Button — primitive หลัก (DESIGN.md §5 Buttons)
- * - ปุ่ม primary = Civic Indigo Strong + white text (≥7:1 AAA)
+ * - ปุ่ม primary = Emerald gradient + white text
  * - touch target ≥44px (C6) ทุก variant
- * - focus-visible ring 3px indigo (ไม่ใช่ outline กรอบเดี่ยว)
+ * - focus-visible ring emerald (ไม่ใช่ outline กรอบเดี่ยว)
  * - ใช้ Radix Slot สำหรับ asChild (render เป็น <a>/<Link> ได้)
  */
-export type ButtonVariant = 'primary' | 'secondary' | 'destructive' | 'ghost';
-export type ButtonSize = 'md' | 'lg';
+export type ButtonVariant = 'primary' | 'secondary' | 'destructive' | 'ghost' | 'outline';
+export type ButtonSize = 'sm' | 'md' | 'lg';
 
 const base =
   'inline-flex items-center justify-center gap-2 rounded-md font-semibold whitespace-nowrap ' +
@@ -22,12 +22,15 @@ const variantClass: Record<ButtonVariant, string> = {
   primary: 'min-h-touch bg-accent-strong px-7 text-on-accent hover:bg-accent-strong/90',
   secondary:
     'min-h-touch border border-border-strong bg-transparent px-7 text-accent-strong hover:bg-accent-sunken',
+  outline:
+    'min-h-touch border border-border-strong bg-transparent px-7 text-ink hover:bg-accent-sunken',
   destructive: 'min-h-touch bg-danger px-7 text-on-accent hover:bg-danger/90',
   ghost: 'min-h-touch px-3 text-ink/80 hover:bg-accent-sunken hover:text-ink',
 };
 
 const sizeClass: Record<ButtonSize, string> = {
-  md: 'text-base',
+  sm: 'min-h-[40px] px-4 text-sm',
+  md: 'min-h-touch text-base',
   lg: 'min-h-touch px-8 text-lg',
 };
 

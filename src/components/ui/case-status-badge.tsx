@@ -4,6 +4,7 @@ import { cn } from '../../lib/cn';
  * CaseStatusBadge — signature component (DESIGN.md §5 Chips/Status Badge)
  * แมป state machine รับเรื่อง → ปิดเรื่อง ไปยังสีสถานะ
  * ใช้ soft พื้น + strong text (contrast ปลอดภัย ไม่ใช่ badge เต็มสี)
+ * Palette: emerald (primary), amber (warning/progress), red (urgent/danger)
  */
 
 export type CaseStatus =
@@ -19,8 +20,8 @@ const statusMap: Record<CaseStatus, { label: string; class: string }> = {
   received: { label: 'รับเรื่อง', class: 'bg-accent-sunken text-accent-strong' },
   reviewing: { label: 'ตรวจสอบ', class: 'bg-warning-soft text-warning' },
   assigned: { label: 'มอบหมาย', class: 'bg-warning-soft text-warning' },
-  in_progress: { label: 'ดำเนินการ', class: 'bg-warning-soft text-warning' },
-  done: { label: 'เสร็จ', class: 'bg-success-soft text-success' },
+  in_progress: { label: 'กำลังดำเนินการ', class: 'bg-warning-soft text-warning' },
+  done: { label: 'เสร็จสิ้น', class: 'bg-success-soft text-success' },
   closed: { label: 'ปิดเรื่อง', class: 'bg-success-soft text-success' },
   urgent: { label: 'ฉุกเฉิน', class: 'bg-danger-soft text-danger' },
 };
