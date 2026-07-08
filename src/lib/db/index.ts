@@ -1,28 +1,45 @@
-import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import Database from 'better-sqlite3';
+import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
 import * as schema from './schema';
 
 /**
- * DB — SQLite connection singleton
- * ใช้ better-sqlite3 (synchronous, fast, single-process)
+ * DB — PostgreSQL connection singleton (postgres-js, pure JS, no native build)
+ *
+ * Migrated from better-sqlite3 (sync) → postgres-js (async).
+ * - lazy-init: สร้าง pool เมื่อเรียกครั้งแรกเท่านั้น (avoid build-time connect)
+ * - pool size 10 (mitigate postgres-js pure-JS overhead vs native)
+ * - foreign_keys pragma ถูกลบ (SQLite-only — PG enforce FK ที่ column definition)
+ * - WAL pragma ถูกลบ (PG ใช้ MVCC ไม่ใช้ WAL mode toggle)
  */
 
-let dbInstance: BetterSQLite3Database<typeof schema> | null = null;
+let dbInstance: PostgresJsDatabase<typeof schema> | null = null;
+let pgClient: postgres.Sql | null = null;
 
-export function getDb(): BetterSQLite3Database<typeof schema> {
-  if (!dbInstance) {
-    const dbPath = process.env.DATABASE_URL || './data/huangua.db';
-    const sqlite = new Database(dbPath);
+export async function getDb(): Promise<PostgresJsDatabase<typeof schema>> {
+  if (dbInstance) return dbInstance;
 
-    // Enable WAL mode (Write-Ahead Logging) for better concurrency
-    sqlite.pragma('journal_mode = WAL');
-    sqlite.pragma('foreign_keys = ON');
-
-    dbInstance = drizzle(sqlite, { schema });
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error('DATABASE_URL is not set (expected postgresql://...)');
   }
+
+  // prepare=true รวม parse cache; max=10 จำกัด pool; ssl ตาม connection string
+  pgClient = postgres(url, { max: 10, prepare: true });
+  dbInstance = drizzle(pgClient, { schema });
 
   return dbInstance;
 }
 
+/**
+ * ปิด connection pool (ใช้ใน script/telemetry เท่านั้น — Next.js route ไม่ควรเรียก)
+ */
+export async function closeDb(): Promise<void> {
+  if (pgClient) {
+    await pgClient.end();
+    pgClient = null;
+    dbInstance = null;
+  }
+}
+
 export { schema };
-export type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+export type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';

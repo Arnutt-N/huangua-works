@@ -1,34 +1,80 @@
-import { sql } from 'drizzle-orm';
-import { integer, sqliteTable, text, index } from 'drizzle-orm/sqlite-core';
+import {
+  pgTable,
+  text,
+  timestamp,
+  boolean,
+  integer,
+  jsonb,
+  date,
+  pgEnum,
+  index,
+} from 'drizzle-orm/pg-core';
 
 /**
- * Schema — อบต.หัวงัว citizen-help (SQLite)
+ * Schema — อบต.หัวงัว citizen-help (PostgreSQL)
  * P0 Foundation: core tables + audit + RLS simulation via application layer
+ *
+ * Migrated from SQLite dialect → PostgreSQL dialect (self-hosted via Docker).
+ * - integer(timestamp) + unixepoch() → timestamp({ mode: 'date' }) + defaultNow()
+ * - integer(boolean) → boolean
+ * - text(json) → jsonb
+ * - inline text enums → pgEnum
+ * - UUID v7 PKs remain text('id').primaryKey() (app-generated)
  */
+
+// ────────────────────────────────────────────────────────────────────────────
+// § Enums
+// ────────────────────────────────────────────────────────────────────────────
+
+export const userRoleEnum = pgEnum('user_role', [
+  'citizen',
+  'officer',
+  'chief',
+  'head',
+  'superadmin',
+]);
+
+export const caseStatusEnum = pgEnum('case_status', [
+  'received',
+  'reviewing',
+  'assigned',
+  'in_progress',
+  'done',
+  'closed',
+  'rejected',
+]);
+
+export const casePriorityEnum = pgEnum('case_priority', ['normal', 'urgent']);
+
+export const updateTypeEnum = pgEnum('update_type', [
+  'status_change',
+  'assignment',
+  'comment',
+  'attachment',
+  'metadata_change',
+]);
 
 // ────────────────────────────────────────────────────────────────────────────
 // § Users (ผู้ใช้งาน 5 บทบาท: citizen/officer/chief/head/superadmin)
 // ────────────────────────────────────────────────────────────────────────────
 
-export const users = sqliteTable(
+export const users = pgTable(
   'users',
   {
     id: text('id').primaryKey(), // UUID v7
-    createdAt: integer('created_at', { mode: 'timestamp' })
+    createdAt: timestamp('created_at', { mode: 'date' })
       .notNull()
-      .default(sql`(unixepoch())`),
-    updatedAt: integer('updated_at', { mode: 'timestamp' })
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' })
       .notNull()
-      .default(sql`(unixepoch())`),
+      .defaultNow(),
     email: text('email').notNull().unique(),
-    role: text('role', {
-      enum: ['citizen', 'officer', 'chief', 'head', 'superadmin'],
-    }).notNull(),
+    role: userRoleEnum().notNull(),
     departmentId: text('department_id'), // FK departments.id (nullable สำหรับ citizen)
-    isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+    isActive: boolean('is_active').notNull().default(true),
     fullName: text('full_name').notNull(),
     phoneNumber: text('phone_number'),
-    metadata: text('metadata', { mode: 'json' }), // JSON: { lastLoginAt, preferences, etc }
+    metadata: jsonb('metadata'), // JSON: { lastLoginAt, preferences, etc }
   },
   (table) => ({
     emailIdx: index('users_email_idx').on(table.email),
@@ -41,19 +87,19 @@ export const users = sqliteTable(
 // § Departments (หน่วยงาน: กองการศึกษา/กองคลัง/กองช่าง/สำนักปลัด/กำนัน-ผู้ใหญ่)
 // ────────────────────────────────────────────────────────────────────────────
 
-export const departments = sqliteTable(
+export const departments = pgTable(
   'departments',
   {
     id: text('id').primaryKey(),
-    createdAt: integer('created_at', { mode: 'timestamp' })
+    createdAt: timestamp('created_at', { mode: 'date' })
       .notNull()
-      .default(sql`(unixepoch())`),
+      .defaultNow(),
     name: text('name').notNull().unique(),
     slug: text('slug').notNull().unique(),
     description: text('description'),
     color: text('color'), // oklch(...) for UI badge
     icon: text('icon'), // lucide icon name
-    isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+    isActive: boolean('is_active').notNull().default(true),
   },
   (table) => ({
     slugIdx: index('departments_slug_idx').on(table.slug),
@@ -64,20 +110,20 @@ export const departments = sqliteTable(
 // § Categories (หมวดหมู่: ถนน/ไฟฟ้า/น้ำประปา/สิ่งแวดล้อม/สังคม/etc — 13 items)
 // ────────────────────────────────────────────────────────────────────────────
 
-export const categories = sqliteTable(
+export const categories = pgTable(
   'categories',
   {
     id: text('id').primaryKey(),
-    createdAt: integer('created_at', { mode: 'timestamp' })
+    createdAt: timestamp('created_at', { mode: 'date' })
       .notNull()
-      .default(sql`(unixepoch())`),
+      .defaultNow(),
     name: text('name').notNull().unique(),
     slug: text('slug').notNull().unique(),
     description: text('description'),
     icon: text('icon'), // lucide icon
     defaultDepartmentId: text('default_department_id'), // FK departments.id
     estimatedDays: integer('estimated_days').default(7),
-    isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+    isActive: boolean('is_active').notNull().default(true),
   },
   (table) => ({
     slugIdx: index('categories_slug_idx').on(table.slug),
@@ -88,34 +134,20 @@ export const categories = sqliteTable(
 // § Cases (เรื่องร้องเรียก/ร้องทุกข์ — state machine: received→reviewing→assigned→in_progress→done→closed/rejected)
 // ────────────────────────────────────────────────────────────────────────────
 
-export const cases = sqliteTable(
+export const cases = pgTable(
   'cases',
   {
     id: text('id').primaryKey(), // UUID v7
-    createdAt: integer('created_at', { mode: 'timestamp' })
+    createdAt: timestamp('created_at', { mode: 'date' })
       .notNull()
-      .default(sql`(unixepoch())`),
-    updatedAt: integer('updated_at', { mode: 'timestamp' })
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' })
       .notNull()
-      .default(sql`(unixepoch())`),
+      .defaultNow(),
 
     // Status
-    status: text('status', {
-      enum: [
-        'received',
-        'reviewing',
-        'assigned',
-        'in_progress',
-        'done',
-        'closed',
-        'rejected',
-      ],
-    })
-      .notNull()
-      .default('received'),
-    priority: text('priority', { enum: ['normal', 'urgent'] })
-      .notNull()
-      .default('normal'),
+    status: caseStatusEnum().notNull().default('received'),
+    priority: casePriorityEnum().notNull().default('normal'),
 
     // Content
     title: text('title').notNull(),
@@ -129,12 +161,12 @@ export const cases = sqliteTable(
     departmentId: text('department_id'), // FK departments.id
 
     // Tracking
-    dueDate: integer('due_date', { mode: 'timestamp' }),
-    closedAt: integer('closed_at', { mode: 'timestamp' }),
+    dueDate: timestamp('due_date', { mode: 'date' }),
+    closedAt: timestamp('closed_at', { mode: 'date' }),
 
     // Metadata
-    attachments: text('attachments', { mode: 'json' }), // JSON array: [{ url, type, size }]
-    metadata: text('metadata', { mode: 'json' }), // JSON: { coordinates, internalNotes, etc }
+    attachments: jsonb('attachments'), // JSON array: [{ url, type, size }]
+    metadata: jsonb('metadata'), // JSON: { coordinates, internalNotes, etc }
   },
   (table) => ({
     statusIdx: index('cases_status_idx').on(table.status),
@@ -150,32 +182,24 @@ export const cases = sqliteTable(
 // § Case Updates (timeline: รับเรื่อง/มอบหมาย/ดำเนินการ/เสร็จ/ปิดเรื่อง)
 // ────────────────────────────────────────────────────────────────────────────
 
-export const caseUpdates = sqliteTable(
+export const caseUpdates = pgTable(
   'case_updates',
   {
     id: text('id').primaryKey(),
-    createdAt: integer('created_at', { mode: 'timestamp' })
+    createdAt: timestamp('created_at', { mode: 'date' })
       .notNull()
-      .default(sql`(unixepoch())`),
+      .defaultNow(),
     caseId: text('case_id').notNull(), // FK cases.id
     userId: text('user_id').notNull(), // FK users.id (ผู้อัปเดต)
 
-    updateType: text('update_type', {
-      enum: [
-        'status_change',
-        'assignment',
-        'comment',
-        'attachment',
-        'metadata_change',
-      ],
-    }).notNull(),
+    updateType: updateTypeEnum().notNull(),
 
     oldValue: text('old_value'),
     newValue: text('new_value'),
     comment: text('comment'),
-    attachments: text('attachments', { mode: 'json' }), // JSON array
+    attachments: jsonb('attachments'), // JSON array
 
-    isPublic: integer('is_public', { mode: 'boolean' }).notNull().default(true), // ประชาชนเห็นได้หรือไม่
+    isPublic: boolean('is_public').notNull().default(true), // ประชาชนเห็นได้หรือไม่
   },
   (table) => ({
     caseIdx: index('case_updates_case_id_idx').on(table.caseId),
@@ -188,13 +212,13 @@ export const caseUpdates = sqliteTable(
 // § Audit Logs (การตรวจสอบ: ทุกการเข้าถึง sensitive data — PDPA compliance)
 // ────────────────────────────────────────────────────────────────────────────
 
-export const auditLogs = sqliteTable(
+export const auditLogs = pgTable(
   'audit_logs',
   {
     id: text('id').primaryKey(),
-    createdAt: integer('created_at', { mode: 'timestamp' })
+    createdAt: timestamp('created_at', { mode: 'date' })
       .notNull()
-      .default(sql`(unixepoch())`),
+      .defaultNow(),
 
     userId: text('user_id'), // FK users.id (nullable สำหรับ system events)
     action: text('action').notNull(), // 'view_case', 'update_case', 'export_data', etc
@@ -203,7 +227,7 @@ export const auditLogs = sqliteTable(
 
     ipAddress: text('ip_address'),
     userAgent: text('user_agent'),
-    metadata: text('metadata', { mode: 'json' }), // JSON: { changes, reason, etc }
+    metadata: jsonb('metadata'), // JSON: { changes, reason, etc }
   },
   (table) => ({
     userIdx: index('audit_logs_user_id_idx').on(table.userId),
@@ -217,25 +241,25 @@ export const auditLogs = sqliteTable(
 // § Consent Records (ความยินยอม PDPA: เก็บหลักฐานการยินยอม/ถอน)
 // ────────────────────────────────────────────────────────────────────────────
 
-export const consentRecords = sqliteTable(
+export const consentRecords = pgTable(
   'consent_records',
   {
     id: text('id').primaryKey(),
-    createdAt: integer('created_at', { mode: 'timestamp' })
+    createdAt: timestamp('created_at', { mode: 'date' })
       .notNull()
-      .default(sql`(unixepoch())`),
+      .defaultNow(),
 
     userId: text('user_id').notNull(), // FK users.id
     consentType: text('consent_type').notNull(), // 'data_collection', 'data_sharing', 'marketing'
     version: text('version').notNull(), // "1.0" (PDPA policy version)
 
-    isGranted: integer('is_granted', { mode: 'boolean' }).notNull(),
-    grantedAt: integer('granted_at', { mode: 'timestamp' }),
-    revokedAt: integer('revoked_at', { mode: 'timestamp' }),
+    isGranted: boolean('is_granted').notNull(),
+    grantedAt: timestamp('granted_at', { mode: 'date' }),
+    revokedAt: timestamp('revoked_at', { mode: 'date' }),
 
     ipAddress: text('ip_address'),
     userAgent: text('user_agent'),
-    metadata: text('metadata', { mode: 'json' }),
+    metadata: jsonb('metadata'),
   },
   (table) => ({
     userIdx: index('consent_records_user_id_idx').on(table.userId),
@@ -247,18 +271,18 @@ export const consentRecords = sqliteTable(
 // § Deduplication Hashes (ป้องกันซ้ำซ้อน: HMAC-SHA256 ของ CID+title+description)
 // ────────────────────────────────────────────────────────────────────────────
 
-export const dedupHashes = sqliteTable(
+export const dedupHashes = pgTable(
   'dedup_hashes',
   {
     id: text('id').primaryKey(),
-    createdAt: integer('created_at', { mode: 'timestamp' })
+    createdAt: timestamp('created_at', { mode: 'date' })
       .notNull()
-      .default(sql`(unixepoch())`),
+      .defaultNow(),
 
     hash: text('hash').notNull().unique(), // HMAC-SHA256 hex
     caseId: text('case_id').notNull(), // FK cases.id
 
-    expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(), // 7 วัน
+    expiresAt: timestamp('expires_at', { mode: 'date' }).notNull(), // 7 วัน
   },
   (table) => ({
     hashIdx: index('dedup_hashes_hash_idx').on(table.hash),
@@ -270,11 +294,11 @@ export const dedupHashes = sqliteTable(
 // § Case Stats Daily (materialized view simulation: สถิติรายวัน — refresh ทุก 00:00)
 // ────────────────────────────────────────────────────────────────────────────
 
-export const caseStatsDaily = sqliteTable(
+export const caseStatsDaily = pgTable(
   'case_stats_daily',
   {
     id: text('id').primaryKey(),
-    date: text('date').notNull().unique(), // YYYY-MM-DD (ISO 8601)
+    date: date('date').notNull().unique(), // YYYY-MM-DD (ISO 8601)
 
     totalReceived: integer('total_received').notNull().default(0),
     totalClosed: integer('total_closed').notNull().default(0),
@@ -283,10 +307,10 @@ export const caseStatsDaily = sqliteTable(
 
     avgResolutionDays: integer('avg_resolution_days'), // average (closedAt - createdAt) in days
 
-    byDepartment: text('by_department', { mode: 'json' }), // JSON: { [deptId]: count }
-    byCategory: text('by_category', { mode: 'json' }), // JSON: { [catId]: count }
+    byDepartment: jsonb('by_department'), // JSON: { [deptId]: count }
+    byCategory: jsonb('by_category'), // JSON: { [catId]: count }
 
-    metadata: text('metadata', { mode: 'json' }), // JSON: { refreshedAt, dataSource, etc }
+    metadata: jsonb('metadata'), // JSON: { refreshedAt, dataSource, etc }
   },
   (table) => ({
     dateIdx: index('case_stats_daily_date_idx').on(table.date),
