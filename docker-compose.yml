@@ -2,9 +2,20 @@
 # ใช้: docker compose up --build   → http://localhost:3000
 # หยุด: docker compose down
 #
-# env: สำหรับ M0 (foundation) หน้า hero render ได้โดยไม่ต้องมี secret
-# เมื่อเข้า P0 (Supabase/Upstash) ให้สร้าง .env.local จาก .env.example
-# แล้ว uncomment บล็อก env_file ด้านล่าง
+# Architecture: app container ต่อกับ Supabase local Postgres ที่รันแยก
+# (ผ่าน `supabase start` — stack ของตัว CLI เอง, expose port 54322 บน host).
+# เครื่องมือ: DATABASE_URL ชี้ไป host.docker.internal:54322 เพื่อให้ container
+# มองเห็น Supabase DB บน host (Docker Desktop มี host.docker.internal พร้อมใช้;
+# extra_hosts ด้านล่างเพิ่ม Linux compat).
+#
+# ขั้นตอน local ฉบับเต็ม:
+#   1. supabase start          (ยก Postgres stack ของ Supabase)
+#   2. pnpm db:push            (สร้าง schema — รันบน host)
+#   3. pnpm db:seed            (ใส่ข้อมูลเริ่มต้น — รันบน host)
+#   4. docker compose up --build  (รัน app ใน container ต่อ DB ผ่าน host)
+#
+# env: สำหรับ M0 (foundation) หน้า hero render ได้โดยไม่ต้องมี secret.
+# เมื่อใช้ API จริง (categories/cases) ต้องสร้าง .env.local จาก .env.local.example.
 
 services:
   app:
@@ -16,7 +27,12 @@ services:
     ports:
       - '3000:3000'
     restart: unless-stopped
-    # env_file:
-    #   - .env.local
-    # environment:
-    #   NODE_ENV: production
+    # ให้ container มองเห็น host ผ่าน host.docker.internal (Linux ต้องการ gateway mapping)
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    env_file:
+      - .env.local
+    environment:
+      NODE_ENV: production
+      # DATABASE_URL default ชี้ไป Supabase local DB (override ได้ใน .env.local)
+      DATABASE_URL: postgresql://postgres:postgres@host.docker.internal:54322/postgres
