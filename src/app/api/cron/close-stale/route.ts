@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const db = getDb();
+  const db = await getDb();
   const now = new Date();
   const staleThreshold = new Date(now.getTime() - STALE_DAYS * 24 * 60 * 60 * 1000);
 
@@ -31,8 +31,7 @@ export async function GET(req: NextRequest) {
   const staleCases = await db
     .select()
     .from(cases)
-    .where(and(eq(cases.status, 'done'), lt(cases.updatedAt, staleThreshold)))
-    .all();
+    .where(and(eq(cases.status, 'done'), lt(cases.updatedAt, staleThreshold)));
 
   let closedCount = 0;
 
@@ -45,8 +44,7 @@ export async function GET(req: NextRequest) {
         closedAt: now,
         updatedAt: now,
       })
-      .where(eq(cases.id, c.id))
-      .run();
+      .where(eq(cases.id, c.id));
 
     // Log update
     await db.insert(caseUpdates).values({

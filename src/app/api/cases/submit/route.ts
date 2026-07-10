@@ -75,16 +75,24 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const db = getDb();
+  const db = await getDb();
 
   // § Verify category exists
-  const category = await db.select().from(categories).where(eq(categories.id, categoryId)).get();
+  const category = (
+    await db.select().from(categories).where(eq(categories.id, categoryId)).limit(1)
+  )[0];
   if (!category) {
     return NextResponse.json({ error: 'หมวดหมู่ไม่ถูกต้อง' }, { status: 400 });
   }
 
   // § Find or create citizen user
-  let citizenUser = await db.select().from(users).where(eq(users.email, email || `cid-${cid}@placeholder.local`)).get();
+  let citizenUser = (
+    await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email || `cid-${cid}@placeholder.local`))
+      .limit(1)
+  )[0];
 
   if (!citizenUser) {
     const userId = generateId();
@@ -98,7 +106,9 @@ export async function POST(req: NextRequest) {
       metadata: JSON.stringify({ cid, source: 'web_intake' }),
     });
 
-    citizenUser = await db.select().from(users).where(eq(users.id, userId)).get();
+    citizenUser = (
+      await db.select().from(users).where(eq(users.id, userId)).limit(1)
+    )[0];
   }
 
   if (!citizenUser) {

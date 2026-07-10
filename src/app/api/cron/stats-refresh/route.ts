@@ -21,40 +21,47 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const db = getDb();
+  const db = await getDb();
   const today: string = new Date().toISOString().split('T')[0]!; // YYYY-MM-DD
 
   // § Count cases by status
-  const receivedCount = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(cases)
-    .where(eq(cases.status, 'received'))
-    .get();
+  const receivedCount = (
+    await db
+      .select({ count: sql<number>`count(*)` })
+      .from(cases)
+      .where(eq(cases.status, 'received'))
+      .limit(1)
+  )[0];
 
-  const closedCount = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(cases)
-    .where(eq(cases.status, 'closed'))
-    .get();
+  const closedCount = (
+    await db
+      .select({ count: sql<number>`count(*)` })
+      .from(cases)
+      .where(eq(cases.status, 'closed'))
+      .limit(1)
+  )[0];
 
-  const rejectedCount = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(cases)
-    .where(eq(cases.status, 'rejected'))
-    .get();
+  const rejectedCount = (
+    await db
+      .select({ count: sql<number>`count(*)` })
+      .from(cases)
+      .where(eq(cases.status, 'rejected'))
+      .limit(1)
+  )[0];
 
-  const inProgressCount = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(cases)
-    .where(or(eq(cases.status, 'in_progress'), eq(cases.status, 'assigned'), eq(cases.status, 'reviewing')))
-    .get();
+  const inProgressCount = (
+    await db
+      .select({ count: sql<number>`count(*)` })
+      .from(cases)
+      .where(or(eq(cases.status, 'in_progress'), eq(cases.status, 'assigned'), eq(cases.status, 'reviewing')))
+      .limit(1)
+  )[0];
 
   // § Calculate average resolution days (closed cases only)
   const closedCases = await db
     .select()
     .from(cases)
-    .where(eq(cases.status, 'closed'))
-    .all();
+    .where(eq(cases.status, 'closed'));
 
   let avgResolutionDays: number | null = null;
   if (closedCases.length > 0) {
@@ -69,7 +76,7 @@ export async function GET(req: NextRequest) {
   }
 
   // § Group by department (คำนวณแบบง่าย — ใช้ in-memory)
-  const allCases = await db.select().from(cases).all();
+  const allCases = await db.select().from(cases);
   const byDepartment: Record<string, number> = {};
   const byCategory: Record<string, number> = {};
 
@@ -84,8 +91,7 @@ export async function GET(req: NextRequest) {
   const existingRows = await db
     .select()
     .from(caseStatsDaily)
-    .where(eq(caseStatsDaily.date, today))
-    .all();
+    .where(eq(caseStatsDaily.date, today));
   const existing = existingRows[0];
 
   if (existing) {
@@ -101,8 +107,7 @@ export async function GET(req: NextRequest) {
         byCategory: JSON.stringify(byCategory),
         metadata: JSON.stringify({ refreshedAt: new Date().toISOString() }),
       })
-      .where(eq(caseStatsDaily.date, today))
-      .run();
+      .where(eq(caseStatsDaily.date, today));
   } else {
     await db.insert(caseStatsDaily).values({
       id: generateId(),

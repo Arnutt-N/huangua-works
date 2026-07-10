@@ -7,7 +7,7 @@ import { getDb } from '../src/lib/db';
 import { departments, categories, users } from '../src/lib/db/schema';
 import { generateId } from '../src/lib/id';
 
-const db = getDb();
+const db = await getDb();
 
 console.log('🌱 Seeding database...\n');
 
