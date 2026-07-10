@@ -3,7 +3,7 @@
  * รันด้วย: pnpm tsx scripts/seed.ts
  */
 
-import { getDb } from '../src/lib/db';
+import { getDb, closeDb } from '../src/lib/db';
 import { departments, categories, users } from '../src/lib/db/schema';
 import { generateId } from '../src/lib/id';
 
@@ -233,3 +233,6 @@ console.log('Next steps:');
 console.log('  1. Start dev server: pnpm dev');
 console.log('  2. Visit: http://localhost:3000');
 console.log('  3. Test case submission flow\n');
+
+// ปิด connection pool หลัง seed เสร็จ เพื่อให้ process exit อัตโนมัติ
+await closeDb();
