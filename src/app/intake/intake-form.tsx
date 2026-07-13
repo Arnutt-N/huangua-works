@@ -126,12 +126,20 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
           {result.caseId}
         </p>
         <p className="mt-2 text-sm text-muted">จดเลขที่เรื่องนี้ไว้เพื่อใช้ติดตามสถานะภายหลัง</p>
-        <Link
-          href="/"
-          className="mt-6 inline-flex min-h-touch items-center justify-center gap-2 rounded-md bg-accent-strong px-7 text-on-accent hover:bg-accent-strong/90"
-        >
-          กลับหน้าหลัก
-        </Link>
+        <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+          <Link
+            href={`/track?id=${result.caseId}`}
+            className="inline-flex min-h-touch items-center justify-center gap-2 rounded-md bg-accent-strong px-7 text-on-accent hover:bg-accent-strong/90"
+          >
+            ติดตามเรื่องนี้
+          </Link>
+          <Link
+            href="/"
+            className="inline-flex min-h-touch items-center justify-center gap-2 rounded-md border border-border-strong px-7 text-accent-strong hover:bg-accent-sunken"
+          >
+            กลับหน้าหลัก
+          </Link>
+        </div>
       </div>
     );
   }

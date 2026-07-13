@@ -14,7 +14,8 @@ export type CaseStatus =
   | 'in_progress' // ดำเนินการ
   | 'done' // เสร็จ
   | 'closed' // ปิดเรื่อง
-  | 'urgent'; // ฉุกเฉิน
+  | 'rejected' // ปฏิเสธ (case_status enum จริงใน DB)
+  | 'urgent'; // ฉุกเฉิน (ใช้กับ priority ไม่ใช่ status)
 
 const statusMap: Record<CaseStatus, { label: string; class: string }> = {
   received: { label: 'รับเรื่อง', class: 'bg-accent-sunken text-accent-strong' },
@@ -23,6 +24,7 @@ const statusMap: Record<CaseStatus, { label: string; class: string }> = {
   in_progress: { label: 'กำลังดำเนินการ', class: 'bg-warning-soft text-warning' },
   done: { label: 'เสร็จสิ้น', class: 'bg-success-soft text-success' },
   closed: { label: 'ปิดเรื่อง', class: 'bg-success-soft text-success' },
+  rejected: { label: 'ไม่ดำเนินการ', class: 'bg-danger-soft text-danger' },
   urgent: { label: 'ฉุกเฉิน', class: 'bg-danger-soft text-danger' },
 };
 
