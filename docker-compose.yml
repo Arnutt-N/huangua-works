@@ -8,11 +8,16 @@
 # มองเห็น Supabase DB บน host (Docker Desktop มี host.docker.internal พร้อมใช้;
 # extra_hosts ด้านล่างเพิ่ม Linux compat).
 #
+# Rate limiting: up-redis (REST proxy) แปลง @upstash/redis REST API → Redis RESP.
+# เลือกแทน redis stack/valkey เพราะ @upstash/redis SDK ใช้ REST (env UPSTASH_REDIS_REST_URL
+# + UPSTASH_REDIS_REST_TOKEN) ไม่ใช่ RESP ตรงๆ. host mode (pnpm dev) เข้า localhost:8080;
+# container mode เข้าผ่าน service name up-redis:8080 (override ใน app environment ด้านล่าง).
+#
 # ขั้นตอน local ฉบับเต็ม:
 #   1. supabase start          (ยก Postgres stack ของ Supabase)
 #   2. pnpm db:push            (สร้าง schema — รันบน host)
 #   3. pnpm db:seed            (ใส่ข้อมูลเริ่มต้น — รันบน host)
-#   4. docker compose up --build  (รัน app ใน container ต่อ DB ผ่าน host)
+#   4. docker compose up --build  (รัน app + redis + up-redis ใน container ต่อ DB ผ่าน host)
 #
 # env: สำหรับ M0 (foundation) หน้า hero render ได้โดยไม่ต้องมี secret.
 # เมื่อใช้ API จริง (categories/cases) ต้องสร้าง .env.local จาก .env.local.example.
@@ -36,3 +41,30 @@ services:
       NODE_ENV: production
       # DATABASE_URL default ชี้ไป Supabase local DB (override ได้ใน .env.local)
       DATABASE_URL: postgresql://postgres:postgres@host.docker.internal:54322/postgres
+      # container mode: ชี้ไป up-redis ใน compose network (override .env.local ที่ใช้ localhost)
+      UPSTASH_REDIS_REST_URL: http://up-redis:8080
+    depends_on:
+      up-redis:
+        condition: service_healthy
+
+  # Redis backend — เก็บข้อมูล rate-limit ภายใน compose network (ไม่ expose ออก host)
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+
+  # up-redis — REST proxy drop-in สำหรับ @upstash/redis SDK (มี built-in healthcheck)
+  up-redis:
+    image: ghcr.io/coriou/up-redis:latest
+    restart: unless-stopped
+    ports:
+      # host port configurable: ตั้ง UPREDIS_HOST_PORT ใน .env (compose interpolation)
+      # หรือ shell env หากเครื่องมี process อื่นจอง 8080 อยู่ก่อน (เช่น TokenAgent.exe).
+      # default 8080 สำหรับเครื่องทั่วไป — container port ยังเป็น 8080 เสมอ.
+      - '${UPREDIS_HOST_PORT:-8080}:8080'
+    environment:
+      # Bearer token auth — reuse ค่าเดียวกับ UPSTASH_REDIS_REST_TOKEN ของ app
+      # default fallback ใช้เมื่อผู้ใช้ยังไม่ตั้ง UPSTASH_REDIS_REST_TOKEN ใน .env.local
+      UPREDIS_TOKEN: ${UPSTASH_REDIS_REST_TOKEN:-local-dev-token-0123456789}
+      UPREDIS_REDIS_URL: redis://redis:6379
+    depends_on:
+      - redis
