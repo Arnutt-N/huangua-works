@@ -36,6 +36,8 @@
     "@radix-ui/react-tabs": "^1.1.2",
     "@radix-ui/react-toast": "^1.2.4",
     "@radix-ui/react-tooltip": "^1.1.6",
+    "@supabase/ssr": "^0.12.0",
+    "@supabase/supabase-js": "^2.110.2",
     "@upstash/qstash": "^2.11.1",
     "@upstash/redis": "^1.38.0",
     "dotenv": "^17.4.2",
@@ -46,6 +48,7 @@
     "postgres": "^3.4.5",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "server-only": "^0.0.1",
     "uuid": "^14.0.1"
   },
   "devDependencies": {
