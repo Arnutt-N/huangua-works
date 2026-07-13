@@ -4,6 +4,7 @@
  */
 
 import { getDb } from './db';
+import { firstOrUndefined } from './db/query-helpers';
 import { dedupHashes } from './db/schema';
 import { generateId } from './id';
 import { generateDedupHash } from './cid-hmac';
@@ -23,13 +24,13 @@ export async function checkDuplicate(
   const hash = generateDedupHash(cid, title, description);
   const now = Date.now();
 
-  const existing = (
-    await db
+  const existing = await firstOrUndefined(
+    db
       .select()
       .from(dedupHashes)
       .where(and(eq(dedupHashes.hash, hash), gt(dedupHashes.expiresAt, new Date(now))))
       .limit(1)
-  )[0];
+  );
 
   if (existing) {
     return { isDuplicate: true, caseId: existing.caseId };
