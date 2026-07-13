@@ -192,7 +192,7 @@ export const caseUpdates = pgTable(
     caseId: text('case_id').notNull(), // FK cases.id
     userId: text('user_id').notNull(), // FK users.id (ผู้อัปเดต)
 
-    updateType: updateTypeEnum().notNull(),
+    updateType: updateTypeEnum('update_type').notNull(),
 
     oldValue: text('old_value'),
     newValue: text('new_value'),
