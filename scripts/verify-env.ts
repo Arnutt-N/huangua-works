@@ -52,6 +52,32 @@ for (const spec of required) {
   }
 }
 
+// § ตรวจ SUPABASE_SERVICE_ROLE_KEY เป็น JWT ที่มี role claim = "service_role" จริง
+// (กันเผลอใส่ anon key ผิดช่อง — anon key ก็ยาวพอผ่าน minLen check ข้างบนได้เหมือนกัน)
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    const b64 = parts[1]!.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64.padEnd(b64.length + ((4 - (b64.length % 4)) % 4), '=');
+    return JSON.parse(Buffer.from(padded, 'base64').toString('utf-8'));
+  } catch {
+    return null;
+  }
+}
+
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (serviceRoleKey && !serviceRoleKey.startsWith('YOUR_') && !serviceRoleKey.startsWith('CHANGE_ME')) {
+  const payload = decodeJwtPayload(serviceRoleKey);
+  if (!payload) {
+    errors.push('✗ SUPABASE_SERVICE_ROLE_KEY — decode JWT payload ไม่ได้ (ไม่ใช่ JWT ที่ถูกต้อง)');
+  } else if (payload.role !== 'service_role') {
+    errors.push(
+      `✗ SUPABASE_SERVICE_ROLE_KEY — JWT role claim คือ "${String(payload.role)}" ไม่ใช่ "service_role" (อาจใส่ anon key ผิดช่อง)`,
+    );
+  }
+}
+
 if (errors.length > 0) {
   console.error('\n[verify-env] BLOCKED — env ขาดหรือไม่ถูกต้อง:');
   for (const e of errors) console.error('  ' + e);
