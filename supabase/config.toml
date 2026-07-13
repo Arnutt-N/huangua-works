@@ -173,7 +173,11 @@ enable_refresh_token_rotation = true
 # Requires enable_refresh_token_rotation = true.
 refresh_token_reuse_interval = 10
 # Allow/disallow new user signups to your project.
-enable_signup = true
+# ปิดไว้ — staff account ทุกตัวสร้างผ่าน scripts/seed.ts ด้วย service role เท่านั้น
+# ไม่มี public signup flow ในแอป เปิดทิ้งไว้จะให้คนนอก self-register จอง email ของ
+# staff ล่วงหน้าได้ (block provisioning จริง) และ middleware ที่สมมติ "มี session
+# = staff" จะเกิด redirect loop กับ user ที่ self-register (ไม่มีแถวใน users)
+enable_signup = false
 # Allow/disallow anonymous sign-ins to your project.
 enable_anonymous_sign_ins = false
 # Allow/disallow testing manual linking of accounts
@@ -218,6 +222,10 @@ web3 = 30
 
 [auth.email]
 # Allow/disallow new user signups via email to your project.
+# หมายเหตุ: flag นี้เป็น master switch ของ "email provider" ทั้งหมด (ปิด = sign-in
+# ด้วย email/password ใช้ไม่ได้เลยแม้เป็น account ที่ provision ไว้แล้วผ่าน Admin API
+# ก็ตาม — ต่างจาก [auth] ด้านบนที่คุมแค่ signup) ต้องเปิดไว้ true เพื่อให้ staff
+# login ได้ — ตัวที่ปิด public signup จริงคือ [auth] enable_signup ด้านบนเพียงพอแล้ว
 enable_signup = true
 # If enabled, a user will be required to confirm any email change on both the old, and new email
 # addresses. If disabled, only the new email is required to confirm.

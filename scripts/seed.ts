@@ -3,9 +3,11 @@
  * รันด้วย: pnpm tsx scripts/seed.ts
  */
 
+import { eq } from 'drizzle-orm';
 import { getDb, closeDb } from '../src/lib/db';
 import { departments, categories, users } from '../src/lib/db/schema';
 import { generateId } from '../src/lib/id';
+import { createAdminClient } from '../src/lib/supabase/admin';
 
 const db = await getDb();
 
@@ -63,18 +65,21 @@ const deptData = [
   },
 ];
 
-await db.insert(departments).values(deptData);
-console.log(`✓ Inserted ${deptData.length} departments`);
+const existingDept = (await db.select().from(departments).limit(1))[0];
 
-// ────────────────────────────────────────────────────────────────────────────
-// § Categories (13 หมวดหมู่ตามแบบ Traffy)
-// ────────────────────────────────────────────────────────────────────────────
+if (existingDept) {
+  console.log('⏭  Departments/categories มีอยู่แล้ว — ข้าม\n');
+} else {
+  await db.insert(departments).values(deptData);
+  console.log(`✓ Inserted ${deptData.length} departments`);
 
-const publicWorksId = deptData[2]!.id; // กองช่าง
-const clerkId = deptData[0]!.id; // สำนักปลัด
-const educationId = deptData[3]!.id; // กองการศึกษา
+  // § Categories (13 หมวดหมู่ตามแบบ Traffy)
 
-const categoryData = [
+  const publicWorksId = deptData[2]!.id; // กองช่าง
+  const clerkId = deptData[0]!.id; // สำนักปลัด
+  const educationId = deptData[3]!.id; // กองการศึกษา
+
+  const categoryData = [
   {
     id: generateId(),
     name: 'ถนน-ทางเท้า',
@@ -207,27 +212,77 @@ const categoryData = [
   },
 ];
 
-await db.insert(categories).values(categoryData);
-console.log(`✓ Inserted ${categoryData.length} categories`);
+  await db.insert(categories).values(categoryData);
+  console.log(`✓ Inserted ${categoryData.length} categories`);
+}
 
 // ────────────────────────────────────────────────────────────────────────────
-// § Superadmin user
+// § Superadmin user (DB row + Supabase Auth account จริง)
 // ────────────────────────────────────────────────────────────────────────────
 
-const superadminId = generateId();
+const clerkDept = (
+  await db.select().from(departments).where(eq(departments.slug, 'clerk-office')).limit(1)
+)[0];
 
-await db.insert(users).values({
-  id: superadminId,
-  email: 'admin@huangua.go.th',
-  role: 'superadmin',
-  departmentId: clerkId,
-  isActive: true,
-  fullName: 'ผู้ดูแลระบบ',
-  phoneNumber: '043-000-0000',
-  metadata: JSON.stringify({ createdBy: 'seed' }),
-});
+const superadminEmail = 'admin@huangua.go.th';
+const superadminPassword = 'ChangeMe123!'; // local dev เท่านั้น — เปลี่ยนก่อนใช้งานจริง
 
-console.log(`✓ Inserted superadmin user (${superadminId})`);
+const existingSuperadmin = (
+  await db.select().from(users).where(eq(users.email, superadminEmail)).limit(1)
+)[0];
+
+if (existingSuperadmin?.authUserId) {
+  console.log(`⏭  Superadmin (${superadminEmail}) มี Supabase Auth account แล้ว — ข้าม`);
+} else {
+  let authUserId: string;
+  try {
+    const { data, error } = await createAdminClient().auth.admin.createUser({
+      email: superadminEmail,
+      password: superadminPassword,
+      // email_confirm ต้องระบุตรงนี้ — แยกจาก [auth.email] enable_confirmations
+      // ใน supabase/config.toml ซึ่งคุมแค่ public signup flow ไม่คุม Admin API
+      email_confirm: true,
+    });
+    if (error || !data.user) {
+      throw error ?? new Error('createUser คืนค่า user เป็น null');
+    }
+    authUserId = data.user.id;
+  } catch (err) {
+    console.error('✗ สร้าง Supabase Auth user ไม่สำเร็จ');
+    console.error('  ตรวจสอบว่า `supabase start` รันอยู่ (Auth API ที่ NEXT_PUBLIC_SUPABASE_URL)');
+    console.error(`  Error: ${err instanceof Error ? err.message : String(err)}`);
+    await closeDb();
+    process.exit(1);
+  }
+
+  if (existingSuperadmin) {
+    // แถวมีอยู่แล้ว (seed ไว้ก่อนเพิ่มฟีเจอร์ auth) — link authUserId เข้ากับแถวเดิมแทนที่จะสร้างซ้ำ
+    await db
+      .update(users)
+      .set({ authUserId })
+      .where(eq(users.id, existingSuperadmin.id));
+    console.log(`✓ Linked Supabase Auth account เข้ากับ superadmin เดิม (${existingSuperadmin.id})`);
+  } else {
+    const superadminId = generateId();
+
+    await db.insert(users).values({
+      id: superadminId,
+      email: superadminEmail,
+      role: 'superadmin',
+      departmentId: clerkDept?.id,
+      isActive: true,
+      fullName: 'ผู้ดูแลระบบ',
+      phoneNumber: '043-000-0000',
+      metadata: JSON.stringify({ createdBy: 'seed' }),
+      authUserId,
+    });
+
+    console.log(`✓ Inserted superadmin user (${superadminId})`);
+  }
+
+  console.log(`  Login: ${superadminEmail} / ${superadminPassword}`);
+}
+
 console.log('\n🎉 Seed completed!\n');
 console.log('Next steps:');
 console.log('  1. Start dev server: pnpm dev');
