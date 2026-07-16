@@ -10,6 +10,12 @@ import { eq, and, desc } from 'drizzle-orm';
 
 export type ConsentType = 'data_collection' | 'data_sharing' | 'marketing';
 
+/**
+ * เวอร์ชันนโยบาย PDPA ปัจจุบัน — ใช้ทุกที่ที่บันทึกความยินยอม
+ * bump เมื่อมีการเปลี่ยนแปลงนโยบายที่ส่งผลต่อขอบเขตการเก็บ/ใช้ข้อมูล
+ */
+export const CONSENT_VERSION = '1.0';
+
 export interface ConsentGrant {
   userId: string;
   consentType: ConsentType;
@@ -52,7 +58,7 @@ export async function revokeConsent(
     id: generateId(),
     userId,
     consentType,
-    version: '1.0', // current version
+    version: CONSENT_VERSION,
     isGranted: false,
     revokedAt: new Date(),
     metadata,

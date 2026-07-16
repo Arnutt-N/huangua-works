@@ -8,7 +8,9 @@ import {
   date,
   pgEnum,
   index,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 /**
  * Schema — อบต.หัวงัว citizen-help (PostgreSQL)
@@ -167,6 +169,11 @@ export const cases = pgTable(
     dueDate: timestamp('due_date', { mode: 'date' }),
     closedAt: timestamp('closed_at', { mode: 'date' }),
 
+    // § citizen-facing tracking code: HN + 9 หลักสุ่ม (คล้าย EMS ไปรษณีย์ไทย)
+    // null = เคสเก่าก่อนใช้ระบบนี้ → ปิด track (คืน 404)
+    // lookup ผ่าน /api/cases/[id] ใช้ค่านี้แทน PK เพื่อไม่เปิดเผย UUID ที่เดาได้ (UUID v7 timestamp-ordered)
+    trackingCode: text('tracking_code'),
+
     // Metadata
     attachments: jsonb('attachments'), // JSON array: [{ url, type, size }]
     metadata: jsonb('metadata'), // JSON: { coordinates, internalNotes, etc }
@@ -178,6 +185,10 @@ export const cases = pgTable(
     categoryIdx: index('cases_category_id_idx').on(table.categoryId),
     deptIdx: index('cases_department_id_idx').on(table.departmentId),
     createdAtIdx: index('cases_created_at_idx').on(table.createdAt),
+    // § partial unique index — เฉพาะ row ที่มี tracking_code (เคสใหม่); null (เคสเก่า) ไม่นับซ้ำ
+    trackingCodeIdx: uniqueIndex('cases_tracking_code_idx')
+      .on(table.trackingCode)
+      .where(sql`tracking_code IS NOT NULL`),
   })
 );
 

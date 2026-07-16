@@ -1,5 +1,28 @@
 import { describe, expect, test } from 'vitest';
-import { generateDedupHash, verifyDedupHash } from './cid-hmac';
+import { generateCidHash, generateDedupHash, verifyDedupHash } from './cid-hmac';
+
+describe('generateCidHash', () => {
+  test('produces a 16-char lowercase hex string (truncated HMAC)', () => {
+    const hash = generateCidHash('1101200563040');
+    expect(hash).toMatch(/^[0-9a-f]{16}$/);
+  });
+
+  test('is deterministic for identical CID', () => {
+    expect(generateCidHash('1101200563040')).toBe(generateCidHash('1101200563040'));
+  });
+
+  test('changes when cid changes', () => {
+    expect(generateCidHash('1101200563040')).not.toBe(generateCidHash('1101200563041'));
+  });
+
+  test('does NOT leak plaintext CID (substring check)', () => {
+    const cid = '1101200563040';
+    const hash = generateCidHash(cid);
+    // hash เป็น hex อย่างเดียว ไม่มีตัวเลข CID ฝังอยู่
+    expect(hash).not.toContain(cid);
+    expect(hash).not.toContain('1101');
+  });
+});
 
 describe('generateDedupHash', () => {
   test('produces a 64-char lowercase hex string (SHA-256 digest)', () => {

@@ -1,66 +1,85 @@
 /**
- * GET /api/cases/[id] — ดูรายละเอียดเรื่องร้องเรียก (สำหรับประชาชน + เจ้าหน้าที่)
- * Public endpoint (ไม่ต้อง auth สำหรับตอนนี้ — citizen ดูเรื่องของตัวเองได้)
+ * GET /api/cases/[id] — ดูสถานะเรื่องร้องเรียก (สำหรับ citizen track)
+ *
+ * [id] ตอนนี้คือ **trackingCode** (HN + 9 หลัก) ไม่ใช่ UUID PK
+ * เพื่อไม่เปิดเผย UUID v7 ที่ timestamp-ordered และเดาได้
+ *
+ * ความปลอดภัย (PDPA):
+ * - Rate limit 10 ครั้ง/5 นาทีต่อ IP — กัน brute force tracking code
+ * - Tracking code เป็น random 30-bit + rate limit → คาดเดาไม่ได้ในทางปฏิบัติ
+ * - Response ถอด PII ออกหมด: เหลือเฉพาะ สถานะ + หัวเรื่อง + หมวดหมู่ + ไทม์ไลน์
+ *   (เอา ชื่อ/เบอร์/ที่อยู่/รายละเอียด/เอกสารแนบ/department/submitter/assignedOfficer ออก)
+ * - 404 ทุกกรณีที่ไม่พบ (format ผิด / code ผิด / เคสเก่าไม่มี trackingCode) — ไม่บอกสาเหตุ เพื่อกัน enumeration
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
-import { cases, caseUpdates, users, categories, departments } from '@/lib/db/schema';
+import { cases, caseUpdates, categories } from '@/lib/db/schema';
 import { logAudit } from '@/lib/audit';
+import { checkRateLimit } from '@/lib/upstash';
+import { normalizeTrackingCode } from '@/lib/case-tracking';
 import { eq, and } from 'drizzle-orm';
+
+const NOT_FOUND = { error: 'ไม่พบเรื่องนี้' };
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
+  const { id: rawId } = await params;
+  const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
+
+  // § Rate limit — 10 requests / 5 minutes per IP (fail-open เหมือน submit)
+  const rateLimit = await checkRateLimit(`rate:track:${ip}`, 10, 300);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: 'ค้นหาถี่เกินไป กรุณารอ ' + rateLimit.reset + ' วินาที' },
+      { status: 429 }
+    );
+  }
+
+  // § Normalize tracking code (uppercase + strip whitespace/dashes)
+  // format ผิด → คืน 404 ไม่ใช่ 400 เพื่อไม่เปิดเผยว่า format ผิด (กัน enumeration)
+  const trackingCode = normalizeTrackingCode(rawId);
+  if (!trackingCode) {
+    return NextResponse.json(NOT_FOUND, { status: 404 });
+  }
+
   const db = await getDb();
 
-  // § Fetch case
+  // § Lookup ด้วย trackingCode แทน PK — ถ้าไม่พบ หรือเป็นเคสเก่า (trackingCode null) → 404
   const caseRecord = await firstOrUndefined(
-    db.select().from(cases).where(eq(cases.id, id)).limit(1)
+    db.select().from(cases).where(eq(cases.trackingCode, trackingCode)).limit(1)
   );
 
   if (!caseRecord) {
-    return NextResponse.json({ error: 'ไม่พบเรื่องนี้' }, { status: 404 });
+    return NextResponse.json(NOT_FOUND, { status: 404 });
   }
 
-  // § Fetch related data
-  const submitter = await firstOrUndefined(
-    db.select().from(users).where(eq(users.id, caseRecord.submittedBy)).limit(1)
-  );
+  // § Fetch category (ไม่ fetch department/submitter/officer — PII/ไม่จำเป็นสำหรับ citizen)
   const category = await firstOrUndefined(
     db.select().from(categories).where(eq(categories.id, caseRecord.categoryId)).limit(1)
   );
-  const department = caseRecord.departmentId
-    ? await firstOrUndefined(
-        db.select().from(departments).where(eq(departments.id, caseRecord.departmentId)).limit(1)
-      )
-    : null;
-  const assignedOfficer = caseRecord.assignedTo
-    ? await firstOrUndefined(
-        db.select().from(users).where(eq(users.id, caseRecord.assignedTo)).limit(1)
-      )
-    : null;
 
-  // § Fetch updates (public only สำหรับ citizen)
+  // § Fetch updates (public only — isPublic = true)
   const updates = await db
     .select()
     .from(caseUpdates)
-    .where(and(eq(caseUpdates.caseId, id), eq(caseUpdates.isPublic, true)))
+    .where(and(eq(caseUpdates.caseId, caseRecord.id), eq(caseUpdates.isPublic, true)))
     .orderBy(caseUpdates.createdAt);
 
   // § Audit log
-  const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
   await logAudit({
     action: 'view_case',
     resource: 'cases',
-    resourceId: id,
+    resourceId: caseRecord.id,
     ipAddress: ip,
     userAgent: req.headers.get('user-agent') || undefined,
+    metadata: { via: 'tracking_code' },
   });
 
+  // § Response ถอด PII: เหลือ สถานะ + หัวเรื่อง + หมวด + ไทม์ไลน์
   return NextResponse.json({
     case: {
       id: caseRecord.id,
@@ -69,18 +88,10 @@ export async function GET(
       status: caseRecord.status,
       priority: caseRecord.priority,
       title: caseRecord.title,
-      description: caseRecord.description,
-      location: caseRecord.location,
       dueDate: caseRecord.dueDate,
       closedAt: caseRecord.closedAt,
-      attachments: caseRecord.attachments ? JSON.parse(caseRecord.attachments as string) : [],
     },
     category: category ? { id: category.id, name: category.name, icon: category.icon } : null,
-    department: department ? { id: department.id, name: department.name, icon: department.icon } : null,
-    submitter: submitter
-      ? { id: submitter.id, fullName: submitter.fullName, phoneNumber: submitter.phoneNumber }
-      : null,
-    assignedOfficer: assignedOfficer ? { id: assignedOfficer.id, fullName: assignedOfficer.fullName } : null,
     updates: updates.map((u) => ({
       id: u.id,
       createdAt: u.createdAt,
@@ -88,7 +99,6 @@ export async function GET(
       oldValue: u.oldValue,
       newValue: u.newValue,
       comment: u.comment,
-      attachments: u.attachments ? JSON.parse(u.attachments as string) : [],
     })),
   });
 }
