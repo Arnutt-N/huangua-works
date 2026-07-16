@@ -2,11 +2,9 @@
 # ใช้: docker compose up --build   → http://localhost:3000
 # หยุด: docker compose down
 #
-# Architecture: app container ต่อกับ Supabase local Postgres ที่รันแยก
-# (ผ่าน `supabase start` — stack ของตัว CLI เอง, expose port 54322 บน host).
-# เครื่องมือ: DATABASE_URL ชี้ไป host.docker.internal:54322 เพื่อให้ container
-# มองเห็น Supabase DB บน host (Docker Desktop มี host.docker.internal พร้อมใช้;
-# extra_hosts ด้านล่างเพิ่ม Linux compat).
+# Architecture: app container + plain Postgres + Redis ทั้งหมดใน compose network เดียวกัน
+# (ก่อนหน้านี้ใช้ Supabase local stack รันแยก แต่ย้ายออกแล้วเพราะใช้แค่ Postgres อย่างเดียว).
+# DATABASE_URL ชี้ไป service `postgres:5432` ใน compose network โดยตรง (ไม่ต้อง host.docker.internal).
 #
 # Rate limiting: up-redis (REST proxy) แปลง @upstash/redis REST API → Redis RESP.
 # เลือกแทน redis stack/valkey เพราะ @upstash/redis SDK ใช้ REST (env UPSTASH_REDIS_REST_URL
@@ -14,10 +12,11 @@
 # container mode เข้าผ่าน service name up-redis:8080 (override ใน app environment ด้านล่าง).
 #
 # ขั้นตอน local ฉบับเต็ม:
-#   1. supabase start          (ยก Postgres stack ของ Supabase)
+#   1. docker compose up -d postgres redis up-redis  (ยก Postgres + Redis stack)
 #   2. pnpm db:push            (สร้าง schema — รันบน host)
 #   3. pnpm db:seed            (ใส่ข้อมูลเริ่มต้น — รันบน host)
-#   4. docker compose up --build  (รัน app + redis + up-redis ใน container ต่อ DB ผ่าน host)
+#   4. pnpm dev                (รัน Next.js dev server บน host)
+#      หรือ docker compose up --build  (รันทุกอย่างใน container รวม app)
 #
 # env: สำหรับ M0 (foundation) หน้า hero render ได้โดยไม่ต้องมี secret.
 # เมื่อใช้ API จริง (categories/cases) ต้องสร้าง .env.local จาก .env.local.example.
@@ -32,20 +31,40 @@ services:
     ports:
       - '3000:3000'
     restart: unless-stopped
-    # ให้ container มองเห็น host ผ่าน host.docker.internal (Linux ต้องการ gateway mapping)
-    extra_hosts:
-      - 'host.docker.internal:host-gateway'
     env_file:
       - .env.local
     environment:
       NODE_ENV: production
-      # DATABASE_URL default ชี้ไป Supabase local DB (override ได้ใน .env.local)
-      DATABASE_URL: postgresql://postgres:postgres@host.docker.internal:54322/postgres
+      # DATABASE_URL ชี้ไป service `postgres` ใน compose network (override .env.local ที่ใช้ localhost)
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/postgres
       # container mode: ชี้ไป up-redis ใน compose network (override .env.local ที่ใช้ localhost)
       UPSTASH_REDIS_REST_URL: http://up-redis:8080
     depends_on:
+      postgres:
+        condition: service_healthy
       up-redis:
         condition: service_healthy
+
+  # PostgreSQL 17 — ฐานข้อมูลหลักของแอป (ใช้แทน Supabase stack ทั้งก้อน)
+  # volume `postgres-data` เก็บข้อมูลถาวร รัน `docker compose down` แล้วข้อมูลยังอยู่
+  # รัน `docker compose down -v` เท่านั้นที่ล้าง volume นี้ (จะเสียข้อมูลทั้งหมด)
+  postgres:
+    image: postgres:17-alpine
+    container_name: huangua-postgres
+    restart: unless-stopped
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   # Redis backend — เก็บข้อมูล rate-limit ภายใน compose network (ไม่ expose ออก host)
   redis:
@@ -68,3 +87,6 @@ services:
       UPREDIS_REDIS_URL: redis://redis:6379
     depends_on:
       - redis
+
+volumes:
+  postgres-data:
