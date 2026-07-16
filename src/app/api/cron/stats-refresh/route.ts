@@ -5,9 +5,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { cases, caseStatsDaily } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
-import { sql, eq, or } from 'drizzle-orm';
+import { sql, eq } from 'drizzle-orm';
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
@@ -21,40 +22,34 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const db = getDb();
+  const db = await getDb();
   const today: string = new Date().toISOString().split('T')[0]!; // YYYY-MM-DD
 
-  // § Count cases by status
-  const receivedCount = await db
-    .select({ count: sql<number>`count(*)` })
+  // § Count cases by status (1 GROUP BY query แทน 4 query แยกตาม status)
+  const statusCounts = await db
+    .select({ status: cases.status, count: sql<number>`count(*)` })
     .from(cases)
-    .where(eq(cases.status, 'received'))
-    .get();
+    .groupBy(cases.status);
 
-  const closedCount = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(cases)
-    .where(eq(cases.status, 'closed'))
-    .get();
+  const countByStatus = new Map<string, number>();
+  for (const row of statusCounts) {
+    // count(*) จาก postgres-js คืนเป็น string (bigint) โดย default — ต้อง Number() ก่อนบวกรวม
+    countByStatus.set(row.status, Number(row.count));
+  }
 
-  const rejectedCount = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(cases)
-    .where(eq(cases.status, 'rejected'))
-    .get();
-
-  const inProgressCount = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(cases)
-    .where(or(eq(cases.status, 'in_progress'), eq(cases.status, 'assigned'), eq(cases.status, 'reviewing')))
-    .get();
+  const receivedCount = countByStatus.get('received') ?? 0;
+  const closedCount = countByStatus.get('closed') ?? 0;
+  const rejectedCount = countByStatus.get('rejected') ?? 0;
+  const inProgressCount =
+    (countByStatus.get('in_progress') ?? 0) +
+    (countByStatus.get('assigned') ?? 0) +
+    (countByStatus.get('reviewing') ?? 0);
 
   // § Calculate average resolution days (closed cases only)
   const closedCases = await db
     .select()
     .from(cases)
-    .where(eq(cases.status, 'closed'))
-    .all();
+    .where(eq(cases.status, 'closed'));
 
   let avgResolutionDays: number | null = null;
   if (closedCases.length > 0) {
@@ -69,7 +64,7 @@ export async function GET(req: NextRequest) {
   }
 
   // § Group by department (คำนวณแบบง่าย — ใช้ in-memory)
-  const allCases = await db.select().from(cases).all();
+  const allCases = await db.select().from(cases);
   const byDepartment: Record<string, number> = {};
   const byCategory: Record<string, number> = {};
 
@@ -81,36 +76,32 @@ export async function GET(req: NextRequest) {
   }
 
   // § Upsert stats
-  const existingRows = await db
-    .select()
-    .from(caseStatsDaily)
-    .where(eq(caseStatsDaily.date, today))
-    .all();
-  const existing = existingRows[0];
+  const existing = await firstOrUndefined(
+    db.select().from(caseStatsDaily).where(eq(caseStatsDaily.date, today))
+  );
 
   if (existing) {
     await db
       .update(caseStatsDaily)
       .set({
-        totalReceived: receivedCount?.count || 0,
-        totalClosed: closedCount?.count || 0,
-        totalRejected: rejectedCount?.count || 0,
-        totalInProgress: inProgressCount?.count || 0,
+        totalReceived: receivedCount,
+        totalClosed: closedCount,
+        totalRejected: rejectedCount,
+        totalInProgress: inProgressCount,
         avgResolutionDays,
         byDepartment: JSON.stringify(byDepartment),
         byCategory: JSON.stringify(byCategory),
         metadata: JSON.stringify({ refreshedAt: new Date().toISOString() }),
       })
-      .where(eq(caseStatsDaily.date, today))
-      .run();
+      .where(eq(caseStatsDaily.date, today));
   } else {
     await db.insert(caseStatsDaily).values({
       id: generateId(),
       date: today,
-      totalReceived: receivedCount?.count || 0,
-      totalClosed: closedCount?.count || 0,
-      totalRejected: rejectedCount?.count || 0,
-      totalInProgress: inProgressCount?.count || 0,
+      totalReceived: receivedCount,
+      totalClosed: closedCount,
+      totalRejected: rejectedCount,
+      totalInProgress: inProgressCount,
       avgResolutionDays,
       byDepartment: JSON.stringify(byDepartment),
       byCategory: JSON.stringify(byCategory),
@@ -122,10 +113,10 @@ export async function GET(req: NextRequest) {
     success: true,
     date: today,
     stats: {
-      totalReceived: receivedCount?.count || 0,
-      totalClosed: closedCount?.count || 0,
-      totalRejected: rejectedCount?.count || 0,
-      totalInProgress: inProgressCount?.count || 0,
+      totalReceived: receivedCount,
+      totalClosed: closedCount,
+      totalRejected: rejectedCount,
+      totalInProgress: inProgressCount,
       avgResolutionDays,
     },
   });

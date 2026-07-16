@@ -75,6 +75,9 @@ export const users = pgTable(
     fullName: text('full_name').notNull(),
     phoneNumber: text('phone_number'),
     metadata: jsonb('metadata'), // JSON: { lastLoginAt, preferences, etc }
+    // § bcrypt hash — null สำหรับ citizen (ไม่มี account login) และยังไม่ได้ตั้งรหัสผ่าน
+    // ใช้แทน Supabase Auth (GoTrue) หลังย้าย stack เป็น plain Postgres + Auth.js v5
+    passwordHash: text('password_hash'),
   },
   (table) => ({
     emailIdx: index('users_email_idx').on(table.email),
@@ -192,7 +195,7 @@ export const caseUpdates = pgTable(
     caseId: text('case_id').notNull(), // FK cases.id
     userId: text('user_id').notNull(), // FK users.id (ผู้อัปเดต)
 
-    updateType: updateTypeEnum().notNull(),
+    updateType: updateTypeEnum('update_type').notNull(),
 
     oldValue: text('old_value'),
     newValue: text('new_value'),

@@ -9,14 +9,13 @@ import { categories } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 
 export async function GET() {
-  const db = getDb();
+  const db = await getDb();
 
   const allCategories = await db
     .select()
     .from(categories)
     .where(eq(categories.isActive, true))
-    .orderBy(categories.name)
-    .all();
+    .orderBy(categories.name);
 
   return NextResponse.json({
     categories: allCategories.map((c) => ({

@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { cases, caseUpdates, users, categories, departments } from '@/lib/db/schema';
 import { logAudit } from '@/lib/audit';
 import { eq, and } from 'drizzle-orm';
@@ -14,23 +15,33 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const db = getDb();
+  const db = await getDb();
 
   // § Fetch case
-  const caseRecord = await db.select().from(cases).where(eq(cases.id, id)).get();
+  const caseRecord = await firstOrUndefined(
+    db.select().from(cases).where(eq(cases.id, id)).limit(1)
+  );
 
   if (!caseRecord) {
     return NextResponse.json({ error: 'ไม่พบเรื่องนี้' }, { status: 404 });
   }
 
   // § Fetch related data
-  const submitter = await db.select().from(users).where(eq(users.id, caseRecord.submittedBy)).get();
-  const category = await db.select().from(categories).where(eq(categories.id, caseRecord.categoryId)).get();
+  const submitter = await firstOrUndefined(
+    db.select().from(users).where(eq(users.id, caseRecord.submittedBy)).limit(1)
+  );
+  const category = await firstOrUndefined(
+    db.select().from(categories).where(eq(categories.id, caseRecord.categoryId)).limit(1)
+  );
   const department = caseRecord.departmentId
-    ? await db.select().from(departments).where(eq(departments.id, caseRecord.departmentId)).get()
+    ? await firstOrUndefined(
+        db.select().from(departments).where(eq(departments.id, caseRecord.departmentId)).limit(1)
+      )
     : null;
   const assignedOfficer = caseRecord.assignedTo
-    ? await db.select().from(users).where(eq(users.id, caseRecord.assignedTo)).get()
+    ? await firstOrUndefined(
+        db.select().from(users).where(eq(users.id, caseRecord.assignedTo)).limit(1)
+      )
     : null;
 
   // § Fetch updates (public only สำหรับ citizen)
@@ -38,8 +49,7 @@ export async function GET(
     .select()
     .from(caseUpdates)
     .where(and(eq(caseUpdates.caseId, id), eq(caseUpdates.isPublic, true)))
-    .orderBy(caseUpdates.createdAt)
-    .all();
+    .orderBy(caseUpdates.createdAt);
 
   // § Audit log
   const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';

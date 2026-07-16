@@ -4,6 +4,7 @@
  */
 
 import { getDb } from './db';
+import { firstOrUndefined } from './db/query-helpers';
 import { dedupHashes } from './db/schema';
 import { generateId } from './id';
 import { generateDedupHash } from './cid-hmac';
@@ -19,15 +20,17 @@ export async function checkDuplicate(
   title: string,
   description: string
 ): Promise<{ isDuplicate: boolean; caseId?: string }> {
-  const db = getDb();
+  const db = await getDb();
   const hash = generateDedupHash(cid, title, description);
   const now = Date.now();
 
-  const existing = await db
-    .select()
-    .from(dedupHashes)
-    .where(and(eq(dedupHashes.hash, hash), gt(dedupHashes.expiresAt, new Date(now))))
-    .get();
+  const existing = await firstOrUndefined(
+    db
+      .select()
+      .from(dedupHashes)
+      .where(and(eq(dedupHashes.hash, hash), gt(dedupHashes.expiresAt, new Date(now))))
+      .limit(1)
+  );
 
   if (existing) {
     return { isDuplicate: true, caseId: existing.caseId };
@@ -45,7 +48,7 @@ export async function recordDedupHash(
   description: string,
   caseId: string
 ): Promise<void> {
-  const db = getDb();
+  const db = await getDb();
   const hash = generateDedupHash(cid, title, description);
   const expiresAt = new Date(Date.now() + DEDUP_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
@@ -61,13 +64,12 @@ export async function recordDedupHash(
  * ลบ hash ที่หมดอายุ (cleanup — เรียกจาก cron)
  */
 export async function cleanupExpiredHashes(): Promise<number> {
-  const db = getDb();
+  const db = await getDb();
   const now = new Date();
 
   const result = await db
     .delete(dedupHashes)
-    .where(lte(dedupHashes.expiresAt, now))
-    .run();
+    .where(lte(dedupHashes.expiresAt, now));
 
-  return result.changes;
+  return result.count;
 }

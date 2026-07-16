@@ -22,7 +22,7 @@ export interface AuditLogEntry {
  * บันทึก audit log
  */
 export async function logAudit(entry: AuditLogEntry): Promise<void> {
-  const db = getDb();
+  const db = await getDb();
 
   await db.insert(auditLogs).values({
     id: generateId(),
@@ -46,7 +46,7 @@ export async function getAuditLogs(filters: {
   limit?: number;
   offset?: number;
 }) {
-  const db = getDb();
+  const db = await getDb();
   const { userId, action, resource, limit = 50, offset = 0 } = filters;
 
   let query = db.select().from(auditLogs);
@@ -63,5 +63,5 @@ export async function getAuditLogs(filters: {
     query = query.where(eq(auditLogs.resource, resource)) as typeof query;
   }
 
-  return query.limit(limit).offset(offset).all();
+  return await query.limit(limit).offset(offset);
 }

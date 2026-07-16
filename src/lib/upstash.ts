@@ -7,12 +7,12 @@ import { Redis } from '@upstash/redis';
 
 // Build time: สร้าง stub instance (ไม่เชื่อมจริง)
 // Runtime: scripts/verify-env.ts จะ fail fast
-const REDIS_URL = process.env.UPSTASH_REDIS_URL || 'http://localhost:6379';
-const REDIS_TOKEN = process.env.UPSTASH_REDIS_TOKEN || 'stub-token';
+const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL || 'http://localhost:6379';
+const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || 'stub-token';
 
 if (
   process.env.NODE_ENV === 'production' &&
-  (!process.env.UPSTASH_REDIS_URL || !process.env.UPSTASH_REDIS_TOKEN)
+  (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN)
 ) {
   console.warn('[upstash] Upstash not configured — rate limiting disabled');
 }
@@ -27,40 +27,61 @@ export const redis = new Redis({
  * @param key - rate limit key (e.g., `rate:submit:${ip}`)
  * @param limit - max requests
  * @param windowSeconds - window size in seconds
+ * @param opts.failOpen - true (default): Redis down ⇒ allow (keep service alive)
+ *                        false: Redis down ⇒ reject (fail-secure สำหรับ login path)
  * @returns { allowed: boolean, remaining: number, reset: number }
  */
 export async function checkRateLimit(
   key: string,
   limit: number,
-  windowSeconds: number
+  windowSeconds: number,
+  opts: { failOpen?: boolean } = {}
 ): Promise<{ allowed: boolean; remaining: number; reset: number }> {
+  const failOpen = opts.failOpen ?? true;
   const now = Date.now();
   const windowStart = now - windowSeconds * 1000;
 
-  // Remove old entries
-  await redis.zremrangebyscore(key, 0, windowStart);
+  // § Graceful degradation — ถ้า Redis ไม่พร้อม (local/dev ไม่มี Upstash REST endpoint)
+  // ปล่อยผ่าน + log warn หนึ่งบรรทัด แทนการ throw HTTP 500 ที่บล็อก flow ก่อนถึง DB
+  // prod (มี Upstash จริง) ยัง enforce rate limit ปกติ
+  try {
+    // Remove old entries
+    await redis.zremrangebyscore(key, 0, windowStart);
 
-  // Count current entries
-  const count = await redis.zcard(key);
+    // Count current entries
+    const count = await redis.zcard(key);
 
-  if (count >= limit) {
-    const oldestTimestamp = await redis.zrange<{ score: number; member: string }[]>(key, 0, 0, {
-      withScores: true,
-    });
-    const reset = oldestTimestamp[0]
-      ? Math.ceil((oldestTimestamp[0].score + windowSeconds * 1000 - now) / 1000)
-      : windowSeconds;
+    if (count >= limit) {
+      // ZRANGE WITHSCORES คืน flat array [member, score, ...] — SDK ไม่แปลงเป็น object
+      const oldestEntry = await redis.zrange<(string | number)[]>(key, 0, 0, {
+        withScores: true,
+      });
+      const oldestScore = Number(oldestEntry[1]);
+      const reset = Number.isFinite(oldestScore)
+        ? Math.ceil((oldestScore + windowSeconds * 1000 - now) / 1000)
+        : windowSeconds;
 
-    return { allowed: false, remaining: 0, reset };
+      return { allowed: false, remaining: 0, reset };
+    }
+
+    // Add current request
+    await redis.zadd(key, { score: now, member: `${now}-${Math.random()}` });
+    await redis.expire(key, windowSeconds);
+
+    return {
+      allowed: true,
+      remaining: limit - count - 1,
+      reset: windowSeconds,
+    };
+  } catch {
+    // Redis ไม่ตอบ — policy ตาม opts.failOpen
+    // (ห้าม leak error detail ออก log — เป็น secret/PII risk; จึงใช้ optional catch binding)
+    if (failOpen) {
+      console.warn('[upstash] rate limit unavailable — allowing request (fail-open)');
+      return { allowed: true, remaining: limit, reset: windowSeconds };
+    }
+    // § fail-secure: ปิด brute-force path เมื่อ Redis ล่ม (login ควรใช้ policy นี้กัน brute-force no-limit)
+    console.warn('[upstash] rate limit unavailable — rejecting request (fail-secure)');
+    return { allowed: false, remaining: 0, reset: windowSeconds };
   }
-
-  // Add current request
-  await redis.zadd(key, { score: now, member: `${now}-${Math.random()}` });
-  await redis.expire(key, windowSeconds);
-
-  return {
-    allowed: true,
-    remaining: limit - count - 1,
-    reset: windowSeconds,
-  };
 }

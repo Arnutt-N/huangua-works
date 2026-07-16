@@ -51,8 +51,13 @@ export function sanitizeCid(cid: string): string {
 
 /**
  * ตรวจสอบ CID ว่าถูกต้องหรือไม่ (length + checksum)
+ * รับ unknown เพราะเรียกกับ input ที่ยังไม่ validate (เช่น JSON body ที่ไม่มี field cid)
  */
-export function isValidCid(cid: string): boolean {
+export function isValidCid(cid: unknown): boolean {
+  if (typeof cid !== 'string') {
+    return false;
+  }
+
   const sanitized = sanitizeCid(cid);
   return sanitized.length === 13 && validateCidChecksum(sanitized);
 }

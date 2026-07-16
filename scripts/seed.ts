@@ -3,11 +3,18 @@
  * รันด้วย: pnpm tsx scripts/seed.ts
  */
 
-import { getDb } from '../src/lib/db';
+import { config } from 'dotenv';
+import { eq } from 'drizzle-orm';
+import { getDb, closeDb } from '../src/lib/db';
 import { departments, categories, users } from '../src/lib/db/schema';
 import { generateId } from '../src/lib/id';
+import { hashPassword } from '../src/lib/password';
 
-const db = getDb();
+// § โหลด .env.local เพื่อให้ seed รันได้โดยไม่ต้อง export env ใน shell ทุกครั้ง
+// (เหมือนที่ drizzle.config.ts / vitest.config.ts / playwright.config.ts ทำอยู่แล้ว)
+config({ path: '.env.local', override: false });
+
+const db = await getDb();
 
 console.log('🌱 Seeding database...\n');
 
@@ -63,18 +70,21 @@ const deptData = [
   },
 ];
 
-await db.insert(departments).values(deptData);
-console.log(`✓ Inserted ${deptData.length} departments`);
+const existingDept = (await db.select().from(departments).limit(1))[0];
 
-// ────────────────────────────────────────────────────────────────────────────
-// § Categories (13 หมวดหมู่ตามแบบ Traffy)
-// ────────────────────────────────────────────────────────────────────────────
+if (existingDept) {
+  console.log('⏭  Departments/categories มีอยู่แล้ว — ข้าม\n');
+} else {
+  await db.insert(departments).values(deptData);
+  console.log(`✓ Inserted ${deptData.length} departments`);
 
-const publicWorksId = deptData[2]!.id; // กองช่าง
-const clerkId = deptData[0]!.id; // สำนักปลัด
-const educationId = deptData[3]!.id; // กองการศึกษา
+  // § Categories (13 หมวดหมู่ตามแบบ Traffy)
 
-const categoryData = [
+  const publicWorksId = deptData[2]!.id; // กองช่าง
+  const clerkId = deptData[0]!.id; // สำนักปลัด
+  const educationId = deptData[3]!.id; // กองการศึกษา
+
+  const categoryData = [
   {
     id: generateId(),
     name: 'ถนน-ทางเท้า',
@@ -207,29 +217,64 @@ const categoryData = [
   },
 ];
 
-await db.insert(categories).values(categoryData);
-console.log(`✓ Inserted ${categoryData.length} categories`);
+  await db.insert(categories).values(categoryData);
+  console.log(`✓ Inserted ${categoryData.length} categories`);
+}
 
 // ────────────────────────────────────────────────────────────────────────────
-// § Superadmin user
+// § Superadmin user (DB row + bcrypt hash ใน users.password_hash)
 // ────────────────────────────────────────────────────────────────────────────
 
-const superadminId = generateId();
+const clerkDept = (
+  await db.select().from(departments).where(eq(departments.slug, 'clerk-office')).limit(1)
+)[0];
 
-await db.insert(users).values({
-  id: superadminId,
-  email: 'admin@huangua.go.th',
-  role: 'superadmin',
-  departmentId: clerkId,
-  isActive: true,
-  fullName: 'ผู้ดูแลระบบ',
-  phoneNumber: '043-000-0000',
-  metadata: JSON.stringify({ createdBy: 'seed' }),
-});
+const superadminEmail = 'admin@huangua.go.th';
+const superadminPassword = 'ChangeMe123!'; // local dev เท่านั้น — เปลี่ยนก่อนใช้งานจริง
 
-console.log(`✓ Inserted superadmin user (${superadminId})`);
+const existingSuperadmin = (
+  await db.select().from(users).where(eq(users.email, superadminEmail)).limit(1)
+)[0];
+
+if (existingSuperadmin?.passwordHash) {
+  console.log(`⏭  Superadmin (${superadminEmail}) มี password hash อยู่แล้ว — ข้าม`);
+} else {
+  // § hash รหัสผ่านด้วย bcrypt (ทำใน seed ไม่ใช่ใน authorize callback — ทำครั้งเดียวตอน provision)
+  const passwordHash = await hashPassword(superadminPassword);
+
+  if (existingSuperadmin) {
+    // แถวมีอยู่แล้ว (seed ไว้ก่อนเพิ่มฟีเจอร์ auth) — ใส่ passwordHash เข้าแถวเดิม ไม่สร้างซ้ำ
+    await db
+      .update(users)
+      .set({ passwordHash })
+      .where(eq(users.id, existingSuperadmin.id));
+    console.log(`✓ Set password hash บน superadmin เดิม (${existingSuperadmin.id})`);
+  } else {
+    const superadminId = generateId();
+
+    await db.insert(users).values({
+      id: superadminId,
+      email: superadminEmail,
+      role: 'superadmin',
+      departmentId: clerkDept?.id,
+      isActive: true,
+      fullName: 'ผู้ดูแลระบบ',
+      phoneNumber: '043-000-0000',
+      metadata: JSON.stringify({ createdBy: 'seed' }),
+      passwordHash,
+    });
+
+    console.log(`✓ Inserted superadmin user (${superadminId})`);
+  }
+
+  console.log(`  Login: ${superadminEmail} / ${superadminPassword}`);
+}
+
 console.log('\n🎉 Seed completed!\n');
 console.log('Next steps:');
 console.log('  1. Start dev server: pnpm dev');
 console.log('  2. Visit: http://localhost:3000');
 console.log('  3. Test case submission flow\n');
+
+// ปิด connection pool หลัง seed เสร็จ เพื่อให้ process exit อัตโนมัติ
+await closeDb();
