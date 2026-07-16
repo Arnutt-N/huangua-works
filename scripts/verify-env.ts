@@ -15,14 +15,13 @@ type Spec = {
 };
 
 const required: Spec[] = [
-  { key: 'NEXT_PUBLIC_SUPABASE_URL', label: 'Supabase project URL (public, client-safe)' },
-  { key: 'NEXT_PUBLIC_SUPABASE_ANON_KEY', label: 'Supabase anon key (public, client-safe)' },
   {
-    key: 'SUPABASE_SERVICE_ROLE_KEY',
-    label: 'Supabase service role (SERVER-ONLY — ห้าม NEXT_PUBLIC_)',
+    key: 'AUTH_SECRET',
+    label: 'Auth.js JWT signing secret (SERVER-ONLY — ห้าม NEXT_PUBLIC_)',
     serverOnly: true,
     minLen: 32,
   },
+  { key: 'AUTH_URL', label: 'Auth.js trusted app URL (e.g. http://localhost:3000)' },
   { key: 'UPSTASH_REDIS_REST_URL', label: 'Upstash Redis REST URL' },
   { key: 'UPSTASH_REDIS_REST_TOKEN', label: 'Upstash Redis REST token', minLen: 16 },
   { key: 'QSTASH_TOKEN', label: 'QStash token', minLen: 16 },
@@ -52,37 +51,35 @@ for (const spec of required) {
   }
 }
 
-// § ตรวจ SUPABASE_SERVICE_ROLE_KEY เป็น JWT ที่มี role claim = "service_role" จริง
-// (กันเผลอใส่ anon key ผิดช่อง — anon key ก็ยาวพอผ่าน minLen check ข้างบนได้เหมือนกัน)
-function decodeJwtPayload(token: string): Record<string, unknown> | null {
-  const parts = token.split('.');
-  if (parts.length !== 3) return null;
-  try {
-    const b64 = parts[1]!.replace(/-/g, '+').replace(/_/g, '/');
-    const padded = b64.padEnd(b64.length + ((4 - (b64.length % 4)) % 4), '=');
-    return JSON.parse(Buffer.from(padded, 'base64').toString('utf-8'));
-  } catch {
-    return null;
-  }
-}
-
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (serviceRoleKey && !serviceRoleKey.startsWith('YOUR_') && !serviceRoleKey.startsWith('CHANGE_ME')) {
-  const payload = decodeJwtPayload(serviceRoleKey);
-  if (!payload) {
-    errors.push('✗ SUPABASE_SERVICE_ROLE_KEY — decode JWT payload ไม่ได้ (ไม่ใช่ JWT ที่ถูกต้อง)');
-  } else if (payload.role !== 'service_role') {
-    errors.push(
-      `✗ SUPABASE_SERVICE_ROLE_KEY — JWT role claim คือ "${String(payload.role)}" ไม่ใช่ "service_role" (อาจใส่ anon key ผิดช่อง)`,
-    );
-  }
-}
-
 if (errors.length > 0) {
   console.error('\n[verify-env] BLOCKED — env ขาดหรือไม่ถูกต้อง:');
   for (const e of errors) console.error('  ' + e);
   console.error('\nดู .env.example สำหรับรายการเต็ม (คัดลอกเป็น .env.local)\n');
   process.exit(1);
+}
+
+// § Production-only: AUTH_URL ต้องเป็น https:// + canonical domain (ไม่ใช่ localhost)
+// กัน deploy จริงที่ AUTH_URL ยังเป็น placeholder localhost → secure-cookie flag off + callback URL พัง
+if (process.env.NODE_ENV === 'production') {
+  const u = process.env.AUTH_URL;
+  if (!u) {
+    console.error('✗ AUTH_URL — production ต้องระบุ canonical https URL');
+    process.exit(1);
+  }
+  try {
+    const parsed = new URL(u);
+    if (parsed.protocol !== 'https:') {
+      console.error(`✗ AUTH_URL — production ต้องเป็น https:// (ปัจจุบัน: ${parsed.protocol}//)`);
+      process.exit(1);
+    }
+    if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+      console.error('✗ AUTH_URL — production ห้ามใช้ localhost (ตั้งเป็น canonical domain)');
+      process.exit(1);
+    }
+  } catch {
+    console.error(`✗ AUTH_URL — URL ไม่ถูกต้อง (parse ไม่ผ่าน): ${u}`);
+    process.exit(1);
+  }
 }
 
 console.log('[verify-env] ✓ env vars ครบและถูกต้อง');
