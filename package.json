@@ -36,15 +36,15 @@
     "@radix-ui/react-tabs": "^1.1.2",
     "@radix-ui/react-toast": "^1.2.4",
     "@radix-ui/react-tooltip": "^1.1.6",
-    "@supabase/ssr": "^0.12.0",
-    "@supabase/supabase-js": "^2.110.2",
     "@upstash/qstash": "^2.11.1",
     "@upstash/redis": "^1.38.0",
+    "bcryptjs": "^2.4.3",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "framer-motion": "^12.42.2",
     "lucide-react": "^1.21.0",
     "next": "^16.0.0",
+    "next-auth": "^5.0.0-beta.25",
     "postgres": "^3.4.5",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -64,6 +64,7 @@
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
     "@testing-library/user-event": "^14.5.2",
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.13.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
@@ -85,7 +86,8 @@
       "esbuild",
       "sharp",
       "unrs-resolver",
-      "core-js-pure"
+      "core-js-pure",
+      "bcryptjs"
     ]
   }
 }
