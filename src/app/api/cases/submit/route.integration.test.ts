@@ -2,7 +2,8 @@ import { eq, inArray } from 'drizzle-orm';
 import { NextRequest } from 'next/server';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { closeDb, getDb } from '@/lib/db';
-import { cases, categories, dedupHashes, users } from '@/lib/db/schema';
+import { cases, categories, consentRecords, dedupHashes, users } from '@/lib/db/schema';
+import { generateCidHash } from '@/lib/cid-hmac';
 import { POST } from './route';
 
 /**
@@ -19,9 +20,13 @@ function testIp(offset: number): string {
 }
 
 const VALID_CID = '1101200563040';
-const TEST_EMAIL = `cid-${VALID_CID}@placeholder.local`;
+// email ใช้ HMAC hash ของ CID (ตรงกับที่ route สร้าง) — ไม่ฝัง plaintext CID
+const TEST_EMAIL = `cid-${generateCidHash(VALID_CID)}@placeholder.local`;
+// CID อื่นสำหรับทดสอบ consent rejection (ใช้ email ต่างกัน และ checksum ถูกต้อง)
+const NO_CONSENT_CID = '1101400170025';
 
 const createdCaseIds: string[] = [];
+const createdUserEmails: string[] = [TEST_EMAIL, `cid-${generateCidHash(NO_CONSENT_CID)}@placeholder.local`];
 
 function buildRequest(body: unknown, ip: string): NextRequest {
   return new NextRequest('http://localhost:3000/api/cases/submit', {
@@ -46,12 +51,16 @@ afterAll(async () => {
     await db.delete(dedupHashes).where(inArray(dedupHashes.caseId, createdCaseIds));
     await db.delete(cases).where(inArray(cases.id, createdCaseIds));
   }
-  await db.delete(users).where(eq(users.email, TEST_EMAIL));
+  // § ล้าง consent records ของ users ที่ทดสอบสร้างขึ้น (ใช้ email LIKE prefix)
+  await db.delete(consentRecords).where(inArray(consentRecords.userId,
+    (await db.select({ id: users.id }).from(users).where(inArray(users.email, createdUserEmails))).map(u => u.id)
+  ));
+  await db.delete(users).where(inArray(users.email, createdUserEmails));
   await closeDb();
 });
 
 describe('POST /api/cases/submit', () => {
-  test('valid submission returns 201 with a caseId', async () => {
+  test('valid submission returns 201 with a caseId and trackingCode', async () => {
     const res = await POST(
       buildRequest(
         {
@@ -61,6 +70,7 @@ describe('POST /api/cases/submit', () => {
           title: `ทดสอบ submit สำเร็จ ${Date.now()}`,
           description: 'รายละเอียดทดสอบ submit สำเร็จ',
           location: 'ทดสอบ ตำบลหัวงัว',
+          consent: true,
         },
         testIp(1)
       )
@@ -70,6 +80,7 @@ describe('POST /api/cases/submit', () => {
     const body = await res.json();
     expect(body.success).toBe(true);
     expect(typeof body.caseId).toBe('string');
+    expect(body.trackingCode).toMatch(/^HN\d{9}$/);
     createdCaseIds.push(body.caseId);
   });
 
@@ -83,6 +94,7 @@ describe('POST /api/cases/submit', () => {
           title: 'หัวเรื่องทดสอบ',
           description: 'รายละเอียดทดสอบ',
           location: 'ทดสอบ',
+          consent: true,
         },
         testIp(2)
       )
@@ -103,6 +115,7 @@ describe('POST /api/cases/submit', () => {
           title: '', // missing
           description: 'รายละเอียดทดสอบ',
           location: 'ทดสอบ',
+          consent: true,
         },
         testIp(3)
       )
@@ -132,6 +145,7 @@ describe('POST /api/cases/submit', () => {
           title: `ทดสอบ category ผิด ${Date.now()}`,
           description: 'รายละเอียดทดสอบ',
           location: 'ทดสอบ',
+          consent: true,
         },
         testIp(5)
       )
@@ -150,6 +164,7 @@ describe('POST /api/cases/submit', () => {
       title: `ทดสอบ dedup ${Date.now()}`,
       description: 'รายละเอียดทดสอบ dedup',
       location: 'ทดสอบ',
+      consent: true,
     };
 
     const first = await POST(buildRequest(payload, testIp(6)));
@@ -172,6 +187,7 @@ describe('POST /api/cases/submit', () => {
       title: `ทดสอบ rate limit ${Date.now()}-${n}`,
       description: `รายละเอียดทดสอบ rate limit ${n}`,
       location: 'ทดสอบ',
+      consent: true,
     });
 
     for (let i = 0; i < 3; i++) {
@@ -183,5 +199,63 @@ describe('POST /api/cases/submit', () => {
 
     const fourth = await POST(buildRequest(makePayload(3), ip));
     expect(fourth.status).toBe(429);
+  });
+
+  // ─── PDPA enforcement tests ────────────────────────────────────────────
+
+  test('rejects submission without consent with 400', async () => {
+    const res = await POST(
+      buildRequest(
+        {
+          cid: NO_CONSENT_CID,
+          fullName: 'ทดสอบไม่ยินยอม',
+          categoryId,
+          title: `ทดสอบ reject ไม่ยินยอม ${Date.now()}`,
+          description: 'รายละเอียดทดสอบ',
+          location: 'ทดสอบ',
+          consent: false,
+        },
+        testIp(8)
+      )
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain('ยินยอม');
+  });
+
+  test('records a consent record after successful submission', async () => {
+    // § ใช้ CID ที่ submit สำเร็จไปแล้วใน test แรก (VALID_CID) — consent record ต้องถูกเขียน
+    const db = await getDb();
+    const userRows = await db.select().from(users).where(eq(users.email, TEST_EMAIL)).limit(1);
+    const user = userRows[0];
+    expect(user).toBeDefined();
+    if (!user) return; // type guard (expect ข้างบนจะ fail ก่อน)
+
+    const consents = await db
+      .select()
+      .from(consentRecords)
+      .where(eq(consentRecords.userId, user.id));
+
+    expect(consents.length).toBeGreaterThan(0);
+    expect(consents.some((c) => c.isGranted === true && c.consentType === 'data_collection')).toBe(true);
+  });
+
+  test('does NOT store plaintext CID in user metadata or email', async () => {
+    const db = await getDb();
+    const userRows = await db.select().from(users).where(eq(users.email, TEST_EMAIL)).limit(1);
+    const user = userRows[0];
+    expect(user).toBeDefined();
+    if (!user) return; // type guard (expect ข้างบนจะ fail ก่อน)
+
+    // § email ต้องไม่มี plaintext CID
+    expect(user.email).not.toContain(VALID_CID);
+
+    // § metadata ต้องไม่มี plaintext CID
+    const metadata = user.metadata as Record<string, unknown> | null;
+    if (metadata) {
+      expect(JSON.stringify(metadata)).not.toContain(VALID_CID);
+      expect(metadata.cid).toBeUndefined();
+    }
   });
 });

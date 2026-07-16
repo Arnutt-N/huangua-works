@@ -8,8 +8,9 @@ import { TrackForm } from './track-form';
 export const metadata: Metadata = { title: 'ติดตามเรื่อง' };
 
 /**
- * /track — ค้นหาและดูสถานะเรื่องด้วยเลขที่เรื่อง (เชื่อม GET /api/cases/[id] จริง)
- * ค้นหาด้วยเลขบัตรประชาชนยังไม่รองรับ (มีประเด็น PDPA — ต้องออกแบบ rate-limit เพิ่ม, รอ decision แยก)
+ * /track — ค้นหาและดูสถานะเรื่องด้วยเลขติดตาม (HN + 9 หลัก)
+ * [id] ของ GET /api/cases/[id] ตอนนี้คือ trackingCode (คล้าย EMS ไปรษณีย์ไทย)
+ * ไม่ใช้ UUID PK เพราะ timestamp-ordered และเดาได้
  */
 
 export default async function TrackPage({
@@ -32,7 +33,7 @@ export default async function TrackPage({
         </Link>
 
         <h1 className="mt-4 text-3xl font-bold sm:text-4xl">ติดตามเรื่อง</h1>
-        <p className="mt-3 text-lg text-muted">กรอกเลขที่เรื่อง เพื่อดูสถานะเรื่องที่ท่านแจ้ง</p>
+        <p className="mt-3 text-lg text-muted">กรอกเลขติดตามเรื่อง เพื่อดูสถานะเรื่องที่ท่านแจ้ง</p>
 
         <TrackForm initialId={id} />
       </main>

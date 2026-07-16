@@ -5,6 +5,7 @@ import { cases, categories, users } from '../src/lib/db/schema';
 import { generateId } from '../src/lib/id';
 
 const TEST_USER_EMAIL = 'e2e-track-test@placeholder.local';
+const TEST_TRACKING_CODE = 'HN888888881'; // fixed code สำหรับ e2e
 let testUserId: string;
 let testCaseId: string;
 
@@ -33,6 +34,7 @@ test.beforeAll(async () => {
     location: 'ทดสอบ ตำบลหัวงัว',
     categoryId: category.id,
     submittedBy: testUserId,
+    trackingCode: TEST_TRACKING_CODE,
   });
 });
 
@@ -47,26 +49,29 @@ test('auto-loads a case when visiting /track?id=', async ({ page }) => {
   // timeout กว้างกว่าปกติ -- เทสนี้มักเป็นครั้งแรกที่ route /track ถูก compile
   // สดใน dev server (Turbopack) รวมกับ /api/cases/[id] ที่ fetch ตาม อาจใช้เวลา
   // มากกว่า hit ปกติที่ route compile ไว้แล้ว
-  await page.goto(`/track?id=${testCaseId}`);
-  await expect(page.getByText('เคสทดสอบหน้า track (E2E)')).toBeVisible({ timeout: 20_000 });
+  await page.goto(`/track?id=${TEST_TRACKING_CODE}`);
+  await expect(page.getByText('เคสทดสอบหน้า track (E2E)')).toBeVisible({ timeout: 40_000 });
 });
 
-test('manual search by case id returns the correct result', async ({ page }) => {
+test('manual search by tracking code returns the correct result', async ({ page }) => {
   await page.goto('/track');
-  await page.getByLabel('เลขที่เรื่อง').fill(testCaseId);
+  await page.getByLabel('เลขติดตามเรื่อง').fill(TEST_TRACKING_CODE);
   await page.getByRole('button', { name: 'ค้นหาเรื่อง' }).click();
   await expect(page.getByText('เคสทดสอบหน้า track (E2E)')).toBeVisible({ timeout: 10_000 });
 });
 
-test('shows a friendly error for a non-existent case id', async ({ page }) => {
+test('shows a friendly error for a non-existent tracking code', async ({ page }) => {
   await page.goto('/track');
-  await page.getByLabel('เลขที่เรื่อง').fill('00000000-0000-0000-0000-000000000000');
+  await page.getByLabel('เลขติดตามเรื่อง').fill('HN000000000');
   await page.getByRole('button', { name: 'ค้นหาเรื่อง' }).click();
   await expect(page.getByText('ไม่พบเรื่องนี้')).toBeVisible();
 });
 
 test('empty search is caught client-side without a network call', async ({ page }) => {
   await page.goto('/track');
+  // รอ client component hydrate เสร็จก่อน click มิฉะนั้น click ตกที่ native form submit
+  // (page reload) แทน React handler → ไม่ตั้งค่า error ฝั่ง client
+  await page.waitForLoadState('networkidle');
   await page.getByRole('button', { name: 'ค้นหาเรื่อง' }).click();
-  await expect(page.getByText('กรุณากรอกเลขที่เรื่อง')).toBeVisible();
+  await expect(page.getByText('กรุณากรอกเลขติดตามเรื่อง')).toBeVisible();
 });

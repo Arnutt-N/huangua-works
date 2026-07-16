@@ -7,12 +7,13 @@ import { generateId } from '@/lib/id';
 import { GET } from './route';
 
 const TEST_USER_EMAIL = 'integration-test-case-detail@placeholder.local';
+const TEST_TRACKING_CODE = 'HN999999991'; // fixed code เพื่อให้ assertion ตรงได้
 let testUserId: string;
 let testCaseId: string;
 let categoryId: string;
 
-function buildRequest(): NextRequest {
-  return new NextRequest('http://localhost:3000/api/cases/test', { method: 'GET' });
+function buildRequest(id: string): NextRequest {
+  return new NextRequest(`http://localhost:3000/api/cases/${id}`, { method: 'GET' });
 }
 
 beforeAll(async () => {
@@ -41,6 +42,7 @@ beforeAll(async () => {
     location: 'ทดสอบ ตำบลหัวงัว',
     categoryId,
     submittedBy: testUserId,
+    trackingCode: TEST_TRACKING_CODE,
   });
 
   await db.insert(caseUpdates).values([
@@ -72,31 +74,50 @@ afterAll(async () => {
   await closeDb();
 });
 
-describe('GET /api/cases/[id]', () => {
-  test('returns 200 with the full case shape for an existing case', async () => {
-    const res = await GET(buildRequest(), { params: Promise.resolve({ id: testCaseId }) });
+describe('GET /api/cases/[id] (lookup via trackingCode)', () => {
+  test('returns 200 with PII-stripped shape for a valid tracking code', async () => {
+    const res = await GET(buildRequest(TEST_TRACKING_CODE), {
+      params: Promise.resolve({ id: TEST_TRACKING_CODE }),
+    });
 
     expect(res.status).toBe(200);
     const body = await res.json();
 
-    expect(body.case.id).toBe(testCaseId);
     expect(body.case.status).toBe('in_progress');
+    expect(body.case.title).toBe('เคสทดสอบ GET /api/cases/[id]');
     expect(body.category).toMatchObject({ id: categoryId });
-    expect(body.submitter).toMatchObject({ fullName: 'ผู้แจ้งทดสอบ Integration' });
-    expect(body.assignedOfficer).toBeNull();
+
+    // § PII ถูกถอดออกทั้งหมด
+    expect(body.submitter).toBeUndefined();
+    expect(body.assignedOfficer).toBeUndefined();
+    expect(body.case.description).toBeUndefined();
+    expect(body.case.location).toBeUndefined();
+    expect(body.case.attachments).toBeUndefined();
+    expect(body.department).toBeUndefined();
   });
 
   test('only includes public case_updates, not internal ones', async () => {
-    const res = await GET(buildRequest(), { params: Promise.resolve({ id: testCaseId }) });
+    const res = await GET(buildRequest(TEST_TRACKING_CODE), {
+      params: Promise.resolve({ id: TEST_TRACKING_CODE }),
+    });
     const body = await res.json();
 
     expect(body.updates).toHaveLength(1);
     expect(body.updates[0].updateType).toBe('status_change');
   });
 
-  test('returns 404 for a non-existent case id', async () => {
-    const res = await GET(buildRequest(), {
-      params: Promise.resolve({ id: 'does-not-exist' }),
+  test('returns 404 for a non-existent tracking code', async () => {
+    const res = await GET(buildRequest('HN000000000'), {
+      params: Promise.resolve({ id: 'HN000000000' }),
+    });
+
+    expect(res.status).toBe(404);
+  });
+
+  test('returns 404 for malformed input (not HN + 9 digits)', async () => {
+    // UUID รูปแบบเก่า — ต้อง 404 ไม่ใช่ lookup ด้วย PK
+    const res = await GET(buildRequest('019f5c00-932f-776b-9203-ac13c48c2937'), {
+      params: Promise.resolve({ id: '019f5c00-932f-776b-9203-ac13c48c2937' }),
     });
 
     expect(res.status).toBe(404);

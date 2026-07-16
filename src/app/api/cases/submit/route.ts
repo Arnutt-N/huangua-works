@@ -14,6 +14,9 @@ import { checkDuplicate, recordDedupHash } from '@/lib/dedup';
 import { logAudit } from '@/lib/audit';
 import { checkRateLimit } from '@/lib/upstash';
 import { getFiscalYear } from '@/lib/thai-date';
+import { generateTrackingCode } from '@/lib/case-tracking';
+import { generateCidHash } from '@/lib/cid-hmac';
+import { grantConsent, CONSENT_VERSION } from '@/lib/consent';
 import { eq } from 'drizzle-orm';
 
 interface SubmitRequest {
@@ -26,6 +29,9 @@ interface SubmitRequest {
   title: string;
   description: string;
   location: string;
+
+  // § citizen ต้องยินยอม PDPA — เก็บหลักฐานความยินยอมทุกครั้ง (server-enforced)
+  consent: boolean;
 
   attachments?: Array<{ url: string; type: string; size: number }>;
 }
@@ -52,7 +58,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { cid, fullName, phoneNumber, email, categoryId, title, description, location, attachments } = body;
+  const { cid, fullName, phoneNumber, email, categoryId, title, description, location, attachments, consent } = body;
 
   // § Validate CID
   if (!isValidCid(cid)) {
@@ -62,6 +68,11 @@ export async function POST(req: NextRequest) {
   // § Validate required fields
   if (!fullName || !categoryId || !title || !description || !location) {
     return NextResponse.json({ error: 'กรุณากรอกข้อมูลให้ครบถ้วน' }, { status: 400 });
+  }
+
+  // § Consent enforcement — ปฏิเสธการส่งทันทีถ้าไม่ยินยอม PDPA (defense-in-depth นอกเหนือจาก UI gate)
+  if (consent !== true) {
+    return NextResponse.json({ error: 'กรุณายินยอมให้เก็บข้อมูลก่อนส่งเรื่อง' }, { status: 400 });
   }
 
   // § Check duplicate (7 วัน sliding window)
@@ -87,24 +98,23 @@ export async function POST(req: NextRequest) {
   }
 
   // § Find or create citizen user
+  // § ไม่ฝัง plaintext CID ใน email — ใช้ HMAC hash แทน (PDPA: CID ห้ามรั่วไหลใน identifier ที่อาจถูก log/แสดง)
+  const citizenEmail = email || `cid-${generateCidHash(cid)}@placeholder.local`;
   let citizenUser = await firstOrUndefined(
-    db
-      .select()
-      .from(users)
-      .where(eq(users.email, email || `cid-${cid}@placeholder.local`))
-      .limit(1)
+    db.select().from(users).where(eq(users.email, citizenEmail)).limit(1)
   );
 
   if (!citizenUser) {
     const userId = generateId();
     await db.insert(users).values({
       id: userId,
-      email: email || `cid-${cid}@placeholder.local`,
+      email: citizenEmail,
       role: 'citizen',
       isActive: true,
       fullName,
       phoneNumber,
-      metadata: JSON.stringify({ cid, source: 'web_intake' }),
+      // § เลิกเก็บ plaintext CID ใน metadata — CID เก็บเฉพาะในรูป HMAC (dedup_hashes) เท่านั้น
+      metadata: JSON.stringify({ source: 'web_intake' }),
     });
 
     citizenUser = await firstOrUndefined(
@@ -116,10 +126,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to create user' }, { status: 500 });
   }
 
+  // § บันทึกหลักฐานความยินยอม PDPA — เก็บทุกครั้งที่ส่งเรื่อง (เป็น audit trail ที่ hasConsent จะอ่านภายหลัง)
+  await grantConsent({
+    userId: citizenUser.id,
+    consentType: 'data_collection',
+    version: CONSENT_VERSION,
+    ipAddress: ip,
+    userAgent: req.headers.get('user-agent') || undefined,
+    metadata: { via: 'intake_submit' },
+  });
+
   // § Create case
   const caseId = generateId();
   const fiscalYear = getFiscalYear(new Date());
   const dueDate = new Date(Date.now() + (category.estimatedDays || 7) * 24 * 60 * 60 * 1000);
+
+  // § Generate tracking code (HN + 9 หลัก) — วนจนได้ code ที่ไม่ชนกับเคสเดิม
+  // collision เกือบเป็นไปไม่ได้ที่ 10^9 ค่า แต่เช็กเผื่อเพื่อความถูกต้อง
+  let trackingCode = generateTrackingCode();
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const collision = await firstOrUndefined(
+      db.select({ id: cases.id }).from(cases).where(eq(cases.trackingCode, trackingCode)).limit(1)
+    );
+    if (!collision) break;
+    trackingCode = generateTrackingCode();
+  }
 
   await db.insert(cases).values({
     id: caseId,
@@ -138,6 +169,7 @@ export async function POST(req: NextRequest) {
       ipAddress: ip,
       userAgent: req.headers.get('user-agent') || 'unknown',
     }),
+    trackingCode,
   });
 
   // § Record dedup hash
@@ -158,6 +190,7 @@ export async function POST(req: NextRequest) {
     {
       success: true,
       caseId,
+      trackingCode,
       message: 'รับเรื่องเรียบร้อย — เจ้าหน้าที่จะติดตามภายใน ' + (category.estimatedDays || 7) + ' วัน',
     },
     { status: 201 }

@@ -45,6 +45,7 @@ type FieldErrors = Partial<Record<keyof FormState, string>>;
 
 interface SubmitResult {
   caseId: string;
+  trackingCode: string;
   message: string;
 }
 
@@ -94,6 +95,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
           title: form.title.trim(),
           description: form.detail.trim(),
           location: form.addr.trim(),
+          consent: form.consent,
         }),
       });
 
@@ -108,7 +110,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
         return;
       }
 
-      setResult({ caseId: data.caseId, message: data.message });
+      setResult({ caseId: data.caseId, trackingCode: data.trackingCode, message: data.message });
     } catch {
       setSubmitError('เชื่อมต่อระบบไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่');
     } finally {
@@ -122,13 +124,20 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
         <CheckCircle2 className="mx-auto h-12 w-12 text-success" aria-hidden="true" />
         <h2 className="mt-4 text-2xl font-bold text-ink">รับเรื่องเรียบร้อย</h2>
         <p className="mt-2 text-muted">{result.message}</p>
-        <p className="mt-4 rounded-md border border-border bg-surface-raised px-4 py-3 font-mono text-lg font-semibold text-ink">
-          {result.caseId}
+        <p className="mt-4 text-sm font-semibold text-ink">เลขติดตามเรื่องของท่าน</p>
+        <p
+          data-testid="tracking-code"
+          data-case-id={result.caseId}
+          className="mt-2 rounded-md border border-border bg-surface-raised px-4 py-3 font-mono text-2xl font-bold tracking-widest text-ink"
+        >
+          {result.trackingCode}
         </p>
-        <p className="mt-2 text-sm text-muted">จดเลขที่เรื่องนี้ไว้เพื่อใช้ติดตามสถานะภายหลัง</p>
+        <p className="mt-3 text-sm text-muted">
+          จดเลขติดตามนี้ไว้เพื่อใช้ติดตามสถานะภายหลัง — ห้ามให้ผู้อื่น เพราะสามารถใช้ดูสถานะเรื่องของท่านได้
+        </p>
         <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
           <Link
-            href={`/track?id=${result.caseId}`}
+            href={`/track?id=${result.trackingCode}`}
             className="inline-flex min-h-touch items-center justify-center gap-2 rounded-md bg-accent-strong px-7 text-on-accent hover:bg-accent-strong/90"
           >
             ติดตามเรื่องนี้
