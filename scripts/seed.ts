@@ -3,11 +3,16 @@
  * รันด้วย: pnpm tsx scripts/seed.ts
  */
 
+import { config } from 'dotenv';
 import { eq } from 'drizzle-orm';
 import { getDb, closeDb } from '../src/lib/db';
 import { departments, categories, users } from '../src/lib/db/schema';
 import { generateId } from '../src/lib/id';
-import { createAdminClient } from '../src/lib/supabase/admin';
+import { hashPassword } from '../src/lib/password';
+
+// § โหลด .env.local เพื่อให้ seed รันได้โดยไม่ต้อง export env ใน shell ทุกครั้ง
+// (เหมือนที่ drizzle.config.ts / vitest.config.ts / playwright.config.ts ทำอยู่แล้ว)
+config({ path: '.env.local', override: false });
 
 const db = await getDb();
 
@@ -217,7 +222,7 @@ if (existingDept) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// § Superadmin user (DB row + Supabase Auth account จริง)
+// § Superadmin user (DB row + bcrypt hash ใน users.password_hash)
 // ────────────────────────────────────────────────────────────────────────────
 
 const clerkDept = (
@@ -231,37 +236,19 @@ const existingSuperadmin = (
   await db.select().from(users).where(eq(users.email, superadminEmail)).limit(1)
 )[0];
 
-if (existingSuperadmin?.authUserId) {
-  console.log(`⏭  Superadmin (${superadminEmail}) มี Supabase Auth account แล้ว — ข้าม`);
+if (existingSuperadmin?.passwordHash) {
+  console.log(`⏭  Superadmin (${superadminEmail}) มี password hash อยู่แล้ว — ข้าม`);
 } else {
-  let authUserId: string;
-  try {
-    const { data, error } = await createAdminClient().auth.admin.createUser({
-      email: superadminEmail,
-      password: superadminPassword,
-      // email_confirm ต้องระบุตรงนี้ — แยกจาก [auth.email] enable_confirmations
-      // ใน supabase/config.toml ซึ่งคุมแค่ public signup flow ไม่คุม Admin API
-      email_confirm: true,
-    });
-    if (error || !data.user) {
-      throw error ?? new Error('createUser คืนค่า user เป็น null');
-    }
-    authUserId = data.user.id;
-  } catch (err) {
-    console.error('✗ สร้าง Supabase Auth user ไม่สำเร็จ');
-    console.error('  ตรวจสอบว่า `supabase start` รันอยู่ (Auth API ที่ NEXT_PUBLIC_SUPABASE_URL)');
-    console.error(`  Error: ${err instanceof Error ? err.message : String(err)}`);
-    await closeDb();
-    process.exit(1);
-  }
+  // § hash รหัสผ่านด้วย bcrypt (ทำใน seed ไม่ใช่ใน authorize callback — ทำครั้งเดียวตอน provision)
+  const passwordHash = await hashPassword(superadminPassword);
 
   if (existingSuperadmin) {
-    // แถวมีอยู่แล้ว (seed ไว้ก่อนเพิ่มฟีเจอร์ auth) — link authUserId เข้ากับแถวเดิมแทนที่จะสร้างซ้ำ
+    // แถวมีอยู่แล้ว (seed ไว้ก่อนเพิ่มฟีเจอร์ auth) — ใส่ passwordHash เข้าแถวเดิม ไม่สร้างซ้ำ
     await db
       .update(users)
-      .set({ authUserId })
+      .set({ passwordHash })
       .where(eq(users.id, existingSuperadmin.id));
-    console.log(`✓ Linked Supabase Auth account เข้ากับ superadmin เดิม (${existingSuperadmin.id})`);
+    console.log(`✓ Set password hash บน superadmin เดิม (${existingSuperadmin.id})`);
   } else {
     const superadminId = generateId();
 
@@ -274,7 +261,7 @@ if (existingSuperadmin?.authUserId) {
       fullName: 'ผู้ดูแลระบบ',
       phoneNumber: '043-000-0000',
       metadata: JSON.stringify({ createdBy: 'seed' }),
-      authUserId,
+      passwordHash,
     });
 
     console.log(`✓ Inserted superadmin user (${superadminId})`);

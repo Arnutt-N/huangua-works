@@ -3,10 +3,10 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { desc, eq } from 'drizzle-orm';
 import { logAudit } from '@/lib/audit';
+import { auth } from '@/auth';
 import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { cases, categories, departments, users } from '@/lib/db/schema';
-import { createClient } from '@/lib/supabase/server';
 import { logout } from './actions';
 import { SiteHeader } from '../../components/site/site-header';
 import { SiteFooter } from '../../components/site/site-footer';
@@ -25,7 +25,7 @@ import { cn } from '../../lib/cn';
 export const metadata: Metadata = { title: 'แดชบอร์ดเจ้าหน้าที่' };
 
 /**
- * /admin — แดชบอร์ดเจ้าหน้าที่ (เชื่อม Supabase Auth + ข้อมูลเคสจริงแล้ว)
+ * /admin — แดชบอร์ดเจ้าหน้าที่ (เชื่อม Auth.js v5 + ข้อมูลเคสจริง)
  * middleware.ts เช็ค session เบื้องต้น — หน้านี้เช็คซ้ำ + เช็ค role/isActive ตาม users table
  * (defense in depth: session อาจยังอยู่แม้ role/isActive เปลี่ยนไปหลัง login)
  * ยังไม่มีปุ่มแก้ไข/มอบหมายเคส, filter ยังเป็น UI เฉยๆ (descoped — ดู BACKLOG.md)
@@ -84,16 +84,13 @@ function formatAge(date: Date, now: number): string {
 const OPEN_STATUSES: CaseStatus[] = ['received', 'reviewing', 'assigned', 'in_progress'];
 
 export default async function AdminDashboardPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect('/admin/login');
+  // § auth() อ่าน session จาก JWT cookie (ไม่ติด DB ตอน decode)
+  const session = await auth();
+  if (!session?.user.userId) redirect('/admin/login');
 
   const db = await getDb();
   const staffUser = await firstOrUndefined(
-    db.select().from(users).where(eq(users.authUserId, user.id)).limit(1)
+    db.select().from(users).where(eq(users.id, session.user.userId)).limit(1)
   );
 
   if (!staffUser || staffUser.role === 'citizen' || !staffUser.isActive) {
