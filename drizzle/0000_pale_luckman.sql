@@ -33,7 +33,7 @@ CREATE TABLE "case_updates" (
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"case_id" text NOT NULL,
 	"user_id" text NOT NULL,
-	"updateType" "update_type" NOT NULL,
+	"update_type" "update_type" NOT NULL,
 	"old_value" text,
 	"new_value" text,
 	"comment" text,
@@ -121,6 +121,7 @@ CREATE TABLE "users" (
 	"full_name" text NOT NULL,
 	"phone_number" text,
 	"metadata" jsonb,
+	"password_hash" text,
 	CONSTRAINT "users_email_unique" UNIQUE("email")
 );
 --> statement-breakpoint

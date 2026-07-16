@@ -1,5 +1,5 @@
 {
-  "id": "d207910a-c882-44fc-90ce-d43c81c84eb1",
+  "id": "53a6ebca-2566-4e6d-bc4c-509ff16fcf09",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -263,8 +263,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "updateType": {
-          "name": "updateType",
+        "update_type": {
+          "name": "update_type",
           "type": "update_type",
           "typeSchema": "public",
           "primaryKey": false,
@@ -1016,6 +1016,12 @@
         "metadata": {
           "name": "metadata",
           "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         }

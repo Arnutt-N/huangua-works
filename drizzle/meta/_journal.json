@@ -5,29 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1783662200402,
-      "tag": "0000_next_scarlet_spider",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1784200000000,
-      "tag": "0001_rename_update_type_column",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1783959516304,
-      "tag": "0002_add_users_auth_user_id",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1783959599656,
-      "tag": "0003_enable_rls",
+      "when": 1784135043804,
+      "tag": "0000_pale_luckman",
       "breakpoints": true
     }
   ]

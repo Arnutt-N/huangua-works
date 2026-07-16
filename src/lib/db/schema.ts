@@ -75,13 +75,14 @@ export const users = pgTable(
     fullName: text('full_name').notNull(),
     phoneNumber: text('phone_number'),
     metadata: jsonb('metadata'), // JSON: { lastLoginAt, preferences, etc }
-    authUserId: text('auth_user_id').unique(), // FK Supabase auth.users.id — null สำหรับ citizen (ยังไม่มี account)
+    // § bcrypt hash — null สำหรับ citizen (ไม่มี account login) และยังไม่ได้ตั้งรหัสผ่าน
+    // ใช้แทน Supabase Auth (GoTrue) หลังย้าย stack เป็น plain Postgres + Auth.js v5
+    passwordHash: text('password_hash'),
   },
   (table) => ({
     emailIdx: index('users_email_idx').on(table.email),
     roleIdx: index('users_role_idx').on(table.role),
     deptIdx: index('users_department_id_idx').on(table.departmentId),
-    authUserIdx: index('users_auth_user_id_idx').on(table.authUserId),
   })
 );
 
