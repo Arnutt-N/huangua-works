@@ -14,7 +14,9 @@ export const authConfig = {
   // database session strategy กับ Credentials (provider ไม่ไหลผ่าน adapter เหมือน OAuth)
   // revoke ของจริง (suspend บัญชีกลางคัน) ทำผ่าน per-request role/isActive DB re-check
   // ใน src/app/admin/page.tsx แทน — พฤติกรรมเทียบเท่า Supabase เดิม (JWT 1h + re-check ทุกหน้า)
-  session: { strategy: 'jwt' },
+  // § maxAge 3600s (1h) — default ของ Auth.js v5 คือ 30 วัน เท่ากับให้ session ที่ถูกขโมยอยู่ได้นาน
+  // 1h ทำให้ stolen cookie หมดอายุเร็ว + token rotation ทุกครั้งที่ access (default)
+  session: { strategy: 'jwt', maxAge: 60 * 60 },
   // § ตั้ง secret อย่างชัดเจน — Auth.js v5 ปกติอ่าน AUTH_SECRET จาก env เอง แต่ edge runtime
   // ของ proxy บางครั้งไม่ได้รับ env เดียวกับ Node runtime ทำให้ decode JWT ไม่ได้ = redirect loop
   // (login สำเร็จใน Node runtime แต่ proxy อ่าน cookie เป็นค่าว่าง)

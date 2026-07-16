@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { desc, eq } from 'drizzle-orm';
 import { logAudit } from '@/lib/audit';
-import { auth } from '@/auth';
+import { auth, signOut } from '@/auth';
 import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { cases, categories, departments, users } from '@/lib/db/schema';
@@ -96,6 +96,9 @@ export default async function AdminDashboardPage() {
   if (!staffUser || staffUser.role === 'citizen' || !staffUser.isActive) {
     // § session ยัง valid แต่ role/isActive ไม่ผ่าน — เกิดขึ้นได้เมื่อบัญชีถูกระงับ
     // หลัง login ไปแล้ว sensitive กว่าการ login ครั้งแรกไม่ผ่าน ต้อง audit เหมือนกัน
+    // § ต้อง signOut ก่อน redirect ไม่งั้น cookie ยังอยู่ → proxy bounce กลับ /admin จาก
+    // /admin/login → วนลูปไม่รู้จบ (H1 จาก code review) — เหมือนที่ actions.ts ทำตอน login
+    await signOut({ redirect: false });
     await logAudit({
       action: 'access_denied',
       resource: 'auth',
