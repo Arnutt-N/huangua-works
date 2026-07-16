@@ -27,13 +27,17 @@ export const redis = new Redis({
  * @param key - rate limit key (e.g., `rate:submit:${ip}`)
  * @param limit - max requests
  * @param windowSeconds - window size in seconds
+ * @param opts.failOpen - true (default): Redis down ⇒ allow (keep service alive)
+ *                        false: Redis down ⇒ reject (fail-secure สำหรับ login path)
  * @returns { allowed: boolean, remaining: number, reset: number }
  */
 export async function checkRateLimit(
   key: string,
   limit: number,
-  windowSeconds: number
+  windowSeconds: number,
+  opts: { failOpen?: boolean } = {}
 ): Promise<{ allowed: boolean; remaining: number; reset: number }> {
+  const failOpen = opts.failOpen ?? true;
   const now = Date.now();
   const windowStart = now - windowSeconds * 1000;
 
@@ -70,9 +74,14 @@ export async function checkRateLimit(
       reset: windowSeconds,
     };
   } catch {
-    // Redis ไม่ตอบ — ปล่อยผ่านเพื่อไม่ให้ rate-limit บล็อก service
+    // Redis ไม่ตอบ — policy ตาม opts.failOpen
     // (ห้าม leak error detail ออก log — เป็น secret/PII risk; จึงใช้ optional catch binding)
-    console.warn('[upstash] rate limit unavailable — allowing request through');
-    return { allowed: true, remaining: limit, reset: windowSeconds };
+    if (failOpen) {
+      console.warn('[upstash] rate limit unavailable — allowing request (fail-open)');
+      return { allowed: true, remaining: limit, reset: windowSeconds };
+    }
+    // § fail-secure: ปิด brute-force path เมื่อ Redis ล่ม (login ควรใช้ policy นี้กัน brute-force no-limit)
+    console.warn('[upstash] rate limit unavailable — rejecting request (fail-secure)');
+    return { allowed: false, remaining: 0, reset: windowSeconds };
   }
 }
