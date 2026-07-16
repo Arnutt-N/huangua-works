@@ -5,8 +5,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],
-    // integration test (*.integration.test.ts) ต้องมี local Supabase stack + Redis
-    // รันอยู่จริง (pnpm supabase start, docker compose up redis up-redis) — โหลด
+    // integration test (*.integration.test.ts) ต้องมี local Postgres + Redis
+    // รันอยู่จริง (`docker compose up -d postgres redis up-redis`) — โหลด
     // DATABASE_URL/Redis vars จาก .env.local ผ่านไฟล์นี้ ไม่กระทบ unit test ปกติ
     setupFiles: ['./vitest.setup.ts'],
     env: {

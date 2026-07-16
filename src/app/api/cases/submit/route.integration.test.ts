@@ -6,8 +6,8 @@ import { cases, categories, dedupHashes, users } from '@/lib/db/schema';
 import { POST } from './route';
 
 /**
- * Integration test — ต้องมี local Supabase stack (`supabase start`) + Redis
- * (`docker compose up -d redis up-redis`) รันอยู่จริง ยิงผ่าน route handler ตรง
+ * Integration test — ต้องมี local Postgres + Redis stack
+ * (`docker compose up -d postgres redis up-redis`) รันอยู่จริง ยิงผ่าน route handler ตรง
  * (ไม่ผ่าน pnpm dev) แต่คุยกับ Postgres/Redis ของจริง ไม่ mock
  *
  * ip แต่ละ test derive จาก Date.now() ตอนไฟล์นี้ load เพื่อไม่ให้ rate-limit
