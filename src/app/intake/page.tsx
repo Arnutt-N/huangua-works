@@ -10,6 +10,11 @@ import { IntakeForm } from './intake-form';
 
 export const metadata: Metadata = { title: 'แจ้งเรื่องใหม่' };
 
+// § force-dynamic: หน้านี้ query categories จาก DB ระดับ Server Component รันทุก request
+// ห้ามให้ Next.js prerender เป็น static HTML ตอน build เพราะ build machine จะต้องต่อ DB
+// (Supabase) ตอน build → fragile และช้า อีกทั้ง categories ควรสดใหม่ (admin เพิ่มหมวดได้ตลอด)
+export const dynamic = 'force-dynamic';
+
 /**
  * /intake — ฟอร์มแจ้งเรื่องร้องเรียก/ร้องทุกข์
  * เชื่อม POST /api/cases/submit จริง (rate-limit + dedup + CID validate ทำงานแล้วจาก T-2/T-7)
