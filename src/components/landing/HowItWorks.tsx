@@ -16,7 +16,7 @@ const steps = [
     title: 'ตรวจสอบ',
     description: 'เจ้าหน้าที่รับเรื่อง ตรวจสอบความถูกต้อง และจัดลำดับความสำคัญ',
     icon: Search,
-    color: 'oklch(82% 0.14 80)',
+    color: 'oklch(45% 0.15 160)',
   },
   {
     number: '03',
@@ -62,12 +62,13 @@ export function HowItWorks() {
               transition={{ delay: i * 0.1 }}
               className="relative"
             >
-              {/* Connector line */}
+              {/* Connector line — เชื่อมระหว่างวงกลม (lg+ เท่านั้น) */}
               {i < steps.length - 1 && (
                 <div
                   className="absolute left-1/2 top-16 hidden h-px w-full lg:block"
                   style={{
-                    background: 'linear-gradient(to right, oklch(55% 0.13 160 / 0.3), oklch(82% 0.14 80 / 0.3))',
+                    background:
+                      'linear-gradient(to right, oklch(55% 0.13 160 / 0.3), oklch(45% 0.15 160 / 0.3))',
                   }}
                 />
               )}
@@ -83,8 +84,9 @@ export function HowItWorks() {
                   <step.icon className="h-12 w-12" style={{ color: step.color }} />
                 </div>
 
+                {/* ตัวเลขขั้น — วางบนขอบวงกลม (overlap ตั้งใจ) แต่ใช้ padding-top ดัน h3 ลงมาไม่ให้ทับ */}
                 <div
-                  className="absolute -bottom-3 flex h-12 w-12 items-center justify-center rounded-full font-bold shadow-lg"
+                  className="absolute top-28 flex h-12 w-12 items-center justify-center rounded-full font-bold shadow-lg ring-4 ring-white"
                   style={{
                     backgroundColor: step.color,
                     color: 'oklch(99% 0.005 145)',
@@ -93,7 +95,7 @@ export function HowItWorks() {
                   {step.number}
                 </div>
 
-                <h3 className="mt-8 text-xl font-semibold">{step.title}</h3>
+                <h3 className="mt-16 text-xl font-semibold">{step.title}</h3>
                 <p className="mt-2 text-sm text-muted">{step.description}</p>
               </div>
             </motion.div>
