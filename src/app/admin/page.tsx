@@ -24,6 +24,11 @@ import { cn } from '../../lib/cn';
 
 export const metadata: Metadata = { title: 'แดชบอร์ดเจ้าหน้าที่' };
 
+// § force-dynamic: หน้านี้ query cases/users/departments จาก DB + ตรวจ session ต่อ request
+// ห้ามให้ Next.js prerender เป็น static HTML ตอน build — build machine จะต้องต่อ DB และ auth
+// ณ build-time (session ไม่มีตอน build) → พังทุกครั้ง ทั้ง cases ยังต้องสดใหม่ real-time
+export const dynamic = 'force-dynamic';
+
 /**
  * /admin — แดชบอร์ดเจ้าหน้าที่ (เชื่อม Auth.js v5 + ข้อมูลเคสจริง)
  * middleware.ts เช็ค session เบื้องต้น — หน้านี้เช็คซ้ำ + เช็ค role/isActive ตาม users table
