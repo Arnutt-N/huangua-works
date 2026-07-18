@@ -24,12 +24,14 @@ const required: Spec[] = [
   { key: 'AUTH_URL', label: 'Auth.js trusted app URL (e.g. http://localhost:3000)' },
   { key: 'UPSTASH_REDIS_REST_URL', label: 'Upstash Redis REST URL' },
   { key: 'UPSTASH_REDIS_REST_TOKEN', label: 'Upstash Redis REST token', minLen: 16 },
-  { key: 'QSTASH_TOKEN', label: 'QStash token', minLen: 16 },
-  { key: 'QSTASH_CURRENT_SIGNING_KEY', label: 'QStash current signing key' },
-  { key: 'QSTASH_NEXT_SIGNING_KEY', label: 'QStash next signing key' },
   { key: 'CID_HMAC_KEY', label: 'CID keyed-HMAC key (C2 — ≥32 char)', minLen: 32 },
-  { key: 'CRON_SECRET', label: 'Vercel Cron shared secret (≥16 char)', minLen: 16 },
+  { key: 'CRON_SECRET', label: 'Cron shared secret (Authorization: Bearer — ≥16 char)', minLen: 16 },
 ];
+
+// § QStash env (QSTASH_TOKEN, QSTASH_CURRENT_SIGNING_KEY, QSTASH_NEXT_SIGNING_KEY)
+// ไม่ได้ใช้ที่ runtime อีกต่อไป (cron รันผ่าน external scheduler เช่น cron-job.org ที่ตรวจ
+// CRON_SECRET ผ่าน header Authorization แทน signature verification) → ไม่บังคับตอน build
+// ถ้าในอนาคตกลับไปใช้ QStash Receiver.verify() ให้เพิ่มกลับเข้ามาใน required[] ข้างบน
 
 const errors: string[] = [];
 
