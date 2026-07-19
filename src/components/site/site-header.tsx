@@ -16,7 +16,7 @@ export function SiteHeader() {
           />
           <span className="flex flex-col leading-none">
             <span className="text-base font-bold tracking-tight">อบต.หัวงัว</span>
-            <span className="mt-0.5 text-xs text-muted">แจ้งเรื่องร้องเรียก · ร้องทุกข์</span>
+            <span className="mt-0.5 text-xs text-muted">แจ้งเหตุ · ติดตามงานบริการ</span>
           </span>
         </Link>
         <nav aria-label="เมนูหลัก" className="flex items-center gap-1 text-sm sm:gap-2">

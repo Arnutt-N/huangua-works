@@ -136,7 +136,7 @@ export const categories = pgTable(
 );
 
 // ────────────────────────────────────────────────────────────────────────────
-// § Cases (เรื่องร้องเรียก/ร้องทุกข์ — state machine: received→reviewing→assigned→in_progress→done→closed/rejected)
+// § Cases (เรื่องแจ้งเหตุ — state machine: received→reviewing→assigned→in_progress→done→closed/rejected)
 // ────────────────────────────────────────────────────────────────────────────
 
 export const cases = pgTable(

@@ -33,7 +33,7 @@ export const Error: Story = {
 export const TextareaStory: Story = {
   render: () => (
     <div className="max-w-sm">
-      <Label htmlFor="detail">รายละเอียดเรื่องร้องเรียก</Label>
+      <Label htmlFor="detail">รายละเอียดเรื่องแจ้งเหตุ</Label>
       <Textarea id="detail" placeholder="อธิบายเรื่องที่ต้องการแจ้ง..." />
     </div>
   ),
