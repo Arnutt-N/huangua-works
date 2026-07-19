@@ -1,5 +1,5 @@
 /**
- * POST /api/cases/submit — รับเรื่องร้องเรียก/ร้องทุกข์จากประชาชน
+ * POST /api/cases/submit — รับเรื่องแจ้งเหตุจากประชาชน
  * Rate limit: 3 requests / 5 minutes per IP
  * Deduplication: 7 วัน sliding window (CID + title + description)
  */

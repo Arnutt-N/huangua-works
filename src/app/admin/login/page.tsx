@@ -27,7 +27,7 @@ export default function AdminLoginPage() {
         <div className="mt-6 rounded-lg border border-border bg-surface-raised p-6 sm:p-8">
           <h1 className="text-2xl font-bold">เข้าระบบเจ้าหน้าที่</h1>
           <p className="mt-2 text-sm text-muted">
-            สำหรับเจ้าหน้าที่ อบต.หัวงัว เข้าดูคิวและดำเนินเรื่องร้องเรียก/ร้องทุกข์
+            สำหรับเจ้าหน้าที่ อบต.หัวงัว เข้าดูคิวและดำเนินเรื่องแจ้งเหตุ
           </p>
 
           <LoginForm />

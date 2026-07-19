@@ -310,7 +310,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
             onChange={(e) => updateField('consent', e.target.checked)}
           />
           <span className="text-sm text-ink">
-            ฉันยินยอมให้ อบต.หัวงัว เก็บรวบรวมและใช้ข้อมูลข้างต้นเพื่อดำเนินการเรื่องร้องเรียก/ร้องทุกข์
+            ฉันยินยอมให้ อบต.หัวงัว เก็บรวบรวมและใช้ข้อมูลข้างต้นเพื่อดำเนินการเรื่องแจ้งเหตุ
             ตามพระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล (PDPA) พ.ศ. 2562
           </span>
         </label>

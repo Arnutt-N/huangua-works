@@ -157,7 +157,7 @@ export default async function AdminDashboardPage() {
           <div>
             <h1 className="text-2xl font-bold sm:text-3xl">แดชบอร์ดเจ้าหน้าที่</h1>
             <p className="mt-2 text-sm text-muted">
-              คิวเรื่องร้องเรียก/ร้องทุกข์ พร้อมสถานะ มอบหมาย และ SLA
+              คิวเรื่องแจ้งเหตุ พร้อมสถานะ มอบหมาย และ SLA
             </p>
           </div>
           <div className="flex items-center gap-3">

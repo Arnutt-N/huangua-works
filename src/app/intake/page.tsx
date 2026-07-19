@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: 'แจ้งเรื่องให
 export const dynamic = 'force-dynamic';
 
 /**
- * /intake — ฟอร์มแจ้งเรื่องร้องเรียก/ร้องทุกข์
+ * /intake — ฟอร์มแจ้งเหตุ
  * เชื่อม POST /api/cases/submit จริง (rate-limit + dedup + CID validate ทำงานแล้วจาก T-2/T-7)
  */
 
