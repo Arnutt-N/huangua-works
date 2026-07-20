@@ -36,7 +36,7 @@ export function CTA() {
               }}
               asChild
             >
-              <Link href="#tracking">
+              <Link href="/intake">
                 <Bell className="mr-2 h-5 w-5" />
                 เริ่มแจ้งเหตุเลย
               </Link>

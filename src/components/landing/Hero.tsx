@@ -154,7 +154,7 @@ export function Hero() {
                 }}
                 asChild
               >
-                <Link href="#tracking">
+                <Link href="/intake">
                   <Bell className="mr-2 h-5 w-5" />
                   แจ้งเหตุออนไลน์
                 </Link>
@@ -165,7 +165,7 @@ export function Hero() {
                 className="h-12 border-2 px-7 text-base hover:bg-surface-sunken"
                 asChild
               >
-                <Link href="#tracking">
+                <Link href="/track">
                   <Search className="mr-2 h-5 w-5" />
                   ติดตามงาน
                   <ArrowRight className="ml-2 h-4 w-4" />
