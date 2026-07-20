@@ -1,4 +1,4 @@
-/* tokens.css — อบต.หัวงัว Smart Service Center design tokens (Tailwind v4 CSS-first)
+/* tokens.css — อบต.หัวงัว design tokens (Tailwind v4 CSS-first)
  * Source of truth = DESIGN.md (emerald 160 + amber 80 + glassmorphism + framer-motion).
  * Runtime theming light/dark ผ่าน [data-theme] ด้วย @theme inline (utilities อ้าง var ตอน runtime). */
 
