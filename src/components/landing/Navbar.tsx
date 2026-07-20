@@ -12,16 +12,16 @@ export function Navbar() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
             <div
-              className="flex h-10 w-10 items-center justify-center rounded-lg font-bold text-white"
+              className="flex h-10 w-10 items-center justify-center rounded-lg text-sm font-bold text-white"
               style={{
                 background: 'linear-gradient(to bottom right, oklch(55% 0.13 160), oklch(45% 0.15 160))',
               }}
             >
-              อท
+              อบต
             </div>
             <div className="hidden sm:block">
               <div className="text-sm font-bold">อบต.หัวงัว</div>
-              <div className="text-xs text-muted">Smart Service Center</div>
+              <div className="text-xs text-muted">แจ้งเหตุ · ติดตามงานบริการ</div>
             </div>
           </Link>
 
