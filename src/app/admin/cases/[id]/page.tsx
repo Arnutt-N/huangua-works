@@ -176,7 +176,7 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
 
   return (
     <div className="min-h-dvh bg-surface text-ink">
-      <AdminChrome user={staffUser} />
+      <AdminChrome user={staffUser} active="dashboard" />
       <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
       {/* breadcrumb */}
       <Link
