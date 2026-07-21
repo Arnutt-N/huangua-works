@@ -1,84 +1,79 @@
-'use client';
+import { desc } from 'drizzle-orm';
+import { getDb } from '@/lib/db';
+import { caseStatsDaily } from '@/lib/db/schema';
+import { firstOrUndefined } from '@/lib/db/query-helpers';
+import { StatsClient, type StatItem } from './stats-client';
 
-import { motion } from 'framer-motion';
-import { TrendingUp, Clock, Users, CheckCircle2 } from 'lucide-react';
+/**
+ * Stats — แสดงตัวเลขจริงจาก `case_stats_daily` (refresh โดย cron `stats-refresh`)
+ *
+ * ถ้ายังไม่มีข้อมูล (ระบบใหม่ / cron ยังไม่ทำงาน / DB ล่ม) → แสดง "—" แทน
+ * ไม่แสดงตัวเลขปลอมเพราะเป็นความน่าเชื่อถือของหน่วยงานราชการ
+ *
+ * เดิมเป็นเลขปลอมตายตัว (23/18 ชม./2,847/94%) — เปลี่ยนเป็นข้อมูลจริงแล้ว
+ *
+ * หมายเหตุเรื่อง rendering:
+ * - Component นี้ query DB (async) → ต้องถูกห่อด้วย <Suspense> ใน page
+ * - ใช้ try/catch เพื่อ resilience: ถ้า DB ล่มตอน build/runtime จะแสดง "—" ไม่พังทั้งหน้า
+ */
+export async function Stats() {
+  let latest: typeof caseStatsDaily.$inferSelect | undefined;
+  try {
+    latest = await firstOrUndefined(
+      getDb().then((db) =>
+        db
+          .select()
+          .from(caseStatsDaily)
+          .orderBy(desc(caseStatsDaily.date))
+          .limit(1)
+      )
+    );
+  } catch {
+    // Build-time ไม่มี DB / DB ล่ม / case_stats_daily ยังว่าง → แสดง "—"
+    latest = undefined;
+  }
 
-const stats = [
-  {
-    label: 'เรื่องดำเนินการวันนี้',
-    value: '23',
-    change: '+12%',
-    icon: TrendingUp,
-    color: 'oklch(55% 0.13 160)',
-    bgColor: 'oklch(94% 0.04 160)',
-  },
-  {
-    label: 'เวลาตอบสนองเฉลี่ย',
-    value: '18 ชม.',
-    change: '-24%',
-    icon: Clock,
-    color: 'oklch(82% 0.14 80)',
-    bgColor: 'oklch(95% 0.05 80)',
-  },
-  {
-    label: 'ผู้ใช้งานทั้งหมด',
-    value: '2,847',
-    change: '+8%',
-    icon: Users,
-    color: 'oklch(55% 0.13 160)',
-    bgColor: 'oklch(94% 0.04 160)',
-  },
-  {
-    label: 'อัตราความสำเร็จ',
-    value: '94%',
-    change: '+2%',
-    icon: CheckCircle2,
-    color: 'oklch(55% 0.13 160)',
-    bgColor: 'oklch(94% 0.04 160)',
-  },
-];
+  const hasData = !!latest;
 
-export function Stats() {
-  return (
-    <section className="relative py-16 lg:py-20">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {stats.map((stat, i) => (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }}
-              className="glass rounded-2xl p-6 shadow-lg"
-            >
-              <div className="flex items-start justify-between">
-                <div
-                  className="flex h-12 w-12 items-center justify-center rounded-xl"
-                  style={{ backgroundColor: stat.bgColor }}
-                >
-                  <stat.icon className="h-6 w-6" style={{ color: stat.color }} />
-                </div>
-                <span
-                  className="rounded-full px-2 py-0.5 text-xs font-semibold"
-                  style={{
-                    backgroundColor: stat.bgColor,
-                    color: stat.color,
-                  }}
-                >
-                  {stat.change}
-                </span>
-              </div>
-              <div className="mt-4">
-                <p className="text-3xl font-bold" style={{ color: stat.color }}>
-                  {stat.value}
-                </p>
-                <p className="mt-1 text-sm text-muted">{stat.label}</p>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
+  const stats: StatItem[] = [
+    {
+      label: 'เรื่องดำเนินการ',
+      value: hasData ? formatNumber(latest!.totalInProgress + latest!.totalReceived) : '—',
+      // change% ไม่แสดงเพราะต้องเทียบกับวันก่อนหน้า (เก็บไว้ทำใน PR #3 reports)
+      change: null,
+      icon: 'TrendingUp',
+      color: 'oklch(55% 0.13 160)',
+      bgColor: 'oklch(94% 0.04 160)',
+    },
+    {
+      label: 'เวลาตอบสนองเฉลี่ย',
+      value: hasData && latest!.avgResolutionDays != null ? `${latest!.avgResolutionDays} วัน` : '—',
+      change: null,
+      icon: 'Clock',
+      color: 'oklch(82% 0.14 80)',
+      bgColor: 'oklch(95% 0.05 80)',
+    },
+    {
+      label: 'เรื่องรับทั้งหมด',
+      value: hasData ? formatNumber(latest!.totalReceived) : '—',
+      change: null,
+      icon: 'Users',
+      color: 'oklch(55% 0.13 160)',
+      bgColor: 'oklch(94% 0.04 160)',
+    },
+    {
+      label: 'เรื่องปิดสำเร็จ',
+      value: hasData ? formatNumber(latest!.totalClosed) : '—',
+      change: null,
+      icon: 'CheckCircle2',
+      color: 'oklch(55% 0.13 160)',
+      bgColor: 'oklch(94% 0.04 160)',
+    },
+  ];
+
+  return <StatsClient stats={stats} hasData={hasData} />;
+}
+
+function formatNumber(n: number): string {
+  return n.toLocaleString('th-TH');
 }

@@ -20,23 +20,23 @@ export function Footer() {
             <h3 className="text-lg font-semibold">ลิงก์ด่วน</h3>
             <ul className="mt-4 space-y-2 text-sm">
               <li>
-                <Link href="#home" className="text-muted transition-colors hover:text-accent">
+                <Link href="/" className="text-muted transition-colors hover:text-accent">
                   หน้าแรก
                 </Link>
               </li>
               <li>
-                <Link href="#services" className="text-muted transition-colors hover:text-accent">
-                  บริการของเรา
+                <Link href="/intake" className="text-muted transition-colors hover:text-accent">
+                  แจ้งเหตุออนไลน์
                 </Link>
               </li>
               <li>
-                <Link href="#how-it-works" className="text-muted transition-colors hover:text-accent">
-                  ขั้นตอนการทำงาน
-                </Link>
-              </li>
-              <li>
-                <Link href="#tracking" className="text-muted transition-colors hover:text-accent">
+                <Link href="/track" className="text-muted transition-colors hover:text-accent">
                   ติดตามงาน
+                </Link>
+              </li>
+              <li>
+                <Link href="/#how-it-works" className="text-muted transition-colors hover:text-accent">
+                  ขั้นตอนการทำงาน
                 </Link>
               </li>
             </ul>
