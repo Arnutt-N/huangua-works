@@ -17,24 +17,8 @@ import { getFiscalYear } from '@/lib/thai-date';
 import { generateTrackingCode } from '@/lib/case-tracking';
 import { generateCidHash } from '@/lib/cid-hmac';
 import { grantConsent, CONSENT_VERSION } from '@/lib/consent';
+import { submitCaseSchema, validateOrError } from '@/lib/validation';
 import { eq } from 'drizzle-orm';
-
-interface SubmitRequest {
-  cid: string;
-  fullName: string;
-  phoneNumber?: string;
-  email?: string;
-
-  categoryId: string;
-  title: string;
-  description: string;
-  location: string;
-
-  // § citizen ต้องยินยอม PDPA — เก็บหลักฐานความยินยอมทุกครั้ง (server-enforced)
-  consent: boolean;
-
-  attachments?: Array<{ url: string; type: string; size: number }>;
-}
 
 export async function POST(req: NextRequest) {
   const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
@@ -50,29 +34,24 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // § Parse body
-  let body: SubmitRequest;
+  // § Parse body + validate ด้วย zod (แทน manual checks ทั้งหมด)
+  let body: unknown;
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { cid, fullName, phoneNumber, email, categoryId, title, description, location, attachments, consent } = body;
+  const validation = validateOrError(submitCaseSchema, body);
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
+  }
 
-  // § Validate CID
+  const { cid, fullName, phoneNumber, email, categoryId, title, description, location, attachments } = validation.data;
+
+  // § CID checksum check (zod ตรวจ format 13 หลักเท่านั้น — checksum ตรวนที่นี่)
   if (!isValidCid(cid)) {
     return NextResponse.json({ error: 'เลขบัตรประชาชนไม่ถูกต้อง' }, { status: 400 });
-  }
-
-  // § Validate required fields
-  if (!fullName || !categoryId || !title || !description || !location) {
-    return NextResponse.json({ error: 'กรุณากรอกข้อมูลให้ครบถ้วน' }, { status: 400 });
-  }
-
-  // § Consent enforcement — ปฏิเสธการส่งทันทีถ้าไม่ยินยอม PDPA (defense-in-depth นอกเหนือจาก UI gate)
-  if (consent !== true) {
-    return NextResponse.json({ error: 'กรุณายินยอมให้เก็บข้อมูลก่อนส่งเรื่อง' }, { status: 400 });
   }
 
   // § Check duplicate (7 วัน sliding window)

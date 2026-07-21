@@ -34,24 +34,7 @@ import { logAudit } from '@/lib/audit';
 import { generateId } from '@/lib/id';
 import { requireStaff } from '@/lib/auth/require-staff';
 import { assertTransition, type CaseStatus } from '@/lib/cases/state-machine';
-
-interface PatchBody {
-  status?: CaseStatus;
-  assignedTo?: string | null;
-  departmentId?: string | null;
-  priority?: 'normal' | 'urgent';
-  comment?: string;
-}
-
-const VALID_STATUSES: CaseStatus[] = [
-  'received',
-  'reviewing',
-  'assigned',
-  'in_progress',
-  'done',
-  'closed',
-  'rejected',
-];
+import { patchCaseSchema, validateOrError } from '@/lib/validation';
 
 // § supervisor-only fields — ต้องตรงกับ server action `changeDepartment`
 // (officer ย้ายข้ามหน่วยงานไม่ได้ — ป้องกัน Broken Access Control ผ่าน alternative path)
@@ -64,32 +47,26 @@ export async function PATCH(
   const { user, ipAddress, userAgent } = await requireStaff();
   const { id: caseId } = await params;
 
-  let body: PatchBody;
+  let body: unknown;
   try {
-    body = (await req.json()) as PatchBody;
+    body = await req.json();
   } catch {
     return NextResponse.json({ error: 'invalid JSON body' }, { status: 400 });
   }
 
-  if (
-    body.status !== undefined &&
-    !VALID_STATUSES.includes(body.status)
-  ) {
-    return NextResponse.json({ error: 'invalid status' }, { status: 400 });
+  // § validate ด้วย zod (แทน manual VALID_STATUSES.includes + priority check)
+  const validation = validateOrError(patchCaseSchema, body);
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
-  if (
-    body.priority !== undefined &&
-    body.priority !== 'normal' &&
-    body.priority !== 'urgent'
-  ) {
-    return NextResponse.json({ error: 'invalid priority' }, { status: 400 });
-  }
+  const validated = validation.data;
 
   // § role check สำหรับ departmentId — ต้องตรงกับ server action `changeDepartment`
   // ที่เรียก requireStaff(['chief','head','superadmin'])
   // ถ้าไม่เช็คที่นี่ officer จะ bypass authorization ผ่าน PATCH API ได้
+  // (zod validate shape ของข้อมูล, role check เป็น authorization layer แยก)
   if (
-    body.departmentId !== undefined &&
+    validated.departmentId !== undefined &&
     !SUPERVISOR_ROLES.includes(user.role as (typeof SUPERVISOR_ROLES)[number])
   ) {
     await logAudit({
@@ -133,8 +110,8 @@ export async function PATCH(
   }
 
   // validate state transition if status change requested
-  if (body.status && body.status !== current.status) {
-    const transition = assertTransition(current.status as CaseStatus, body.status);
+  if (validated.status && validated.status !== current.status) {
+    const transition = assertTransition(current.status as CaseStatus, validated.status);
     if (!transition.ok) {
       return NextResponse.json(
         { error: transition.reason ?? 'invalid transition' },
@@ -150,12 +127,12 @@ export async function PATCH(
     await db.transaction(async (tx) => {
       const updateSet: Partial<typeof cases.$inferInsert> = { updatedAt: now };
 
-      if (body.status && body.status !== current.status) {
-        updateSet.status = body.status;
-        const isClosing = body.status === 'closed' || body.status === 'done';
-        const isRejected = body.status === 'rejected';
+      if (validated.status && validated.status !== current.status) {
+        updateSet.status = validated.status;
+        const isClosing = validated.status === 'closed' || validated.status === 'done';
+        const isRejected = validated.status === 'rejected';
         if (isClosing || isRejected) updateSet.closedAt = now;
-        changes.status = { from: current.status, to: body.status };
+        changes.status = { from: current.status, to: validated.status };
 
         await tx.insert(caseUpdates).values({
           id: generateId(),
@@ -163,16 +140,16 @@ export async function PATCH(
           userId: user.id,
           updateType: 'status_change',
           oldValue: current.status,
-          newValue: body.status,
+          newValue: validated.status,
           isPublic: true,
         });
       }
 
-      if (body.assignedTo !== undefined && body.assignedTo !== current.assignedTo) {
-        updateSet.assignedTo = body.assignedTo;
+      if (validated.assignedTo !== undefined && validated.assignedTo !== current.assignedTo) {
+        updateSet.assignedTo = validated.assignedTo;
         changes.assignedTo = {
           from: current.assignedTo ?? '(ยังไม่มอบหมาย)',
-          to: body.assignedTo ?? '(ยังไม่มอบหมาย)',
+          to: validated.assignedTo ?? '(ยังไม่มอบหมาย)',
         };
 
         await tx.insert(caseUpdates).values({
@@ -181,19 +158,19 @@ export async function PATCH(
           userId: user.id,
           updateType: 'assignment',
           oldValue: current.assignedTo ?? '(ยังไม่มอบหมาย)',
-          newValue: body.assignedTo ?? '(ยังไม่มอบหมาย)',
+          newValue: validated.assignedTo ?? '(ยังไม่มอบหมาย)',
           isPublic: true,
         });
       }
 
       if (
-        body.departmentId !== undefined &&
-        body.departmentId !== current.departmentId
+        validated.departmentId !== undefined &&
+        validated.departmentId !== current.departmentId
       ) {
-        updateSet.departmentId = body.departmentId;
+        updateSet.departmentId = validated.departmentId;
         changes.departmentId = {
           from: current.departmentId ?? '(ไม่ระบุ)',
-          to: body.departmentId ?? '(ไม่ระบุ)',
+          to: validated.departmentId ?? '(ไม่ระบุ)',
         };
 
         await tx.insert(caseUpdates).values({
@@ -202,15 +179,15 @@ export async function PATCH(
           userId: user.id,
           updateType: 'metadata_change',
           oldValue: current.departmentId ?? '(ไม่ระบุ)',
-          newValue: body.departmentId ?? '(ไม่ระบุ)',
+          newValue: validated.departmentId ?? '(ไม่ระบุ)',
           comment: 'เปลี่ยนหน่วยงานที่รับผิดชอบ',
           isPublic: true,
         });
       }
 
-      if (body.priority && body.priority !== current.priority) {
-        updateSet.priority = body.priority;
-        changes.priority = { from: current.priority, to: body.priority };
+      if (validated.priority && validated.priority !== current.priority) {
+        updateSet.priority = validated.priority;
+        changes.priority = { from: current.priority, to: validated.priority };
 
         await tx.insert(caseUpdates).values({
           id: generateId(),
@@ -218,14 +195,14 @@ export async function PATCH(
           userId: user.id,
           updateType: 'metadata_change',
           oldValue: current.priority,
-          newValue: body.priority,
-          comment: body.priority === 'urgent' ? 'ปรับเป็นเรื่องด่วน' : 'ปรับเป็นเรื่องปกติ',
+          newValue: validated.priority,
+          comment: validated.priority === 'urgent' ? 'ปรับเป็นเรื่องด่วน' : 'ปรับเป็นเรื่องปกติ',
           isPublic: true,
         });
       }
 
-      if (body.comment && body.comment.trim()) {
-        const trimmed = body.comment.trim().slice(0, 2000);
+      if (validated.comment && validated.comment.trim()) {
+        const trimmed = validated.comment.trim().slice(0, 2000);
         await tx.insert(caseUpdates).values({
           id: generateId(),
           caseId,

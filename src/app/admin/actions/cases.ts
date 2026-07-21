@@ -14,6 +14,14 @@ import {
   STATUS_LABELS_TH,
   type CaseStatus,
 } from '@/lib/cases/state-machine';
+import {
+  changeStatusFormSchema,
+  assignOfficerFormSchema,
+  changeDepartmentFormSchema,
+  setPriorityFormSchema,
+  addUpdateFormSchema,
+  validateFormData,
+} from '@/lib/validation';
 
 /**
  * Server actions สำหรับจัดการเคสจากหน้า /admin/cases/[id]
@@ -44,14 +52,10 @@ export async function changeStatus(
 ): Promise<CaseActionState> {
   const { user, ipAddress, userAgent } = await requireStaff();
 
-  const caseId = formData.get('caseId');
-  const newStatus = formData.get('status');
-  const comment = formData.get('comment');
-  const isPublic = formData.get('isPublic');
-
-  if (typeof caseId !== 'string' || typeof newStatus !== 'string') {
-    return { error: 'ข้อมูลไม่ครบถ้วน' };
-  }
+  // § validate ด้วย zod (แทน typeof checks)
+  const v = validateFormData(changeStatusFormSchema, formData);
+  if (!v.success) return { error: v.error };
+  const { caseId, status: newStatus, comment, isPublic } = v.data;
 
   const db = await getDb();
 
@@ -68,7 +72,7 @@ export async function changeStatus(
     return { error: 'ไม่พบเรื่องที่ระบุ' };
   }
 
-  const transition = assertTransition(current.status as CaseStatus, newStatus as CaseStatus);
+  const transition = assertTransition(current.status as CaseStatus, newStatus);
   if (!transition.ok) {
     return { error: transition.reason ?? 'การเปลี่ยนสถานะไม่ถูกต้อง' };
   }
@@ -82,7 +86,7 @@ export async function changeStatus(
       await tx
         .update(cases)
         .set({
-          status: newStatus as CaseStatus,
+          status: newStatus,
           updatedAt: now,
           closedAt: isClosing || isRejected ? now : null,
         })
@@ -95,7 +99,7 @@ export async function changeStatus(
         updateType: 'status_change',
         oldValue: current.status,
         newValue: newStatus,
-        comment: typeof comment === 'string' && comment.trim() ? comment.trim() : null,
+        comment,
         isPublic: isPublic === 'true',
       });
 
@@ -134,12 +138,9 @@ export async function assignOfficer(
 ): Promise<CaseActionState> {
   const { user, ipAddress, userAgent } = await requireStaff();
 
-  const caseId = formData.get('caseId');
-  const officerId = formData.get('officerId'); // '__unassign__' = unset
-
-  if (typeof caseId !== 'string' || typeof officerId !== 'string') {
-    return { error: 'ข้อมูลไม่ครบถ้วน' };
-  }
+  const v = validateFormData(assignOfficerFormSchema, formData);
+  if (!v.success) return { error: v.error };
+  const { caseId, officerId } = v.data;
 
   const db = await getDb();
 
@@ -219,12 +220,9 @@ export async function changeDepartment(
     'superadmin',
   ]);
 
-  const caseId = formData.get('caseId');
-  const departmentId = formData.get('departmentId'); // '__unset__' = unset
-
-  if (typeof caseId !== 'string' || typeof departmentId !== 'string') {
-    return { error: 'ข้อมูลไม่ครบถ้วน' };
-  }
+  const v = validateFormData(changeDepartmentFormSchema, formData);
+  if (!v.success) return { error: v.error };
+  const { caseId, departmentId } = v.data;
 
   const db = await getDb();
 
@@ -297,16 +295,9 @@ export async function setPriority(
 ): Promise<CaseActionState> {
   const { user, ipAddress, userAgent } = await requireStaff();
 
-  const caseId = formData.get('caseId');
-  const priority = formData.get('priority');
-
-  if (typeof caseId !== 'string' || typeof priority !== 'string') {
-    return { error: 'ข้อมูลไม่ครบถ้วน' };
-  }
-
-  if (priority !== 'normal' && priority !== 'urgent') {
-    return { error: 'ค่าความเร่งด่วนไม่ถูกต้อง' };
-  }
+  const v = validateFormData(setPriorityFormSchema, formData);
+  if (!v.success) return { error: v.error };
+  const { caseId, priority } = v.data;
 
   const db = await getDb();
 
@@ -331,7 +322,7 @@ export async function setPriority(
       await tx
         .update(cases)
         .set({
-          priority: priority as 'normal' | 'urgent',
+          priority,
           updatedAt: new Date(),
         })
         .where(eq(cases.id, caseId));
@@ -382,22 +373,11 @@ export async function addUpdate(
 ): Promise<CaseActionState> {
   const { user, ipAddress, userAgent } = await requireStaff();
 
-  const caseId = formData.get('caseId');
-  const comment = formData.get('comment');
-  const isPublic = formData.get('isPublic');
+  const v = validateFormData(addUpdateFormSchema, formData);
+  if (!v.success) return { error: v.error };
+  const { caseId, comment: trimmed, isPublic } = v.data;
 
-  if (typeof caseId !== 'string' || typeof comment !== 'string') {
-    return { error: 'ข้อมูลไม่ครบถ้วน' };
-  }
-
-  const trimmed = comment.trim();
-  if (!trimmed) {
-    return { error: 'กรุณากรอกข้อความ' };
-  }
-  if (trimmed.length > 2000) {
-    return { error: 'ข้อความยาวเกิน 2,000 ตัวอักษร' };
-  }
-
+  // § comment ถูก trim + length-check โดย zod แล้ว (commentSchema)
   const db = await getDb();
 
   const current = await firstOrUndefined(
