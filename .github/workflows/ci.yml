@@ -23,8 +23,8 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 11
+        # ไม่ระบุ version — ใช้ packageManager จาก package.json (pnpm@11.0.8)
+        # ถ้าระบุ version ที่นี่จะซ้อนกับ packageManager → action-setup v4 ปฏิเสธ
 
       - name: Setup Node
         uses: actions/setup-node@v4
