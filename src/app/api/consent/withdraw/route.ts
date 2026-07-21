@@ -25,7 +25,7 @@ import { consentWithdrawSchema, validateOrError } from '@/lib/validation';
 
 export async function POST(req: NextRequest) {
   const ip =
-    req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'unknown';
 
   // § Rate limit — 5 requests / 10 minutes (ถี่เกินไป = น่าสงสัย)
   const rateLimit = await checkRateLimit(`rate:consent-withdraw:${ip}`, 5, 600);

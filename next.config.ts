@@ -25,10 +25,13 @@ const nextConfig: NextConfig = {
   },
   // Headers ความปลอดภัย — PDPA + OWASP baseline
   async headers() {
+    const scriptSrc = isProduction
+      ? "script-src 'self' 'unsafe-inline'"
+      : "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
+
     const cspDirectives = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-      // 'unsafe-inline' สำหรับ Next.js inline styles; 'unsafe-eval' สำหรับ dev HMR
+      scriptSrc,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self' data:",
