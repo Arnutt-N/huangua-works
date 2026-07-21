@@ -75,4 +75,12 @@ project-log-md/
 
 # ---- 🤖 Agent / tool artifacts (local-only, ไม่ commit) ----
 .zcode/
+.kilo/
 .claude/skill-collections-comparison.md
+.claude/skill-collections-20260712.md
+
+# ---- 🗄️ Database artifacts (เก่า — migrate เป็น Postgres แล้ว) ----
+data/
+*.db
+*.sqlite
+*.sqlite3

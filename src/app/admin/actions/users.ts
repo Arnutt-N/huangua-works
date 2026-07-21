@@ -10,6 +10,12 @@ import { logAudit } from '@/lib/audit';
 import { generateId } from '@/lib/id';
 import { hashPassword } from '@/lib/password';
 import { requireStaff } from '@/lib/auth/require-staff';
+import {
+  createUserFormSchema,
+  updateUserRoleFormSchema,
+  resetPasswordFormSchema,
+  validateFormData,
+} from '@/lib/validation';
 
 type UserRole = (typeof userRoleEnum.enumValues)[number];
 
@@ -35,50 +41,22 @@ export interface UserActionState {
 // 1. สร้าง user ใหม่
 // ────────────────────────────────────────────────────────────────────────────
 
-const VALID_ROLES = new Set<UserRole>(['officer', 'chief', 'head', 'superadmin']);
-
 export async function createUser(
   _prevState: UserActionState,
   formData: FormData,
 ): Promise<UserActionState> {
   const { user: actor, ipAddress, userAgent } = await requireStaff(SUPERVISOR_ROLES);
 
-  const email = formData.get('email');
-  const fullName = formData.get('fullName');
-  const role = formData.get('role');
-  const departmentId = formData.get('departmentId');
-  const password = formData.get('password');
-
-  if (
-    typeof email !== 'string' ||
-    typeof fullName !== 'string' ||
-    typeof role !== 'string' ||
-    typeof password !== 'string'
-  ) {
-    return { error: 'ข้อมูลไม่ครบถ้วน' };
-  }
-
-  const trimmedEmail = email.trim().toLowerCase();
-  const trimmedName = fullName.trim();
-
-  if (!trimmedEmail || !trimmedName || !password) {
-    return { error: 'กรุณากรอกข้อมูลให้ครบ' };
-  }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-    return { error: 'รูปแบบอีเมลไม่ถูกต้อง' };
-  }
-  if (password.length < 8) {
-    return { error: 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร' };
-  }
-  if (!VALID_ROLES.has(role as UserRole)) {
-    return { error: 'บทบาทไม่ถูกต้อง' };
-  }
+  // § validate ด้วย zod (แทน manual email regex / role check / password length)
+  const v = validateFormData(createUserFormSchema, formData);
+  if (!v.success) return { error: v.error };
+  const { email, fullName, role, departmentId, password } = v.data;
 
   const db = await getDb();
 
-  // § เช็ค email ซ้ำ
+  // § เช็ค email ซ้ำ (zod validate format แล้ว แต่ uniqueness ต้องเช็ค DB)
   const existing = await firstOrUndefined(
-    db.select({ id: users.id }).from(users).where(eq(users.email, trimmedEmail)).limit(1),
+    db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1),
   );
   if (existing) {
     return { error: 'อีเมลนี้มีอยู่ในระบบแล้ว' };
@@ -87,16 +65,14 @@ export async function createUser(
   const passwordHash = await hashPassword(password);
   const newUserId = generateId();
   const deptValue =
-    typeof departmentId === 'string' && departmentId && departmentId !== '__none__'
-      ? departmentId
-      : null;
+    departmentId && departmentId !== '__none__' ? departmentId : null;
 
   try {
     await db.insert(users).values({
       id: newUserId,
-      email: trimmedEmail,
-      fullName: trimmedName,
-      role: role as UserRole,
+      email,
+      fullName,
+      role,
       departmentId: deptValue,
       passwordHash,
       isActive: true,
@@ -109,7 +85,7 @@ export async function createUser(
       resourceId: newUserId,
       ipAddress,
       userAgent,
-      metadata: { email: trimmedEmail, fullName: trimmedName, role },
+      metadata: { email, fullName, role },
     });
   } catch (err) {
     console.error('[createUser] failed', err);
@@ -190,16 +166,9 @@ export async function updateUserRole(
 ): Promise<UserActionState> {
   const { user: actor, ipAddress, userAgent } = await requireStaff(SUPERVISOR_ROLES);
 
-  const userId = formData.get('userId');
-  const role = formData.get('role');
-  const departmentId = formData.get('departmentId');
-
-  if (typeof userId !== 'string' || typeof role !== 'string') {
-    return { error: 'ข้อมูลไม่ครบถ้วน' };
-  }
-  if (!VALID_ROLES.has(role as UserRole)) {
-    return { error: 'บทบาทไม่ถูกต้อง' };
-  }
+  const v = validateFormData(updateUserRoleFormSchema, formData);
+  if (!v.success) return { error: v.error };
+  const { userId, role, departmentId } = v.data;
 
   // § ห้ามเปลี่ยน role ตัวเอง (กัน self-escalation/de-escalation)
   if (userId === actor.id) {
@@ -220,15 +189,12 @@ export async function updateUserRole(
     return { error: 'ไม่สามารถแก้ไขผู้ดูแลระบบได้' };
   }
 
-  const deptValue =
-    typeof departmentId === 'string' && departmentId && departmentId !== '__none__'
-      ? departmentId
-      : null;
+  const deptValue = departmentId && departmentId !== '__none__' ? departmentId : null;
 
   try {
     await db
       .update(users)
-      .set({ role: role as UserRole, departmentId: deptValue, updatedAt: new Date() })
+      .set({ role, departmentId: deptValue, updatedAt: new Date() })
       .where(eq(users.id, userId));
 
     await logAudit({
@@ -265,15 +231,10 @@ export async function resetPassword(
 ): Promise<UserActionState> {
   const { user: actor, ipAddress, userAgent } = await requireStaff(SUPERADMIN_ONLY);
 
-  const userId = formData.get('userId');
-  const newPassword = formData.get('newPassword');
+  const v = validateFormData(resetPasswordFormSchema, formData);
+  if (!v.success) return { error: v.error };
+  const { userId, newPassword } = v.data;
 
-  if (typeof userId !== 'string' || typeof newPassword !== 'string') {
-    return { error: 'ข้อมูลไม่ครบถ้วน' };
-  }
-  if (newPassword.length < 8) {
-    return { error: 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร' };
-  }
   if (userId === actor.id) {
     return { error: 'ไม่สามารถรีเซ็ตรหัสผ่านตัวเองได้จากที่นี่' };
   }
