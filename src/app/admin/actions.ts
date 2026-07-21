@@ -1,7 +1,6 @@
 'use server';
 
 import { eq } from 'drizzle-orm';
-import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { logAudit } from '@/lib/audit';
 import { auth, signIn, signOut } from '@/auth';
@@ -9,14 +8,10 @@ import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { users } from '@/lib/db/schema';
 import { checkRateLimit } from '@/lib/upstash';
+import { getClientIp } from '@/lib/auth/require-staff';
 
 export interface LoginState {
   error: string | null;
-}
-
-async function getClientIp(): Promise<string> {
-  const h = await headers();
-  return h.get('x-forwarded-for') || h.get('x-real-ip') || 'unknown';
 }
 
 /**

@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# ยกเลิก run เดิมเมื่อมี push ใหม่เข้ามาที่ branch เดียวกัน
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: lint + typecheck + unit test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        # ไม่ระบุ version — ใช้ packageManager จาก package.json (pnpm@11.0.8)
+        # ถ้าระบุ version ที่นี่จะซ้อนกับ packageManager → action-setup v4 ปฏิเสธ
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      # Unit tests เท่านั้น — integration tests ต้องการ Postgres+Redis จริง (run แยกใน dedicated job ถ้าต้องการ)
+      - name: Unit tests
+        run: pnpm vitest run --exclude '**/*.integration.test.ts'
