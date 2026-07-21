@@ -53,6 +53,10 @@ const VALID_STATUSES: CaseStatus[] = [
   'rejected',
 ];
 
+// § supervisor-only fields — ต้องตรงกับ server action `changeDepartment`
+// (officer ย้ายข้ามหน่วยงานไม่ได้ — ป้องกัน Broken Access Control ผ่าน alternative path)
+const SUPERVISOR_ROLES = ['chief', 'head', 'superadmin'] as const;
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -79,6 +83,32 @@ export async function PATCH(
     body.priority !== 'urgent'
   ) {
     return NextResponse.json({ error: 'invalid priority' }, { status: 400 });
+  }
+
+  // § role check สำหรับ departmentId — ต้องตรงกับ server action `changeDepartment`
+  // ที่เรียก requireStaff(['chief','head','superadmin'])
+  // ถ้าไม่เช็คที่นี่ officer จะ bypass authorization ผ่าน PATCH API ได้
+  if (
+    body.departmentId !== undefined &&
+    !SUPERVISOR_ROLES.includes(user.role as (typeof SUPERVISOR_ROLES)[number])
+  ) {
+    await logAudit({
+      userId: user.id,
+      action: 'access_denied',
+      resource: 'cases',
+      resourceId: caseId,
+      ipAddress,
+      userAgent,
+      metadata: {
+        reason: 'insufficient_role_for_department_change',
+        role: user.role,
+        required: SUPERVISOR_ROLES,
+      },
+    });
+    return NextResponse.json(
+      { error: 'เปลี่ยนหน่วยงานต้องการสิทธิ supervisor (chief/head/superadmin)' },
+      { status: 403 }
+    );
   }
 
   const db = await getDb();
