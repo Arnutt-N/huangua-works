@@ -58,6 +58,16 @@ export const locationSchema = z
   .max(500, 'ที่ตั้งยาวเกิน 500 ตัวอักษร')
   .transform((v) => v.trim());
 
+export const villageSchema = z
+  .string()
+  .max(100, 'หมู่บ้านยาวเกินไป')
+  .transform((v) => v.trim())
+  .or(z.literal(''))
+  .optional();
+
+/** id ของ geography tables (province/district/subdistrict) — integer จาก source dataset */
+export const geodataIdSchema = z.number().int().positive();
+
 export const commentSchema = z
   .string()
   .min(1, 'กรุณากรอกข้อความ')
@@ -115,6 +125,11 @@ export const submitCaseSchema = z.object({
   title: caseTitleSchema,
   description: caseDescriptionSchema,
   location: locationSchema,
+  // § ที่อยู่เชิงโครงสร้าง (cascading dropdown) — optional ใน schema แต่ UI บังคับเลือก
+  provinceId: geodataIdSchema.optional(),
+  districtId: geodataIdSchema.optional(),
+  subDistrictId: geodataIdSchema.optional(),
+  village: villageSchema,
   consent: z.literal(true, {
     message: 'กรุณายินยอมให้เก็บข้อมูลก่อนส่งเรื่อง',
   }),

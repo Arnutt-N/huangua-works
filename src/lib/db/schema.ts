@@ -136,6 +136,62 @@ export const categories = pgTable(
 );
 
 // ────────────────────────────────────────────────────────────────────────────
+// § Geography (จังหวัด/อำเภอ/ตำบล — thailand-geodata, MIT)
+// ใช้ integer PK ตาม natural key ของ source dataset (PROVINCE_ID/DISTRICT_ID/
+// SUB_DISTRICT_ID) เพื่อให้ seed import รักษา id เดิม + FK integrity; ต่างจาก
+// ตารางแอปที่ใช้ UUID v7 เพราะนี่คือ reference data ที่ id นิ่งจากแหล่งข้อมูล
+// ⚠️ ไม่มีระดับหมู่บ้าน (village) — dataset หยุดที่ตำบล; หมู่บ้านเก็บเป็น free-text ใน cases.village
+// ────────────────────────────────────────────────────────────────────────────
+
+export const provinces = pgTable(
+  'provinces',
+  {
+    id: integer('id').primaryKey(), // source PROVINCE_ID
+    code: text('code').notNull(), // e.g. "46" (กาฬสินธุ์)
+    nameTh: text('name_th').notNull(),
+    nameEn: text('name_en').notNull(),
+  },
+  (table) => ({
+    nameThIdx: index('provinces_name_th_idx').on(table.nameTh),
+  })
+);
+
+export const districts = pgTable(
+  'districts',
+  {
+    id: integer('id').primaryKey(), // source DISTRICT_ID
+    provinceId: integer('province_id').notNull(), // FK provinces.id
+    code: text('code').notNull(),
+    districtCode: text('district_code').notNull(), // e.g. "4607" (ยางตลาด)
+    nameTh: text('name_th').notNull(),
+    nameEn: text('name_en').notNull(),
+  },
+  (table) => ({
+    provinceIdx: index('districts_province_id_idx').on(table.provinceId),
+    nameThIdx: index('districts_name_th_idx').on(table.nameTh),
+  })
+);
+
+export const subDistricts = pgTable(
+  'sub_districts',
+  {
+    id: integer('id').primaryKey(), // source SUB_DISTRICT_ID
+    districtId: integer('district_id').notNull(), // FK districts.id
+    code: text('code').notNull(),
+    subDistrictCode: text('sub_district_code').notNull(), // e.g. "460701"
+    nameTh: text('name_th').notNull(),
+    nameEn: text('name_en').notNull(),
+    postalCode: text('postal_code'),
+    latitude: text('latitude'),
+    longitude: text('longitude'),
+  },
+  (table) => ({
+    districtIdx: index('sub_districts_district_id_idx').on(table.districtId),
+    nameThIdx: index('sub_districts_name_th_idx').on(table.nameTh),
+  })
+);
+
+// ────────────────────────────────────────────────────────────────────────────
 // § Cases (เรื่องแจ้งเหตุ — state machine: received→reviewing→assigned→in_progress→done→closed/rejected)
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -157,7 +213,15 @@ export const cases = pgTable(
     // Content
     title: text('title').notNull(),
     description: text('description').notNull(),
-    location: text('location').notNull(), // address/landmark ไทย
+    location: text('location').notNull(), // address/landmark ไทย (รายละเอียดเพิ่มเติม เช่น จุดสังเกต/ถนน)
+
+    // § ที่อยู่เชิงโครงสร้าง (cascading dropdown จาก geography tables)
+    // village เป็น free-text เพราะ dataset ไม่มีระดับหมู่บ้าน
+    provinceId: integer('province_id'), // FK provinces.id
+    districtId: integer('district_id'), // FK districts.id
+    subDistrictId: integer('sub_district_id'), // FK sub_districts.id
+    village: text('village'), // หมู่/หมู่บ้าน (free-text)
+
     categoryId: text('category_id').notNull(), // FK categories.id
 
     // Assignment
@@ -184,6 +248,9 @@ export const cases = pgTable(
     assignedToIdx: index('cases_assigned_to_idx').on(table.assignedTo),
     categoryIdx: index('cases_category_id_idx').on(table.categoryId),
     deptIdx: index('cases_department_id_idx').on(table.departmentId),
+    provinceIdx: index('cases_province_id_idx').on(table.provinceId),
+    districtIdx: index('cases_district_id_idx').on(table.districtId),
+    subDistrictIdx: index('cases_sub_district_id_idx').on(table.subDistrictId),
     createdAtIdx: index('cases_created_at_idx').on(table.createdAt),
     // § partial unique index — เฉพาะ row ที่มี tracking_code (เคสใหม่); null (เคสเก่า) ไม่นับซ้ำ
     trackingCodeIdx: uniqueIndex('cases_tracking_code_idx')
