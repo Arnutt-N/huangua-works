@@ -201,17 +201,16 @@ export async function PATCH(
         });
       }
 
-      if (validated.comment && validated.comment.trim()) {
-        const trimmed = validated.comment.trim().slice(0, 2000);
+      if (validated.comment) {
         await tx.insert(caseUpdates).values({
           id: generateId(),
           caseId,
           userId: user.id,
           updateType: 'comment',
-          comment: trimmed,
+          comment: validated.comment,
           isPublic: true,
         });
-        changes.comment = { from: null, to: trimmed.length };
+        changes.comment = { from: null, to: validated.comment.length };
       }
 
       // only UPDATE if there are field changes (avoid no-op write)

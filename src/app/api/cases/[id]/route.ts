@@ -19,6 +19,7 @@ import { cases, caseUpdates, categories } from '@/lib/db/schema';
 import { logAudit } from '@/lib/audit';
 import { checkRateLimit } from '@/lib/upstash';
 import { normalizeTrackingCode } from '@/lib/case-tracking';
+import { hasConsent } from '@/lib/consent';
 import { eq, and } from 'drizzle-orm';
 
 const NOT_FOUND = { error: 'ไม่พบเรื่องนี้' };
@@ -28,7 +29,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: rawId } = await params;
-  const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'unknown';
 
   // § Rate limit — 10 requests / 5 minutes per IP (fail-open เหมือน submit)
   const rateLimit = await checkRateLimit(`rate:track:${ip}`, 10, 300);
@@ -55,6 +56,14 @@ export async function GET(
 
   if (!caseRecord) {
     return NextResponse.json(NOT_FOUND, { status: 404 });
+  }
+
+  // § PDPA: ถ้าเจ้าของเรื่องถอนความยินยอมแล้ว → คืน 404 เหมือนไม่พบ (กัน enumeration)
+  if (caseRecord.submittedBy) {
+    const consentActive = await hasConsent(caseRecord.submittedBy, 'data_collection');
+    if (!consentActive) {
+      return NextResponse.json(NOT_FOUND, { status: 404 });
+    }
   }
 
   // § Fetch category (ไม่ fetch department/submitter/officer — PII/ไม่จำเป็นสำหรับ citizen)

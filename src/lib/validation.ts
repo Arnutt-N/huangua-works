@@ -31,8 +31,8 @@ export const phoneSchema = z
   .string()
   .max(20, 'เบอร์โทรยาวเกินไป')
   .regex(/^[\d+\-\s()]+$/, 'รูปแบบเบอร์โทรไม่ถูกต้อง')
-  .optional()
-  .or(z.literal(''));
+  .or(z.literal(''))
+  .optional();
 
 export const fullNameSchema = z
   .string()
@@ -138,7 +138,7 @@ export const patchCaseSchema = z.object({
   assignedTo: uuidSchema.nullable().optional(),
   departmentId: uuidSchema.nullable().optional(),
   priority: casePrioritySchema.optional(),
-  comment: z.string().max(2000).optional(),
+  comment: commentSchema.optional(),
 });
 
 /**
@@ -245,7 +245,7 @@ export function validateFormData<T>(
 ): { success: true; data: T } | { success: false; error: string } {
   const obj: Record<string, unknown> = {};
   formData.forEach((value, key) => {
-    obj[key] = typeof value === 'string' ? value : undefined;
+    if (typeof value === 'string') obj[key] = value;
   });
   return validateOrError(schema, obj);
 }

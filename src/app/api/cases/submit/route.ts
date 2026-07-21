@@ -21,7 +21,7 @@ import { submitCaseSchema, validateOrError } from '@/lib/validation';
 import { eq } from 'drizzle-orm';
 
 export async function POST(req: NextRequest) {
-  const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'unknown';
 
   // § Rate limit — 3 requests / 5 minutes
   const rateLimitKey = `rate:submit:${ip}`;
