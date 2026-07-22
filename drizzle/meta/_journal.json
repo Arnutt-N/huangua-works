@@ -15,6 +15,13 @@
       "when": 1784215046695,
       "tag": "0001_friendly_gideon",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784677080873,
+      "tag": "0002_magical_prima",
+      "breakpoints": true
     }
   ]
 }

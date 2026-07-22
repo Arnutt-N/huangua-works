@@ -61,12 +61,10 @@ async function fetchCase(id: string): Promise<{ ok: true; data: CaseDetail } | {
 
 export function TrackForm({ initialId }: { initialId?: string }) {
   const [trackId, setTrackId] = useState(initialId ?? '');
-  // เริ่มเป็น true ตั้งแต่ initial render ถ้ามี initialId เพื่อเลี่ยง setState แบบ sync ใน effect
   const [isSearching, setIsSearching] = useState(() => Boolean(initialId));
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CaseDetail | null>(null);
 
-  // ค้นหาอัตโนมัติเมื่อมี ?id= จาก query param (เช่น ลิงก์ "ติดตามเรื่องนี้" จากหน้าแจ้งเรื่อง)
   useEffect(() => {
     if (!initialId) return;
     let cancelled = false;
@@ -105,16 +103,42 @@ export function TrackForm({ initialId }: { initialId?: string }) {
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="mt-8 rounded-lg border border-border bg-surface-raised p-5 sm:p-6">
-        <Label htmlFor="trackId">เลขติดตามเรื่อง</Label>
-        <Input
-          id="trackId"
-          placeholder="เช่น HN483729156"
-          invalid={!!error}
-          value={trackId}
-          onChange={(e) => setTrackId(e.target.value)}
-        />
-        <Button type="submit" className="mt-5 w-full sm:w-auto" disabled={isSearching}>
+      <form
+        onSubmit={handleSubmit}
+        className="mt-8 rounded-3xl border bg-surface-raised p-6 shadow-sm sm:p-8"
+        style={{ borderColor: 'oklch(90% 0.01 145)' }}
+      >
+        <div className="flex items-center gap-3">
+          <span
+            className="flex h-10 w-10 items-center justify-center rounded-xl"
+            style={{ backgroundColor: 'oklch(94% 0.04 160)' }}
+          >
+            <Search className="h-5 w-5" style={{ color: 'oklch(45% 0.15 160)' }} aria-hidden="true" />
+          </span>
+          <h2 className="text-xl font-semibold">ค้นหาเรื่อง</h2>
+        </div>
+
+        <div className="mt-5">
+          <Label htmlFor="trackId">เลขติดตามเรื่อง</Label>
+          <Input
+            id="trackId"
+            placeholder="เช่น HN483729156"
+            invalid={!!error}
+            value={trackId}
+            onChange={(e) => setTrackId(e.target.value)}
+          />
+        </div>
+
+        <Button
+          type="submit"
+          className="mt-5 h-11 px-7"
+          disabled={isSearching}
+          style={{
+            background: 'linear-gradient(to right, oklch(55% 0.13 160), oklch(45% 0.15 160))',
+            color: 'oklch(99% 0.005 145)',
+            boxShadow: '0 10px 40px -10px oklch(55% 0.13 160 / 0.3)',
+          }}
+        >
           {isSearching ? (
             <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
           ) : (
@@ -122,6 +146,7 @@ export function TrackForm({ initialId }: { initialId?: string }) {
           )}
           ค้นหาเรื่อง
         </Button>
+
         {error ? (
           <p role="alert" className="mt-3 flex items-start gap-2 text-sm font-semibold text-danger">
             <AlertCircle className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
@@ -133,11 +158,11 @@ export function TrackForm({ initialId }: { initialId?: string }) {
       </form>
 
       {result && (
-        <section aria-labelledby="result" className="mt-10">
-          <h2 id="result" className="text-xl font-semibold">
-            ผลการค้นหา
-          </h2>
-          <div className="mt-4 rounded-lg border border-border bg-surface-raised p-5 sm:p-6">
+        <section aria-labelledby="result" className="mt-8">
+          <div
+            className="rounded-3xl border bg-surface-raised p-6 shadow-sm sm:p-8"
+            style={{ borderColor: 'oklch(90% 0.01 145)' }}
+          >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm text-muted">
