@@ -124,7 +124,7 @@ export const submitCaseSchema = z.object({
   categoryId: uuidSchema,
   title: caseTitleSchema,
   description: caseDescriptionSchema,
-  location: locationSchema,
+  location: locationSchema.optional(),
   // § ที่อยู่เชิงโครงสร้าง (cascading dropdown) — optional ใน schema แต่ UI บังคับเลือก
   provinceId: geodataIdSchema.optional(),
   districtId: geodataIdSchema.optional(),
