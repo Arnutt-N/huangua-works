@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
-  const { cid, fullName, phoneNumber, email, categoryId, title, description, location, attachments } = validation.data;
+  const { cid, fullName, phoneNumber, email, categoryId, title, description, location, provinceId, districtId, subDistrictId, village, attachments } = validation.data;
 
   // § CID checksum check (zod ตรวจ format 13 หลักเท่านั้น — checksum ตรวนที่นี่)
   if (!isValidCid(cid)) {
@@ -138,6 +138,10 @@ export async function POST(req: NextRequest) {
     title,
     description,
     location,
+    provinceId: provinceId ?? null,
+    districtId: districtId ?? null,
+    subDistrictId: subDistrictId ?? null,
+    village: village || null,
     categoryId,
     submittedBy: citizenUser.id,
     departmentId: category.defaultDepartmentId || null,

@@ -1,8 +1,17 @@
 'use client';
 
-import { AlertCircle, ArrowRight, CheckCircle2, Loader2, MapPin, Paperclip } from 'lucide-react';
+import {
+  AlertCircle,
+  ArrowRight,
+  CheckCircle2,
+  Loader2,
+  MapPin,
+  Paperclip,
+  User,
+  FileText,
+} from 'lucide-react';
 import Link from 'next/link';
-import { useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Button } from '../../components/ui/button';
 import { FieldError, FieldHint, Input, Label, Textarea } from '../../components/ui/field';
 import {
@@ -19,6 +28,11 @@ export interface IntakeCategory {
   name: string;
 }
 
+interface GeoOption {
+  id: number;
+  nameTh: string;
+}
+
 interface FormState {
   fullName: string;
   cid: string;
@@ -26,6 +40,10 @@ interface FormState {
   categoryId: string;
   title: string;
   detail: string;
+  provinceId: string;
+  districtId: string;
+  subDistrictId: string;
+  village: string;
   addr: string;
   consent: boolean;
 }
@@ -37,6 +55,10 @@ const initialForm: FormState = {
   categoryId: '',
   title: '',
   detail: '',
+  provinceId: '',
+  districtId: '',
+  subDistrictId: '',
+  village: '',
   addr: '',
   consent: false,
 };
@@ -57,10 +79,34 @@ function validate(form: FormState): FieldErrors {
   if (!form.categoryId) errors.categoryId = 'กรุณาเลือกหมวดเรื่อง';
   if (!form.title.trim()) errors.title = 'กรุณากรอกหัวเรื่อง';
   if (!form.detail.trim()) errors.detail = 'กรุณากรอกรายละเอียด';
-  if (!form.addr.trim()) errors.addr = 'กรุณาระบุที่ตั้ง';
+  if (!form.provinceId) errors.provinceId = 'กรุณาเลือกจังหวัด';
+  if (!form.districtId) errors.districtId = 'กรุณาเลือกอำเภอ';
+  if (!form.subDistrictId) errors.subDistrictId = 'กรุณาเลือกตำบล';
   if (!form.consent) errors.consent = 'กรุณายินยอมให้เก็บข้อมูลก่อนส่งเรื่อง';
 
   return errors;
+}
+
+function SectionCard({ children }: { children: React.ReactNode }) {
+  return (
+    <section className="rounded-3xl border bg-surface-raised p-6 shadow-sm sm:p-8" style={{ borderColor: 'oklch(90% 0.01 145)' }}>
+      {children}
+    </section>
+  );
+}
+
+function SectionHeading({ icon: Icon, children }: { icon: typeof User; children: React.ReactNode }) {
+  return (
+    <h2 className="flex items-center gap-3 text-xl font-semibold">
+      <span
+        className="flex h-10 w-10 items-center justify-center rounded-xl"
+        style={{ backgroundColor: 'oklch(94% 0.04 160)' }}
+      >
+        <Icon className="h-5 w-5" style={{ color: 'oklch(45% 0.15 160)' }} aria-hidden="true" />
+      </span>
+      {children}
+    </h2>
+  );
 }
 
 export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
@@ -70,8 +116,53 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<SubmitResult | null>(null);
 
+  const [provinces, setProvinces] = useState<GeoOption[]>([]);
+  const [districts, setDistricts] = useState<GeoOption[]>([]);
+  const [subdistricts, setSubdistricts] = useState<GeoOption[]>([]);
+  const [loadingGeo, setLoadingGeo] = useState<'provinces' | 'districts' | 'subdistricts' | null>(null);
+
+  useEffect(() => {
+    fetch('/api/provinces')
+      .then((r) => r.json())
+      .then((d) => setProvinces(d.provinces ?? []))
+      .catch(() => {});
+  }, []);
+
+  const loadDistricts = useCallback((provinceId: string) => {
+    if (!provinceId) { setDistricts([]); setSubdistricts([]); return; }
+    setLoadingGeo('districts');
+    fetch(`/api/districts?provinceId=${provinceId}`)
+      .then((r) => r.json())
+      .then((d) => setDistricts(d.districts ?? []))
+      .catch(() => setDistricts([]))
+      .finally(() => setLoadingGeo(null));
+  }, []);
+
+  const loadSubdistricts = useCallback((districtId: string) => {
+    if (!districtId) { setSubdistricts([]); return; }
+    setLoadingGeo('subdistricts');
+    fetch(`/api/subdistricts?districtId=${districtId}`)
+      .then((r) => r.json())
+      .then((d) => setSubdistricts(d.subdistricts ?? []))
+      .catch(() => setSubdistricts([]))
+      .finally(() => setLoadingGeo(null));
+  }, []);
+
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function handleProvinceChange(value: string) {
+    setForm((prev) => ({ ...prev, provinceId: value, districtId: '', subDistrictId: '' }));
+    setDistricts([]);
+    setSubdistricts([]);
+    loadDistricts(value);
+  }
+
+  function handleDistrictChange(value: string) {
+    setForm((prev) => ({ ...prev, districtId: value, subDistrictId: '' }));
+    setSubdistricts([]);
+    loadSubdistricts(value);
   }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -94,7 +185,11 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
           categoryId: form.categoryId,
           title: form.title.trim(),
           description: form.detail.trim(),
-          location: form.addr.trim(),
+          location: form.addr.trim() || undefined,
+          provinceId: Number(form.provinceId),
+          districtId: Number(form.districtId),
+          subDistrictId: Number(form.subDistrictId),
+          village: form.village.trim() || undefined,
           consent: form.consent,
         }),
       });
@@ -120,31 +215,42 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
 
   if (result) {
     return (
-      <div className="mt-8 rounded-md border border-success bg-success-soft px-6 py-8 text-center">
-        <CheckCircle2 className="mx-auto h-12 w-12 text-success" aria-hidden="true" />
-        <h2 className="mt-4 text-2xl font-bold text-ink">รับเรื่องเรียบร้อย</h2>
+      <div className="mt-8 rounded-3xl border bg-surface-raised px-6 py-10 text-center shadow-lg" style={{ borderColor: 'oklch(90% 0.01 145)' }}>
+        <span
+          className="mx-auto flex h-16 w-16 items-center justify-center rounded-full"
+          style={{ backgroundColor: 'oklch(94% 0.04 160)' }}
+        >
+          <CheckCircle2 className="h-8 w-8" style={{ color: 'oklch(45% 0.15 160)' }} aria-hidden="true" />
+        </span>
+        <h2 className="mt-5 text-2xl font-bold text-ink">รับเรื่องเรียบร้อย</h2>
         <p className="mt-2 text-muted">{result.message}</p>
-        <p className="mt-4 text-sm font-semibold text-ink">เลขติดตามเรื่องของท่าน</p>
+        <p className="mt-5 text-sm font-semibold text-ink">เลขติดตามเรื่องของท่าน</p>
         <p
           data-testid="tracking-code"
           data-case-id={result.caseId}
-          className="mt-2 rounded-md border border-border bg-surface-raised px-4 py-3 font-mono text-2xl font-bold tracking-widest text-ink"
+          className="mx-auto mt-2 inline-block rounded-xl border px-6 py-3 font-mono text-2xl font-bold tracking-widest text-ink"
+          style={{ borderColor: 'oklch(90% 0.01 145)', backgroundColor: 'oklch(96% 0.02 145 / 0.5)' }}
         >
           {result.trackingCode}
         </p>
         <p className="mt-3 text-sm text-muted">
           จดเลขติดตามนี้ไว้เพื่อใช้ติดตามสถานะภายหลัง — ห้ามให้ผู้อื่น เพราะสามารถใช้ดูสถานะเรื่องของท่านได้
         </p>
-        <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+        <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
           <Link
             href={`/track?id=${result.trackingCode}`}
-            className="inline-flex min-h-touch items-center justify-center gap-2 rounded-md bg-accent-strong px-7 text-on-accent hover:bg-accent-strong/90"
+            className="inline-flex min-h-touch items-center justify-center gap-2 rounded-xl px-7 font-semibold text-white"
+            style={{
+              background: 'linear-gradient(to right, oklch(55% 0.13 160), oklch(45% 0.15 160))',
+              boxShadow: '0 10px 40px -10px oklch(55% 0.13 160 / 0.3)',
+            }}
           >
             ติดตามเรื่องนี้
           </Link>
           <Link
             href="/"
-            className="inline-flex min-h-touch items-center justify-center gap-2 rounded-md border border-border-strong px-7 text-accent-strong hover:bg-accent-sunken"
+            className="inline-flex min-h-touch items-center justify-center gap-2 rounded-xl border-2 px-7 font-semibold text-accent-strong hover:bg-accent-sunken"
+            style={{ borderColor: 'oklch(80% 0.015 145)' }}
           >
             กลับหน้าหลัก
           </Link>
@@ -154,11 +260,11 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
   }
 
   return (
-    <form className="mt-8 flex flex-col gap-8" noValidate onSubmit={handleSubmit}>
+    <form className="mt-8 flex flex-col gap-6" noValidate onSubmit={handleSubmit}>
       {submitError && (
         <div
           role="alert"
-          className="flex items-start gap-3 rounded-md border border-danger bg-danger-soft px-4 py-3 text-sm font-semibold text-danger"
+          className="flex items-start gap-3 rounded-xl border border-danger bg-danger-soft px-5 py-4 text-sm font-semibold text-danger"
         >
           <AlertCircle className="mt-0.5 h-5 w-5 flex-none" aria-hidden="true" />
           {submitError}
@@ -166,9 +272,9 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
       )}
 
       {/* ข้อมูลผู้แจ้ง */}
-      <section className="flex flex-col gap-4">
-        <h2 className="text-xl font-semibold">ข้อมูลผู้แจ้ง</h2>
-        <div className="grid gap-4 sm:grid-cols-2">
+      <SectionCard>
+        <SectionHeading icon={User}>ข้อมูลผู้แจ้ง</SectionHeading>
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <div>
             <Label htmlFor="name">ชื่อ - นามสกุล</Label>
             <Input
@@ -199,7 +305,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
             )}
           </div>
         </div>
-        <div>
+        <div className="mt-4">
           <Label htmlFor="phone">เบอร์โทรติดต่อ</Label>
           <Input
             id="phone"
@@ -211,97 +317,157 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
             onChange={(e) => updateField('phone', e.target.value)}
           />
         </div>
-      </section>
+      </SectionCard>
 
       {/* เรื่องที่แจ้ง */}
-      <section className="flex flex-col gap-4 border-t border-border pt-8">
-        <h2 className="text-xl font-semibold">เรื่องที่แจ้ง</h2>
-        <div>
-          <Label htmlFor="cat">หมวดเรื่อง</Label>
-          <Select value={form.categoryId} onValueChange={(v) => updateField('categoryId', v)}>
-            <SelectTrigger id="cat" aria-invalid={!!fieldErrors.categoryId || undefined}>
-              <SelectValue placeholder="เลือกหมวดที่ใกล้เรื่องของท่าน" />
-            </SelectTrigger>
-            <SelectContent>
-              {categories.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <FieldError>{fieldErrors.categoryId}</FieldError>
+      <SectionCard>
+        <SectionHeading icon={FileText}>เรื่องที่แจ้ง</SectionHeading>
+        <div className="mt-5 flex flex-col gap-4">
+          <div>
+            <Label htmlFor="cat">หมวดเรื่อง</Label>
+            <Select value={form.categoryId} onValueChange={(v) => updateField('categoryId', v)}>
+              <SelectTrigger id="cat" aria-invalid={!!fieldErrors.categoryId || undefined}>
+                <SelectValue placeholder="เลือกหมวดที่ใกล้เรื่องของท่าน" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FieldError>{fieldErrors.categoryId}</FieldError>
+          </div>
+          <div>
+            <Label htmlFor="title">หัวเรื่อง</Label>
+            <Input
+              id="title"
+              name="title"
+              placeholder="เช่น ถนนหน้าบ้านเป็นหลุมเป็นบ่อ"
+              invalid={!!fieldErrors.title}
+              value={form.title}
+              onChange={(e) => updateField('title', e.target.value)}
+            />
+            <FieldError>{fieldErrors.title}</FieldError>
+          </div>
+          <div>
+            <Label htmlFor="detail">รายละเอียด</Label>
+            <Textarea
+              id="detail"
+              name="detail"
+              rows={5}
+              placeholder="บอกเล่าเรื่องที่เกิด เวลา ความเสียหาย ฯลฯ"
+              invalid={!!fieldErrors.detail}
+              value={form.detail}
+              onChange={(e) => updateField('detail', e.target.value)}
+            />
+            {fieldErrors.detail ? (
+              <FieldError>{fieldErrors.detail}</FieldError>
+            ) : (
+              <FieldHint>ยิ่งละเอียด เจ้าหน้าที่เข้าใจและดำเนินการได้เร็วขึ้น</FieldHint>
+            )}
+          </div>
         </div>
-        <div>
-          <Label htmlFor="title">หัวเรื่อง</Label>
-          <Input
-            id="title"
-            name="title"
-            placeholder="เช่น ถนนหน้าบ้านเป็นหลุมเป็นบ่อ"
-            invalid={!!fieldErrors.title}
-            value={form.title}
-            onChange={(e) => updateField('title', e.target.value)}
-          />
-          <FieldError>{fieldErrors.title}</FieldError>
-        </div>
-        <div>
-          <Label htmlFor="detail">รายละเอียด</Label>
-          <Textarea
-            id="detail"
-            name="detail"
-            rows={5}
-            placeholder="บอกเล่าเรื่องที่เกิด เวลา ความเสียหาย ฯลฯ"
-            invalid={!!fieldErrors.detail}
-            value={form.detail}
-            onChange={(e) => updateField('detail', e.target.value)}
-          />
-          {fieldErrors.detail ? (
-            <FieldError>{fieldErrors.detail}</FieldError>
-          ) : (
-            <FieldHint>ยิ่งละเอียด เจ้าหน้าที่เข้าใจและดำเนินการได้เร็วขึ้น</FieldHint>
-          )}
-        </div>
-      </section>
+      </SectionCard>
 
       {/* ที่ตั้ง */}
-      <section className="flex flex-col gap-4 border-t border-border pt-8">
-        <h2 className="flex items-center gap-2 text-xl font-semibold">
-          <MapPin className="h-5 w-5 text-accent-strong" aria-hidden="true" />
-          ที่ตั้ง
-        </h2>
-        <div>
-          <Label htmlFor="addr">ที่อยู่ / จุดที่เกิดเรื่อง</Label>
-          <Input
-            id="addr"
-            name="addr"
-            placeholder="บ้าน/หมู่ที่/ถนน/จุดสังเกต"
-            invalid={!!fieldErrors.addr}
-            value={form.addr}
-            onChange={(e) => updateField('addr', e.target.value)}
-          />
-          {fieldErrors.addr ? (
-            <FieldError>{fieldErrors.addr}</FieldError>
-          ) : (
-            <FieldHint>ระบุให้ชัดเจน เจ้าหน้าที่จะได้ลงพื้นที่ถูกจุด</FieldHint>
-          )}
+      <SectionCard>
+        <SectionHeading icon={MapPin}>ที่ตั้ง</SectionHeading>
+        <div className="mt-5 grid gap-4 sm:grid-cols-3">
+          <div>
+            <Label htmlFor="province">จังหวัด</Label>
+            <Select value={form.provinceId} onValueChange={handleProvinceChange}>
+              <SelectTrigger id="province" aria-invalid={!!fieldErrors.provinceId || undefined}>
+                <SelectValue placeholder="เลือกจังหวัด" />
+              </SelectTrigger>
+              <SelectContent>
+                {provinces.map((p) => (
+                  <SelectItem key={p.id} value={String(p.id)}>
+                    {p.nameTh}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FieldError>{fieldErrors.provinceId}</FieldError>
+          </div>
+          <div>
+            <Label htmlFor="district">อำเภอ</Label>
+            <Select
+              value={form.districtId}
+              onValueChange={handleDistrictChange}
+              disabled={!form.provinceId || loadingGeo === 'districts'}
+            >
+              <SelectTrigger id="district" aria-invalid={!!fieldErrors.districtId || undefined}>
+                <SelectValue placeholder={loadingGeo === 'districts' ? 'กำลังโหลด...' : 'เลือกอำเภอ'} />
+              </SelectTrigger>
+              <SelectContent>
+                {districts.map((d) => (
+                  <SelectItem key={d.id} value={String(d.id)}>
+                    {d.nameTh}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FieldError>{fieldErrors.districtId}</FieldError>
+          </div>
+          <div>
+            <Label htmlFor="subdistrict">ตำบล</Label>
+            <Select
+              value={form.subDistrictId}
+              onValueChange={(v) => updateField('subDistrictId', v)}
+              disabled={!form.districtId || loadingGeo === 'subdistricts'}
+            >
+              <SelectTrigger id="subdistrict" aria-invalid={!!fieldErrors.subDistrictId || undefined}>
+                <SelectValue placeholder={loadingGeo === 'subdistricts' ? 'กำลังโหลด...' : 'เลือกตำบล'} />
+              </SelectTrigger>
+              <SelectContent>
+                {subdistricts.map((s) => (
+                  <SelectItem key={s.id} value={String(s.id)}>
+                    {s.nameTh}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FieldError>{fieldErrors.subDistrictId}</FieldError>
+          </div>
         </div>
-      </section>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div>
+            <Label htmlFor="village">หมู่บ้าน / หมู่ที่</Label>
+            <Input
+              id="village"
+              name="village"
+              placeholder="เช่น บ้านหัวงัว หมู่ 5"
+              value={form.village}
+              onChange={(e) => updateField('village', e.target.value)}
+            />
+          </div>
+          <div>
+            <Label htmlFor="addr">รายละเอียดเพิ่มเติม / จุดสังเกต</Label>
+            <Input
+              id="addr"
+              name="addr"
+              placeholder="เช่น หน้าวัดหัวงัว ติดกับร้านสะดวกซื้อ"
+              value={form.addr}
+              onChange={(e) => updateField('addr', e.target.value)}
+            />
+          </div>
+        </div>
+      </SectionCard>
 
       {/* ไฟล์แนบ */}
-      <section className="flex flex-col gap-4 border-t border-border pt-8">
-        <h2 className="flex items-center gap-2 text-xl font-semibold">
-          <Paperclip className="h-5 w-5 text-accent-strong" aria-hidden="true" />
-          รูปภาพประกอบ (ไม่จำเป็น)
-        </h2>
-        <div className="rounded-md border border-dashed border-border-strong bg-surface-raised px-4 py-8 text-center">
+      <SectionCard>
+        <SectionHeading icon={Paperclip}>รูปภาพประกอบ (ไม่จำเป็น)</SectionHeading>
+        <div className="mt-5 rounded-xl border border-dashed px-4 py-8 text-center" style={{ borderColor: 'oklch(80% 0.015 145)', backgroundColor: 'oklch(96% 0.02 145 / 0.3)' }}>
           <p className="text-sm text-muted">ลากไฟล์มาวาง หรือเลือกจากเครื่อง (สูงสุด 5 รูป)</p>
           <p className="mt-1 text-xs text-muted">ยังไม่เปิดใช้งานในเฟสนี้</p>
         </div>
-      </section>
+      </SectionCard>
 
       {/* PDPA consent */}
-      <section className="border-t border-border pt-8">
-        <label className="flex items-start gap-3 rounded-md border border-border bg-surface-raised p-4">
+      <div className="rounded-3xl border bg-surface-raised p-6 shadow-sm sm:p-8" style={{ borderColor: 'oklch(90% 0.01 145)' }}>
+        <label className="flex items-start gap-3 rounded-xl border p-4" style={{ borderColor: 'oklch(90% 0.01 145)', backgroundColor: 'oklch(96% 0.02 145 / 0.3)' }}>
           <input
             type="checkbox"
             aria-label="ยินยอมให้เก็บข้อมูลตามพระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล PDPA"
@@ -315,11 +481,21 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
           </span>
         </label>
         <FieldError>{fieldErrors.consent}</FieldError>
-      </section>
+      </div>
 
       {/* actions */}
-      <div className="flex flex-col gap-3 border-t border-border pt-8 sm:flex-row">
-        <Button type="submit" size="lg" disabled={isSubmitting}>
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <Button
+          type="submit"
+          size="lg"
+          disabled={isSubmitting}
+          className="h-12 px-8 text-base"
+          style={{
+            background: 'linear-gradient(to right, oklch(55% 0.13 160), oklch(45% 0.15 160))',
+            color: 'oklch(99% 0.005 145)',
+            boxShadow: '0 10px 40px -10px oklch(55% 0.13 160 / 0.3)',
+          }}
+        >
           {isSubmitting ? (
             <>
               <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
