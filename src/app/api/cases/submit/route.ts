@@ -137,7 +137,7 @@ export async function POST(req: NextRequest) {
     priority: 'normal',
     title,
     description,
-    location,
+    location: location ?? '',
     provinceId: provinceId ?? null,
     districtId: districtId ?? null,
     subDistrictId: subDistrictId ?? null,

@@ -51,7 +51,9 @@ interface SubDistrictSrc {
 function loadJson<T>(filename: string, key: string): T[] {
   const raw = readFileSync(join(geodataDir, filename), 'utf-8');
   const parsed = JSON.parse(raw) as Record<string, T[]>;
-  return parsed[key];
+  const data = parsed[key];
+  if (!data) throw new Error(`Key "${key}" not found in ${filename}`);
+  return data;
 }
 
 /** แยก insert เป็นชุดๆ กัน query ใหญ่เกินไป (sub_districts ~7.4k แถว) */
