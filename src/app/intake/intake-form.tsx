@@ -11,7 +11,7 @@ import {
   FileText,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { Button } from '../../components/ui/button';
 import { FieldError, FieldHint, Input, Label, Textarea } from '../../components/ui/field';
 import {
@@ -120,32 +120,38 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
   const [districts, setDistricts] = useState<GeoOption[]>([]);
   const [subdistricts, setSubdistricts] = useState<GeoOption[]>([]);
   const [loadingGeo, setLoadingGeo] = useState<'provinces' | 'districts' | 'subdistricts' | null>(null);
+  const [geoError, setGeoError] = useState<string | null>(null);
+  const geoRequestId = useRef(0);
 
   useEffect(() => {
+    setLoadingGeo('provinces');
     fetch('/api/provinces')
       .then((r) => r.json())
       .then((d) => setProvinces(d.provinces ?? []))
-      .catch(() => {});
+      .catch(() => setGeoError('โหลดรายชื่อจังหวัดไม่สำเร็จ กรุณารีเฟรชหน้า'))
+      .finally(() => setLoadingGeo(null));
   }, []);
 
   const loadDistricts = useCallback((provinceId: string) => {
     if (!provinceId) { setDistricts([]); setSubdistricts([]); return; }
+    const requestId = ++geoRequestId.current;
     setLoadingGeo('districts');
     fetch(`/api/districts?provinceId=${provinceId}`)
       .then((r) => r.json())
-      .then((d) => setDistricts(d.districts ?? []))
-      .catch(() => setDistricts([]))
-      .finally(() => setLoadingGeo(null));
+      .then((d) => { if (geoRequestId.current === requestId) setDistricts(d.districts ?? []); })
+      .catch(() => { if (geoRequestId.current === requestId) setDistricts([]); })
+      .finally(() => { if (geoRequestId.current === requestId) setLoadingGeo(null); });
   }, []);
 
   const loadSubdistricts = useCallback((districtId: string) => {
     if (!districtId) { setSubdistricts([]); return; }
+    const requestId = ++geoRequestId.current;
     setLoadingGeo('subdistricts');
     fetch(`/api/subdistricts?districtId=${districtId}`)
       .then((r) => r.json())
-      .then((d) => setSubdistricts(d.subdistricts ?? []))
-      .catch(() => setSubdistricts([]))
-      .finally(() => setLoadingGeo(null));
+      .then((d) => { if (geoRequestId.current === requestId) setSubdistricts(d.subdistricts ?? []); })
+      .catch(() => { if (geoRequestId.current === requestId) setSubdistricts([]); })
+      .finally(() => { if (geoRequestId.current === requestId) setLoadingGeo(null); });
   }, []);
 
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -374,6 +380,12 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
       {/* ที่ตั้ง */}
       <SectionCard>
         <SectionHeading icon={MapPin}>ที่ตั้ง</SectionHeading>
+        {geoError && (
+          <p role="alert" className="mt-4 flex items-start gap-2 rounded-xl border border-danger bg-danger-soft px-4 py-3 text-sm font-semibold text-danger">
+            <AlertCircle className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
+            {geoError}
+          </p>
+        )}
         <div className="mt-5 grid gap-4 sm:grid-cols-3">
           <div>
             <Label htmlFor="province">จังหวัด</Label>
