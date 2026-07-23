@@ -56,6 +56,30 @@ export const updateTypeEnum = pgEnum('update_type', [
   'metadata_change',
 ]);
 
+export const conversationModeEnum = pgEnum('conversation_mode', [
+  'bot_active',
+  'waiting_handoff',
+  'human_active',
+  'resolved',
+]);
+
+export const chatMessageTypeEnum = pgEnum('chat_message_type', [
+  'text',
+  'image',
+  'location',
+  'sticker',
+  'flex',
+  'template',
+  'system',
+]);
+
+export const chatSenderEnum = pgEnum('chat_sender', [
+  'user',
+  'bot',
+  'admin',
+  'system',
+]);
+
 // ────────────────────────────────────────────────────────────────────────────
 // § Users (ผู้ใช้งาน 5 บทบาท: citizen/officer/chief/head/superadmin)
 // ────────────────────────────────────────────────────────────────────────────
@@ -411,5 +435,123 @@ export const caseStatsDaily = pgTable(
   },
   (table) => ({
     dateIdx: index('case_stats_daily_date_idx').on(table.date),
+  })
+);
+
+// ────────────────────────────────────────────────────────────────────────────
+// § LINE Chat (LINE Messaging API — live chat + agent/human handoff)
+// ────────────────────────────────────────────────────────────────────────────
+
+export const lineUsers = pgTable(
+  'line_users',
+  {
+    id: text('id').primaryKey(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+
+    lineUserId: text('line_user_id').notNull().unique(),
+    displayName: text('display_name'),
+    pictureUrl: text('picture_url'),
+
+    linkedUserId: text('linked_user_id'),
+    botState: jsonb('bot_state'),
+    lastMessageAt: timestamp('last_message_at', { mode: 'date' }),
+    metadata: jsonb('metadata'),
+  },
+  (table) => ({
+    lineUserIdIdx: uniqueIndex('line_users_line_user_id_idx').on(table.lineUserId),
+    linkedUserIdx: index('line_users_linked_user_id_idx').on(table.linkedUserId),
+  })
+);
+
+export const chatConversations = pgTable(
+  'chat_conversations',
+  {
+    id: text('id').primaryKey(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+
+    lineUserId: text('line_user_id').notNull().unique(),
+    mode: conversationModeEnum().notNull().default('bot_active'),
+
+    assignedAdminId: text('assigned_admin_id'),
+    assignedAt: timestamp('assigned_at', { mode: 'date' }),
+    linkedCaseId: text('linked_case_id'),
+
+    unreadAdmin: integer('unread_admin').notNull().default(0),
+    lastMessageText: text('last_message_text'),
+    lastMessageAt: timestamp('last_message_at', { mode: 'date' }),
+    lastMessageSender: chatSenderEnum('last_message_sender'),
+
+    resolvedAt: timestamp('resolved_at', { mode: 'date' }),
+    metadata: jsonb('metadata'),
+  },
+  (table) => ({
+    lineUserIdIdx: uniqueIndex('chat_conversations_line_user_id_idx').on(table.lineUserId),
+    modeIdx: index('chat_conversations_mode_idx').on(table.mode),
+    assignedAdminIdx: index('chat_conversations_assigned_admin_id_idx').on(table.assignedAdminId),
+    lastMessageAtIdx: index('chat_conversations_last_message_at_idx').on(table.lastMessageAt),
+  })
+);
+
+export const chatMessages = pgTable(
+  'chat_messages',
+  {
+    id: text('id').primaryKey(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+
+    conversationId: text('conversation_id').notNull(),
+    sender: chatSenderEnum().notNull(),
+    messageType: chatMessageTypeEnum('message_type').notNull().default('text'),
+
+    textContent: text('text_content'),
+    mediaUrl: text('media_url'),
+    flexPayload: jsonb('flex_payload'),
+    locationData: jsonb('location_data'),
+
+    lineMessageId: text('line_message_id'),
+    adminUserId: text('admin_user_id'),
+    metadata: jsonb('metadata'),
+  },
+  (table) => ({
+    conversationIdx: index('chat_messages_conversation_id_idx').on(table.conversationId),
+    createdAtIdx: index('chat_messages_created_at_idx').on(table.createdAt),
+    lineMessageIdIdx: index('chat_messages_line_message_id_idx').on(table.lineMessageId),
+  })
+);
+
+export const chatFaq = pgTable(
+  'chat_faq',
+  {
+    id: text('id').primaryKey(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+
+    question: text('question').notNull(),
+    answer: text('answer').notNull(),
+    keywords: jsonb('keywords').notNull(),
+    categoryId: text('category_id'),
+    isActive: boolean('is_active').notNull().default(true),
+    hitCount: integer('hit_count').notNull().default(0),
+    priority: integer('priority').notNull().default(0),
+  },
+  (table) => ({
+    activeIdx: index('chat_faq_is_active_idx').on(table.isActive),
+  })
+);
+
+export const chatSettings = pgTable(
+  'chat_settings',
+  {
+    id: text('id').primaryKey(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+
+    key: text('key').notNull().unique(),
+    value: jsonb('value').notNull(),
+    description: text('description'),
+  },
+  (table) => ({
+    keyIdx: uniqueIndex('chat_settings_key_idx').on(table.key),
   })
 );

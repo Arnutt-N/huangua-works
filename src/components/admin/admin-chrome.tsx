@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { LayoutDashboard, LogOut, BarChart3, Users, ScrollText } from 'lucide-react';
+import { LayoutDashboard, LogOut, BarChart3, Users, ScrollText, MessageSquare } from 'lucide-react';
 import { logout } from '@/app/admin/actions';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
@@ -20,7 +20,7 @@ type UserRole = (typeof userRoleEnum.enumValues)[number];
  *
  * `active` prop ระบุ tab ปัจจุบัน — explicit จากแต่ละ page (สะอาดกว่า headers() parsing)
  */
-export type AdminTab = 'dashboard' | 'reports' | 'users' | 'audit';
+export type AdminTab = 'dashboard' | 'reports' | 'chat' | 'users' | 'audit';
 
 const SUPERVISOR_ROLES: UserRole[] = ['head', 'superadmin'];
 
@@ -35,6 +35,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard', label: 'แดชบอร์ด', href: '/admin', icon: LayoutDashboard },
   { key: 'reports', label: 'รายงาน', href: '/admin/reports', icon: BarChart3 },
+  { key: 'chat', label: 'แชท LINE', href: '/admin/chat', icon: MessageSquare },
   { key: 'users', label: 'ผู้ใช้งาน', href: '/admin/users', icon: Users, supervisorOnly: true },
   { key: 'audit', label: 'ประวัติ', href: '/admin/audit', icon: ScrollText },
 ];
