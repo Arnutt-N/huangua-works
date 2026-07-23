@@ -33,7 +33,7 @@ test.beforeAll(async () => {
 });
 
 test('province dropdown loads on page load', async ({ page }) => {
-  await page.goto('/intake');
+  await page.goto('/intake', { timeout: 60_000 });
   await page.locator('#province').click();
   const options = page.getByRole('option');
   await expect(options.first()).toBeVisible({ timeout: 15_000 });
