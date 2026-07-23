@@ -36,6 +36,13 @@
       "when": 1784825379287,
       "tag": "0004_whole_runaways",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1784829278286,
+      "tag": "0005_supreme_galactus",
+      "breakpoints": true
     }
   ]
 }
