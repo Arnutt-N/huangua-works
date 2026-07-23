@@ -136,11 +136,11 @@ export const categories = pgTable(
 );
 
 // ────────────────────────────────────────────────────────────────────────────
-// § Geography (จังหวัด/อำเภอ/ตำบล — thailand-geodata, MIT)
-// ใช้ integer PK ตาม natural key ของ source dataset (PROVINCE_ID/DISTRICT_ID/
-// SUB_DISTRICT_ID) เพื่อให้ seed import รักษา id เดิม + FK integrity; ต่างจาก
-// ตารางแอปที่ใช้ UUID v7 เพราะนี่คือ reference data ที่ id นิ่งจากแหล่งข้อมูล
-// ⚠️ ไม่มีระดับหมู่บ้าน (village) — dataset หยุดที่ตำบล; หมู่บ้านเก็บเป็น free-text ใน cases.village
+// § Geography (จังหวัด/อำเภอ/ตำบล/หมู่บ้าน)
+// ใช้ integer PK ตาม natural key ของ source dataset เพื่อให้ seed import รักษา
+// id เดิม + FK integrity; ต่างจากตารางแอปที่ใช้ UUID v7 เพราะนี่คือ reference data
+// แหล่งข้อมูล: provinces/districts/sub_districts — Dhanabhon/thailand-geodata (MIT)
+//             villages — กรมการปกครอง catalog.dopa.go.th (Open Data Commons)
 // ────────────────────────────────────────────────────────────────────────────
 
 export const provinces = pgTable(
@@ -191,6 +191,22 @@ export const subDistricts = pgTable(
   })
 );
 
+export const villages = pgTable(
+  'villages',
+  {
+    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    subDistrictId: integer('sub_district_id').notNull().references(() => subDistricts.id),
+    code: text('code').notNull(), // mcode e.g. "46010150"
+    nameTh: text('name_th').notNull(),
+    latitude: text('latitude'),
+    longitude: text('longitude'),
+  },
+  (table) => ({
+    subDistrictIdx: index('villages_sub_district_id_idx').on(table.subDistrictId),
+    codeIdx: index('villages_code_idx').on(table.code),
+  })
+);
+
 // ────────────────────────────────────────────────────────────────────────────
 // § Cases (เรื่องแจ้งเหตุ — state machine: received→reviewing→assigned→in_progress→done→closed/rejected)
 // ────────────────────────────────────────────────────────────────────────────
@@ -216,11 +232,11 @@ export const cases = pgTable(
     location: text('location').notNull(), // address/landmark ไทย (รายละเอียดเพิ่มเติม เช่น จุดสังเกต/ถนน)
 
     // § ที่อยู่เชิงโครงสร้าง (cascading dropdown จาก geography tables)
-    // village เป็น free-text เพราะ dataset ไม่มีระดับหมู่บ้าน
     provinceId: integer('province_id').references(() => provinces.id),
     districtId: integer('district_id').references(() => districts.id),
     subDistrictId: integer('sub_district_id').references(() => subDistricts.id),
-    village: text('village'), // หมู่/หมู่บ้าน (free-text)
+    villageId: integer('village_id').references(() => villages.id),
+    village: text('village'), // free-text fallback (ชื่อหมู่บ้านที่ผู้ใช้พิมพ์เอง)
 
     categoryId: text('category_id').notNull(), // FK categories.id
 

@@ -129,6 +129,7 @@ export const submitCaseSchema = z.object({
   provinceId: geodataIdSchema.optional(),
   districtId: geodataIdSchema.optional(),
   subDistrictId: geodataIdSchema.optional(),
+  villageId: geodataIdSchema.optional(),
   village: villageSchema,
   consent: z.literal(true, {
     message: 'กรุณายินยอมให้เก็บข้อมูลก่อนส่งเรื่อง',

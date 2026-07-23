@@ -1,7 +1,6 @@
-import { NextRequest } from 'next/server';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { closeDb, getDb } from '@/lib/db';
-import { provinces, districts, subDistricts } from '@/lib/db/schema';
+import { provinces } from '@/lib/db/schema';
 import { GET as getProvinces } from './route';
 
 describe('GET /api/provinces', () => {
@@ -16,8 +15,7 @@ describe('GET /api/provinces', () => {
   });
 
   test('returns 200 with provinces array', async () => {
-    const req = new NextRequest('http://localhost:3000/api/provinces');
-    const res = await getProvinces(req);
+    const res = await getProvinces();
     expect(res.status).toBe(200);
 
     const data = await res.json();
@@ -26,8 +24,7 @@ describe('GET /api/provinces', () => {
   });
 
   test('each province has id, nameTh, nameEn', async () => {
-    const req = new NextRequest('http://localhost:3000/api/provinces');
-    const res = await getProvinces(req);
+    const res = await getProvinces();
     const data = await res.json();
 
     const first = data.provinces[0];
@@ -38,8 +35,7 @@ describe('GET /api/provinces', () => {
   });
 
   test('has Cache-Control header (1 day)', async () => {
-    const req = new NextRequest('http://localhost:3000/api/provinces');
-    const res = await getProvinces(req);
+    const res = await getProvinces();
     expect(res.headers.get('Cache-Control')).toBe('public, max-age=86400');
   });
 });

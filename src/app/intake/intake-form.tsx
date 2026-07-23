@@ -43,6 +43,7 @@ interface FormState {
   provinceId: string;
   districtId: string;
   subDistrictId: string;
+  villageId: string;
   village: string;
   addr: string;
   consent: boolean;
@@ -58,6 +59,7 @@ const initialForm: FormState = {
   provinceId: '',
   districtId: '',
   subDistrictId: '',
+  villageId: '',
   village: '',
   addr: '',
   consent: false,
@@ -119,7 +121,8 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
   const [provinces, setProvinces] = useState<GeoOption[]>([]);
   const [districts, setDistricts] = useState<GeoOption[]>([]);
   const [subdistricts, setSubdistricts] = useState<GeoOption[]>([]);
-  const [loadingGeo, setLoadingGeo] = useState<'provinces' | 'districts' | 'subdistricts' | null>(null);
+  const [villagesList, setVillagesList] = useState<GeoOption[]>([]);
+  const [loadingGeo, setLoadingGeo] = useState<'provinces' | 'districts' | 'subdistricts' | 'villages' | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
   const geoRequestId = useRef(0);
 
@@ -154,21 +157,40 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
       .finally(() => { if (geoRequestId.current === requestId) setLoadingGeo(null); });
   }, []);
 
+  const loadVillages = useCallback((subDistrictId: string) => {
+    if (!subDistrictId) { setVillagesList([]); return; }
+    const requestId = ++geoRequestId.current;
+    setLoadingGeo('villages');
+    fetch(`/api/villages?subDistrictId=${subDistrictId}`)
+      .then((r) => r.json())
+      .then((d) => { if (geoRequestId.current === requestId) setVillagesList(d.villages ?? []); })
+      .catch(() => { if (geoRequestId.current === requestId) setVillagesList([]); })
+      .finally(() => { if (geoRequestId.current === requestId) setLoadingGeo(null); });
+  }, []);
+
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
   function handleProvinceChange(value: string) {
-    setForm((prev) => ({ ...prev, provinceId: value, districtId: '', subDistrictId: '' }));
+    setForm((prev) => ({ ...prev, provinceId: value, districtId: '', subDistrictId: '', villageId: '' }));
     setDistricts([]);
     setSubdistricts([]);
+    setVillagesList([]);
     loadDistricts(value);
   }
 
   function handleDistrictChange(value: string) {
-    setForm((prev) => ({ ...prev, districtId: value, subDistrictId: '' }));
+    setForm((prev) => ({ ...prev, districtId: value, subDistrictId: '', villageId: '' }));
     setSubdistricts([]);
+    setVillagesList([]);
     loadSubdistricts(value);
+  }
+
+  function handleSubDistrictChange(value: string) {
+    setForm((prev) => ({ ...prev, subDistrictId: value, villageId: '' }));
+    setVillagesList([]);
+    loadVillages(value);
   }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -195,6 +217,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
           provinceId: Number(form.provinceId),
           districtId: Number(form.districtId),
           subDistrictId: Number(form.subDistrictId),
+          villageId: form.villageId ? Number(form.villageId) : undefined,
           village: form.village.trim() || undefined,
           consent: form.consent,
         }),
@@ -427,7 +450,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
             <Label htmlFor="subdistrict">ตำบล</Label>
             <Select
               value={form.subDistrictId}
-              onValueChange={(v) => updateField('subDistrictId', v)}
+              onValueChange={handleSubDistrictChange}
               disabled={!form.districtId || loadingGeo === 'subdistricts'}
             >
               <SelectTrigger id="subdistrict" aria-invalid={!!fieldErrors.subDistrictId || undefined}>
@@ -444,9 +467,28 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
             <FieldError>{fieldErrors.subDistrictId}</FieldError>
           </div>
         </div>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div className="mt-4 grid gap-4 sm:grid-cols-3">
           <div>
-            <Label htmlFor="village">หมู่บ้าน / หมู่ที่</Label>
+            <Label htmlFor="villageId">หมู่บ้าน</Label>
+            <Select
+              value={form.villageId}
+              onValueChange={(v) => updateField('villageId', v)}
+              disabled={!form.subDistrictId || loadingGeo === 'villages'}
+            >
+              <SelectTrigger id="villageId">
+                <SelectValue placeholder={loadingGeo === 'villages' ? 'กำลังโหลด...' : 'เลือกหมู่บ้าน'} />
+              </SelectTrigger>
+              <SelectContent>
+                {villagesList.map((v) => (
+                  <SelectItem key={v.id} value={String(v.id)}>
+                    {v.nameTh}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="village">ชื่อหมู่บ้าน (ถ้าไม่อยู่ในรายการ)</Label>
             <Input
               id="village"
               name="village"

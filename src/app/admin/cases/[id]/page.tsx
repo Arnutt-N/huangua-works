@@ -14,6 +14,7 @@ import {
   provinces,
   subDistricts,
   users,
+  villages,
 } from '@/lib/db/schema';
 import { requireStaff } from '@/lib/auth/require-staff';
 import { AdminChrome } from '@/components/admin/admin-chrome';
@@ -82,6 +83,7 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
         provinceName: provinces.nameTh,
         districtName: districts.nameTh,
         subDistrictName: subDistricts.nameTh,
+        villageName: villages.nameTh,
       })
       .from(cases)
       .leftJoin(categories, eq(cases.categoryId, categories.id))
@@ -90,6 +92,7 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
       .leftJoin(provinces, eq(cases.provinceId, provinces.id))
       .leftJoin(districts, eq(cases.districtId, districts.id))
       .leftJoin(subDistricts, eq(cases.subDistrictId, subDistricts.id))
+      .leftJoin(villages, eq(cases.villageId, villages.id))
       // § 2nd join to users for assignee — alias ไม่ได้ใน core query, ใช้ subquery แยกแทน (ด้านล่าง)
       .where(eq(cases.id, caseId))
       .limit(1)
@@ -268,7 +271,7 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
                       .join(' · ')}
                   </p>
                 )}
-                {caseRow.village && <p>หมู่บ้าน: {caseRow.village}</p>}
+                {(caseRow.villageName || caseRow.village) && <p>หมู่บ้าน: {caseRow.villageName || caseRow.village}</p>}
                 {caseRow.location && <p className="text-muted">{caseRow.location}</p>}
               </div>
             </div>
