@@ -217,9 +217,9 @@ export const cases = pgTable(
 
     // § ที่อยู่เชิงโครงสร้าง (cascading dropdown จาก geography tables)
     // village เป็น free-text เพราะ dataset ไม่มีระดับหมู่บ้าน
-    provinceId: integer('province_id'), // FK provinces.id
-    districtId: integer('district_id'), // FK districts.id
-    subDistrictId: integer('sub_district_id'), // FK sub_districts.id
+    provinceId: integer('province_id').references(() => provinces.id),
+    districtId: integer('district_id').references(() => districts.id),
+    subDistrictId: integer('sub_district_id').references(() => subDistricts.id),
     village: text('village'), // หมู่/หมู่บ้าน (free-text)
 
     categoryId: text('category_id').notNull(), // FK categories.id

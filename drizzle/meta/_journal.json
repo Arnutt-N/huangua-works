@@ -22,6 +22,13 @@
       "when": 1784677080873,
       "tag": "0002_magical_prima",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1784764336031,
+      "tag": "0003_dear_hex",
+      "breakpoints": true
     }
   ]
 }

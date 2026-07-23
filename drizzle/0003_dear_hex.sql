@@ -1,0 +1,3 @@
+ALTER TABLE "cases" ADD CONSTRAINT "cases_province_id_provinces_id_fk" FOREIGN KEY ("province_id") REFERENCES "public"."provinces"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "cases" ADD CONSTRAINT "cases_district_id_districts_id_fk" FOREIGN KEY ("district_id") REFERENCES "public"."districts"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "cases" ADD CONSTRAINT "cases_sub_district_id_sub_districts_id_fk" FOREIGN KEY ("sub_district_id") REFERENCES "public"."sub_districts"("id") ON DELETE no action ON UPDATE no action;
