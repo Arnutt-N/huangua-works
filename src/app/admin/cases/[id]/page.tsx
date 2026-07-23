@@ -10,6 +10,9 @@ import {
   caseUpdates,
   categories,
   departments,
+  districts,
+  provinces,
+  subDistricts,
   users,
 } from '@/lib/db/schema';
 import { requireStaff } from '@/lib/auth/require-staff';
@@ -75,11 +78,18 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
         assigneeName: users.fullName,
         departmentId: cases.departmentId,
         departmentName: departments.name,
+        village: cases.village,
+        provinceName: provinces.nameTh,
+        districtName: districts.nameTh,
+        subDistrictName: subDistricts.nameTh,
       })
       .from(cases)
       .leftJoin(categories, eq(cases.categoryId, categories.id))
       .leftJoin(departments, eq(cases.departmentId, departments.id))
       .leftJoin(users, eq(cases.submittedBy, users.id))
+      .leftJoin(provinces, eq(cases.provinceId, provinces.id))
+      .leftJoin(districts, eq(cases.districtId, districts.id))
+      .leftJoin(subDistricts, eq(cases.subDistrictId, subDistricts.id))
       // § 2nd join to users for assignee — alias ไม่ได้ใน core query, ใช้ subquery แยกแทน (ด้านล่าง)
       .where(eq(cases.id, caseId))
       .limit(1)
@@ -248,10 +258,20 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
         <div className="mt-6 space-y-4">
           <div>
             <h2 className="mb-2 text-sm font-bold text-muted">ที่ตั้ง</h2>
-            <p className="flex items-start gap-2 text-sm text-ink">
+            <div className="flex items-start gap-2 text-sm text-ink">
               <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-accent" aria-hidden="true" />
-              {caseRow.location}
-            </p>
+              <div className="space-y-1">
+                {(caseRow.provinceName || caseRow.districtName || caseRow.subDistrictName) && (
+                  <p>
+                    {[caseRow.subDistrictName, caseRow.districtName, caseRow.provinceName]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                )}
+                {caseRow.village && <p>หมู่บ้าน: {caseRow.village}</p>}
+                {caseRow.location && <p className="text-muted">{caseRow.location}</p>}
+              </div>
+            </div>
           </div>
           <div>
             <h2 className="mb-2 text-sm font-bold text-muted">รายละเอียด</h2>
