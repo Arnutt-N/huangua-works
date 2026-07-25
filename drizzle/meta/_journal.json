@@ -43,6 +43,13 @@
       "when": 1784829278286,
       "tag": "0005_supreme_galactus",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1784962111978,
+      "tag": "0006_add_geography_fk",
+      "breakpoints": true
     }
   ]
 }

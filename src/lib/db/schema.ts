@@ -184,7 +184,7 @@ export const districts = pgTable(
   'districts',
   {
     id: integer('id').primaryKey(), // source DISTRICT_ID
-    provinceId: integer('province_id').notNull(), // FK provinces.id
+    provinceId: integer('province_id').notNull().references(() => provinces.id),
     code: text('code').notNull(),
     districtCode: text('district_code').notNull(), // e.g. "4607" (ยางตลาด)
     nameTh: text('name_th').notNull(),
@@ -200,7 +200,7 @@ export const subDistricts = pgTable(
   'sub_districts',
   {
     id: integer('id').primaryKey(), // source SUB_DISTRICT_ID
-    districtId: integer('district_id').notNull(), // FK districts.id
+    districtId: integer('district_id').notNull().references(() => districts.id),
     code: text('code').notNull(),
     subDistrictCode: text('sub_district_code').notNull(), // e.g. "460701"
     nameTh: text('name_th').notNull(),

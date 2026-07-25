@@ -1,13 +1,14 @@
 import { expect, test } from '@playwright/test';
 import { eq } from 'drizzle-orm';
 import { closeDb, getDb } from '../src/lib/db';
-import { cases, categories, users } from '../src/lib/db/schema';
+import { cases, categories, consentRecords, users } from '../src/lib/db/schema';
 import { generateId } from '../src/lib/id';
 
 const TEST_USER_EMAIL = 'e2e-track-test@placeholder.local';
 const TEST_TRACKING_CODE = 'HN888888881'; // fixed code สำหรับ e2e
 let testUserId: string;
 let testCaseId: string;
+let testConsentId: string;
 
 test.beforeAll(async () => {
   const db = await getDb();
@@ -22,6 +23,16 @@ test.beforeAll(async () => {
     role: 'citizen',
     isActive: true,
     fullName: 'ผู้แจ้งทดสอบ E2E Track',
+  });
+
+  testConsentId = generateId();
+  await db.insert(consentRecords).values({
+    id: testConsentId,
+    userId: testUserId,
+    consentType: 'data_collection',
+    version: '1.0',
+    isGranted: true,
+    grantedAt: new Date(),
   });
 
   testCaseId = generateId();
@@ -41,6 +52,7 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   const db = await getDb();
   await db.delete(cases).where(eq(cases.id, testCaseId));
+  await db.delete(consentRecords).where(eq(consentRecords.id, testConsentId));
   await db.delete(users).where(eq(users.id, testUserId));
   await closeDb();
 });

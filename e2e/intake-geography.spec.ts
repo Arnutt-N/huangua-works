@@ -1,33 +1,47 @@
 import { expect, test } from '@playwright/test';
 import { eq } from 'drizzle-orm';
 import { closeDb, getDb } from '../src/lib/db';
-import { districts, provinces, subDistricts } from '../src/lib/db/schema';
+import { districts, provinces, subDistricts, villages } from '../src/lib/db/schema';
 
 let testProvince: { id: number; nameTh: string };
 let testDistrict: { id: number; nameTh: string };
 let testSubdistrict: { id: number; nameTh: string };
+let testVillage: { id: number; nameTh: string };
 let secondProvince: { id: number; nameTh: string };
 
 test.beforeAll(async () => {
   const db = await getDb();
 
-  const provinceRows = await db.select({ id: provinces.id, nameTh: provinces.nameTh }).from(provinces).limit(2);
-  testProvince = provinceRows[0]!;
-  secondProvince = provinceRows[1]!;
-
-  const districtRow = await db
-    .select({ id: districts.id, nameTh: districts.nameTh })
-    .from(districts)
-    .where(eq(districts.provinceId, testProvince.id))
+  // Start from villages and join upward to guarantee all 4 levels have data.
+  const chain = await db
+    .select({
+      provinceId: provinces.id,
+      provinceName: provinces.nameTh,
+      districtId: districts.id,
+      districtName: districts.nameTh,
+      subdistrictId: subDistricts.id,
+      subdistrictName: subDistricts.nameTh,
+      villageId: villages.id,
+      villageName: villages.nameTh,
+    })
+    .from(villages)
+    .innerJoin(subDistricts, eq(villages.subDistrictId, subDistricts.id))
+    .innerJoin(districts, eq(subDistricts.districtId, districts.id))
+    .innerJoin(provinces, eq(districts.provinceId, provinces.id))
     .limit(1);
-  testDistrict = districtRow[0]!;
+  const row = chain[0]!;
 
-  const subdistrictRow = await db
-    .select({ id: subDistricts.id, nameTh: subDistricts.nameTh })
-    .from(subDistricts)
-    .where(eq(subDistricts.districtId, testDistrict.id))
-    .limit(1);
-  testSubdistrict = subdistrictRow[0]!;
+  testProvince = { id: row.provinceId, nameTh: row.provinceName };
+  testDistrict = { id: row.districtId, nameTh: row.districtName };
+  testSubdistrict = { id: row.subdistrictId, nameTh: row.subdistrictName };
+  testVillage = { id: row.villageId, nameTh: row.villageName };
+
+  // Pick any province whose id differs from testProvince for the reset test.
+  const otherProvince = await db
+    .select({ id: provinces.id, nameTh: provinces.nameTh })
+    .from(provinces)
+    .limit(2);
+  secondProvince = otherProvince.find((p) => p.id !== testProvince.id)!;
 
   await closeDb();
 });
@@ -66,6 +80,25 @@ test('selecting district loads its subdistricts', async ({ page }) => {
   await expect(page.getByRole('option', { name: testSubdistrict.nameTh })).toBeVisible({ timeout: 10_000 });
 });
 
+test('selecting subdistrict loads its villages', async ({ page }) => {
+  await page.goto('/intake');
+
+  await page.locator('#province').click();
+  await page.getByRole('option', { name: testProvince.nameTh }).click();
+
+  await expect(page.locator('#district')).toBeEnabled({ timeout: 10_000 });
+  await page.locator('#district').click();
+  await page.getByRole('option', { name: testDistrict.nameTh }).click();
+
+  await expect(page.locator('#subdistrict')).toBeEnabled({ timeout: 10_000 });
+  await page.locator('#subdistrict').click();
+  await page.getByRole('option', { name: testSubdistrict.nameTh }).click();
+
+  await expect(page.locator('#villageId')).toBeEnabled({ timeout: 10_000 });
+  await page.locator('#villageId').click();
+  await expect(page.getByRole('option', { name: testVillage.nameTh })).toBeVisible({ timeout: 10_000 });
+});
+
 test('changing province resets downstream selects', async ({ page }) => {
   await page.goto('/intake');
 
@@ -77,10 +110,15 @@ test('changing province resets downstream selects', async ({ page }) => {
   await page.getByRole('option', { name: testDistrict.nameTh }).click();
   await expect(page.locator('#subdistrict')).toBeEnabled({ timeout: 10_000 });
 
-  // change province → district and subdistrict should reset
+  await page.locator('#subdistrict').click();
+  await page.getByRole('option', { name: testSubdistrict.nameTh }).click();
+  await expect(page.locator('#villageId')).toBeEnabled({ timeout: 10_000 });
+
+  // change province → district, subdistrict, and village should reset
   await page.locator('#province').click();
   await page.getByRole('option', { name: secondProvince.nameTh }).click();
 
-  await expect(page.locator('#subdistrict')).toBeDisabled();
   await expect(page.locator('#district')).toContainText('เลือกอำเภอ');
+  await expect(page.locator('#subdistrict')).toBeDisabled();
+  await expect(page.locator('#villageId')).toBeDisabled();
 });

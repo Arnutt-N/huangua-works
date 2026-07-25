@@ -36,6 +36,9 @@ dist/
 build/
 *.tsbuildinfo
 
+# Generated rich menu image (สร้างด้วย scripts/generate-rich-menu.ts)
+scripts/rich-menu.png
+
 # ---- 📖 Storybook ----
 storybook-static/
 
