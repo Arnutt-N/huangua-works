@@ -70,12 +70,17 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
     eventSourceRef.current = es;
 
     es.onmessage = (e) => {
-      const event = JSON.parse(e.data);
+      let event: { type?: string; conversationId?: string; payload?: { mode?: string } & Record<string, unknown> };
+      try {
+        event = JSON.parse(e.data);
+      } catch {
+        return;
+      }
       if (event.type === 'connected') return;
 
       if (event.type === 'new_message') {
         if (event.conversationId === selectedId) {
-          setMessages((prev) => [...prev, event.payload]);
+          setMessages((prev) => [...prev, event.payload as unknown as Message]);
         }
         loadConversations();
       }

@@ -1,16 +1,38 @@
 import { expect, test } from '@playwright/test';
 import { eq } from 'drizzle-orm';
 import { closeDb, getDb } from '../src/lib/db';
-import { cases, dedupHashes, users } from '../src/lib/db/schema';
+import { cases, dedupHashes, districts, provinces, subDistricts, users, villages } from '../src/lib/db/schema';
 import { resetRateLimits } from './helpers/reset-rate-limits';
 
 const TEST_CID = '1101200563040';
 const TEST_EMAIL = `cid-${TEST_CID}@placeholder.local`;
 const createdCaseIds: string[] = [];
 
+let geoProvince: string;
+let geoDistrict: string;
+let geoSubdistrict: string;
+
 test.beforeAll(async () => {
   // ::1 คือ IP ที่ request จาก Playwright (ผ่าน localhost) เห็นจริงบนเครื่องนี้
   await resetRateLimits('rate:submit:::1');
+
+  const db = await getDb();
+  const chain = await db
+    .select({
+      provinceName: provinces.nameTh,
+      districtName: districts.nameTh,
+      subdistrictName: subDistricts.nameTh,
+    })
+    .from(villages)
+    .innerJoin(subDistricts, eq(villages.subDistrictId, subDistricts.id))
+    .innerJoin(districts, eq(subDistricts.districtId, districts.id))
+    .innerJoin(provinces, eq(districts.provinceId, provinces.id))
+    .limit(1);
+  const row = chain[0]!;
+  geoProvince = row.provinceName;
+  geoDistrict = row.districtName;
+  geoSubdistrict = row.subdistrictName;
+  await closeDb();
 });
 
 test.afterAll(async () => {
@@ -33,6 +55,7 @@ test('submitting an empty form shows validation errors without a network call', 
 });
 
 test('golden path: filling and submitting creates a real case', async ({ page }) => {
+  test.slow();
   await page.goto('/intake');
 
   await page.getByLabel('ชื่อ - นามสกุล').fill('ทดสอบ E2E Playwright');
@@ -40,13 +63,23 @@ test('golden path: filling and submitting creates a real case', async ({ page })
   await page.getByLabel('หมวดเรื่อง').click();
   await page.getByRole('option').first().click();
   await page.getByLabel('หัวเรื่อง').fill(`ทดสอบ E2E intake ${Date.now()}`);
-  await page.getByLabel('รายละเอียด').fill('ทดสอบฟอร์มแจ้งเรื่องผ่าน Playwright E2E ถาวร');
-  await page.getByLabel('ที่อยู่ / จุดที่เกิดเรื่อง').fill('ทดสอบ ตำบลหัวงัว');
+  await page.getByLabel('รายละเอียด', { exact: true }).fill('ทดสอบฟอร์มแจ้งเรื่องผ่าน Playwright E2E ถาวร');
+  await page.getByLabel('รายละเอียดเพิ่มเติม / จุดสังเกต').fill('ทดสอบ ตำบลหัวงัว');
+
+  await page.locator('#province').click();
+  await page.getByRole('option', { name: geoProvince }).click();
+  await expect(page.locator('#district')).toBeEnabled({ timeout: 10_000 });
+  await page.locator('#district').click();
+  await page.getByRole('option', { name: geoDistrict }).click();
+  await expect(page.locator('#subdistrict')).toBeEnabled({ timeout: 10_000 });
+  await page.locator('#subdistrict').click();
+  await page.getByRole('option', { name: geoSubdistrict }).click();
+
   await page.getByRole('checkbox').check();
   await page.getByRole('button', { name: 'ส่งเรื่อง' }).click();
 
   await expect(page.getByRole('heading', { name: 'รับเรื่องเรียบร้อย' })).toBeVisible({
-    timeout: 10_000,
+    timeout: 30_000,
   });
 
   // § อ่าน tracking code (HN...) และ caseId (UUID — เก็บไว้ใน data attribute สำหรับ cleanup)

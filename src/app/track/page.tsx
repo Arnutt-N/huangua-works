@@ -1,7 +1,7 @@
 import { ArrowLeft } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { SiteHeader } from '../../components/site/site-header';
+import { Navbar } from '@/components/landing/Navbar';
 import { SiteFooter } from '../../components/site/site-footer';
 import { TrackForm } from './track-form';
 
@@ -22,8 +22,8 @@ export default async function TrackPage({
 
   return (
     <div className="min-h-dvh bg-surface text-ink">
-      <SiteHeader />
-      <main className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
+      <Navbar />
+      <main className="mx-auto w-full max-w-3xl px-4 pb-16 pt-24 sm:px-6 sm:pb-20 sm:pt-28">
         <Link
           href="/"
           className="inline-flex min-h-touch items-center gap-1.5 text-sm text-muted hover:text-ink"

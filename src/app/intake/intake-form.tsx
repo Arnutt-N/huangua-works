@@ -327,11 +327,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
               value={form.cid}
               onChange={(e) => updateField('cid', e.target.value)}
             />
-            {fieldErrors.cid ? (
-              <FieldError>{fieldErrors.cid}</FieldError>
-            ) : (
-              <FieldHint>ใช้ยืนยันตัวตนและติดตามเรื่อง เก็บเป็นรหัส (hash) ไม่รั่วไหล</FieldHint>
-            )}
+            {fieldErrors.cid && <FieldError>{fieldErrors.cid}</FieldError>}
           </div>
         </div>
         <div className="mt-4">
@@ -524,14 +520,14 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
         <label className="flex items-start gap-3 rounded-xl border p-4" style={{ borderColor: 'oklch(90% 0.01 145)', backgroundColor: 'oklch(96% 0.02 145 / 0.3)' }}>
           <input
             type="checkbox"
-            aria-label="ยินยอมให้เก็บข้อมูลตามพระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล PDPA"
+            aria-label="ยินยอมให้เก็บข้อมูลตามกฎหมายว่าด้วยการคุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562"
             className="mt-1 h-5 w-5 flex-none rounded border-border-strong text-accent-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
             checked={form.consent}
             onChange={(e) => updateField('consent', e.target.checked)}
           />
           <span className="text-sm text-ink">
             ฉันยินยอมให้ อบต.หัวงัว เก็บรวบรวมและใช้ข้อมูลข้างต้นเพื่อดำเนินการเรื่องแจ้งเหตุ
-            ตามพระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล (PDPA) พ.ศ. 2562
+            ตามกฎหมายว่าด้วยการคุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562
           </span>
         </label>
         <FieldError>{fieldErrors.consent}</FieldError>
@@ -540,10 +536,28 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
       {/* actions */}
       <div className="flex flex-col gap-3 sm:flex-row">
         <Button
+          type="button"
+          variant="ghost"
+          size="lg"
+          disabled={isSubmitting}
+          onClick={() => {
+            setForm(initialForm);
+            setFieldErrors({});
+            setSubmitError(null);
+            setDistricts([]);
+            setSubdistricts([]);
+            setVillagesList([]);
+            setGeoError(null);
+          }}
+          className="h-12 px-6 text-base"
+        >
+          ล้างทั้งหมด
+        </Button>
+        <Button
           type="submit"
           size="lg"
           disabled={isSubmitting}
-          className="h-12 px-8 text-base"
+          className="h-12 flex-1 px-8 text-base"
           style={{
             background: 'linear-gradient(to right, oklch(55% 0.13 160), oklch(45% 0.15 160))',
             color: 'oklch(99% 0.005 145)',
