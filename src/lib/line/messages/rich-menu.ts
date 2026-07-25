@@ -12,7 +12,7 @@ function getHeaders(): HeadersInit {
 export const RICH_MENU_BODY = {
   size: { width: 2500, height: 1686 },
   selected: true,
-  name: 'อบต.หัวงัว Main Menu',
+  name: 'กองช่าง อบต.หัวงัว Main Menu',
   chatBarText: 'เมนูหลัก',
   areas: [
     {
