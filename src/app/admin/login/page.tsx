@@ -1,7 +1,7 @@
 import { ArrowLeft } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { SiteHeader } from '../../../components/site/site-header';
+import { Navbar } from '@/components/landing/Navbar';
 import { SiteFooter } from '../../../components/site/site-footer';
 import { LoginForm } from './login-form';
 
@@ -14,8 +14,8 @@ export const metadata: Metadata = { title: 'เข้าระบบเจ้า
 export default function AdminLoginPage() {
   return (
     <div className="min-h-dvh bg-surface text-ink">
-      <SiteHeader />
-      <main className="mx-auto flex w-full max-w-md flex-col px-4 py-14 sm:px-6">
+      <Navbar />
+      <main className="mx-auto flex w-full max-w-md flex-col px-4 pb-16 pt-24 sm:px-6 sm:pt-28">
         <Link
           href="/"
           className="inline-flex min-h-touch items-center gap-1.5 text-sm text-muted hover:text-ink"

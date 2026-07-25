@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { getDb } from '@/lib/db';
 import { categories as categoriesTable } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import { SiteHeader } from '../../components/site/site-header';
+import { Navbar } from '@/components/landing/Navbar';
 import { SiteFooter } from '../../components/site/site-footer';
 import { IntakeForm } from './intake-form';
 
@@ -30,8 +30,8 @@ export default async function IntakePage() {
 
   return (
     <div className="min-h-dvh bg-surface text-ink">
-      <SiteHeader />
-      <main className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
+      <Navbar />
+      <main className="mx-auto w-full max-w-3xl px-4 pb-16 pt-24 sm:px-6 sm:pb-20 sm:pt-28">
         <Link
           href="/"
           className="inline-flex min-h-touch items-center gap-1.5 text-sm text-muted hover:text-ink"
@@ -42,7 +42,7 @@ export default async function IntakePage() {
 
         <h1 className="mt-4 text-3xl font-bold sm:text-4xl">แจ้งเรื่องใหม่</h1>
         <p className="mt-3 text-lg text-muted">
-          กรอกเรื่องของท่าน เจ้าหน้าที่รับและติดตามให้ทุกขั้นตอน โปร่งใส ตรวจสอบได้
+          กรอกข้อมูลให้ครบ เจ้าหน้าที่จะรับเรื่องและติดตามให้ท่านทุกขั้นตอน
         </p>
 
         <IntakeForm categories={categories} />

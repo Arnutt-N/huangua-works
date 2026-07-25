@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Bell, Menu, X, Search } from 'lucide-react';
+import { Bell, Menu, X, Search, LogIn } from 'lucide-react';
 import { Button } from '../ui/button';
 
 /**
@@ -34,8 +34,11 @@ export function Navbar() {
             >
               อบต
             </div>
-            <div className="hidden sm:block">
-              <div className="text-sm font-bold">อบต.หัวงัว</div>
+            <div className="hidden sm:block leading-tight">
+              <div className="text-sm font-bold">
+                <span className="lg:hidden">กองช่าง อบต.หัวงัว</span>
+                <span className="hidden lg:inline">กองช่าง องค์การบริหารส่วนตำบลหัวงัว</span>
+              </div>
               <div className="text-xs text-muted">แจ้งเหตุ · ติดตามงานบริการ</div>
             </div>
           </Link>
@@ -69,7 +72,13 @@ export function Navbar() {
           </div>
 
           {/* CTA */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Link
+              href="/admin/login"
+              className="hidden min-h-touch items-center rounded-md px-3 text-sm font-medium text-ink/80 transition-colors hover:bg-surface-sunken hover:text-ink sm:inline-flex"
+            >
+              เข้าสู่ระบบ
+            </Link>
             <Button
               size="sm"
               className="shadow-md"
@@ -109,6 +118,9 @@ export function Navbar() {
           aria-label="เมนูหลัก (มือถือ)"
         >
           <div className="container mx-auto flex flex-col gap-1 px-4 py-4 sm:px-6">
+            <MobileLink href="/admin/login" onClick={() => setMobileOpen(false)} icon={<LogIn className="h-4 w-4" />}>
+              เข้าสู่ระบบ
+            </MobileLink>
             <MobileLink href="/intake" onClick={() => setMobileOpen(false)} icon={<Bell className="h-4 w-4" />}>
               แจ้งเหตุออนไลน์
             </MobileLink>
