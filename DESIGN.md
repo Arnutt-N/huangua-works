@@ -1,6 +1,6 @@
 <!-- SEED: re-run $impeccable document once tokens.css + primitives exist to capture real rendered tokens and generate .impeccable/design.json sidecar. Anchor values ด้านล่างอ้างอิง glm5-2-smart-service emerald/amber palette + glassmorphism + framer-motion. ค้าง verify contrast AA ตอน implement. -->
 ---
-name: อบต.หัวงัว Smart Service Center
+name: กองช่าง องค์การบริหารส่วนตำบลหัวงัว
 description: ระบบรับแจ้งเหตุและติดตามงานบริการสาธารณูปโภคออนไลน์ — รวดเร็ว โปร่งใส มีประสิทธิภาพ (tech/smart + Thai royal vibe)
 colors:
   surface: "oklch(99% 0.005 145)"
@@ -97,7 +97,7 @@ motion:
   note: "ทุก animation ต้อง respect prefers-reduced-motion — disable float/pulse/shimmer/gradient-shift เมื่อ user ตั้ง reduce-motion"
 ---
 
-# อบต.หัวงัว Smart Service Center — Design System
+# กองช่าง องค์การบริหารส่วนตำบลหัวงัว — Design System
 
 **ตัวตน:** ระบบรับแจ้งเหตุและติดตามงานบริการสาธารณูปโภคออนไลน์ — น่าเชื่อถือ โปร่งใส มีประสิทธิภาพ (tech/smart vibe + Thai royal gold accent)
 
