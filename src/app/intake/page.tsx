@@ -31,21 +31,24 @@ export default async function IntakePage() {
   return (
     <div className="min-h-dvh bg-surface text-ink">
       <Navbar />
-      <main className="mx-auto w-full max-w-3xl px-4 pb-16 pt-24 sm:px-6 sm:pb-20 sm:pt-28">
-        <Link
-          href="/"
-          className="inline-flex min-h-touch items-center gap-1.5 text-sm text-muted hover:text-ink"
-        >
-          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          กลับหน้าหลัก
-        </Link>
+      <main className="relative overflow-hidden mesh-gradient">
+        <div className="absolute inset-0 thai-pattern pointer-events-none" />
+        <div className="relative z-10 mx-auto w-full max-w-3xl px-4 pb-16 pt-24 sm:px-6 sm:pb-20 sm:pt-28">
+          <Link
+            href="/"
+            className="inline-flex min-h-touch items-center gap-1.5 text-sm text-muted hover:text-ink"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            กลับหน้าหลัก
+          </Link>
 
-        <h1 className="mt-4 text-3xl font-bold sm:text-4xl">แจ้งเรื่องใหม่</h1>
-        <p className="mt-3 text-lg text-muted">
-          กรอกข้อมูลให้ครบ เจ้าหน้าที่จะรับเรื่องและติดตามให้ท่านทุกขั้นตอน
-        </p>
+          <h1 className="mt-4 text-3xl font-bold sm:text-4xl">แจ้งเรื่องใหม่</h1>
+          <p className="mt-3 text-lg text-muted">
+            กรอกข้อมูลให้ครบ เจ้าหน้าที่จะรับเรื่องและติดตามให้ท่านทุกขั้นตอน
+          </p>
 
-        <IntakeForm categories={categories} />
+          <IntakeForm categories={categories} />
+        </div>
       </main>
       <SiteFooter />
     </div>

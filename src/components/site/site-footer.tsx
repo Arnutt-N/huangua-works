@@ -6,8 +6,8 @@ import type { ReactNode } from 'react';
  */
 export function SiteFooter({ children }: { children?: ReactNode }) {
   return (
-    <footer className="border-t border-border">
-      <div className="mx-auto w-full max-w-6xl px-4 py-8 text-sm text-muted sm:px-6">
+    <footer className="border-t bg-surface-raised">
+      <div className="mx-auto w-full max-w-6xl px-4 py-10 text-sm text-muted sm:px-6 sm:py-12">
         <p className="font-semibold text-ink">
           องค์การบริหารส่วนตำบลหัวงัว · อำเภอยางตลาด · จังหวัดกาฬสินธุ์
         </p>
