@@ -1,7 +1,8 @@
 'use client';
 
 import { AlertCircle, LogIn } from 'lucide-react';
-import { useActionState } from 'react';
+import { useActionState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { login, type LoginState } from '../actions';
 import { Button } from '../../../components/ui/button';
 import { Input, Label } from '../../../components/ui/field';
@@ -10,6 +11,16 @@ const initialState: LoginState = { error: null };
 
 export function LoginForm() {
   const [state, formAction, isPending] = useActionState(login, initialState);
+  const router = useRouter();
+
+  useEffect(() => {
+    // § navigate ฝั่ง client หลัง response ของ server action (พร้อม Set-Cookie) ถึง browser
+    // แล้วเท่านั้น — ไม่ redirect() ใน server action เดียวกับที่ signIn() ตั้ง cookie (ดู actions.ts)
+    if (state.success) {
+      router.push('/admin');
+      router.refresh();
+    }
+  }, [state.success, router]);
 
   return (
     <form action={formAction} className="mt-6 flex flex-col gap-4">
