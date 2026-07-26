@@ -15,7 +15,7 @@ if (!email) {
 
 const sql = postgres(process.env.DATABASE_URL!);
 
-async function main() {
+async function main(email: string) {
   // Check both the secret email and the default seed email
   const users = await sql`SELECT id, email, role, full_name, password_hash IS NOT NULL AS has_password FROM users WHERE email = ${email} OR email = 'admin@huangua.go.th' OR role = 'superadmin' ORDER BY role`;
   if (users.length === 0) {
@@ -30,7 +30,7 @@ async function main() {
   await sql.end();
 }
 
-main().catch((err) => {
+main(email).catch((err) => {
   console.error(err);
   process.exit(1);
 });

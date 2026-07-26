@@ -55,14 +55,14 @@ function buildEvent(type: string) {
   }
 }
 
-async function main() {
+async function main(secret: string) {
   const event = buildEvent(EVENT_TYPE);
   const body = JSON.stringify({
     destination: 'U_test_oa',
     events: [event],
   });
 
-  const signature = createHmac('sha256', SECRET).update(body, 'utf8').digest('base64');
+  const signature = createHmac('sha256', secret).update(body, 'utf8').digest('base64');
 
   console.log(`📤 Sending ${EVENT_TYPE} event to ${BASE}/api/line/webhook`);
   console.log(`   Body length: ${body.length}`);
@@ -97,7 +97,7 @@ async function main() {
   }
 }
 
-main().catch((err) => {
+main(SECRET).catch((err) => {
   console.error('Fatal:', err);
   process.exit(1);
 });
