@@ -12,6 +12,7 @@ import { getClientIp } from '@/lib/auth/require-staff';
 
 export interface LoginState {
   error: string | null;
+  success?: boolean;
 }
 
 /**
@@ -114,7 +115,11 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
     ipAddress: ip,
   });
 
-  redirect('/admin');
+  // § ไม่ redirect() ในนี้ — signIn() ตั้ง cookie ผ่าน response เดียวกัน แต่ redirect()
+  // ที่ throw NEXT_REDIRECT ในหน้าเดิมทำให้บาง build ของ Auth.js v5 beta + Next.js 16
+  // ไม่ commit Set-Cookie ให้ browser ทัน (login สำเร็จจริงแต่ cookie ไม่เคยถูกตั้ง — H1 bug)
+  // แก้โดยคืนค่าสำเร็จแทน แล้วให้ client navigate เอง หลัง response (พร้อม cookie) ถึง browser แล้ว
+  return { error: null, success: true };
 }
 
 export async function logout(): Promise<void> {
