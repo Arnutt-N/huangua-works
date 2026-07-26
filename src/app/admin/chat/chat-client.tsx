@@ -62,6 +62,7 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch conversations on mount; loadConversations is also reused by the SSE handler and manual refresh below, so it can't be inlined
     loadConversations();
   }, [loadConversations]);
 
@@ -249,6 +250,7 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
             <div className="border-t border-border p-3">
               <div className="flex gap-2">
                 <input
+                  aria-label="พิมพ์ข้อความ"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
