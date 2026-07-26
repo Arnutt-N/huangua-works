@@ -122,12 +122,11 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
   const [districts, setDistricts] = useState<GeoOption[]>([]);
   const [subdistricts, setSubdistricts] = useState<GeoOption[]>([]);
   const [villagesList, setVillagesList] = useState<GeoOption[]>([]);
-  const [loadingGeo, setLoadingGeo] = useState<'provinces' | 'districts' | 'subdistricts' | 'villages' | null>(null);
+  const [loadingGeo, setLoadingGeo] = useState<'provinces' | 'districts' | 'subdistricts' | 'villages' | null>('provinces');
   const [geoError, setGeoError] = useState<string | null>(null);
   const geoRequestId = useRef(0);
 
   useEffect(() => {
-    setLoadingGeo('provinces');
     fetch('/api/provinces')
       .then((r) => r.json())
       .then((d) => setProvinces(d.provinces ?? []))
