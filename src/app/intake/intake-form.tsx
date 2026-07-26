@@ -91,7 +91,7 @@ function validate(form: FormState): FieldErrors {
 
 function SectionCard({ children }: { children: React.ReactNode }) {
   return (
-    <section className="rounded-3xl border bg-surface-raised p-6 shadow-sm sm:p-8" style={{ borderColor: 'oklch(90% 0.01 145)' }}>
+    <section className="glass rounded-3xl p-6 shadow-sm sm:p-8">
       {children}
     </section>
   );
@@ -244,7 +244,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
 
   if (result) {
     return (
-      <div className="mt-8 rounded-3xl border bg-surface-raised px-6 py-10 text-center shadow-lg" style={{ borderColor: 'oklch(90% 0.01 145)' }}>
+      <div className="glass mt-8 rounded-3xl px-6 py-10 text-center shadow-lg">
         <span
           className="mx-auto flex h-16 w-16 items-center justify-center rounded-full"
           style={{ backgroundColor: 'oklch(94% 0.04 160)' }}
@@ -516,7 +516,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
       </SectionCard>
 
       {/* PDPA consent */}
-      <div className="rounded-3xl border bg-surface-raised p-6 shadow-sm sm:p-8" style={{ borderColor: 'oklch(90% 0.01 145)' }}>
+      <div className="glass rounded-3xl p-6 shadow-sm sm:p-8">
         <label className="flex items-start gap-3 rounded-xl border p-4" style={{ borderColor: 'oklch(90% 0.01 145)', backgroundColor: 'oklch(96% 0.02 145 / 0.3)' }}>
           <input
             type="checkbox"
