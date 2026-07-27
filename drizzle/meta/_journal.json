@@ -50,6 +50,13 @@
       "when": 1784962111978,
       "tag": "0006_add_geography_fk",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785167053691,
+      "tag": "0007_natural_fixer",
+      "breakpoints": true
     }
   ]
 }

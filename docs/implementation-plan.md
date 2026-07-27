@@ -401,7 +401,7 @@ PR #4 (PDPA/security)  ──────────┘ (อิสระ แต
 
 - **Stack**: Next.js 16 + Drizzle 0.45 + Auth.js v5 beta + PostgreSQL (postgres-js) + Tailwind 4 + Radix UI + Upstash Redis (REST)
 - **DB pool**: `max: 10` (postgres-js) — ไม่เหมาะกับ long-lived LISTEN
-- **Session**: JWT 1h maxAge, httpOnly cookie (Auth.js default name), Credentials provider only
+- **Session**: JWT strategy, cookie maxAge 30 วัน (เพดาน remember-me) แต่บังคับอายุจริงราย token ผ่าน `expiresAt` claim — ไม่ติ๊ก "จดจำฉัน" = 1h, ติ๊ก = 30d; jwt callback (ทั้ง Node `auth.ts` และ edge `auth.config.ts`) คืน `null` เมื่อเกิน `expiresAt` → Auth.js ล้าง cookie, httpOnly cookie (Auth.js default name), Credentials provider only
 - **Session shape**: `{ user: { userId, role, email } }` — role snapshot ที่ login (re-check DB ทุก admin request)
 - **No Drizzle `relations()`** — ต้องใช้ explicit `leftJoin` ทุก query
 - **No PATCH/PUT** on cases — citizen `/api/cases/[id]` เป็น GET only

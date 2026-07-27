@@ -6,6 +6,10 @@
 > Stack อนุมัติ: Vercel + Supabase Cloud + Upstash Redis (REST) + QStash + Next.js App Router + TypeScript + Tailwind (custom tokens) + Radix UI (ร่างเอง ไม่ใช้ shadcn)
 > HARD-GATE: ห้ามเขียนโค้ด/scaffold/สร้าง package.json จนกว่า design ได้รับอนุมัติ
 
+> ⚠️ **หมายเหตุสถานะ (อัปเดต 2026-07-28):** เอกสารนี้เป็นบันทึกการวางแผนยุคเริ่มต้น — **stack ที่ใช้จริงเปลี่ยนแล้ว** จาก Supabase Cloud เป็น **Postgres self-host (postgres-js + Drizzle ORM) + Auth.js v5** (Credentials provider, JWT session) ดังนั้นเนื้อหาที่เกี่ยวกับ Supabase/RLS/Edge Fn/Realtime ในนี้คือ "ข้อเสนอเดิม" ไม่ใช่สถานะปัจจุบัน
+> โดยเฉพาะ §8.4 "Session: short-lived JWT + refresh rotation" → ของจริงใช้ **JWT + `expiresAt` claim ราย token** (ไม่ติ๊ก "จดจำฉัน" = 1h, ติ๊ก = 30d; jwt callback คืน `null` เมื่อหมดอายุเพื่อล้าง cookie) ไม่มี refresh rotation
+> สถานะปัจจุบันดูที่ `docs/implementation-plan.md` (ภาคผนวก recon) และ `docs/prd-login-enhancements.md`
+
 ---
 
 ## 1. ภาพรวม / ปัญหา / บริบท

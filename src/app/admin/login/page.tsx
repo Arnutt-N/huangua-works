@@ -1,4 +1,4 @@
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Navbar } from '@/components/landing/Navbar';
@@ -8,10 +8,16 @@ import { LoginForm } from './login-form';
 export const metadata: Metadata = { title: 'เข้าระบบเจ้าหน้าที่' };
 
 /**
- * /admin/login — เข้าระบบเจ้าหน้าที่ผ่าน Supabase Auth (email+password)
- * middleware.ts เด้งกลับ /admin ถ้า login อยู่แล้ว
+ * /admin/login — เข้าระบบเจ้าหน้าที่ผ่าน Auth.js v5 (email+password)
+ * proxy.ts (authorized callback) เด้งกลับ /admin ถ้า login อยู่แล้ว
+ * § searchParams.reset === 'ok' → แสดงป้าย "รีเซ็ตรหัสสำเร็จ" (redirect มาจาก /admin/reset-password)
  */
-export default function AdminLoginPage() {
+export default async function AdminLoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ reset?: string }>;
+}) {
+  const { reset } = await searchParams;
   return (
     <div className="min-h-dvh bg-surface text-ink">
       <Navbar />
@@ -39,6 +45,16 @@ export default function AdminLoginPage() {
             <p className="mt-2 text-sm text-muted">
               สำหรับเจ้าหน้าที่ อบต.หัวงัว เข้าดูคิวและดำเนินเรื่องแจ้งเหตุ
             </p>
+
+            {reset === 'ok' && (
+              <div
+                role="status"
+                className="mt-4 flex items-start gap-2 rounded-md border border-success-ink/30 bg-success-soft px-4 py-3 text-sm font-semibold text-success-ink"
+              >
+                <CheckCircle2 className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
+                รีเซ็ตรหัสผ่านสำเร็จ กรุณาเข้าระบบด้วยรหัสผ่านใหม่
+              </div>
+            )}
 
             <LoginForm />
           </div>

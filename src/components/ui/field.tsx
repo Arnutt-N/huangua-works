@@ -1,6 +1,7 @@
 'use client';
 
 import { Label as LabelPrimitive } from '@radix-ui/react-label';
+import type { LucideIcon } from 'lucide-react';
 import { forwardRef, type InputHTMLAttributes, type LabelHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 import { cn } from '../../lib/cn';
 
@@ -26,17 +27,31 @@ const fieldState = {
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   invalid?: boolean;
+  /** lucide icon แสดงด้านซ้ายของ field (เพิ่ม left padding อัตโนมัติ) */
+  icon?: LucideIcon;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, invalid = false, ...props }, ref) => (
-    <input
-      ref={ref}
-      aria-invalid={invalid || undefined}
-      className={cn(fieldBase, invalid ? fieldState.error : fieldState.ok, className)}
-      {...props}
-    />
-  ),
+  ({ className, invalid = false, icon: Icon, ...props }, ref) => {
+    const input = (
+      <input
+        ref={ref}
+        aria-invalid={invalid || undefined}
+        className={cn(fieldBase, invalid ? fieldState.error : fieldState.ok, Icon && 'pl-11', className)}
+        {...props}
+      />
+    );
+    if (!Icon) return input;
+    return (
+      <span className="relative block">
+        <Icon
+          aria-hidden="true"
+          className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-muted"
+        />
+        {input}
+      </span>
+    );
+  },
 );
 Input.displayName = 'Input';
 
