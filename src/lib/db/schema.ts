@@ -113,6 +113,33 @@ export const users = pgTable(
 );
 
 // ────────────────────────────────────────────────────────────────────────────
+// § Password Reset Tokens (รีเซ็ตรหัสผ่านด้วยตนเอง: token เดียวใช้ครั้งเดียว)
+// เก็บเฉพาะ SHA-256 hash ของ token — plaintext token อยู่ในลิงก์อีเมลเท่านั้น
+// ดังนั้น DB leak จึงไม่ทำให้ยึดบัญชีได้ (ต้องได้ token จากอีเมลด้วย)
+// ────────────────────────────────────────────────────────────────────────────
+
+export const passwordResetTokens = pgTable(
+  'password_reset_tokens',
+  {
+    id: text('id').primaryKey(), // UUID v7
+    createdAt: timestamp('created_at', { mode: 'date' })
+      .notNull()
+      .defaultNow(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull().unique(), // SHA-256 hex ของ plaintext token
+    expiresAt: timestamp('expires_at', { mode: 'date' }).notNull(), // now + 1h
+    usedAt: timestamp('used_at', { mode: 'date' }), // null = ยังไม่ใช้
+  },
+  (table) => ({
+    userIdIdx: index('password_reset_tokens_user_id_idx').on(table.userId),
+    tokenHashIdx: index('password_reset_tokens_token_hash_idx').on(table.tokenHash),
+    expiresAtIdx: index('password_reset_tokens_expires_at_idx').on(table.expiresAt),
+  })
+);
+
+// ────────────────────────────────────────────────────────────────────────────
 // § Departments (หน่วยงาน: กองการศึกษา/กองคลัง/กองช่าง/สำนักปลัด/กำนัน-ผู้ใหญ่)
 // ────────────────────────────────────────────────────────────────────────────
 

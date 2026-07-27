@@ -56,3 +56,14 @@ test('full session lifecycle: login -> dashboard -> bounce-back -> logout -> re-
   await page.goto('/admin');
   await expect(page).toHaveURL(/\/admin\/login(\?.*)?$/);
 });
+
+test('login page exposes remember-me, forgot-password link, and contact text', async ({ page }) => {
+  await page.goto('/admin/login');
+
+  await expect(page.getByLabel('จดจำฉัน')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'ลืมรหัสผ่าน?' })).toBeVisible();
+  await expect(page.getByText('ยังไม่มีบัญชี? ติดต่อผู้ดูแลระบบ')).toBeVisible();
+
+  await page.getByRole('link', { name: 'ลืมรหัสผ่าน?' }).click();
+  await expect(page).toHaveURL(/\/admin\/forgot-password$/);
+});

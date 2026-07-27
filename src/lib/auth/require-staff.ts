@@ -47,6 +47,9 @@ export interface StaffContext {
 export async function requireStaff(allowedRoles?: readonly UserRole[]): Promise<StaffContext> {
   const session = await auth();
   if (!session?.user.userId) {
+    // § session หมดอายุ (jwt คืน null จาก expiresAt) แต่ cookie 30d อาจยังค้างอยู่ —
+    // ต้อง signOut ล้าง cookie ก่อน redirect กัน authorized เห็น cookie แล้ว bounce กลับ (H1)
+    await signOut({ redirect: false });
     redirect('/admin/login');
   }
 

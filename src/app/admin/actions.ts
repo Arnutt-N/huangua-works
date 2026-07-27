@@ -23,6 +23,9 @@ export interface LoginState {
 export async function login(_prevState: LoginState, formData: FormData): Promise<LoginState> {
   const emailRaw = formData.get('email');
   const passwordRaw = formData.get('password');
+  // § "จดจำฉัน" — checkbox ส่ง 'on' เมื่อติ๊ก; null/undefined เมื่อไม่ติ๊ก
+  // ส่งต่อให้ authorize → jwt callback กำหนดอายุ session (1h vs 30d)
+  const rememberRaw = formData.get('remember');
 
   if (typeof emailRaw !== 'string' || typeof passwordRaw !== 'string' || !emailRaw || !passwordRaw) {
     return { error: 'กรุณากรอกอีเมลและรหัสผ่าน' };
@@ -57,6 +60,8 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
     await signIn('credentials', {
       email: normalizedEmail,
       password: passwordRaw,
+      // § ส่ง remember ('on' เมื่อติ๊ก) ให้ authorize → jwt callback ตั้งอายุ session
+      ...(rememberRaw ? { remember: String(rememberRaw) } : {}),
       redirect: false,
     });
     signInOk = true;

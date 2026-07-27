@@ -254,6 +254,41 @@ export const changeOwnPasswordFormSchema = z
   });
 
 // ────────────────────────────────────────────────────────────────────────────
+// § Password reset — รีเซ็ตรหัสผ่านด้วยตนเอง (/admin/forgot-password)
+// ตั้งชื่อแยกจาก resetPasswordFormSchema (admin ตั้งตรง) เพื่อไม่ให้ชนกัน
+// ────────────────────────────────────────────────────────────────────────────
+
+/** รหัสผ่านใหม่ — ใช้กับ forgot-password reset */
+const newPasswordSchema = z
+  .string()
+  .min(8, 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร')
+  .max(128, 'รหัสผ่านยาวเกินไป');
+
+/** plaintext reset token — 64 hex chars จาก crypto.randomBytes(32) */
+const resetTokenSchema = z
+  .string()
+  .min(64, 'ลิงก์รีเซ็ตไม่ถูกต้อง')
+  .max(64, 'ลิงก์รีเซ็ตไม่ถูกต้อง')
+  .regex(/^[a-f0-9]{64}$/, 'ลิงก์รีเซ็ตไม่ถูกต้อง');
+
+/** ขอรีเซ็ตรหัสผ่าน — กรอกแค่อีเมล (anti-enumeration: คืนผลเหมือนกันเสมอ) */
+export const forgotPasswordRequestSchema = z.object({
+  email: emailSchema,
+});
+
+/** ยืนยันรีเซ็ตรหัสผ่าน — token จากลิงก์ + รหัสผ่านใหม่ + ยืนยัน */
+export const forgotPasswordResetSchema = z
+  .object({
+    token: resetTokenSchema,
+    newPassword: newPasswordSchema,
+    confirmPassword: z.string().max(128),
+  })
+  .refine((v) => v.newPassword === v.confirmPassword, {
+    message: 'รหัสผ่านใหม่และการยืนยันไม่ตรงกัน',
+    path: ['confirmPassword'],
+  });
+
+// ────────────────────────────────────────────────────────────────────────────
 // § Master data — หน่วยงาน / หมวดหมู่ (/admin/master-data)
 // ────────────────────────────────────────────────────────────────────────────
 
