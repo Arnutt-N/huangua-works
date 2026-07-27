@@ -21,11 +21,13 @@ export const authConfig = {
   // ของ proxy บางครั้งไม่ได้รับ env เดียวกับ Node runtime ทำให้ decode JWT ไม่ได้ = redirect loop
   // (login สำเร็จใน Node runtime แต่ proxy อ่าน cookie เป็นค่าว่าง)
   secret: process.env.AUTH_SECRET,
-  // § trustHost จำเป็นสำหรับ local dev — ไม่งั้น Auth.js v5 จะ reject request
-  // ที่ Host header ไม่ตรง AUTH_URL ทำให้ middleware อ่าน session cookie ไม่ได้
-  // production: ปิด trustHost ทั้งหมด → enforce canonical AUTH_URL (กัน Host header spoofing
-  // ที่ attacker ส่งเข้ามาหลอก Auth.js callback URL — สำคัญเมื่อเพิ่ม OAuth/magic-link provider)
-  trustHost: process.env.NODE_ENV !== 'production',
+  // § trustHost ต้องเป็น true เสมอเมื่อรันหลัง reverse proxy (Vercel/Cloud Run/nginx) —
+  // Auth.js อ่าน host จาก X-Forwarded-Host ซึ่งเชื่อถือได้ก็ต่อเมื่อ proxy เป็นคนใส่ให้
+  // ตั้ง false = Auth.js คืน UntrustedHost → ทุก endpoint /api/auth/* ตอบ 500
+  // "There was a problem with the server configuration" → login พังทั้งระบบ
+  // การกัน Host header spoofing บน Vercel เป็นหน้าที่ของ platform + canonical AUTH_URL
+  // ไม่ใช่ flag นี้ (flag นี้แค่บอกว่า "เชื่อ forwarded header ได้ไหม")
+  trustHost: true,
   pages: {
     signIn: '/admin/login',
   },
