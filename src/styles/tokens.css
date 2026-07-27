@@ -56,12 +56,32 @@
   /* font (Noto Sans Thai self-host ผ่าน next/font; --font-noto ถูก set ที่ <html>) */
   --font-sans: var(--font-noto), 'Noto Sans Thai', system-ui, -apple-system, sans-serif;
 
-  /* radius (glassmorphism style) */
+  /* radius (glassmorphism style)
+   * ⚠️ สเกลนี้มีแค่ sm/md/lg/xl/pill — rounded-2xl / rounded-3xl ของ Tailwind
+   * ไม่ได้ถูก override จึงใช้ค่า default (1rem / 1.5rem) ผลคือสเกลไม่เรียงกัน:
+   *   rounded-lg = 16px, rounded-xl = 24px, rounded-2xl = 16px, rounded-3xl = 24px
+   * → rounded-2xl "เล็กกว่า" rounded-xl ทั้งที่ชื่อใหญ่กว่า
+   * ใช้เฉพาะชื่อใน token (sm/md/lg/xl/pill) เพื่อไม่ให้เข้าใจผิด */
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-xl: 24px;
   --radius-pill: 9999px;
+
+  /* gradient หลักของแบรนด์ (DESIGN.md §2 "The One Emerald Rule")
+   * ประกาศจาก token เพื่อให้จุดเดียวคุมทั้งระบบ — ก่อนหน้านี้ gradient ชุดนี้
+   * ถูกพิมพ์ค่า oklch ซ้ำด้วยมือ 12 จุดทั่วโปรเจกต์ ถ้าปรับ --color-accent
+   * สำเนาทั้ง 12 จะไม่ตามและสีจะเพี้ยนกันเงียบ ๆ */
+  --gradient-accent: linear-gradient(
+    to right,
+    var(--color-accent),
+    var(--color-accent-strong)
+  );
+  --gradient-accent-br: linear-gradient(
+    to bottom right,
+    var(--color-accent),
+    var(--color-accent-strong)
+  );
 
   /* touch (C6 enforce) + motion */
   --touch-target-min: 44px;
@@ -368,6 +388,22 @@
 [data-theme='dark'] .glass-panel {
   background: oklch(20% 0.02 160 / 0.88);
   border-color: var(--color-border);
+}
+
+/* ---------- Brand gradient surfaces ----------
+ * ใช้แทนการเขียน style={{ background: 'linear-gradient(...)' }} ซ้ำในแต่ละไฟล์
+ * -br = ทแยงมุม (ใช้กับสี่เหลี่ยม/วงกลมเล็ก เช่นตราแบรนด์, avatar) */
+@utility bg-accent-gradient {
+  background-image: var(--gradient-accent);
+}
+
+@utility bg-accent-gradient-br {
+  background-image: var(--gradient-accent-br);
+}
+
+/* เงาเรืองแสงใต้ปุ่ม primary — เดิมพิมพ์ค่า oklch ซ้ำในทุก call site */
+@utility shadow-accent-glow {
+  box-shadow: 0 10px 40px -10px oklch(55% 0.13 160 / 0.3);
 }
 
 /* ซ่อน scrollbar สำหรับแถบแท็บที่เลื่อนแนวนอนบนมือถือ (ยังเลื่อนได้ปกติ) */

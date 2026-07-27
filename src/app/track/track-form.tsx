@@ -130,13 +130,8 @@ export function TrackForm({ initialId }: { initialId?: string }) {
 
         <Button
           type="submit"
-          className="mt-5 h-11 px-7"
+          className="shadow-accent-glow mt-5 h-11 px-7"
           disabled={isSearching}
-          style={{
-            background: 'linear-gradient(to right, oklch(55% 0.13 160), oklch(45% 0.15 160))',
-            color: 'oklch(99% 0.005 145)',
-            boxShadow: '0 10px 40px -10px oklch(55% 0.13 160 / 0.3)',
-          }}
         >
           {isSearching ? (
             <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />

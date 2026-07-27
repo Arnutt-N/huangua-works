@@ -267,11 +267,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
         <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
           <Link
             href={`/track?id=${result.trackingCode}`}
-            className="inline-flex min-h-touch items-center justify-center gap-2 rounded-xl px-7 font-semibold text-white"
-            style={{
-              background: 'linear-gradient(to right, oklch(55% 0.13 160), oklch(45% 0.15 160))',
-              boxShadow: '0 10px 40px -10px oklch(55% 0.13 160 / 0.3)',
-            }}
+            className="bg-accent-gradient shadow-accent-glow inline-flex min-h-touch items-center justify-center gap-2 rounded-md px-7 font-semibold text-on-accent"
           >
             ติดตามเรื่องนี้
           </Link>
@@ -556,12 +552,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
           type="submit"
           size="lg"
           disabled={isSubmitting}
-          className="h-12 flex-1 px-8 text-base"
-          style={{
-            background: 'linear-gradient(to right, oklch(55% 0.13 160), oklch(45% 0.15 160))',
-            color: 'oklch(99% 0.005 145)',
-            boxShadow: '0 10px 40px -10px oklch(55% 0.13 160 / 0.3)',
-          }}
+          className="shadow-accent-glow h-12 flex-1 px-8 text-base"
         >
           {isSubmitting ? (
             <>

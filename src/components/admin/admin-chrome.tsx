@@ -116,11 +116,7 @@ export function AdminChrome({
             <span className="hidden min-w-0 items-center gap-2 rounded-pill border border-border bg-surface-raised/70 py-1 pr-3 pl-1 md:inline-flex">
               <span
                 aria-hidden="true"
-                className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-xs font-bold text-on-accent"
-                style={{
-                  background:
-                    'linear-gradient(to bottom right, oklch(55% 0.13 160), oklch(45% 0.15 160))',
-                }}
+                className="bg-accent-gradient-br flex h-8 w-8 flex-none items-center justify-center rounded-full text-xs font-bold text-on-accent"
               >
                 {initialsOf(user.fullName)}
               </span>

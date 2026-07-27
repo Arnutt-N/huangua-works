@@ -58,12 +58,7 @@ export function LoginForm() {
       <Button
         type="submit"
         size="lg"
-        className="mt-2 w-full shadow-lg"
-        style={{
-          background:
-            'linear-gradient(to right, oklch(55% 0.13 160), oklch(45% 0.15 160))',
-          boxShadow: '0 10px 40px -10px oklch(55% 0.13 160 / 0.35)',
-        }}
+        className="shadow-accent-glow mt-2 w-full"
         disabled={isPending}
       >
         <LogIn className="h-5 w-5" aria-hidden="true" />

@@ -145,7 +145,7 @@ export function CaseDetailClient({
               value="true"
               defaultChecked
               aria-label="ให้ประชาชนเห็นการอัปเดตนี้"
-              className="h-4 w-4 rounded border-border-strong accent-[oklch(45%_0.15_160)]"
+              className="h-4 w-4 rounded border-border-strong accent-accent-strong"
             />
             <span>ให้ประชาชนเห็นการอัปเดตนี้</span>
           </label>
@@ -260,7 +260,7 @@ export function CaseDetailClient({
               name="isPublic"
               value="false"
               aria-label="ตั้งเป็นหมายเหตุภายใน (ไม่แสดงให้ประชาชนเห็น)"
-              className="h-4 w-4 rounded border-border-strong accent-[oklch(45%_0.15_160)]"
+              className="h-4 w-4 rounded border-border-strong accent-accent-strong"
             />
             <span>หมายเหตุภายใน (ไม่แสดงให้ประชาชนเห็น)</span>
           </label>

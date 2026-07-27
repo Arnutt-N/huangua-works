@@ -20,15 +20,11 @@ export function BrandMark({
     <span
       aria-hidden="true"
       className={cn(
-        'flex flex-none items-center justify-center rounded-lg font-bold tracking-tight text-on-accent',
+        'bg-accent-gradient-br flex flex-none items-center justify-center rounded-lg font-bold tracking-tight text-on-accent',
         size === 'sm' ? 'h-9 w-9 text-xs' : 'h-10 w-10 text-sm',
         className,
       )}
-      style={{
-        background:
-          'linear-gradient(to bottom right, oklch(55% 0.13 160), oklch(45% 0.15 160))',
-        boxShadow: '0 6px 16px -8px oklch(45% 0.15 160 / 0.7)',
-      }}
+      style={{ boxShadow: '0 6px 16px -8px var(--color-accent-strong)' }}
     >
       อบต
     </span>

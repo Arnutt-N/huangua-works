@@ -146,12 +146,7 @@ export function Hero() {
             >
               <Button
                 size="lg"
-                className="h-12 px-7 text-base shadow-lg"
-                style={{
-                  background: 'linear-gradient(to right, oklch(55% 0.13 160), oklch(45% 0.15 160))',
-                  color: 'oklch(99% 0.005 145)',
-                  boxShadow: '0 10px 40px -10px oklch(55% 0.13 160 / 0.3)',
-                }}
+                className="shadow-accent-glow h-12 px-7 text-base"
                 asChild
               >
                 <Link href="/intake">
@@ -264,10 +259,7 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
       >
         {/* Header */}
         <div
-          className="p-5 text-white"
-          style={{
-            background: 'linear-gradient(to right, oklch(55% 0.13 160), oklch(45% 0.15 160))',
-          }}
+          className="bg-accent-gradient p-5 text-on-accent"
         >
           <div className="flex items-center justify-between">
             <div>
@@ -325,10 +317,7 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
                 initial={{ width: 0 }}
                 animate={{ width: '65%' }}
                 transition={{ duration: reduce ? 0 : 1.2, delay: reduce ? 0 : 0.8, ease: 'easeOut' }}
-                className="relative h-full rounded-full"
-                style={{
-                  background: 'linear-gradient(to right, oklch(55% 0.13 160), oklch(45% 0.15 160))',
-                }}
+                className="bg-accent-gradient relative h-full rounded-full"
               >
                 <motion.div
                   animate={reduce ? undefined : { x: ['-100%', '200%'] }}
@@ -378,11 +367,7 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
           <div className="flex items-center justify-between border-t pt-2" style={{ borderColor: 'oklch(90% 0.01 145)' }}>
             <div className="flex items-center gap-2">
               <div
-                className="flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold"
-                style={{
-                  background: 'linear-gradient(to bottom right, oklch(55% 0.13 160), oklch(45% 0.15 160))',
-                  color: 'oklch(99% 0.005 145)',
-                }}
+                className="bg-accent-gradient-br flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold text-on-accent"
               >
                 สช
               </div>

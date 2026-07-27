@@ -76,11 +76,6 @@ export function Navbar() {
             </Link>
             <Button
               size="sm"
-              className="shadow-md"
-              style={{
-                background: 'linear-gradient(to right, oklch(55% 0.13 160), oklch(45% 0.15 160))',
-                color: 'oklch(99% 0.005 145)',
-              }}
               asChild
             >
               {/* Button base มี gap-2 อยู่แล้ว — mr-2 เดิมทำให้ไอคอนเยื้องตอนซ่อนข้อความบนมือถือ */}
