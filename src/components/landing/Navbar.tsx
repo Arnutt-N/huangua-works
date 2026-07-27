@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Bell, Menu, X, Search, LogIn } from 'lucide-react';
 import { Button } from '../ui/button';
+import { BrandMark } from '../site/brand-mark';
 
 /**
  * Navbar หลักของหน้า landing (/)
@@ -24,23 +25,17 @@ export function Navbar() {
     <nav className="glass fixed top-0 left-0 right-0 z-50 border-b">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2">
-            <div
-              className="flex h-10 w-10 items-center justify-center rounded-lg text-sm font-bold text-white"
-              style={{
-                background: 'linear-gradient(to bottom right, oklch(55% 0.13 160), oklch(45% 0.15 160))',
-              }}
-            >
-              อบต
-            </div>
-            <div className="hidden sm:block leading-tight">
-              <div className="text-sm font-bold">
-                <span className="lg:hidden">กองช่าง อบต.หัวงัว</span>
-                <span className="hidden lg:inline">กองช่าง องค์การบริหารส่วนตำบลหัวงัว</span>
-              </div>
-              <div className="text-xs text-muted">แจ้งเหตุ · ติดตามงานบริการ</div>
-            </div>
+          {/* Logo — บรรทัดเดียวเสมอ
+              เดิมซ้อนชื่อหน่วยงาน + tagline เป็น 2 บรรทัดใน bar สูง h-16 พอชื่อยาว
+              (โดยเฉพาะ "กองช่าง องค์การบริหารส่วนตำบลหัวงัว" ที่ breakpoint lg)
+              ข้อความจะห่อบรรทัดแล้วดันแถวเสียทรง — ตัดเหลือบรรทัดเดียว + nowrap
+              แล้วสลับความยาวชื่อตามจอแทน */}
+          <Link href="/" className="flex min-w-0 items-center gap-2.5">
+            <BrandMark />
+            <span className="hidden truncate whitespace-nowrap text-sm font-bold sm:block">
+              <span className="lg:hidden">กองช่าง อบต.หัวงัว</span>
+              <span className="hidden lg:inline">กองช่าง องค์การบริหารส่วนตำบลหัวงัว</span>
+            </span>
           </Link>
 
           {/* Desktop Nav */}
@@ -75,7 +70,7 @@ export function Navbar() {
           <div className="flex items-center gap-2 sm:gap-3">
             <Link
               href="/admin/login"
-              className="hidden min-h-touch items-center rounded-md px-3 text-sm font-medium text-ink/80 transition-colors hover:bg-surface-sunken hover:text-ink sm:inline-flex"
+              className="hidden min-h-touch items-center whitespace-nowrap rounded-md px-3 text-sm font-medium text-ink/80 transition-colors hover:bg-surface-sunken hover:text-ink sm:inline-flex"
             >
               เข้าสู่ระบบ
             </Link>
@@ -88,9 +83,10 @@ export function Navbar() {
               }}
               asChild
             >
+              {/* Button base มี gap-2 อยู่แล้ว — mr-2 เดิมทำให้ไอคอนเยื้องตอนซ่อนข้อความบนมือถือ */}
               <Link href="/intake">
-                <Bell className="mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">แจ้งเหตุ</span>
+                <Bell className="h-4 w-4" />
+                <span className="hidden whitespace-nowrap sm:inline">แจ้งเหตุ</span>
               </Link>
             </Button>
 

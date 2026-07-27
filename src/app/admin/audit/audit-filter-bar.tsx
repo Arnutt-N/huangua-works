@@ -73,7 +73,7 @@ export function AuditFilterBar({ actions }: AuditFilterBarProps) {
 
   return (
     <div
-      className="rounded-lg border border-border bg-surface-raised p-4 sm:p-5"
+      className="glass-panel rounded-xl p-4 shadow-sm sm:p-5"
       aria-label="ตัวกรองประวัติ"
     >
       <form onSubmit={handleSubmit} className="space-y-4">

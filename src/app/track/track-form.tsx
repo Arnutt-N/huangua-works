@@ -147,7 +147,7 @@ export function TrackForm({ initialId }: { initialId?: string }) {
         </Button>
 
         {error ? (
-          <p role="alert" className="mt-3 flex items-start gap-2 text-sm font-semibold text-danger">
+          <p role="alert" className="mt-3 flex items-start gap-2 text-sm font-semibold text-danger-ink">
             <AlertCircle className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
             {error}
           </p>
@@ -191,7 +191,7 @@ export function TrackForm({ initialId }: { initialId?: string }) {
                           'relative z-10 flex h-11 w-11 flex-none items-center justify-center rounded-full ring-1',
                           isCurrent
                             ? 'bg-accent-strong text-on-accent ring-accent-strong'
-                            : 'bg-success-soft text-success ring-success/30',
+                            : 'bg-success-soft text-success-ink ring-success-ink/30',
                         )}
                       >
                         {isCurrent ? (

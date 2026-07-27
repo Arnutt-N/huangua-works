@@ -86,7 +86,7 @@ export function UsersClient({
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-muted">
-          ทั้งหมด {users.length.toLocaleString('th-TH')} บัญชี
+          ทั้งหมด <strong className="text-ink">{users.length.toLocaleString('th-TH')}</strong> บัญชี
         </p>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
@@ -110,8 +110,8 @@ export function UsersClient({
         </Dialog>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-border bg-surface-raised">
-        <div className="hidden border-b border-border px-4 py-3 text-xs font-semibold text-muted sm:grid sm:grid-cols-[2fr_1.5fr_1fr_1fr_auto] sm:gap-4">
+      <div className="glass-panel overflow-hidden rounded-xl shadow-sm">
+        <div className="hidden border-b border-border bg-surface-sunken/60 px-4 py-3 text-xs font-semibold tracking-wide text-muted uppercase sm:grid sm:grid-cols-[2fr_1.5fr_1fr_1fr_auto] sm:gap-4">
           <span>ชื่อ · อีเมล</span>
           <span>บทบาท</span>
           <span>หน่วยงาน</span>
@@ -122,7 +122,7 @@ export function UsersClient({
           {users.map((u) => (
             <li
               key={u.id}
-              className="border-b border-border px-4 py-4 last:border-0 hover:bg-surface-sunken/50 sm:grid sm:grid-cols-[2fr_1.5fr_1fr_1fr_auto] sm:items-center sm:gap-4"
+              className="border-b border-border px-4 py-4 transition-colors duration-normal ease-out-expo last:border-0 hover:bg-accent-sunken/60 sm:grid sm:grid-cols-[2fr_1.5fr_1fr_1fr_auto] sm:items-center sm:gap-4"
             >
               {/* Name + email */}
               <div className="min-w-0">
@@ -148,15 +148,15 @@ export function UsersClient({
                 <span
                   className={
                     u.isActive
-                      ? 'inline-flex items-center gap-1.5 text-sm font-semibold text-success'
-                      : 'inline-flex items-center gap-1.5 text-sm font-semibold text-danger'
+                      ? 'inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-semibold text-success-ink'
+                      : 'inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-semibold text-danger-ink'
                   }
                 >
                   <span
                     className={
                       u.isActive
-                        ? 'h-2 w-2 rounded-full bg-success'
-                        : 'h-2 w-2 rounded-full bg-danger'
+                        ? 'h-2 w-2 flex-none rounded-full bg-success'
+                        : 'h-2 w-2 flex-none rounded-full bg-danger'
                     }
                     aria-hidden="true"
                   />
@@ -470,7 +470,7 @@ function FormError({ children }: { children: React.ReactNode }) {
   return (
     <p
       role="alert"
-      className="flex items-start gap-2 rounded-md border border-danger bg-danger-soft px-3 py-2 text-sm font-semibold text-danger"
+      className="flex items-start gap-2 rounded-md border border-danger-ink/30 bg-danger-soft px-3 py-2 text-sm font-semibold text-danger-ink"
     >
       <AlertCircle className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
       {children}
@@ -491,7 +491,7 @@ export function UserSuccessToast({ ok }: { ok: string | null }) {
   return (
     <div
       role="status"
-      className="mb-4 flex items-center gap-2 rounded-md border border-success bg-success-soft px-4 py-3 text-sm font-semibold text-success"
+      className="mb-4 flex items-center gap-2 rounded-xl border border-success-ink/30 bg-success-soft px-4 py-3 text-sm font-semibold text-success-ink shadow-sm"
     >
       <CheckCircle2 className="h-4 w-4 flex-none" aria-hidden="true" />
       {msg}

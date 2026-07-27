@@ -12,27 +12,33 @@ import type { ReactNode } from 'react';
  *  - default: emerald accent (tech/smart)
  *  - gold: amber accent (Thai royal — ใช้สำหรับ highlight KPI)
  *  - danger: red accent (SLA breach / warning)
+ *
+ * § สีไอคอนใช้ token *-ink ทั้งหมด — ของเดิม variant gold ใช้ text-accent-gold (L82%)
+ * บนพื้น gold-soft (L95%) = 1.52:1 ไอคอนแทบหายไปกับพื้น (ต่ำกว่า 3:1 ของ WCAG 1.4.11)
  */
 type KpiVariant = 'default' | 'gold' | 'danger';
 
 const variantStyles: Record<
   KpiVariant,
-  { iconBg: string; iconColor: string; valueColor: string }
+  { iconBg: string; iconColor: string; valueColor: string; rule: string }
 > = {
   default: {
     iconBg: 'bg-accent-sunken',
     iconColor: 'text-accent-strong',
     valueColor: 'text-ink',
+    rule: 'bg-accent',
   },
   gold: {
     iconBg: 'bg-accent-gold-soft',
-    iconColor: 'text-accent-gold',
+    iconColor: 'text-warning-ink',
     valueColor: 'text-ink',
+    rule: 'bg-accent-gold',
   },
   danger: {
     iconBg: 'bg-danger-soft',
-    iconColor: 'text-danger',
-    valueColor: 'text-danger',
+    iconColor: 'text-danger-ink',
+    valueColor: 'text-danger-ink',
+    rule: 'bg-danger',
   },
 };
 
@@ -57,14 +63,20 @@ export function KpiCard({
   return (
     <div
       className={cn(
-        'glass flex flex-col gap-3 rounded-lg p-5 shadow-sm',
+        'glass-panel relative flex flex-col gap-3 overflow-hidden rounded-xl p-5 shadow-sm',
+        'transition-shadow duration-normal ease-out-expo hover:shadow-md',
         className,
       )}
     >
-      <div className="flex items-center justify-between">
+      {/* แถบสีบนหัวการ์ด — บอก variant ได้ทันทีโดยไม่ต้องพึ่งสีไอคอนอย่างเดียว */}
+      <span
+        className={cn('absolute inset-x-0 top-0 h-1', styles.rule)}
+        aria-hidden="true"
+      />
+      <div className="flex items-center justify-between gap-2">
         <span
           className={cn(
-            'flex h-11 w-11 items-center justify-center rounded-md',
+            'flex h-11 w-11 flex-none items-center justify-center rounded-md',
             styles.iconBg,
           )}
         >

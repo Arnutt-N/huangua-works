@@ -292,7 +292,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
       {submitError && (
         <div
           role="alert"
-          className="flex items-start gap-3 rounded-xl border border-danger bg-danger-soft px-5 py-4 text-sm font-semibold text-danger"
+          className="flex items-start gap-3 rounded-xl border border-danger-ink/30 bg-danger-soft px-5 py-4 text-sm font-semibold text-danger-ink"
         >
           <AlertCircle className="mt-0.5 h-5 w-5 flex-none" aria-hidden="true" />
           {submitError}
@@ -399,7 +399,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
       <SectionCard>
         <SectionHeading icon={MapPin}>ที่ตั้ง</SectionHeading>
         {geoError && (
-          <p role="alert" className="mt-4 flex items-start gap-2 rounded-xl border border-danger bg-danger-soft px-4 py-3 text-sm font-semibold text-danger">
+          <p role="alert" className="mt-4 flex items-start gap-2 rounded-xl border border-danger-ink/30 bg-danger-soft px-4 py-3 text-sm font-semibold text-danger-ink">
             <AlertCircle className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
             {geoError}
           </p>

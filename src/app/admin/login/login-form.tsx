@@ -27,7 +27,7 @@ export function LoginForm() {
       {state.error && (
         <p
           role="alert"
-          className="flex items-start gap-2 rounded-md border border-danger bg-danger-soft px-4 py-3 text-sm font-semibold text-danger"
+          className="flex items-start gap-2 rounded-md border border-danger-ink/30 bg-danger-soft px-4 py-3 text-sm font-semibold text-danger-ink"
         >
           <AlertCircle className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
           {state.error}
@@ -55,7 +55,17 @@ export function LoginForm() {
           required
         />
       </div>
-      <Button type="submit" size="lg" className="mt-2" disabled={isPending}>
+      <Button
+        type="submit"
+        size="lg"
+        className="mt-2 w-full shadow-lg"
+        style={{
+          background:
+            'linear-gradient(to right, oklch(55% 0.13 160), oklch(45% 0.15 160))',
+          boxShadow: '0 10px 40px -10px oklch(55% 0.13 160 / 0.35)',
+        }}
+        disabled={isPending}
+      >
         <LogIn className="h-5 w-5" aria-hidden="true" />
         {isPending ? 'กำลังเข้าระบบ...' : 'เข้าระบบ'}
       </Button>

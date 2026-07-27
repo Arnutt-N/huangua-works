@@ -4,9 +4,8 @@ import { ScrollText, Globe, Fingerprint, Clock, FileJson } from 'lucide-react';
 import { getDb } from '@/lib/db';
 import { auditLogs, users } from '@/lib/db/schema';
 import { requireStaff } from '@/lib/auth/require-staff';
-import { AdminChrome } from '@/components/admin/admin-chrome';
+import { AdminShell } from '@/components/admin/admin-shell';
 import { AdminPageHeader } from '@/components/admin/admin-page-header';
-import { AdminPageTransition } from '@/components/admin/admin-page-transition';
 import { AdminCard } from '@/components/admin/admin-card';
 import { EmptyState } from '@/components/admin/empty-state';
 import { Pagination } from '@/components/admin/pagination';
@@ -124,116 +123,113 @@ export default async function AuditPage({
     .orderBy(auditLogs.action);
 
   return (
-    <div className="min-h-dvh bg-surface text-ink">
-      <AdminChrome user={staffUser} active="audit" />
-      <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
-        <AdminPageTransition>
-          <div className="space-y-6">
-            <AdminPageHeader
-              title="ประวัติการกระทำ"
-              subtitle="บันทึกการเข้าถึงและเปลี่ยนแปลงข้อมูล (PDPA compliance audit trail)"
+    <AdminShell user={staffUser} active="audit">
+      <div className="space-y-6">
+        <AdminPageHeader
+          eyebrow="Audit trail"
+          title="ประวัติการกระทำ"
+          subtitle="บันทึกการเข้าถึงและเปลี่ยนแปลงข้อมูล (PDPA compliance audit trail)"
+        />
+
+        <AuditFilterBar actions={distinctActions.map((a) => a.action)} />
+
+        <p className="text-sm text-muted">
+          ทั้งหมด <strong className="text-ink">{total.toLocaleString('th-TH')}</strong> รายการ
+          · หน้า {page}/{totalPages}
+        </p>
+
+        {rows.length === 0 ? (
+          <AdminCard>
+            <EmptyState
+              icon={ScrollText}
+              title="ไม่มีประวัติ"
+              description="ยังไม่มีการกระทำที่ถูกบันทึก หรือไม่ตรงกับตัวกรอง"
             />
-
-            <AuditFilterBar actions={distinctActions.map((a) => a.action)} />
-
-            <p className="text-sm text-muted">
-              ทั้งหมด {total.toLocaleString('th-TH')} รายการ · หน้า {page}/{totalPages}
-            </p>
-
-            {rows.length === 0 ? (
-              <AdminCard>
-                <EmptyState
-                  icon={ScrollText}
-                  title="ไม่มีประวัติ"
-                  description="ยังไม่มีการกระทำที่ถูกบันทึก หรือไม่ตรงกับตัวกรอง"
-                />
-              </AdminCard>
-            ) : (
-              <div className="space-y-3">
-                {rows.map((row) => (
-                  <AdminCard key={row.id} className="p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1 space-y-2">
-                        {/* Action + resource */}
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-pill bg-accent-sunken px-3 py-0.5 text-xs font-semibold text-accent-strong">
-                            {row.action}
-                          </span>
-                          <span className="text-xs text-muted">
-                            resource: <code className="font-mono text-ink">{row.resource}</code>
-                            {row.resourceId && (
-                              <>
-                                {' '}· id:{' '}
-                                <code className="font-mono text-ink">{row.resourceId}</code>
-                              </>
-                            )}
-                          </span>
-                        </div>
-
-                        {/* Actor */}
-                        <div className="flex flex-wrap items-center gap-2 text-sm">
-                          {row.userName ? (
-                            <>
-                              <span className="font-semibold text-ink">{row.userName}</span>
-                              <span className="text-muted">({row.userEmail})</span>
-                              {row.userRole && <RoleBadge role={row.userRole} />}
-                            </>
-                          ) : (
-                            <span className="text-muted">system (no user)</span>
-                          )}
-                        </div>
-
-                        {/* Meta: IP + time */}
-                        <div className="flex flex-wrap items-center gap-4 text-xs text-muted">
-                          <span className="inline-flex items-center gap-1">
-                            <Clock className="h-3.5 w-3.5" aria-hidden="true" />
-                            {formatDateTime(row.createdAt)}
-                          </span>
-                          {row.ipAddress && (
-                            <span className="inline-flex items-center gap-1">
-                              <Globe className="h-3.5 w-3.5" aria-hidden="true" />
-                              <code className="font-mono">{row.ipAddress}</code>
-                            </span>
-                          )}
-                          {row.userAgent && (
-                            <span className="inline-flex items-center gap-1" title={row.userAgent}>
-                              <Fingerprint className="h-3.5 w-3.5" aria-hidden="true" />
-                              <span className="max-w-[200px] truncate">{row.userAgent}</span>
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Metadata (expandable) */}
-                        {row.metadata != null && (
-                          <details className="group">
-                            <summary className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-accent-strong hover:underline">
-                              <FileJson className="h-3.5 w-3.5" aria-hidden="true" />
-                              metadata
-                              <span className="text-muted group-open:hidden">(แสดง)</span>
-                              <span className="hidden text-muted group-open:inline">(ซ่อน)</span>
-                            </summary>
-                            <pre className="mt-2 overflow-x-auto rounded-md bg-surface-sunken p-3 text-xs text-ink">
-                              <code>{formatMetadata(row.metadata)}</code>
-                            </pre>
-                          </details>
+          </AdminCard>
+        ) : (
+          <div className="space-y-3">
+            {rows.map((row) => (
+              <AdminCard key={row.id} className="p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1 space-y-2">
+                    {/* Action + resource */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-pill bg-accent-sunken px-3 py-0.5 font-mono text-xs font-semibold text-accent-strong ring-1 ring-accent-strong/20 ring-inset">
+                        {row.action}
+                      </span>
+                      <span className="text-xs text-muted">
+                        resource: <code className="font-mono text-ink">{row.resource}</code>
+                        {row.resourceId && (
+                          <>
+                            {' '}· id:{' '}
+                            <code className="font-mono text-ink">{row.resourceId}</code>
+                          </>
                         )}
-                      </div>
+                      </span>
                     </div>
-                  </AdminCard>
-                ))}
-              </div>
-            )}
 
-            <Pagination
-              currentPage={page}
-              totalPages={totalPages}
-              basePath="/admin/audit"
-              searchParams={params as Record<string, string | string[] | undefined>}
-            />
+                    {/* Actor */}
+                    <div className="flex flex-wrap items-center gap-2 text-sm">
+                      {row.userName ? (
+                        <>
+                          <span className="font-semibold text-ink">{row.userName}</span>
+                          <span className="text-muted">({row.userEmail})</span>
+                          {row.userRole && <RoleBadge role={row.userRole} />}
+                        </>
+                      ) : (
+                        <span className="text-muted">system (no user)</span>
+                      )}
+                    </div>
+
+                    {/* Meta: IP + time */}
+                    <div className="flex flex-wrap items-center gap-4 text-xs text-muted">
+                      <span className="inline-flex items-center gap-1">
+                        <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                        {formatDateTime(row.createdAt)}
+                      </span>
+                      {row.ipAddress && (
+                        <span className="inline-flex items-center gap-1">
+                          <Globe className="h-3.5 w-3.5" aria-hidden="true" />
+                          <code className="font-mono">{row.ipAddress}</code>
+                        </span>
+                      )}
+                      {row.userAgent && (
+                        <span className="inline-flex items-center gap-1" title={row.userAgent}>
+                          <Fingerprint className="h-3.5 w-3.5" aria-hidden="true" />
+                          <span className="max-w-[200px] truncate">{row.userAgent}</span>
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Metadata (expandable) */}
+                    {row.metadata != null && (
+                      <details className="group">
+                        <summary className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-accent-strong hover:underline">
+                          <FileJson className="h-3.5 w-3.5" aria-hidden="true" />
+                          metadata
+                          <span className="text-muted group-open:hidden">(แสดง)</span>
+                          <span className="hidden text-muted group-open:inline">(ซ่อน)</span>
+                        </summary>
+                        <pre className="mt-2 overflow-x-auto rounded-md border border-border bg-surface-sunken p-3 text-xs text-ink">
+                          <code>{formatMetadata(row.metadata)}</code>
+                        </pre>
+                      </details>
+                    )}
+                  </div>
+                </div>
+              </AdminCard>
+            ))}
           </div>
-        </AdminPageTransition>
-      </main>
-    </div>
+        )}
+
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          basePath="/admin/audit"
+          searchParams={params as Record<string, string | string[] | undefined>}
+        />
+      </div>
+    </AdminShell>
   );
 }
 

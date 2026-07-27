@@ -3,9 +3,8 @@ import { asc, eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { users, departments } from '@/lib/db/schema';
 import { requireStaff } from '@/lib/auth/require-staff';
-import { AdminChrome } from '@/components/admin/admin-chrome';
+import { AdminShell } from '@/components/admin/admin-shell';
 import { AdminPageHeader } from '@/components/admin/admin-page-header';
-import { AdminPageTransition } from '@/components/admin/admin-page-transition';
 import { UsersClient, UserSuccessToast } from './users-client';
 
 export const metadata: Metadata = { title: 'จัดการผู้ใช้' };
@@ -49,29 +48,25 @@ export default async function UsersPage({
     .orderBy(departments.name);
 
   return (
-    <div className="min-h-dvh bg-surface text-ink">
-      <AdminChrome user={staffUser} active="users" />
-      <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
-        <AdminPageTransition>
-          <div className="space-y-6">
-            <AdminPageHeader
-              title="จัดการผู้ใช้"
-              subtitle="สร้าง ระงับ แก้ไขบทบาท และรีเซ็ตรหัสผ่านของบัญชีเจ้าหน้าที่"
-            />
-            <UserSuccessToast ok={ok ?? null} />
-            <UsersClient
-              users={userRows.map((r) => ({
-                ...r,
-                departmentId: r.departmentId,
-                departmentName: r.departmentName,
-              }))}
-              departments={deptOptions}
-              canResetPassword={staffUser.role === 'superadmin'}
-              currentUserId={staffUser.id}
-            />
-          </div>
-        </AdminPageTransition>
-      </main>
-    </div>
+    <AdminShell user={staffUser} active="users">
+      <div className="space-y-6">
+        <AdminPageHeader
+          eyebrow="สิทธิ์และบัญชี"
+          title="จัดการผู้ใช้"
+          subtitle="สร้าง ระงับ แก้ไขบทบาท และรีเซ็ตรหัสผ่านของบัญชีเจ้าหน้าที่"
+        />
+        <UserSuccessToast ok={ok ?? null} />
+        <UsersClient
+          users={userRows.map((r) => ({
+            ...r,
+            departmentId: r.departmentId,
+            departmentName: r.departmentName,
+          }))}
+          departments={deptOptions}
+          canResetPassword={staffUser.role === 'superadmin'}
+          currentUserId={staffUser.id}
+        />
+      </div>
+    </AdminShell>
   );
 }

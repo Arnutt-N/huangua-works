@@ -98,7 +98,7 @@ export function CaseFilterBar({ categories }: { categories: CategoryOption[] }) 
 
   return (
     <div
-      className="rounded-lg border border-border bg-surface-raised p-4 sm:p-5"
+      className="glass-panel rounded-xl p-4 shadow-sm sm:p-5"
       aria-label="ตัวกรองเรื่อง"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
