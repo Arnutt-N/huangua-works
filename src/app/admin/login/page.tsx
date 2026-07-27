@@ -2,7 +2,6 @@ import { ArrowLeft } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Navbar } from '@/components/landing/Navbar';
-import { BrandMark } from '@/components/site/brand-mark';
 import { SiteFooter } from '../../../components/site/site-footer';
 import { LoginForm } from './login-form';
 
@@ -27,11 +26,16 @@ export default function AdminLoginPage() {
             กลับหน้าหลัก
           </Link>
 
+          {/* § หัวการ์ดเป็นตัวอักษรสีทึบ ไม่ใช้ .gradient-text
+              เหตุผลไม่ใช่แค่รสนิยม — .gradient-text ไล่ผ่าน accent-gold (L82%)
+              เป็นจุดกลาง ซึ่งบนพื้นการ์ดขาวให้ contrast แค่ 1.73:1 (ต่ำกว่าเกณฑ์
+              ทั้ง 4.5:1 ของข้อความปกติและ 3:1 ของข้อความใหญ่) คือบั๊กชนิดเดียวกับ
+              text-warning บน warning-soft ที่ 1.52:1 ที่เพิ่งไล่แก้ไปทั้งระบบ
+              อีกทั้ง "เข้าระบบเจ้าหน้าที่" คือ label ของฟอร์ม ไม่ใช่หัวข้อโปรโมต —
+              landing สงวน .gradient-text ไว้ให้ H1 hero กับหัว section เท่านั้น
+              และหน้านี้เป็นประตูเข้าแอดมินซึ่งหัวเรื่องทุกหน้าเป็นสีทึบอยู่แล้ว */}
           <div className="glass-panel mt-6 rounded-xl p-6 shadow-lg sm:p-8">
-            <BrandMark className="mb-4" />
-            <h1 className="text-2xl font-bold">
-              <span className="gradient-text">เข้าระบบเจ้าหน้าที่</span>
-            </h1>
+            <h1 className="text-2xl font-bold text-ink">เข้าระบบเจ้าหน้าที่</h1>
             <p className="mt-2 text-sm text-muted">
               สำหรับเจ้าหน้าที่ อบต.หัวงัว เข้าดูคิวและดำเนินเรื่องแจ้งเหตุ
             </p>

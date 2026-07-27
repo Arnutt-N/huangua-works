@@ -188,7 +188,7 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
   );
 
   return (
-    <AdminShell user={staffUser} active="dashboard">
+    <AdminShell user={staffUser} active="dashboard" title="รายละเอียดเรื่อง">
       {/* breadcrumb */}
       <Link
         href="/admin"

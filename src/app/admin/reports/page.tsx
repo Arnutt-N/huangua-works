@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { and, count, desc, eq, isNotNull, sql } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNotNull, lt } from 'drizzle-orm';
 import {
   BarChart3,
   TrendingUp,
@@ -15,7 +15,6 @@ import { cases, caseStatsDaily, categories, departments } from '@/lib/db/schema'
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { requireStaff } from '@/lib/auth/require-staff';
 import { AdminShell } from '@/components/admin/admin-shell';
-import { AdminPageHeader } from '@/components/admin/admin-page-header';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import { KpiCard } from '@/components/admin/kpi-card';
 import { CaseStatusBadge } from '@/components/ui/case-status-badge';
@@ -65,6 +64,12 @@ export default async function ReportsPage() {
     .orderBy(desc(count()));
 
   // § SLA breach count (open + dueDate < now)
+  //
+  // เดิมเขียนว่า sql`${cases.status} = ANY (${OPEN_STATUSES})` ซึ่งทำให้หน้านี้ 500
+  // ทุกครั้งที่เปิด: Drizzle กาง JS array ใน sql template ออกเป็น parameter list
+  // "($1, $2, $3, $4)" ซึ่งใช้ได้กับ IN (...) แต่ ANY ต้องการ array จริงฝั่งขวา
+  // Postgres จึงตอบ 42809 "op ANY/ALL (array) requires array on right side"
+  // ใช้ inArray() ของ Drizzle แทน — สร้าง IN (...) ที่ถูกต้องและ type-safe
   const now = new Date();
   const slaResult = await firstOrUndefined(
     db
@@ -72,8 +77,9 @@ export default async function ReportsPage() {
       .from(cases)
       .where(
         and(
-          sql`${cases.status} = ANY (${OPEN_STATUSES})`,
-          sql`${cases.dueDate} IS NOT NULL AND ${cases.dueDate} < ${now}`,
+          inArray(cases.status, OPEN_STATUSES),
+          isNotNull(cases.dueDate),
+          lt(cases.dueDate, now),
         ),
       ),
   );
@@ -118,16 +124,13 @@ export default async function ReportsPage() {
   const maxDeptCount = Math.max(1, ...deptCounts.map((d) => Number(d.c)));
 
   return (
-    <AdminShell user={staffUser} active="reports">
+    <AdminShell user={staffUser} active="reports" title="รายงานสรุป">
       <div className="space-y-6">
-        <AdminPageHeader
-          title="รายงานสรุป"
-          subtitle={
-            latest
-              ? `อัปเดตล่าสุด: ${new Date(latest.date).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}`
-              : 'สรุปภาพรวมเคสทั้งระบบ (ยังไม่มีข้อมูลรายวัน)'
-          }
-        />
+        <p className="text-sm text-muted">
+          {latest
+            ? `อัปเดตล่าสุด: ${new Date(latest.date).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}`
+            : 'สรุปภาพรวมเคสทั้งระบบ (ยังไม่มีข้อมูลรายวัน)'}
+        </p>
 
         {/* KPI cards */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
