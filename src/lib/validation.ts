@@ -223,7 +223,7 @@ export const resetPasswordFormSchema = z.object({
 });
 
 // ────────────────────────────────────────────────────────────────────────────
-// § Settings — บัญชีของตัวเอง (/admin/settings)
+// § Profile — บัญชีของตัวเอง (/admin/profile)
 // ────────────────────────────────────────────────────────────────────────────
 
 export const updateProfileFormSchema = z.object({
@@ -252,6 +252,56 @@ export const changeOwnPasswordFormSchema = z
     message: 'รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสผ่านเดิม',
     path: ['newPassword'],
   });
+
+// ────────────────────────────────────────────────────────────────────────────
+// § Master data — หน่วยงาน / หมวดหมู่ (/admin/master-data)
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * slug ใช้เป็น natural key ที่ปรากฏใน URL/ข้อมูล export จึงจำกัดเป็น
+ * a-z 0-9 และขีดกลาง — ไม่รับตัวพิมพ์ใหญ่/ภาษาไทย/ช่องว่าง เพื่อไม่ให้เกิด
+ * สองสลักที่ต่างกันแค่ตัวพิมพ์ (departments.slug/categories.slug เป็น unique)
+ */
+const slugSchema = z
+  .string()
+  .trim()
+  .min(2, 'slug ต้องมีอย่างน้อย 2 ตัวอักษร')
+  .max(60)
+  .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'slug ใช้ได้เฉพาะ a-z, 0-9 และ - (เช่น public-works)');
+
+const displayNameSchema = z
+  .string()
+  .trim()
+  .min(2, 'ชื่อต้องมีอย่างน้อย 2 ตัวอักษร')
+  .max(120);
+
+const descriptionSchema = z.string().trim().max(500).optional().or(z.literal(''));
+
+export const departmentFormSchema = z.object({
+  id: z.string().optional(),
+  name: displayNameSchema,
+  slug: slugSchema,
+  description: descriptionSchema,
+});
+
+export const categoryFormSchema = z.object({
+  id: z.string().optional(),
+  name: displayNameSchema,
+  slug: slugSchema,
+  description: descriptionSchema,
+  defaultDepartmentId: z.string().optional(),
+  // SLA เริ่มต้นของหมวด — 0 วันไม่มีความหมาย และเกิน 365 แปลว่ากรอกผิด
+  estimatedDays: z.coerce
+    .number()
+    .int('จำนวนวันต้องเป็นจำนวนเต็ม')
+    .min(1, 'จำนวนวันต้องอย่างน้อย 1')
+    .max(365, 'จำนวนวันต้องไม่เกิน 365'),
+});
+
+export const toggleActiveFormSchema = z.object({
+  id: z.string().min(1),
+  kind: z.enum(['department', 'category']),
+});
 
 // ────────────────────────────────────────────────────────────────────────────
 // § Helpers
