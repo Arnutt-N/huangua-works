@@ -126,7 +126,6 @@ export default async function AuditPage({
     <AdminShell user={staffUser} active="audit">
       <div className="space-y-6">
         <AdminPageHeader
-          eyebrow="Audit trail"
           title="ประวัติการกระทำ"
           subtitle="บันทึกการเข้าถึงและเปลี่ยนแปลงข้อมูล (PDPA compliance audit trail)"
         />

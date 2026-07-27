@@ -121,7 +121,6 @@ export default async function ReportsPage() {
     <AdminShell user={staffUser} active="reports">
       <div className="space-y-6">
         <AdminPageHeader
-          eyebrow="ภาพรวมระบบ"
           title="รายงานสรุป"
           subtitle={
             latest
@@ -192,7 +191,7 @@ export default async function ReportsPage() {
                   <div className="flex-1">
                     <div className="h-2.5 overflow-hidden rounded-pill bg-ink/10 ring-1 ring-ink/5 ring-inset">
                       <div
-                        className="accent-rule h-full rounded-pill transition-all duration-slow ease-out-expo"
+                        className="h-full rounded-pill bg-accent-strong transition-all duration-slow ease-out-expo"
                         style={{ width: `${(item.count / maxStatusCount) * 100}%` }}
                       />
                     </div>
@@ -224,7 +223,7 @@ export default async function ReportsPage() {
                     <div className="flex-1">
                       <div className="h-2.5 overflow-hidden rounded-pill bg-ink/10 ring-1 ring-ink/5 ring-inset">
                         <div
-                          className="accent-rule h-full rounded-pill transition-all duration-slow ease-out-expo"
+                          className="h-full rounded-pill bg-accent-strong transition-all duration-slow ease-out-expo"
                           style={{ width: `${(Number(item.c) / maxCategoryCount) * 100}%` }}
                         />
                       </div>
@@ -257,7 +256,7 @@ export default async function ReportsPage() {
                     <div className="flex-1">
                       <div className="h-2.5 overflow-hidden rounded-pill bg-ink/10 ring-1 ring-ink/5 ring-inset">
                         <div
-                          className="accent-rule h-full rounded-pill transition-all duration-slow ease-out-expo"
+                          className="h-full rounded-pill bg-accent-strong transition-all duration-slow ease-out-expo"
                           style={{ width: `${(Number(item.c) / maxDeptCount) * 100}%` }}
                         />
                       </div>

@@ -15,30 +15,31 @@ import type { ReactNode } from 'react';
  *
  * § สีไอคอนใช้ token *-ink ทั้งหมด — ของเดิม variant gold ใช้ text-accent-gold (L82%)
  * บนพื้น gold-soft (L95%) = 1.52:1 ไอคอนแทบหายไปกับพื้น (ต่ำกว่า 3:1 ของ WCAG 1.4.11)
+ *
+ * โครงการ์ด = กรอบไอคอนสี + ตัวเลข + label เหมือนการ์ดบริการบน landing (Services.tsx)
+ * ตั้งใจไม่ใส่แถบสีบนหัวการ์ด: variant สื่อผ่านสีไอคอนอยู่แล้ว การเติมช่องสีที่สอง
+ * เป็นการตกแต่งซ้ำที่ landing ไม่ได้ทำ
  */
 type KpiVariant = 'default' | 'gold' | 'danger';
 
 const variantStyles: Record<
   KpiVariant,
-  { iconBg: string; iconColor: string; valueColor: string; rule: string }
+  { iconBg: string; iconColor: string; valueColor: string }
 > = {
   default: {
     iconBg: 'bg-accent-sunken',
     iconColor: 'text-accent-strong',
     valueColor: 'text-ink',
-    rule: 'bg-accent',
   },
   gold: {
     iconBg: 'bg-accent-gold-soft',
     iconColor: 'text-warning-ink',
     valueColor: 'text-ink',
-    rule: 'bg-accent-gold',
   },
   danger: {
     iconBg: 'bg-danger-soft',
     iconColor: 'text-danger-ink',
     valueColor: 'text-danger-ink',
-    rule: 'bg-danger',
   },
 };
 
@@ -63,16 +64,11 @@ export function KpiCard({
   return (
     <div
       className={cn(
-        'glass-panel relative flex flex-col gap-3 overflow-hidden rounded-xl p-5 shadow-sm',
+        'glass-panel flex flex-col gap-3 rounded-xl p-5 shadow-sm',
         'transition-shadow duration-normal ease-out-expo hover:shadow-md',
         className,
       )}
     >
-      {/* แถบสีบนหัวการ์ด — บอก variant ได้ทันทีโดยไม่ต้องพึ่งสีไอคอนอย่างเดียว */}
-      <span
-        className={cn('absolute inset-x-0 top-0 h-1', styles.rule)}
-        aria-hidden="true"
-      />
       <div className="flex items-center justify-between gap-2">
         <span
           className={cn(

@@ -27,11 +27,7 @@ export default function AdminLoginPage() {
             กลับหน้าหลัก
           </Link>
 
-          <div className="glass-panel relative mt-6 overflow-hidden rounded-2xl p-6 shadow-lg sm:p-8">
-            <div
-              className="accent-rule pointer-events-none absolute inset-x-0 top-0 h-1"
-              aria-hidden="true"
-            />
+          <div className="glass-panel mt-6 rounded-2xl p-6 shadow-lg sm:p-8">
             <BrandMark className="mb-4" />
             <h1 className="text-2xl font-bold">
               <span className="gradient-text">เข้าระบบเจ้าหน้าที่</span>

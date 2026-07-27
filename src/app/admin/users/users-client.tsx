@@ -111,7 +111,7 @@ export function UsersClient({
       </div>
 
       <div className="glass-panel overflow-hidden rounded-xl shadow-sm">
-        <div className="hidden border-b border-border bg-surface-sunken/60 px-4 py-3 text-xs font-semibold tracking-wide text-muted uppercase sm:grid sm:grid-cols-[2fr_1.5fr_1fr_1fr_auto] sm:gap-4">
+        <div className="hidden border-b border-border bg-surface-sunken/60 px-4 py-3 text-xs font-semibold text-muted sm:grid sm:grid-cols-[2fr_1.5fr_1fr_1fr_auto] sm:gap-4">
           <span>ชื่อ · อีเมล</span>
           <span>บทบาท</span>
           <span>หน่วยงาน</span>

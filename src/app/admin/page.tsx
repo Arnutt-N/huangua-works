@@ -153,7 +153,6 @@ export default async function AdminDashboardPage({
     <AdminShell user={staffUser} active="dashboard">
       <div className="space-y-6">
         <AdminPageHeader
-          eyebrow="คิวงาน"
           title="แดชบอร์ดเจ้าหน้าที่"
           subtitle="คลิกที่เรื่องเพื่อดูรายละเอียด เปลี่ยนสถานะ หรือมอบหมาย"
         />
@@ -206,7 +205,7 @@ export default async function AdminDashboardPage({
           </div>
         ) : (
           <div className="glass-panel overflow-hidden rounded-xl shadow-sm">
-            <div className="hidden border-b border-border bg-surface-sunken/60 px-4 py-3 text-xs font-semibold tracking-wide text-muted uppercase sm:grid sm:grid-cols-[2.5fr_1fr_1fr_1.2fr_auto_auto] sm:gap-4">
+            <div className="hidden border-b border-border bg-surface-sunken/60 px-4 py-3 text-xs font-semibold text-muted sm:grid sm:grid-cols-[2.5fr_1fr_1fr_1.2fr_auto_auto] sm:gap-4">
               <span>เรื่อง</span>
               <span>หมวด</span>
               <span>ที่ตั้ง</span>

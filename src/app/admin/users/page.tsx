@@ -51,7 +51,6 @@ export default async function UsersPage({
     <AdminShell user={staffUser} active="users">
       <div className="space-y-6">
         <AdminPageHeader
-          eyebrow="สิทธิ์และบัญชี"
           title="จัดการผู้ใช้"
           subtitle="สร้าง ระงับ แก้ไขบทบาท และรีเซ็ตรหัสผ่านของบัญชีเจ้าหน้าที่"
         />

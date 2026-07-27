@@ -370,15 +370,6 @@
   border-color: var(--color-border);
 }
 
-/* แถบ accent บนหัวการ์ด — emerald→amber เดียวกับ .gradient-text ของ landing */
-.accent-rule {
-  background: linear-gradient(
-    to right,
-    var(--color-accent),
-    var(--color-accent-gold)
-  );
-}
-
 /* ซ่อน scrollbar สำหรับแถบแท็บที่เลื่อนแนวนอนบนมือถือ (ยังเลื่อนได้ปกติ) */
 @utility scrollbar-none {
   scrollbar-width: none;
