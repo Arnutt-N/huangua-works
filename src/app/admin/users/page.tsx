@@ -4,7 +4,6 @@ import { getDb } from '@/lib/db';
 import { users, departments } from '@/lib/db/schema';
 import { requireStaff } from '@/lib/auth/require-staff';
 import { AdminShell } from '@/components/admin/admin-shell';
-import { AdminPageHeader } from '@/components/admin/admin-page-header';
 import { UsersClient, UserSuccessToast } from './users-client';
 
 export const metadata: Metadata = { title: 'จัดการผู้ใช้' };
@@ -48,12 +47,11 @@ export default async function UsersPage({
     .orderBy(departments.name);
 
   return (
-    <AdminShell user={staffUser} active="users">
+    <AdminShell user={staffUser} active="users" title="จัดการผู้ใช้">
       <div className="space-y-6">
-        <AdminPageHeader
-          title="จัดการผู้ใช้"
-          subtitle="สร้าง ระงับ แก้ไขบทบาท และรีเซ็ตรหัสผ่านของบัญชีเจ้าหน้าที่"
-        />
+        <p className="text-sm text-muted">
+          สร้าง ระงับ แก้ไขบทบาท และรีเซ็ตรหัสผ่านของบัญชีเจ้าหน้าที่
+        </p>
         <UserSuccessToast ok={ok ?? null} />
         <UsersClient
           users={userRows.map((r) => ({

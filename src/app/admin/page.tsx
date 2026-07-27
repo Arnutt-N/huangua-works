@@ -6,7 +6,6 @@ import { getDb } from '@/lib/db';
 import { cases, categories, users, caseStatusEnum } from '@/lib/db/schema';
 import { requireStaff } from '@/lib/auth/require-staff';
 import { AdminShell } from '@/components/admin/admin-shell';
-import { AdminPageHeader } from '@/components/admin/admin-page-header';
 import { EmptyState } from '@/components/admin/empty-state';
 import { Pagination } from '@/components/admin/pagination';
 import { CaseFilterBar } from '@/components/admin/case-filter-bar';
@@ -150,12 +149,11 @@ export default async function AdminDashboardPage({
   const isFiltered = !!(statusFilter || priorityFilter || categoryFilter || q);
 
   return (
-    <AdminShell user={staffUser} active="dashboard">
+    <AdminShell user={staffUser} active="dashboard" title="แดชบอร์ดเจ้าหน้าที่">
       <div className="space-y-6">
-        <AdminPageHeader
-          title="แดชบอร์ดเจ้าหน้าที่"
-          subtitle="คลิกที่เรื่องเพื่อดูรายละเอียด เปลี่ยนสถานะ หรือมอบหมาย"
-        />
+        <p className="text-sm text-muted">
+          คลิกที่เรื่องเพื่อดูรายละเอียด เปลี่ยนสถานะ หรือมอบหมาย
+        </p>
 
         {/* สรุปยอดหน้านี้ */}
         <div className="glass-panel flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl px-4 py-3 text-sm text-muted shadow-sm">

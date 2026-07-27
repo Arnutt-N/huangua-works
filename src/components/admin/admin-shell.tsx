@@ -1,54 +1,53 @@
 import type { ReactNode } from 'react';
-import { AdminChrome, type AdminTab } from '@/components/admin/admin-chrome';
+import { AdminLayout } from '@/components/admin/admin-layout';
 import { AdminPageTransition } from '@/components/admin/admin-page-transition';
+import type { AdminTab } from '@/components/admin/admin-nav';
 import { cn } from '@/lib/cn';
 import type { users } from '@/lib/db/schema';
 
 /**
- * AdminShell — โครงหน้าเดียวของทุกหน้าแอดมิน
+ * AdminShell — โครงหน้าเดียวของทุกหน้าแอดมิน (server component)
  *
- * เดิมทุกหน้า copy โครง `min-h-dvh bg-surface` + <AdminChrome> + <main> + <AdminPageTransition>
- * เองทีละหน้า ทำให้ค่าคลาดกันไปเรื่อย ๆ (เช่น /admin/cases/[id] ไม่มี transition,
- * /admin/chat ไม่มี main container) รวมไว้ที่เดียวเพื่อ consistency จริง
+ * รวมโครงที่ 6 หน้าเคย copy กันเอง แล้วส่งต่อให้ AdminLayout (client) ซึ่งคุม
+ * สถานะ sidebar ย่อ/ขยาย และ drawer บนมือถือ
  *
- * § พื้นหลัง — เหตุผลที่แอดมินเดิม "ดูยาก"
- * bg-surface (L99%) กับการ์ด bg-surface-raised (L100%) ต่างกัน 1% = แทบไม่มีการแยกชั้น
- * รวมกับขอบ 1.31:1 ที่มองไม่เห็น หน้าจอเลยแบนราบทั้งหน้า
- * เปลี่ยนมาใช้ mesh-gradient + thai-pattern ชุดเดียวกับ Hero/หน้า login แล้ววาง
- * การ์ด .glass-panel ทับ → ได้ทั้งความลึกและภาษาเดียวกับ landing
+ * § ส่งเฉพาะ field ที่ต้องใช้แสดงผลลง client
+ * users.$inferSelect มี passwordHash อยู่ด้วย ถ้าส่งทั้ง row ให้ client component
+ * ค่านั้นจะถูก serialize ลง RSC payload และอ่านได้จาก browser — จึงคัดเฉพาะ
+ * fullName กับ role เท่านั้น
  *
  * `bleed` = ปิด container/padding ของ main สำหรับหน้าที่จัดพื้นที่เอง (เช่น /admin/chat)
  */
 export function AdminShell({
   user,
   active,
+  title,
   children,
   bleed = false,
   className,
 }: {
   user: typeof users.$inferSelect;
   active: AdminTab;
+  /** ชื่อหน้าที่แสดงบน topbar */
+  title: string;
   children: ReactNode;
   bleed?: boolean;
   className?: string;
 }) {
   return (
-    <div className="mesh-gradient relative min-h-dvh text-ink">
-      {/* ลาย Thai pattern จาง ๆ (opacity .04) — ตัวเดียวกับ Hero, ไม่รับ pointer event */}
-      <div className="thai-pattern pointer-events-none fixed inset-0" aria-hidden="true" />
-
-      <div className="relative z-10 flex min-h-dvh flex-col">
-        <AdminChrome user={user} active={active} />
-        <main
-          className={cn(
-            'flex-1',
-            !bleed && 'mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10',
-            className,
-          )}
-        >
-          <AdminPageTransition>{children}</AdminPageTransition>
-        </main>
+    <AdminLayout
+      user={{ fullName: user.fullName, role: user.role }}
+      active={active}
+      title={title}
+    >
+      <div
+        className={cn(
+          !bleed && 'mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8',
+          className,
+        )}
+      >
+        <AdminPageTransition>{children}</AdminPageTransition>
       </div>
-    </div>
+    </AdminLayout>
   );
 }

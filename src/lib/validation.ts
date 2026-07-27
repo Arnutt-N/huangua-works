@@ -223,6 +223,37 @@ export const resetPasswordFormSchema = z.object({
 });
 
 // ────────────────────────────────────────────────────────────────────────────
+// § Settings — บัญชีของตัวเอง (/admin/settings)
+// ────────────────────────────────────────────────────────────────────────────
+
+export const updateProfileFormSchema = z.object({
+  fullName: fullNameSchema,
+  // เว้นว่างได้ (คอลัมน์ phone_number เป็น nullable) แต่ถ้ากรอกต้องเป็นเบอร์ไทยที่ถูกต้อง
+  phoneNumber: z
+    .string()
+    .trim()
+    .max(20)
+    .regex(/^0[0-9]{8,9}$/, 'เบอร์โทรต้องเป็นตัวเลข 9-10 หลัก ขึ้นต้นด้วย 0')
+    .optional()
+    .or(z.literal('')),
+});
+
+export const changeOwnPasswordFormSchema = z
+  .object({
+    currentPassword: z.string().min(1, 'กรุณากรอกรหัสผ่านปัจจุบัน').max(128),
+    newPassword: z.string().min(8, 'รหัสผ่านใหม่ต้องมีอย่างน้อย 8 ตัวอักษร').max(128),
+    confirmPassword: z.string().max(128),
+  })
+  .refine((v) => v.newPassword === v.confirmPassword, {
+    message: 'รหัสผ่านใหม่และการยืนยันไม่ตรงกัน',
+    path: ['confirmPassword'],
+  })
+  .refine((v) => v.newPassword !== v.currentPassword, {
+    message: 'รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสผ่านเดิม',
+    path: ['newPassword'],
+  });
+
+// ────────────────────────────────────────────────────────────────────────────
 // § Helpers
 // ────────────────────────────────────────────────────────────────────────────
 

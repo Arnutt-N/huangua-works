@@ -5,7 +5,6 @@ import { getDb } from '@/lib/db';
 import { auditLogs, users } from '@/lib/db/schema';
 import { requireStaff } from '@/lib/auth/require-staff';
 import { AdminShell } from '@/components/admin/admin-shell';
-import { AdminPageHeader } from '@/components/admin/admin-page-header';
 import { AdminCard } from '@/components/admin/admin-card';
 import { EmptyState } from '@/components/admin/empty-state';
 import { Pagination } from '@/components/admin/pagination';
@@ -123,12 +122,11 @@ export default async function AuditPage({
     .orderBy(auditLogs.action);
 
   return (
-    <AdminShell user={staffUser} active="audit">
+    <AdminShell user={staffUser} active="audit" title="ประวัติการกระทำ">
       <div className="space-y-6">
-        <AdminPageHeader
-          title="ประวัติการกระทำ"
-          subtitle="บันทึกการเข้าถึงและเปลี่ยนแปลงข้อมูล (PDPA compliance audit trail)"
-        />
+        <p className="text-sm text-muted">
+          บันทึกการเข้าถึงและเปลี่ยนแปลงข้อมูล (PDPA compliance audit trail)
+        </p>
 
         <AuditFilterBar actions={distinctActions.map((a) => a.action)} />
 

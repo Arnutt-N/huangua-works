@@ -16,7 +16,7 @@ export default async function AdminChatPage() {
   const { user: staffUser } = await requireStaff();
 
   return (
-    <AdminShell user={staffUser} active="chat" bleed>
+    <AdminShell user={staffUser} active="chat" title="แชท LINE" bleed>
       <ChatClient adminUserId={staffUser.id} />
     </AdminShell>
   );
