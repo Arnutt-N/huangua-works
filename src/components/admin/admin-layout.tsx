@@ -2,21 +2,14 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import {
-  Menu,
-  X,
-  LogOut,
-  ExternalLink,
-  PanelLeftClose,
-  PanelLeftOpen,
-} from 'lucide-react';
+import { Menu, X, LogOut, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { logout } from '@/app/admin/actions';
 import { BrandMark } from '@/components/site/brand-mark';
 import { RoleBadge } from '@/components/admin/role-badge';
 import {
   ADMIN_NAV_ACCOUNT,
-  ADMIN_NAV_MAIN,
   initialsOf,
+  visibleNavGroups,
   visibleNavItems,
   type AdminNavItem,
   type AdminTab,
@@ -34,7 +27,7 @@ import { cn } from '@/lib/cn';
  * ก็อ่านเป็นปุ่มแปลกปลอมเพราะไม่มีกลุ่มรองรับ
  *
  * โครงใหม่แยกหน้าที่ชัดเจน:
- *   - sidebar = นำทางทั้งระบบ + บัญชีของฉัน (คงที่ ไม่เปลี่ยนตามหน้า)
+ *   - sidebar = นำทางทั้งระบบ (แบ่ง 3 กลุ่ม) + บัญชีของฉันแยกไว้ท้าย
  *   - topbar  = ชื่อหน้าปัจจุบัน + ตัวตนผู้ใช้ (บางแถวเดียว)
  *   - เนื้อหา = ตัวกรอง/ข้อมูลของหน้านั้น อยู่ในพื้นที่ของตัวเองชัดเจน
  *
@@ -87,7 +80,7 @@ export function AdminLayout({
     return () => window.removeEventListener('keydown', onKey);
   }, [mobileOpen]);
 
-  const mainItems = visibleNavItems(user.role, ADMIN_NAV_MAIN);
+  const groups = visibleNavGroups(user.role);
   const accountItems = visibleNavItems(user.role, ADMIN_NAV_ACCOUNT);
 
   return (
@@ -169,24 +162,43 @@ export function AdminLayout({
           </button>
         </div>
 
-        {/* เมนูงาน */}
+        {/* เมนูงาน — แบ่งกลุ่มตามหน้าที่ */}
         <nav className="flex-1 overflow-y-auto p-3">
-          <ul className="space-y-1">
-            {mainItems.map((item) => (
-              <li key={item.key}>
-                <SidebarLink
-                  item={item}
-                  isActive={item.key === active}
-                  collapsed={collapsed}
-                  onNavigate={() => setMobileOpen(false)}
-                />
-              </li>
-            ))}
-          </ul>
+          {groups.map((group, i) => (
+            <div key={group.label} className={cn(i > 0 && 'mt-5')}>
+              {/* หัวข้อกลุ่ม: ตอนย่อเปลี่ยนเป็นเส้นคั่นแทน — ถ้าซ่อนเฉย ๆ
+                  ไอคอนทุกกลุ่มจะไหลติดกันจนแยกกลุ่มไม่ออก */}
+              <p
+                className={cn(
+                  'px-3 pb-1.5 text-xs font-semibold tracking-wide text-muted',
+                  collapsed && 'lg:hidden',
+                )}
+              >
+                {group.label}
+              </p>
+              {collapsed && i > 0 && (
+                <div className="mx-2 mb-2 hidden border-t border-border lg:block" aria-hidden="true" />
+              )}
+              <ul className="space-y-1">
+                {group.items.map((item) => (
+                  <li key={item.key}>
+                    <SidebarLink
+                      item={item}
+                      isActive={item.key === active}
+                      collapsed={collapsed}
+                      onNavigate={() => setMobileOpen(false)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </nav>
 
         {/* บัญชีของฉัน + ออกจากระบบ
-            ปุ่มที่เคยลอยอยู่บน header ย้ายมารวมกลุ่มกันที่นี่ */}
+            แยกจากกลุ่มงานด้านบนเพราะเป็นเรื่องของ "ตัวฉัน" ไม่ใช่ของระบบ
+            (ลิงก์ "เปิดหน้าเว็บสาธารณะ" ถูกตัดออก — กินพื้นที่หนึ่งแถวเพื่อสิ่งที่
+            พิมพ์ URL เอาก็ได้ และไม่ใช่งานที่เจ้าหน้าที่ทำระหว่างใช้ระบบ) */}
         <div className="flex-none space-y-1 border-t border-border p-3">
           {accountItems.map((item) => (
             <SidebarLink
@@ -197,21 +209,6 @@ export function AdminLayout({
               onNavigate={() => setMobileOpen(false)}
             />
           ))}
-
-          <Link
-            href="/"
-            onClick={() => setMobileOpen(false)}
-            title={collapsed ? 'เปิดหน้าเว็บสาธารณะ' : undefined}
-            className={cn(
-              'flex min-h-touch items-center gap-3 rounded-md px-3 text-sm font-medium text-muted transition-colors duration-normal ease-out-expo hover:bg-accent-sunken hover:text-accent-strong',
-              collapsed && 'lg:justify-center lg:px-0',
-            )}
-          >
-            <ExternalLink className="h-5 w-5 flex-none" aria-hidden="true" />
-            <span className={cn('truncate', collapsed && 'lg:hidden')}>
-              เปิดหน้าเว็บสาธารณะ
-            </span>
-          </Link>
 
           <form action={logout}>
             <button

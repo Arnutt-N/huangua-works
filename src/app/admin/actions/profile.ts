@@ -16,7 +16,7 @@ import {
 } from '@/lib/validation';
 
 /**
- * Server actions สำหรับ "บัญชีของฉัน" (/admin/settings)
+ * Server actions สำหรับ "บัญชีของฉัน" (/admin/profile)
  *
  * ต่างจาก actions/users.ts ตรงที่ไม่ต้องมีสิทธิ์ supervisor — เจ้าหน้าที่ทุกคนแก้ของ
  * ตัวเองได้ แต่ "ตัวเอง" ต้องมาจาก session เท่านั้น ห้ามรับ userId จากฟอร์ม
@@ -68,7 +68,7 @@ export async function updateProfile(
     return { error: 'บันทึกไม่สำเร็จ กรุณาลองใหม่' };
   }
 
-  revalidatePath('/admin/settings');
+  revalidatePath('/admin/profile');
   return { error: null, success: 'บันทึกข้อมูลส่วนตัวเรียบร้อย' };
 }
 

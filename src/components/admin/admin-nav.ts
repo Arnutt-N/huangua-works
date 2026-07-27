@@ -4,7 +4,8 @@ import {
   Users,
   ScrollText,
   MessageSquare,
-  Settings,
+  FolderCog,
+  UserCircle,
   type LucideIcon,
 } from 'lucide-react';
 import type { userRoleEnum } from '@/lib/db/schema';
@@ -17,7 +18,8 @@ export type AdminTab =
   | 'chat'
   | 'users'
   | 'audit'
-  | 'settings';
+  | 'master-data'
+  | 'profile';
 
 export interface AdminNavItem {
   key: AdminTab;
@@ -27,34 +29,84 @@ export interface AdminNavItem {
   supervisorOnly?: boolean;
 }
 
+export interface AdminNavGroup {
+  /** หัวข้อกลุ่ม — ซ่อนตอน sidebar ย่อ */
+  label: string;
+  items: AdminNavItem[];
+}
+
 /**
  * นิยาม nav ของแอดมินไว้ที่เดียว — sidebar (desktop + mobile drawer) อ่านจากตัวนี้ทั้งคู่
- * ไม่ให้เมนูสองที่หลุดกันเหมือนตอนที่ nav ฝังอยู่ใน header component เดียว
+ *
+ * § หลักการตั้งชื่อกลุ่ม: ตั้งตาม "หน้าที่ของงาน" ไม่ใช่ "ใครเข้าได้"
+ * เดิมเคยคิดจะใช้ชื่อกลุ่มว่า "Admin" แต่ในระบบนี้มีแค่ /admin/users กับ
+ * /admin/master-data ที่จำกัด head/superadmin ส่วน /admin/audit เจ้าหน้าที่ทุกคน
+ * เข้าได้ — ถ้าใช้ชื่อ "Admin" เจ้าหน้าที่ทั่วไปจะเห็นกลุ่มที่สื่อว่าตัวเองไม่มีสิทธิ์
+ * ทั้งที่กดเข้าได้ จึงใช้ "ระบบ" ซึ่งบอกว่าเป็นเรื่องของระบบ ไม่ได้บอกระดับสิทธิ์
  */
-export const ADMIN_NAV_MAIN: AdminNavItem[] = [
-  { key: 'dashboard', label: 'แดชบอร์ด', href: '/admin', icon: LayoutDashboard },
-  { key: 'reports', label: 'รายงานสรุป', href: '/admin/reports', icon: BarChart3 },
-  { key: 'chat', label: 'แชท LINE', href: '/admin/chat', icon: MessageSquare },
+export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
   {
-    key: 'users',
-    label: 'จัดการผู้ใช้',
-    href: '/admin/users',
-    icon: Users,
-    supervisorOnly: true,
+    label: 'งานหลัก',
+    items: [
+      { key: 'dashboard', label: 'แดชบอร์ด', href: '/admin', icon: LayoutDashboard },
+      { key: 'reports', label: 'รายงานสรุป', href: '/admin/reports', icon: BarChart3 },
+    ],
   },
-  { key: 'audit', label: 'ประวัติการกระทำ', href: '/admin/audit', icon: ScrollText },
+  {
+    label: 'แชท LINE',
+    items: [
+      { key: 'chat', label: 'การสนทนา', href: '/admin/chat', icon: MessageSquare },
+    ],
+  },
+  {
+    label: 'ระบบ',
+    items: [
+      {
+        key: 'users',
+        label: 'จัดการผู้ใช้',
+        href: '/admin/users',
+        icon: Users,
+        supervisorOnly: true,
+      },
+      {
+        key: 'master-data',
+        label: 'หน่วยงาน / หมวดหมู่',
+        href: '/admin/master-data',
+        icon: FolderCog,
+        supervisorOnly: true,
+      },
+      { key: 'audit', label: 'ประวัติการกระทำ', href: '/admin/audit', icon: ScrollText },
+    ],
+  },
 ];
 
-/** เมนูส่วนล่าง — แยกกลุ่มเพราะเป็นเรื่องของ "บัญชีฉัน" ไม่ใช่ข้อมูลงาน */
+/**
+ * เมนูท้าย sidebar — แยกจากกลุ่มงานเพราะเป็นเรื่องของ "ตัวฉัน" ไม่ใช่ของระบบ
+ * เจ้าหน้าที่ทุกบทบาทเข้าได้ (ไม่เหมือน /admin/users ที่จำกัดสิทธิ์)
+ */
 export const ADMIN_NAV_ACCOUNT: AdminNavItem[] = [
-  { key: 'settings', label: 'ตั้งค่าบัญชี', href: '/admin/settings', icon: Settings },
+  { key: 'profile', label: 'โปรไฟล์ของฉัน', href: '/admin/profile', icon: UserCircle },
 ];
 
 const SUPERVISOR_ROLES: UserRole[] = ['head', 'superadmin'];
 
+export function isSupervisor(role: UserRole): boolean {
+  return SUPERVISOR_ROLES.includes(role);
+}
+
 export function visibleNavItems(role: UserRole, items: AdminNavItem[]): AdminNavItem[] {
-  const isSupervisor = SUPERVISOR_ROLES.includes(role);
-  return items.filter((item) => !item.supervisorOnly || isSupervisor);
+  return items.filter((item) => !item.supervisorOnly || isSupervisor(role));
+}
+
+/**
+ * กรองทั้งกลุ่มตามสิทธิ์ แล้วตัดกลุ่มที่ไม่เหลือรายการทิ้ง
+ * (ไม่งั้น officer จะเห็นหัวข้อ "ระบบ" ลอยอยู่โดยไม่มีเมนูข้างใต้)
+ */
+export function visibleNavGroups(role: UserRole): AdminNavGroup[] {
+  return ADMIN_NAV_GROUPS.map((group) => ({
+    ...group,
+    items: visibleNavItems(role, group.items),
+  })).filter((group) => group.items.length > 0);
 }
 
 /** คำนำหน้าชื่อไทยที่ไม่ควรกลายเป็นอักษรย่อบน avatar */
