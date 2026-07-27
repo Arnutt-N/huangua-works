@@ -1,7 +1,19 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Bot, User, Send, RefreshCw, CheckCircle, UserCheck } from 'lucide-react';
+import {
+  Bot,
+  User,
+  Send,
+  RefreshCw,
+  CheckCircle,
+  UserCheck,
+  MessagesSquare,
+  ChevronLeft,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/field';
+import { EmptyState } from '@/components/admin/empty-state';
 import { cn } from '@/lib/cn';
 
 interface Conversation {
@@ -30,12 +42,21 @@ const MODE_LABELS: Record<string, string> = {
   resolved: 'ปิดเรื่อง',
 };
 
-const MODE_COLORS: Record<string, string> = {
-  bot_active: 'bg-blue-100 text-blue-800',
-  waiting_handoff: 'bg-yellow-100 text-yellow-800',
-  human_active: 'bg-green-100 text-green-800',
-  resolved: 'bg-gray-100 text-gray-600',
+/**
+ * § สีโหมดสนทนา — ใช้ design token เท่านั้น
+ * ของเดิมเป็นสี Tailwind ดิบ (bg-blue-100/bg-green-600/bg-purple-50/bg-gray-100) ซึ่ง
+ *   (ก) ไม่อยู่ในพาเลต emerald+amber ของระบบเลย หน้านี้จึงดูหลุดจากหน้าอื่นทั้งหมด
+ *   (ข) ไม่ตอบสนอง dark theme เพราะเป็นค่าคงที่
+ * แมปใหม่: emerald = ระบบ/บอท, amber = รอคน, success = คนกำลังคุย, muted = ปิดแล้ว
+ */
+const MODE_BADGE: Record<string, string> = {
+  bot_active: 'bg-accent-sunken text-accent-strong ring-accent-strong/20',
+  waiting_handoff: 'bg-warning-soft text-warning-ink ring-warning-ink/20',
+  human_active: 'bg-success-soft text-success-ink ring-success-ink/20',
+  resolved: 'bg-surface-sunken text-muted ring-border-strong/30',
 };
+
+const FALLBACK_BADGE = 'bg-surface-sunken text-muted ring-border-strong/30';
 
 export function ChatClient({ adminUserId }: { adminUserId: string }) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -132,143 +153,233 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
     loadConversations();
   };
 
+  const canReply = selectedMode === 'human_active';
+
   return (
-    <div className="mx-auto flex h-[calc(100vh-120px)] max-w-6xl gap-0 overflow-hidden border border-border bg-surface">
-      {/* Conversation list */}
-      <div className="w-72 flex-shrink-0 overflow-y-auto border-r border-border">
-        <div className="border-b border-border p-3">
-          <h2 className="text-sm font-bold text-ink">การสนทนา LINE</h2>
-        </div>
-        {conversations.length === 0 && (
-          <p className="p-4 text-center text-sm text-muted">ยังไม่มีการสนทนา</p>
-        )}
-        {conversations.map((conv) => (
-          <button
-            key={conv.id}
-            onClick={() => handleSelect(conv.id)}
-            className={cn(
-              'flex w-full flex-col gap-1 border-b border-border px-3 py-2.5 text-left transition-colors hover:bg-muted/50',
-              selectedId === conv.id && 'bg-accent/5 border-l-2 border-l-accent',
-            )}
-          >
-            <div className="flex items-center justify-between">
-              <span className="truncate text-sm font-semibold text-ink">
-                {conv.displayName ?? conv.lineUserId.slice(0, 8)}
-              </span>
-              {conv.unreadAdmin > 0 && (
-                <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-white">
-                  {conv.unreadAdmin}
-                </span>
-              )}
-            </div>
-            <span className="truncate text-xs text-muted">{conv.lastMessageText ?? '—'}</span>
-            <span className={cn('inline-block w-fit rounded px-1.5 py-0.5 text-[10px] font-medium', MODE_COLORS[conv.mode])}>
-              {MODE_LABELS[conv.mode]}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      {/* Chat window */}
-      <div className="flex flex-1 flex-col">
-        {!selectedId ? (
-          <div className="flex flex-1 items-center justify-center text-muted">
-            <p>เลือกการสนทนาจากด้านซ้าย</p>
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
+      <div className="glass-panel flex h-[calc(100dvh-13rem)] min-h-[28rem] overflow-hidden rounded-xl shadow-sm">
+        {/* ── รายการสนทนา ──
+             มือถือ: แสดงเต็มความกว้าง แล้วสลับไปหน้าต่างแชทเมื่อเลือกห้อง
+             (ของเดิมตรึง w-72 ทุกจอ ทำให้บนมือถือเหลือที่แชทไม่ถึงครึ่งจอ) */}
+        <div
+          className={cn(
+            'flex-col border-r border-border sm:flex sm:w-72 sm:flex-none',
+            selectedId ? 'hidden' : 'flex w-full',
+          )}
+        >
+          <div className="flex items-center gap-2 border-b border-border bg-surface-sunken/60 px-4 py-3">
+            <MessagesSquare className="h-4 w-4 flex-none text-accent-strong" aria-hidden="true" />
+            <h2 className="truncate text-sm font-bold text-ink">การสนทนา LINE</h2>
           </div>
-        ) : (
-          <>
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-border px-4 py-2">
-              <span className={cn('rounded px-2 py-1 text-xs font-medium', MODE_COLORS[selectedMode])}>
-                {MODE_LABELS[selectedMode]}
-              </span>
-              <div className="flex gap-1">
-                {selectedMode !== 'human_active' && selectedMode !== 'resolved' && (
-                  <button
-                    onClick={() => handleModeChange('human_active')}
-                    className="flex items-center gap-1 rounded bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700"
-                  >
-                    <UserCheck className="h-3 w-3" /> รับเรื่อง
-                  </button>
-                )}
-                {selectedMode === 'human_active' && (
-                  <button
-                    onClick={() => handleModeChange('resolved')}
-                    className="flex items-center gap-1 rounded bg-gray-600 px-2 py-1 text-xs font-medium text-white hover:bg-gray-700"
-                  >
-                    <CheckCircle className="h-3 w-3" /> ปิดเรื่อง
-                  </button>
-                )}
-                {selectedMode === 'resolved' && (
-                  <button
-                    onClick={() => handleModeChange('bot_active')}
-                    className="flex items-center gap-1 rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700"
-                  >
-                    <Bot className="h-3 w-3" /> คืนให้ Bot
-                  </button>
-                )}
-              </div>
-            </div>
 
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {messages.map((msg) => (
-                <div
-                  key={msg.id}
+          <div className="flex-1 overflow-y-auto">
+            {conversations.length === 0 ? (
+              <p className="p-4 text-center text-sm text-muted">ยังไม่มีการสนทนา</p>
+            ) : (
+              conversations.map((conv) => {
+                const isSelected = selectedId === conv.id;
+                return (
+                  <button
+                    key={conv.id}
+                    type="button"
+                    onClick={() => handleSelect(conv.id)}
+                    aria-current={isSelected ? 'true' : undefined}
+                    className={cn(
+                      'flex w-full flex-col gap-1.5 border-b border-l-4 border-border px-3 py-3 text-left',
+                      'transition-colors duration-normal ease-out-expo',
+                      isSelected
+                        ? 'border-l-accent-strong bg-accent-sunken'
+                        : 'border-l-transparent hover:bg-accent-sunken/50',
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-sm font-semibold text-ink">
+                        {conv.displayName ?? conv.lineUserId.slice(0, 8)}
+                      </span>
+                      {conv.unreadAdmin > 0 && (
+                        <span className="flex h-5 min-w-5 flex-none items-center justify-center rounded-pill bg-accent-strong px-1.5 text-[10px] font-bold text-on-accent">
+                          {conv.unreadAdmin}
+                        </span>
+                      )}
+                    </div>
+                    <span className="truncate text-xs text-muted">
+                      {conv.lastMessageText ?? '—'}
+                    </span>
+                    <span
+                      className={cn(
+                        'inline-block w-fit rounded-pill px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset',
+                        MODE_BADGE[conv.mode] ?? FALLBACK_BADGE,
+                      )}
+                    >
+                      {MODE_LABELS[conv.mode] ?? conv.mode}
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* ── หน้าต่างแชท ── */}
+        <div
+          className={cn(
+            'min-w-0 flex-1 flex-col sm:flex',
+            selectedId ? 'flex' : 'hidden',
+          )}
+        >
+          {!selectedId ? (
+            <div className="flex flex-1 items-center justify-center">
+              <EmptyState
+                icon={MessagesSquare}
+                title="เลือกการสนทนา"
+                description="เลือกรายการจากด้านซ้ายเพื่อดูข้อความและตอบกลับผู้ใช้ LINE"
+              />
+            </div>
+          ) : (
+            <>
+              {/* Header */}
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-surface-sunken/60 px-4 py-2.5">
+                <button
+                  type="button"
+                  onClick={() => setSelectedId(null)}
+                  className="inline-flex min-h-touch items-center gap-1 text-sm font-medium text-muted hover:text-accent-strong sm:hidden"
+                >
+                  <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                  รายการ
+                </button>
+                <span
                   className={cn(
-                    'flex items-start gap-2',
-                    msg.sender === 'admin' ? 'flex-row-reverse' : 'flex-row',
+                    'rounded-pill px-3 py-1 text-xs font-semibold ring-1 ring-inset',
+                    MODE_BADGE[selectedMode] ?? FALLBACK_BADGE,
                   )}
                 >
-                  <div className={cn(
-                    'flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full',
-                    msg.sender === 'user' ? 'bg-blue-100' : msg.sender === 'bot' ? 'bg-purple-100' : 'bg-green-100',
-                  )}>
-                    {msg.sender === 'user' ? <User className="h-3 w-3 text-blue-600" /> :
-                     msg.sender === 'bot' ? <Bot className="h-3 w-3 text-purple-600" /> :
-                     <UserCheck className="h-3 w-3 text-green-600" />}
-                  </div>
-                  <div className={cn(
-                    'max-w-[70%] rounded-lg px-3 py-2 text-sm',
-                    msg.sender === 'admin'
-                      ? 'bg-green-600 text-white'
-                      : msg.sender === 'bot'
-                        ? 'bg-purple-50 text-purple-900 border border-purple-200'
-                        : 'bg-gray-100 text-ink',
-                  )}>
-                    <p className="whitespace-pre-wrap">{msg.textContent ?? `[${msg.messageType}]`}</p>
-                    <p className={cn('mt-1 text-[10px]', msg.sender === 'admin' ? 'text-green-200' : 'text-muted')}>
-                      {new Date(msg.createdAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  </div>
+                  {MODE_LABELS[selectedMode] ?? selectedMode}
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {selectedMode !== 'human_active' && selectedMode !== 'resolved' && (
+                    <Button type="button" size="sm" onClick={() => handleModeChange('human_active')}>
+                      <UserCheck className="h-4 w-4" aria-hidden="true" />
+                      รับเรื่อง
+                    </Button>
+                  )}
+                  {selectedMode === 'human_active' && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => handleModeChange('resolved')}
+                    >
+                      <CheckCircle className="h-4 w-4" aria-hidden="true" />
+                      ปิดเรื่อง
+                    </Button>
+                  )}
+                  {selectedMode === 'resolved' && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleModeChange('bot_active')}
+                    >
+                      <Bot className="h-4 w-4" aria-hidden="true" />
+                      คืนให้ Bot
+                    </Button>
+                  )}
                 </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-
-            {/* Input */}
-            <div className="border-t border-border p-3">
-              <div className="flex gap-2">
-                <input
-                  aria-label="พิมพ์ข้อความ"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
-                  placeholder={selectedMode === 'human_active' ? 'พิมพ์ข้อความ...' : 'รับเรื่องก่อนเพื่อตอบผู้ใช้'}
-                  disabled={selectedMode !== 'human_active'}
-                  className="flex-1 rounded-lg border border-border px-3 py-2 text-sm outline-none focus:border-accent disabled:bg-muted/50 disabled:text-muted"
-                />
-                <button
-                  onClick={handleSend}
-                  disabled={sending || !input.trim() || selectedMode !== 'human_active'}
-                  className="flex items-center justify-center rounded-lg bg-accent px-3 py-2 text-white disabled:opacity-50"
-                >
-                  {sending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                </button>
               </div>
-            </div>
-          </>
-        )}
+
+              {/* Messages */}
+              <div className="flex-1 space-y-3 overflow-y-auto p-4">
+                {messages.map((msg) => {
+                  const isAdmin = msg.sender === 'admin';
+                  const isBot = msg.sender === 'bot';
+                  return (
+                    <div
+                      key={msg.id}
+                      className={cn(
+                        'flex items-start gap-2',
+                        isAdmin ? 'flex-row-reverse' : 'flex-row',
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'flex h-7 w-7 flex-none items-center justify-center rounded-full ring-1 ring-inset',
+                          isAdmin
+                            ? 'bg-success-soft text-success-ink ring-success-ink/20'
+                            : isBot
+                              ? 'bg-accent-sunken text-accent-strong ring-accent-strong/20'
+                              : 'bg-surface-sunken text-muted ring-border-strong/30',
+                        )}
+                        aria-hidden="true"
+                      >
+                        {isAdmin ? (
+                          <UserCheck className="h-3.5 w-3.5" />
+                        ) : isBot ? (
+                          <Bot className="h-3.5 w-3.5" />
+                        ) : (
+                          <User className="h-3.5 w-3.5" />
+                        )}
+                      </span>
+                      <div
+                        className={cn(
+                          'max-w-[70%] rounded-xl px-3.5 py-2 text-sm',
+                          isAdmin
+                            ? 'bg-accent-strong text-on-accent'
+                            : isBot
+                              ? 'border border-accent-strong/20 bg-accent-sunken text-ink'
+                              : 'border border-border bg-surface-sunken text-ink',
+                        )}
+                      >
+                        <p className="whitespace-pre-wrap break-words">
+                          {msg.textContent ?? `[${msg.messageType}]`}
+                        </p>
+                        <p
+                          className={cn(
+                            'mt-1 text-[10px]',
+                            isAdmin ? 'text-on-accent/75' : 'text-muted',
+                          )}
+                        >
+                          {new Date(msg.createdAt).toLocaleTimeString('th-TH', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Input */}
+              <div className="border-t border-border p-3">
+                <div className="flex gap-2">
+                  <Input
+                    aria-label="พิมพ์ข้อความ"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
+                    placeholder={canReply ? 'พิมพ์ข้อความ...' : 'รับเรื่องก่อนเพื่อตอบผู้ใช้'}
+                    disabled={!canReply}
+                    className="flex-1 disabled:bg-surface-sunken"
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleSend}
+                    disabled={sending || !input.trim() || !canReply}
+                    aria-label="ส่งข้อความ"
+                    className="px-4"
+                  >
+                    {sending ? (
+                      <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <Send className="h-4 w-4" aria-hidden="true" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -123,7 +123,7 @@ export function CaseDetailClient({
               </SelectContent>
             </Select>
             {selectedStatus !== currentStatus && !transitionCheck.ok && (
-              <p role="alert" className="mt-1.5 text-sm font-semibold text-danger">
+              <p role="alert" className="mt-1.5 text-sm font-semibold text-danger-ink">
                 {transitionCheck.reason}
               </p>
             )}
@@ -145,7 +145,7 @@ export function CaseDetailClient({
               value="true"
               defaultChecked
               aria-label="ให้ประชาชนเห็นการอัปเดตนี้"
-              className="h-4 w-4 rounded border-border"
+              className="h-4 w-4 rounded border-border-strong accent-accent-strong"
             />
             <span>ให้ประชาชนเห็นการอัปเดตนี้</span>
           </label>
@@ -260,7 +260,7 @@ export function CaseDetailClient({
               name="isPublic"
               value="false"
               aria-label="ตั้งเป็นหมายเหตุภายใน (ไม่แสดงให้ประชาชนเห็น)"
-              className="h-4 w-4 rounded border-border"
+              className="h-4 w-4 rounded border-border-strong accent-accent-strong"
             />
             <span>หมายเหตุภายใน (ไม่แสดงให้ประชาชนเห็น)</span>
           </label>
@@ -284,9 +284,13 @@ function ActionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-lg border border-border bg-surface-raised p-5">
-      <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink">
-        {icon}
+    <section className="glass-panel rounded-xl p-5 shadow-sm">
+      <h3 className="mb-4 flex items-center gap-2.5 text-base font-bold text-ink">
+        {icon && (
+          <span className="flex h-8 w-8 flex-none items-center justify-center rounded-md bg-accent-sunken text-accent-strong">
+            {icon}
+          </span>
+        )}
         {title}
       </h3>
       {children}
@@ -298,7 +302,7 @@ function ErrorText({ children }: { children: React.ReactNode }) {
   return (
     <p
       role="alert"
-      className="flex items-start gap-2 rounded-md border border-danger bg-danger-soft px-3 py-2 text-sm font-semibold text-danger"
+      className="flex items-start gap-2 rounded-md border border-danger-ink/30 bg-danger-soft px-3 py-2 text-sm font-semibold text-danger-ink"
     >
       <AlertCircle className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
       {children}
@@ -320,7 +324,7 @@ export function SuccessToast({ ok }: { ok: string | null }) {
   return (
     <div
       role="status"
-      className="mb-4 flex items-center gap-2 rounded-md border border-success bg-success-soft px-4 py-3 text-sm font-semibold text-success"
+      className="mb-4 flex items-center gap-2 rounded-xl border border-success-ink/30 bg-success-soft px-4 py-3 text-sm font-semibold text-success-ink shadow-sm"
     >
       <CheckCircle2 className="h-4 w-4 flex-none" aria-hidden="true" />
       {msg}

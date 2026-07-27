@@ -20,7 +20,7 @@ export function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
-      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-accent-sunken">
+      <span className="flex h-16 w-16 items-center justify-center rounded-full bg-accent-sunken ring-1 ring-accent-strong/15 ring-inset">
         <Icon className="h-7 w-7 text-accent-strong" aria-hidden="true" />
       </span>
       <p className="mt-4 text-base font-semibold text-ink">{title}</p>

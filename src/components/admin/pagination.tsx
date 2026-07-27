@@ -133,8 +133,8 @@ function PageLink({
       className={cn(
         'flex min-h-touch min-w-touch items-center justify-center rounded-md px-3 text-sm font-semibold transition-colors duration-normal ease-out-expo',
         active
-          ? 'bg-accent-strong text-on-accent'
-          : 'border border-border bg-surface-raised text-ink hover:bg-accent-sunken',
+          ? 'bg-accent-strong text-on-accent shadow-sm'
+          : 'glass-panel text-ink hover:bg-accent-sunken hover:text-accent-strong',
       )}
     >
       {children}

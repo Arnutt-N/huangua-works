@@ -2,6 +2,7 @@ import { ArrowLeft } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Navbar } from '@/components/landing/Navbar';
+import { BrandMark } from '@/components/site/brand-mark';
 import { SiteFooter } from '../../../components/site/site-footer';
 import { LoginForm } from './login-form';
 
@@ -26,8 +27,11 @@ export default function AdminLoginPage() {
             กลับหน้าหลัก
           </Link>
 
-          <div className="glass mt-6 rounded-2xl p-6 sm:p-8">
-            <h1 className="text-2xl font-bold">เข้าระบบเจ้าหน้าที่</h1>
+          <div className="glass-panel mt-6 rounded-xl p-6 shadow-lg sm:p-8">
+            <BrandMark className="mb-4" />
+            <h1 className="text-2xl font-bold">
+              <span className="gradient-text">เข้าระบบเจ้าหน้าที่</span>
+            </h1>
             <p className="mt-2 text-sm text-muted">
               สำหรับเจ้าหน้าที่ อบต.หัวงัว เข้าดูคิวและดำเนินเรื่องแจ้งเหตุ
             </p>

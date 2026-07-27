@@ -17,7 +17,7 @@ import {
   villages,
 } from '@/lib/db/schema';
 import { requireStaff } from '@/lib/auth/require-staff';
-import { AdminChrome } from '@/components/admin/admin-chrome';
+import { AdminShell } from '@/components/admin/admin-shell';
 import { STATUS_LABELS_TH } from '@/lib/cases/state-machine';
 import { CaseStatusBadge } from '@/components/ui/case-status-badge';
 import { CaseDetailClient, SuccessToast } from './case-detail-client';
@@ -188,13 +188,11 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
   );
 
   return (
-    <div className="min-h-dvh bg-surface text-ink">
-      <AdminChrome user={staffUser} active="dashboard" />
-      <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+    <AdminShell user={staffUser} active="dashboard">
       {/* breadcrumb */}
       <Link
         href="/admin"
-        className="inline-flex items-center gap-2 text-sm text-muted transition-colors hover:text-accent"
+        className="inline-flex min-h-touch items-center gap-2 text-sm font-medium text-muted transition-colors hover:text-accent-strong"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
         กลับไปแดชบอร์ด
@@ -202,19 +200,19 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
 
       <SuccessToast ok={ok ?? null} />
 
-      {/* หัวเรื่อง + meta */}
-      <header className="mt-4">
+      {/* หัวเรื่อง + meta — การ์ด glass ใบเดียวแทนข้อความลอยบนพื้นเปล่า */}
+      <header className="glass-panel mt-2 rounded-xl p-5 shadow-sm sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
               <span className="font-mono">{caseRow.id}</span>
               {caseRow.trackingCode && (
-                <span className="rounded-pill bg-accent-sunken px-2 py-0.5 font-mono font-semibold text-accent-strong">
+                <span className="rounded-pill bg-accent-sunken px-2 py-0.5 font-mono font-semibold text-accent-strong ring-1 ring-accent-strong/20 ring-inset">
                   {caseRow.trackingCode}
                 </span>
               )}
               {caseRow.priority === 'urgent' && (
-                <span className="rounded-pill bg-danger-soft px-2 py-0.5 font-semibold text-danger">
+                <span className="rounded-pill bg-danger-soft px-2 py-0.5 font-semibold text-danger-ink ring-1 ring-danger-ink/20 ring-inset">
                   ฉุกเฉิน
                 </span>
               )}
@@ -227,7 +225,7 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
         </div>
 
         {/* meta grid */}
-        <dl className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <dl className="mt-6 grid gap-4 border-t border-border pt-5 sm:grid-cols-2 lg:grid-cols-4">
           <MetaItem icon={<Calendar className="h-4 w-4" />} label="วันที่รับเรื่อง">
             {formatDateTime(caseRow.createdAt)}
             <span className="ml-1 text-muted">
@@ -258,7 +256,7 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
         </dl>
 
         {/* location + description */}
-        <div className="mt-6 space-y-4">
+        <div className="mt-6 space-y-4 border-t border-border pt-5">
           <div>
             <h2 className="mb-2 text-sm font-bold text-muted">ที่ตั้ง</h2>
             <div className="flex items-start gap-2 text-sm text-ink">
@@ -283,9 +281,7 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
         </div>
       </header>
 
-      <hr className="my-8 border-border" />
-
-      <div className="grid gap-8 lg:grid-cols-[1fr_1fr]">
+      <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_1fr]">
         {/* ซ้าย: actions */}
         <section aria-label="การจัดการเรื่อง">
           <h2 className="mb-4 text-lg font-bold text-ink">การจัดการเรื่อง</h2>
@@ -305,7 +301,7 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
         <section aria-label="ไทม์ไลน์">
           <h2 className="mb-4 text-lg font-bold text-ink">ไทม์ไลน์</h2>
           {timeline.length === 0 ? (
-            <p className="rounded-md border border-border bg-surface-raised px-4 py-8 text-center text-sm text-muted">
+            <p className="glass-panel rounded-xl px-4 py-8 text-center text-sm text-muted shadow-sm">
               ยังไม่มีความคืบหน้า — เริ่มด้วยการเปลี่ยนสถานะหรือเพิ่มความคืบ
             </p>
           ) : (
@@ -315,7 +311,7 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
                 return (
                   <li
                     key={entry.id}
-                    className="rounded-md border border-border bg-surface-raised p-4"
+                    className="glass-panel rounded-xl p-4 shadow-sm"
                   >
                     <div className="flex items-start justify-between gap-2 text-xs text-muted">
                       <span>
@@ -347,7 +343,7 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
                         <p className="mt-1 whitespace-pre-wrap">{entry.comment}</p>
                       )}
                       {!entry.isPublic && (
-                        <span className="mt-2 inline-block rounded-pill bg-warning-soft px-2 py-0.5 text-xs font-semibold text-warning">
+                        <span className="mt-2 inline-block rounded-pill bg-warning-soft px-2 py-0.5 text-xs font-semibold text-warning-ink ring-1 ring-warning-ink/20 ring-inset">
                           ภายใน
                         </span>
                       )}
@@ -359,8 +355,7 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
           )}
         </section>
       </div>
-      </main>
-    </div>
+    </AdminShell>
   );
 }
 
@@ -374,12 +369,12 @@ function MetaItem({
   children: React.ReactNode;
 }) {
   return (
-    <div>
-      <dt className="flex items-center gap-1 text-xs font-semibold text-muted">
-        {icon}
+    <div className="rounded-lg bg-surface-sunken/60 px-3 py-2.5">
+      <dt className="flex items-center gap-1.5 text-xs font-semibold text-muted">
+        {icon && <span className="text-accent-strong">{icon}</span>}
         {label}
       </dt>
-      <dd className="mt-1 text-sm text-ink">{children}</dd>
+      <dd className="mt-1 text-sm font-medium text-ink">{children}</dd>
     </div>
   );
 }

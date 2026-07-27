@@ -28,12 +28,7 @@ export function CTA() {
           <div className="mt-8 flex flex-col justify-center gap-4 sm:flex-row">
             <Button
               size="lg"
-              className="h-12 px-8 text-base shadow-lg"
-              style={{
-                background: 'linear-gradient(to right, oklch(55% 0.13 160), oklch(45% 0.15 160))',
-                color: 'oklch(99% 0.005 145)',
-                boxShadow: '0 10px 40px -10px oklch(55% 0.13 160 / 0.3)',
-              }}
+              className="shadow-accent-glow h-12 px-8 text-base"
               asChild
             >
               <Link href="/intake">

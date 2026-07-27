@@ -4,8 +4,15 @@ import type { ReactNode } from 'react';
 /**
  * AdminPageHeader — ส่วนหัวของทุก admin page
  *
- * Unity กับ landing: ใช้ mesh-gradient accent เป็นพื้นหลังเล็กๆ ที่หัว (subtle)
- * ไม่ใช่ hero เต็มจอ — เพียงพอให้รู้สึกว่าเป็น product เดียวกัน
+ * § เจตนา: เงียบ
+ * หัวหน้าแอดมินคือ "ป้ายบอกว่าอยู่หน้าไหน" ไม่ใช่หัวข้อโปรโมต เจ้าหน้าที่เปิดหน้านี้
+ * วันละหลายสิบครั้ง ของตกแต่งที่พอดีบน landing (ซึ่งผู้ใช้เห็นครั้งเดียว) จะกลายเป็น
+ * noise เมื่อเจอซ้ำทุกวัน — จึงใช้หัวเรื่องสีทึบธรรมดา ไม่ใช้ .gradient-text
+ * (บน landing สงวนไว้ให้ H1 hero กับหัว section เท่านั้น การเอามาใช้ทุกหน้าทำให้
+ * มันไม่เหลือความหมายของการเน้น)
+ *
+ * ความเป็นชุดเดียวกับ landing มาจาก glass-panel + พาเลต + typography
+ * ไม่ใช่จากการแปะ gradient/eyebrow/แถบสีเพิ่ม
  *
  * Layout: title + subtitle ซ้าย, optional action ขวา (เช่น ปุ่ม "เพิ่มผู้ใช้")
  */
@@ -23,20 +30,11 @@ export function AdminPageHeader({
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-lg border border-border bg-surface-raised px-5 py-4 sm:px-6 sm:py-5',
+        'glass-panel rounded-xl px-5 py-5 shadow-sm sm:px-6',
         className,
       )}
     >
-      {/* subtle mesh accent — unity กับ landing แต่ไม่เป็นจุดโฟกัส */}
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.04]"
-        style={{
-          backgroundImage:
-            'radial-gradient(at 12% 18%, oklch(55% 0.13 160) 0px, transparent 50%), radial-gradient(at 88% 12%, oklch(82% 0.14 80) 0px, transparent 50%)',
-        }}
-        aria-hidden="true"
-      />
-      <div className="relative flex flex-wrap items-end justify-between gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">{title}</h1>
           {subtitle && <p className="mt-1.5 text-sm text-muted">{subtitle}</p>}

@@ -74,7 +74,7 @@ Label.displayName = 'Label';
 export function FieldError({ id, children }: { id?: string; children: React.ReactNode }) {
   if (!children) return null;
   return (
-    <p id={id} role="alert" className="mt-1.5 text-sm font-semibold text-danger">
+    <p id={id} role="alert" className="mt-1.5 text-sm font-semibold text-danger-ink">
       {children}
     </p>
   );

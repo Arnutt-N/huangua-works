@@ -12,6 +12,13 @@ import type { ReactNode } from 'react';
  *  - default: emerald accent (tech/smart)
  *  - gold: amber accent (Thai royal — ใช้สำหรับ highlight KPI)
  *  - danger: red accent (SLA breach / warning)
+ *
+ * § สีไอคอนใช้ token *-ink ทั้งหมด — ของเดิม variant gold ใช้ text-accent-gold (L82%)
+ * บนพื้น gold-soft (L95%) = 1.52:1 ไอคอนแทบหายไปกับพื้น (ต่ำกว่า 3:1 ของ WCAG 1.4.11)
+ *
+ * โครงการ์ด = กรอบไอคอนสี + ตัวเลข + label เหมือนการ์ดบริการบน landing (Services.tsx)
+ * ตั้งใจไม่ใส่แถบสีบนหัวการ์ด: variant สื่อผ่านสีไอคอนอยู่แล้ว การเติมช่องสีที่สอง
+ * เป็นการตกแต่งซ้ำที่ landing ไม่ได้ทำ
  */
 type KpiVariant = 'default' | 'gold' | 'danger';
 
@@ -26,13 +33,13 @@ const variantStyles: Record<
   },
   gold: {
     iconBg: 'bg-accent-gold-soft',
-    iconColor: 'text-accent-gold',
+    iconColor: 'text-warning-ink',
     valueColor: 'text-ink',
   },
   danger: {
     iconBg: 'bg-danger-soft',
-    iconColor: 'text-danger',
-    valueColor: 'text-danger',
+    iconColor: 'text-danger-ink',
+    valueColor: 'text-danger-ink',
   },
 };
 
@@ -57,14 +64,15 @@ export function KpiCard({
   return (
     <div
       className={cn(
-        'glass flex flex-col gap-3 rounded-lg p-5 shadow-sm',
+        'glass-panel flex flex-col gap-3 rounded-xl p-5 shadow-sm',
+        'transition-shadow duration-normal ease-out-expo hover:shadow-md',
         className,
       )}
     >
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <span
           className={cn(
-            'flex h-11 w-11 items-center justify-center rounded-md',
+            'flex h-11 w-11 flex-none items-center justify-center rounded-md',
             styles.iconBg,
           )}
         >

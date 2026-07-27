@@ -130,13 +130,8 @@ export function TrackForm({ initialId }: { initialId?: string }) {
 
         <Button
           type="submit"
-          className="mt-5 h-11 px-7"
+          className="shadow-accent-glow mt-5 h-11 px-7"
           disabled={isSearching}
-          style={{
-            background: 'linear-gradient(to right, oklch(55% 0.13 160), oklch(45% 0.15 160))',
-            color: 'oklch(99% 0.005 145)',
-            boxShadow: '0 10px 40px -10px oklch(55% 0.13 160 / 0.3)',
-          }}
         >
           {isSearching ? (
             <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
@@ -147,7 +142,7 @@ export function TrackForm({ initialId }: { initialId?: string }) {
         </Button>
 
         {error ? (
-          <p role="alert" className="mt-3 flex items-start gap-2 text-sm font-semibold text-danger">
+          <p role="alert" className="mt-3 flex items-start gap-2 text-sm font-semibold text-danger-ink">
             <AlertCircle className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
             {error}
           </p>
@@ -191,7 +186,7 @@ export function TrackForm({ initialId }: { initialId?: string }) {
                           'relative z-10 flex h-11 w-11 flex-none items-center justify-center rounded-full ring-1',
                           isCurrent
                             ? 'bg-accent-strong text-on-accent ring-accent-strong'
-                            : 'bg-success-soft text-success ring-success/30',
+                            : 'bg-success-soft text-success-ink ring-success-ink/30',
                         )}
                       >
                         {isCurrent ? (

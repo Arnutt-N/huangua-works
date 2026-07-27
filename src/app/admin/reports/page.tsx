@@ -14,9 +14,8 @@ import { getDb } from '@/lib/db';
 import { cases, caseStatsDaily, categories, departments } from '@/lib/db/schema';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { requireStaff } from '@/lib/auth/require-staff';
-import { AdminChrome } from '@/components/admin/admin-chrome';
+import { AdminShell } from '@/components/admin/admin-shell';
 import { AdminPageHeader } from '@/components/admin/admin-page-header';
-import { AdminPageTransition } from '@/components/admin/admin-page-transition';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import { KpiCard } from '@/components/admin/kpi-card';
 import { CaseStatusBadge } from '@/components/ui/case-status-badge';
@@ -119,164 +118,159 @@ export default async function ReportsPage() {
   const maxDeptCount = Math.max(1, ...deptCounts.map((d) => Number(d.c)));
 
   return (
-    <div className="min-h-dvh bg-surface text-ink">
-      <AdminChrome user={staffUser} active="reports" />
-      <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
-        <AdminPageTransition>
-          <div className="space-y-6">
-            <AdminPageHeader
-              title="รายงานสรุป"
-              subtitle={
-                latest
-                  ? `อัปเดตล่าสุด: ${new Date(latest.date).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}`
-                  : 'สรุปภาพรวมเคสทั้งระบบ (ยังไม่มีข้อมูลรายวัน)'
-              }
-            />
+    <AdminShell user={staffUser} active="reports">
+      <div className="space-y-6">
+        <AdminPageHeader
+          title="รายงานสรุป"
+          subtitle={
+            latest
+              ? `อัปเดตล่าสุด: ${new Date(latest.date).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}`
+              : 'สรุปภาพรวมเคสทั้งระบบ (ยังไม่มีข้อมูลรายวัน)'
+          }
+        />
 
-            {/* KPI cards */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <KpiCard
-                label="เรื่องรับทั้งหมด"
-                value={totalReceived}
-                icon={TrendingUp}
-                variant="default"
-              />
-              <KpiCard
-                label="กำลังดำเนินการ"
-                value={totalInProgress}
-                icon={Activity}
-                variant="gold"
-              />
-              <KpiCard
-                label="ปิดสำเร็จ"
-                value={totalClosed}
-                icon={CheckCircle2}
-                variant="default"
-              />
-              <KpiCard
-                label="เวลาดำเนินการเฉลี่ย"
-                value={avgResolutionDays != null ? `${avgResolutionDays} วัน` : '—'}
-                icon={Clock}
-                variant="default"
-              />
-            </div>
+        {/* KPI cards */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <KpiCard
+            label="เรื่องรับทั้งหมด"
+            value={totalReceived}
+            icon={TrendingUp}
+            variant="default"
+          />
+          <KpiCard
+            label="กำลังดำเนินการ"
+            value={totalInProgress}
+            icon={Activity}
+            variant="gold"
+          />
+          <KpiCard
+            label="ปิดสำเร็จ"
+            value={totalClosed}
+            icon={CheckCircle2}
+            variant="default"
+          />
+          <KpiCard
+            label="เวลาดำเนินการเฉลี่ย"
+            value={avgResolutionDays != null ? `${avgResolutionDays} วัน` : '—'}
+            icon={Clock}
+            variant="default"
+          />
+        </div>
 
-            {/* SLA alert */}
-            {slaBreach > 0 && (
-              <div className="flex items-center gap-3 rounded-lg border border-danger/30 bg-danger-soft/40 px-5 py-4">
-                <span className="flex h-10 w-10 flex-none items-center justify-center rounded-md bg-danger-soft">
-                  <AlertTriangle className="h-5 w-5 text-danger" aria-hidden="true" />
-                </span>
-                <div className="flex-1">
-                  <p className="font-semibold text-danger">
-                    เลยกำหนด SLA {slaBreach.toLocaleString('th-TH')} เรื่อง
-                  </p>
-                  <p className="text-sm text-muted">
-                    เรื่องที่ยังเปิดอยู่และเลยเวลาที่กำหนด — ควรเร่งดำเนินการ
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Breakdown by status */}
-            <AdminCard>
-              <AdminCardTitle icon={<BarChart3 className="h-4 w-4" />}>
-                สถิติตามสถานะ
-              </AdminCardTitle>
-              {statusBreakdown.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted">ยังไม่มีข้อมูล</p>
-              ) : (
-                <ul className="space-y-3">
-                  {statusBreakdown.map((item) => (
-                    <li key={item.status} className="flex items-center gap-3">
-                      <div className="flex w-32 flex-none items-center gap-2">
-                        <CaseStatusBadge status={item.status} />
-                      </div>
-                      <div className="flex-1">
-                        <div className="h-2 overflow-hidden rounded-full bg-surface-sunken">
-                          <div
-                            className="h-full rounded-full bg-accent transition-all duration-slow ease-out-expo"
-                            style={{ width: `${(item.count / maxStatusCount) * 100}%` }}
-                          />
-                        </div>
-                      </div>
-                      <span className="w-12 flex-none text-right text-sm font-semibold text-ink">
-                        {item.count.toLocaleString('th-TH')}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </AdminCard>
-
-            <div className="grid gap-6 lg:grid-cols-2">
-              {/* Breakdown by category */}
-              <AdminCard>
-                <AdminCardTitle icon={<FolderTree className="h-4 w-4" />}>
-                  10 หมวดยอดนิยม
-                </AdminCardTitle>
-                {categoryCounts.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-muted">ยังไม่มีข้อมูล</p>
-                ) : (
-                  <ul className="space-y-3">
-                    {categoryCounts.map((item, i) => (
-                      <li key={item.name ?? `unknown-${i}`} className="flex items-center gap-3">
-                        <span className="w-32 flex-none truncate text-sm text-ink" title={item.name ?? 'ไม่ระบุ'}>
-                          {item.name ?? 'ไม่ระบุ'}
-                        </span>
-                        <div className="flex-1">
-                          <div className="h-2 overflow-hidden rounded-full bg-surface-sunken">
-                            <div
-                              className="h-full rounded-full bg-accent-gold transition-all duration-slow ease-out-expo"
-                              style={{ width: `${(Number(item.c) / maxCategoryCount) * 100}%` }}
-                            />
-                          </div>
-                        </div>
-                        <span className="w-10 flex-none text-right text-sm font-semibold text-ink">
-                          {Number(item.c).toLocaleString('th-TH')}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </AdminCard>
-
-              {/* Breakdown by department */}
-              <AdminCard>
-                <AdminCardTitle icon={<Building2 className="h-4 w-4" />}>
-                  ตามหน่วยงานรับผิดชอบ
-                </AdminCardTitle>
-                {deptCounts.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-muted">
-                    ยังไม่มีเรื่องที่มอบหมายหน่วยงาน
-                  </p>
-                ) : (
-                  <ul className="space-y-3">
-                    {deptCounts.map((item, i) => (
-                      <li key={item.name ?? `unknown-${i}`} className="flex items-center gap-3">
-                        <span className="w-32 flex-none truncate text-sm text-ink" title={item.name ?? 'ไม่ระบุ'}>
-                          {item.name ?? 'ไม่ระบุ'}
-                        </span>
-                        <div className="flex-1">
-                          <div className="h-2 overflow-hidden rounded-full bg-surface-sunken">
-                            <div
-                              className="h-full rounded-full bg-accent transition-all duration-slow ease-out-expo"
-                              style={{ width: `${(Number(item.c) / maxDeptCount) * 100}%` }}
-                            />
-                          </div>
-                        </div>
-                        <span className="w-10 flex-none text-right text-sm font-semibold text-ink">
-                          {Number(item.c).toLocaleString('th-TH')}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </AdminCard>
+        {/* SLA alert */}
+        {slaBreach > 0 && (
+          <div className="flex items-center gap-3 rounded-xl border border-danger-ink/25 bg-danger-soft px-5 py-4 shadow-sm">
+            <span className="flex h-10 w-10 flex-none items-center justify-center rounded-md bg-danger-soft ring-1 ring-danger-ink/25 ring-inset">
+              <AlertTriangle className="h-5 w-5 text-danger-ink" aria-hidden="true" />
+            </span>
+            <div className="flex-1">
+              <p className="font-semibold text-danger-ink">
+                เลยกำหนด SLA {slaBreach.toLocaleString('th-TH')} เรื่อง
+              </p>
+              <p className="text-sm text-ink/80">
+                เรื่องที่ยังเปิดอยู่และเลยเวลาที่กำหนด — ควรเร่งดำเนินการ
+              </p>
             </div>
           </div>
-        </AdminPageTransition>
-      </main>
-    </div>
+        )}
+
+        {/* Breakdown by status */}
+        <AdminCard>
+          <AdminCardTitle icon={<BarChart3 className="h-4 w-4" />}>
+            สถิติตามสถานะ
+          </AdminCardTitle>
+          {statusBreakdown.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted">ยังไม่มีข้อมูล</p>
+          ) : (
+            <ul className="space-y-3">
+              {statusBreakdown.map((item) => (
+                <li key={item.status} className="flex items-center gap-3">
+                  <div className="flex w-32 flex-none items-center gap-2">
+                    <CaseStatusBadge status={item.status} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="h-2.5 overflow-hidden rounded-pill bg-ink/10 ring-1 ring-ink/5 ring-inset">
+                      <div
+                        className="h-full rounded-pill bg-accent-strong transition-all duration-slow ease-out-expo"
+                        style={{ width: `${(item.count / maxStatusCount) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                  <span className="w-12 flex-none text-right text-sm font-semibold text-ink">
+                    {item.count.toLocaleString('th-TH')}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </AdminCard>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Breakdown by category */}
+          <AdminCard>
+            <AdminCardTitle icon={<FolderTree className="h-4 w-4" />}>
+              10 หมวดยอดนิยม
+            </AdminCardTitle>
+            {categoryCounts.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted">ยังไม่มีข้อมูล</p>
+            ) : (
+              <ul className="space-y-3">
+                {categoryCounts.map((item, i) => (
+                  <li key={item.name ?? `unknown-${i}`} className="flex items-center gap-3">
+                    <span className="w-32 flex-none truncate text-sm text-ink" title={item.name ?? 'ไม่ระบุ'}>
+                      {item.name ?? 'ไม่ระบุ'}
+                    </span>
+                    <div className="flex-1">
+                      <div className="h-2.5 overflow-hidden rounded-pill bg-ink/10 ring-1 ring-ink/5 ring-inset">
+                        <div
+                          className="h-full rounded-pill bg-accent-strong transition-all duration-slow ease-out-expo"
+                          style={{ width: `${(Number(item.c) / maxCategoryCount) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                    <span className="w-10 flex-none text-right text-sm font-semibold text-ink">
+                      {Number(item.c).toLocaleString('th-TH')}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </AdminCard>
+
+          {/* Breakdown by department */}
+          <AdminCard>
+            <AdminCardTitle icon={<Building2 className="h-4 w-4" />}>
+              ตามหน่วยงานรับผิดชอบ
+            </AdminCardTitle>
+            {deptCounts.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted">
+                ยังไม่มีเรื่องที่มอบหมายหน่วยงาน
+              </p>
+            ) : (
+              <ul className="space-y-3">
+                {deptCounts.map((item, i) => (
+                  <li key={item.name ?? `unknown-${i}`} className="flex items-center gap-3">
+                    <span className="w-32 flex-none truncate text-sm text-ink" title={item.name ?? 'ไม่ระบุ'}>
+                      {item.name ?? 'ไม่ระบุ'}
+                    </span>
+                    <div className="flex-1">
+                      <div className="h-2.5 overflow-hidden rounded-pill bg-ink/10 ring-1 ring-ink/5 ring-inset">
+                        <div
+                          className="h-full rounded-pill bg-accent-strong transition-all duration-slow ease-out-expo"
+                          style={{ width: `${(Number(item.c) / maxDeptCount) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                    <span className="w-10 flex-none text-right text-sm font-semibold text-ink">
+                      {Number(item.c).toLocaleString('th-TH')}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </AdminCard>
+        </div>
+      </div>
+    </AdminShell>
   );
 }
