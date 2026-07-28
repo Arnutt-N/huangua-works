@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
 import { logAudit } from '@/lib/audit';
 import { auth, signIn, signOut } from '@/auth';
+import { CredentialsSignin } from 'next-auth';
 import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { users } from '@/lib/db/schema';
@@ -69,9 +70,10 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
     // § CredentialsSignin = authorize คืน null = รหัสผ่าน/email ไม่ถูก (user-facing error)
     // error อื่น (ProviderAuthError, Configuration) = runtime/config issue → re-throw ให้ Next
     // แปลงเป็น 500 (ถ้า catch หมดทุกกรณีจะกลบ config error ทำให้ troubleshooting ผิดทาง)
-    const isCredentialsError =
-      err instanceof Error && err.name === 'CredentialsSignin';
-    if (!isCredentialsError) throw err;
+    // § instanceof เท่านั้น — ห้ามเทียบ err.name: @auth/core ตั้ง name จาก constructor.name
+    // ซึ่งโดน minify เปลี่ยนชื่อใน prod build → name ไม่ตรง → re-throw → wrong-password
+    // กลายเป็น 500 ทั้งหน้า (dev ไม่ minify จึงไม่เกิด — เจอใน prod อย่างเดียว)
+    if (!(err instanceof CredentialsSignin)) throw err;
     await logAudit({
       action: 'login_failure',
       resource: 'auth',
