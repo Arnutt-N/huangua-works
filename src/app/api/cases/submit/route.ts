@@ -5,20 +5,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
-import { firstOrUndefined } from '@/lib/db/query-helpers';
-import { cases, categories, users } from '@/lib/db/schema';
-import { generateId } from '@/lib/id';
 import { isValidCid } from '@/lib/cid-checksum';
-import { checkDuplicate, recordDedupHash } from '@/lib/dedup';
-import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
 import { checkRateLimit } from '@/lib/upstash';
-import { getFiscalYear } from '@/lib/thai-date';
-import { generateTrackingCode } from '@/lib/case-tracking';
-import { generateCidHash } from '@/lib/cid-hmac';
-import { grantConsent, CONSENT_VERSION } from '@/lib/consent';
 import { submitCaseSchema, validateOrError } from '@/lib/validation';
-import { eq } from 'drizzle-orm';
+import { createCase } from '@/lib/cases/intake';
 
 export async function POST(req: NextRequest) {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'unknown';
@@ -49,133 +39,45 @@ export async function POST(req: NextRequest) {
 
   const { cid, fullName, phoneNumber, email, categoryId, title, description, location, provinceId, districtId, subDistrictId, villageId, village, attachments } = validation.data;
 
-  // § CID checksum check (zod ตรวจ format 13 หลักเท่านั้น — checksum ตรวนที่นี่)
+  // § CID checksum check (zod ตรวจ format 13 หลักเท่านั้น — checksum ตรวจที่นี่)
   if (!isValidCid(cid)) {
     return NextResponse.json({ error: 'เลขบัตรประชาชนไม่ถูกต้อง' }, { status: 400 });
   }
 
-  // § Check duplicate (7 วัน sliding window)
-  const dupCheck = await checkDuplicate(cid, title, description);
-  if (dupCheck.isDuplicate) {
-    return NextResponse.json(
-      {
-        error: 'คุณเคยแจ้งเรื่องนี้ไปแล้วภายใน 7 วัน',
-        existingCaseId: dupCheck.caseId,
-      },
-      { status: 409 }
-    );
-  }
-
-  const db = await getDb();
-
-  // § Verify category exists
-  const category = await firstOrUndefined(
-    db.select().from(categories).where(eq(categories.id, categoryId)).limit(1)
-  );
-  if (!category) {
-    return NextResponse.json({ error: 'หมวดหมู่ไม่ถูกต้อง' }, { status: 400 });
-  }
-
-  // § Find or create citizen user
-  // § ไม่ฝัง plaintext CID ใน email — ใช้ HMAC hash แทน (PDPA: CID ห้ามรั่วไหลใน identifier ที่อาจถูก log/แสดง)
-  const citizenEmail = email || `cid-${generateCidHash(cid)}@placeholder.local`;
-  let citizenUser = await firstOrUndefined(
-    db.select().from(users).where(eq(users.email, citizenEmail)).limit(1)
-  );
-
-  if (!citizenUser) {
-    const userId = generateId();
-    await db.insert(users).values({
-      id: userId,
-      email: citizenEmail,
-      role: 'citizen',
-      isActive: true,
-      fullName,
-      phoneNumber,
-      // § เลิกเก็บ plaintext CID ใน metadata — CID เก็บเฉพาะในรูป HMAC (dedup_hashes) เท่านั้น
-      metadata: JSON.stringify({ source: 'web_intake' }),
-    });
-
-    citizenUser = await firstOrUndefined(
-      db.select().from(users).where(eq(users.id, userId)).limit(1)
-    );
-  }
-
-  if (!citizenUser) {
-    return NextResponse.json({ error: 'Failed to create user' }, { status: 500 });
-  }
-
-  // § บันทึกหลักฐานความยินยอม PDPA — เก็บทุกครั้งที่ส่งเรื่อง (เป็น audit trail ที่ hasConsent จะอ่านภายหลัง)
-  await grantConsent({
-    userId: citizenUser.id,
-    consentType: 'data_collection',
-    version: CONSENT_VERSION,
-    ipAddress: ip,
-    userAgent: req.headers.get('user-agent') || undefined,
-    metadata: { via: 'intake_submit' },
-  });
-
-  // § Create case
-  const caseId = generateId();
-  const fiscalYear = getFiscalYear(new Date());
-  const dueDate = new Date(Date.now() + (category.estimatedDays || 7) * 24 * 60 * 60 * 1000);
-
-  // § Generate tracking code (HN + 9 หลัก) — วนจนได้ code ที่ไม่ชนกับเคสเดิม
-  // collision เกือบเป็นไปไม่ได้ที่ 10^9 ค่า แต่เช็กเผื่อเพื่อความถูกต้อง
-  let trackingCode = generateTrackingCode();
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const collision = await firstOrUndefined(
-      db.select({ id: cases.id }).from(cases).where(eq(cases.trackingCode, trackingCode)).limit(1)
-    );
-    if (!collision) break;
-    trackingCode = generateTrackingCode();
-  }
-
-  await db.insert(cases).values({
-    id: caseId,
-    status: 'received',
-    priority: 'normal',
+  const result = await createCase({
+    channel: 'web',
     title,
     description,
-    location: location ?? '',
-    provinceId: provinceId ?? null,
-    districtId: districtId ?? null,
-    subDistrictId: subDistrictId ?? null,
-    villageId: villageId ?? null,
-    village: village || null,
+    location,
     categoryId,
-    submittedBy: citizenUser.id,
-    departmentId: category.defaultDepartmentId || null,
-    dueDate,
-    attachments: attachments ? JSON.stringify(attachments) : null,
-    metadata: JSON.stringify({
-      fiscalYear,
-      ipAddress: ip,
-      userAgent: req.headers.get('user-agent') || 'unknown',
-    }),
-    trackingCode,
-  });
-
-  // § Record dedup hash
-  await recordDedupHash(cid, title, description, caseId);
-
-  // § Audit log
-  await logAudit({
-    userId: citizenUser.id,
-    action: AUDIT_ACTIONS.SUBMIT_CASE,
-    resource: 'cases',
-    resourceId: caseId,
+    cid,
+    fullName,
+    phoneNumber,
+    email,
+    provinceId,
+    districtId,
+    subDistrictId,
+    villageId,
+    village,
+    attachments,
     ipAddress: ip,
     userAgent: req.headers.get('user-agent') || undefined,
-    metadata: { categoryId, fiscalYear },
   });
+
+  if (!result.ok) {
+    const status = result.errorCode === 'duplicate' ? 409 : result.errorCode === 'invalid_category' ? 400 : 500;
+    return NextResponse.json(
+      { error: result.error, ...(result.existingCaseId ? { existingCaseId: result.existingCaseId } : {}) },
+      { status }
+    );
+  }
 
   return NextResponse.json(
     {
       success: true,
-      caseId,
-      trackingCode,
-      message: 'รับเรื่องเรียบร้อย — เจ้าหน้าที่จะติดตามภายใน ' + (category.estimatedDays || 7) + ' วัน',
+      caseId: result.caseId,
+      trackingCode: result.trackingCode,
+      message: 'รับเรื่องเรียบร้อย — เจ้าหน้าที่จะติดตามภายใน ' + result.estimatedDays + ' วัน',
     },
     { status: 201 }
   );

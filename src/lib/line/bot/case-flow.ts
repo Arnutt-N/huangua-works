@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
-import { categories, cases } from '@/lib/db/schema';
-import { generateId } from '@/lib/id';
+import { categories } from '@/lib/db/schema';
+import { createCase } from '@/lib/cases/intake';
 import type { LineOutgoingMessage } from '../types';
 import { faqMenuFlex } from '../messages/flex';
 
@@ -104,7 +104,7 @@ export async function processCaseFlow(
         return { state: null, replies: [{ type: 'text', text: 'ยกเลิกแล้วครับ พิมพ์ "แจ้งเรื่อง" เพื่อเริ่มใหม่ได้ตลอด' }] };
       }
       if (text.includes('ยืนยัน') || text.toLowerCase() === 'confirm' || text === 'ใช่' || text === 'ok') {
-        const trackingCode = await createCase(state, lineUserId);
+        const trackingCode = await submitLineCase(state, lineUserId);
         return {
           state: null,
           replies: [{ type: 'text', text: `✅ ส่งเรื่องเรียบร้อยแล้ว!\n\nรหัสติดตาม: ${trackingCode}\n\nพิมพ์ "ติดตาม ${trackingCode}" เพื่อตรวจสอบสถานะได้ตลอด 24 ชม.` }],
@@ -127,7 +127,7 @@ function matchCategory(input: string): { id: string; name: string } | null {
   return null;
 }
 
-async function createCase(state: CaseFlowState, _lineUserId: string): Promise<string> {
+async function submitLineCase(state: CaseFlowState, lineUserId: string): Promise<string> {
   const db = await getDb();
 
   const [cat] = await db
@@ -136,19 +136,18 @@ async function createCase(state: CaseFlowState, _lineUserId: string): Promise<st
     .where(eq(categories.name, state.categoryName!))
     .limit(1);
 
-  const trackingCode = `HN${String(Math.floor(100000000 + Math.random() * 900000000))}`;
-
-  await db.insert(cases).values({
-    id: generateId(),
+  const result = await createCase({
+    channel: 'line',
     title: state.title!,
     description: state.description!,
-    location: state.location!,
-    categoryId: cat?.id ?? 'unknown',
-    submittedBy: 'line-bot',
-    trackingCode,
-    status: 'received',
-    metadata: { source: 'line', categoryName: state.categoryName },
+    location: state.location,
+    categoryId: cat?.id ?? '',
+    lineUserId,
   });
 
-  return trackingCode;
+  if (!result.ok) {
+    throw new Error(`LINE case creation failed: ${result.error}`);
+  }
+
+  return result.trackingCode;
 }
