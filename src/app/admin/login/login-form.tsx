@@ -13,31 +13,26 @@ const initialState: LoginState = { error: null };
 export function LoginForm() {
   const [state, formAction, isPending] = useActionState(login, initialState);
   const [showPassword, setShowPassword] = useState(false);
+  // § คุมค่า input ผ่าน state (controlled) — React 19 reset uncontrolled input อัตโนมัติ
+  // หลัง server action จบ ทำให้ช่องกรอกว่างวูบระหว่างรอ router.push commit (blank flash)
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const router = useRouter();
+
+  // § ปุ่ม submit แสดง spinner ตราบใดที่ยัง submit ค้างอยู่ หรือ success แล้วรอ navigation —
+  // best practice: feedback อยู่ที่ปุ่มเอง ไม่สลับทั้งฟอร์มเป็น panel spinner แยก
+  const submitting = isPending || !!state.success;
 
   useEffect(() => {
     // § navigate ฝั่ง client หลัง response ของ server action (พร้อม Set-Cookie) ถึง browser
     // แล้วเท่านั้น — ไม่ redirect() ใน server action เดียวกับที่ signIn() ตั้ง cookie (ดู actions.ts)
     // § ไม่เรียก router.refresh() — refresh จะ re-render หน้า login ปัจจุบันทันที ทำให้
-    // input (uncontrolled) ว่างวูบก่อน navigation commit = อาการ "หน้ากระพริบ" ที่ผู้ใช้รายงาน
+    // input ว่างวูบก่อน navigation commit = อาการ "หน้ากระพริบ" ที่ผู้ใช้รายงาน
     // router.push('/admin') ไป render หน้า admin ใหม่ทั้งหน้าอยู่แล้ว ไม่ต้อง refresh หน้าเดิม
     if (state.success) {
       router.push('/admin');
     }
   }, [state.success, router]);
-
-  // § React 19 reset form อัตโนมัติหลัง action จบ (input uncontrolled ว่างหมด) — ถ้าค้างฟอร์มไว้
-  // ผู้ใช้จะเห็นช่องกรอกว่างเปล่า + อาการหน่วงระหว่างรอ router.push('/admin') render หน้า admin
-  // จึงเปลี่ยนทั้งฟอร์มเป็น panel "กำลังเปลี่ยนทาง" ทันทีที่ success (state นี้รอดผ่าน re-render)
-  if (state.success) {
-    return (
-      <div role="status" className="mt-6 flex flex-col items-center gap-2 py-10 text-center">
-        <Loader2 className="h-8 w-8 animate-spin text-accent-strong" aria-hidden="true" />
-        <p className="mt-1 font-semibold text-ink">เข้าระบบสำเร็จ</p>
-        <p className="text-sm text-muted">กำลังพาไปยังหน้าจัดการ…</p>
-      </div>
-    );
-  }
 
   return (
     <form action={formAction} className="mt-6 flex flex-col gap-4">
@@ -59,6 +54,8 @@ export function LoginForm() {
           icon={Mail}
           autoComplete="username"
           placeholder="officer@huangua.go.th"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
           required
         />
       </div>
@@ -78,6 +75,8 @@ export function LoginForm() {
             autoComplete="current-password"
             placeholder="รหัสผ่าน"
             className="pr-14"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             required
           />
           <button
@@ -97,13 +96,17 @@ export function LoginForm() {
 
       {/* § แถว "จดจำฉัน" + "ลืมรหัสผ่าน?" — checkbox เป็น uncontrolled (ส่งผ่าน FormData)
           name="remember" → 'on' เมื่อติ๊ก; actions.ts ส่งต่อให้ jwt callback ตั้งอายุ session
-          (1h ไม่ติ๊ก / 30d ติ๊ก) */}
+          (1h ไม่ติ๊ก / 30d ติ๊ก)
+          § defaultChecked — เจ้าหน้าที่ใช้เครื่องมือนี้ทุกวัน ถ้าไม่ติ๊ก session อยู่แค่ 1 ชม.
+          แล้วโดนเตะออกทั้งที่เห็น checkbox "จดจำฉัน" อยู่ (ผู้ใช้รายงาน) จึงจำไว้ก่อนเป็นค่าเริ่มต้น
+          ยกเลิกได้โดยเอาติ๊กออก (เครื่องสาธารณะ) */}
       <div className="flex items-center justify-between gap-2">
         <label className="flex min-h-touch cursor-pointer select-none items-center gap-2 text-sm text-ink">
           <input
             type="checkbox"
             name="remember"
             aria-label="จดจำฉัน"
+            defaultChecked
             className="h-5 w-5 flex-none rounded border-border-strong accent-accent-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
           />
           จดจำฉัน
@@ -120,10 +123,14 @@ export function LoginForm() {
         type="submit"
         size="lg"
         className="shadow-accent-glow mt-2 w-full"
-        disabled={isPending}
+        disabled={submitting}
       >
-        <LogIn className="h-5 w-5" aria-hidden="true" />
-        {isPending ? 'กำลังเข้าระบบ...' : 'เข้าระบบ'}
+        {submitting ? (
+          <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+        ) : (
+          <LogIn className="h-5 w-5" aria-hidden="true" />
+        )}
+        {submitting ? 'กำลังเข้าระบบ...' : 'เข้าระบบ'}
       </Button>
 
       <p className="text-center text-sm text-muted">ยังไม่มีบัญชี? ติดต่อผู้ดูแลระบบ</p>

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { decode } from 'next-auth/jwt';
 import { resetRateLimits } from './helpers/reset-rate-limits';
 
 const ADMIN_EMAIL = 'admin@huangua.go.th';
@@ -66,4 +67,57 @@ test('login page exposes remember-me, forgot-password link, and contact text', a
 
   await page.getByRole('link', { name: 'ลืมรหัสผ่าน?' }).click();
   await expect(page).toHaveURL(/\/admin\/forgot-password$/);
+});
+
+test('remember-me is on by default and controls session lifetime (30d vs 1h)', async ({
+  page,
+}) => {
+  // § ต้อง decode session JWT ตรวจ expiresAt claim โดยตรง — อายุ cookie เท่ากัน 30d เสมอ
+  // (session.maxAge) ตัวบังคับอายุ session จริงคือ expiresAt ใน token (jwt callback, src/auth.ts)
+  test.skip(!process.env.AUTH_SECRET, 'AUTH_SECRET not set — decode session JWT ไม่ได้');
+  test.slow();
+
+  async function loginAndReadExpiresAt(remember: boolean): Promise<number> {
+    await page.goto('/admin/login');
+    await page.getByLabel('อีเมล').fill(ADMIN_EMAIL);
+    await page.getByLabel('รหัสผ่าน').fill(ADMIN_PASSWORD);
+    if (remember) {
+      await page.getByLabel('จดจำฉัน').check();
+    } else {
+      await page.getByLabel('จดจำฉัน').uncheck();
+    }
+    await page.getByRole('button', { name: /เข้าระบบ/ }).click();
+    await expect(page).toHaveURL(/\/admin$/, { timeout: 10_000 });
+
+    // § ทั้ง dev (authjs.session-token) และ prod (__Secure-authjs.session-token) —
+    // ชื่อ cookie นี้ใช้เป็น salt ตอน encode ด้วย จึงส่งชื่อจริงที่เจอให้ decode
+    const session = (await page.context().cookies()).find((c) =>
+      c.name.endsWith('authjs.session-token')
+    );
+    expect(session, 'session cookie missing after login').toBeTruthy();
+    const payload = (await decode({
+      token: session!.value,
+      secret: process.env.AUTH_SECRET!,
+      salt: session!.name,
+    })) as { expiresAt?: number } | null;
+    expect(payload?.expiresAt, 'expiresAt claim missing in session JWT').toBeTruthy();
+
+    await page.getByRole('button', { name: 'ออกจากระบบ' }).click();
+    await expect(page).toHaveURL(/\/admin\/login(\?.*)?$/, { timeout: 10_000 });
+    return payload!.expiresAt!;
+  }
+
+  // ค่าเริ่มต้น: ติ๊ก "จดจำฉัน" ไว้ให้เลย (เจ้าหน้าที่ใช้ทุกวัน — login แล้วต้องอยู่ยาว)
+  await page.goto('/admin/login');
+  await expect(page.getByLabel('จดจำฉัน')).toBeChecked();
+
+  const expiresAtRemembered = await loginAndReadExpiresAt(true);
+  const daysLeft = (expiresAtRemembered - Date.now() / 1000) / 86400;
+  expect(daysLeft, 'ติ๊ก "จดจำฉัน" → session ต้องยาว ~30 วัน').toBeGreaterThan(29);
+  expect(daysLeft).toBeLessThanOrEqual(30.1);
+
+  const expiresAtShort = await loginAndReadExpiresAt(false);
+  const hoursLeft = (expiresAtShort - Date.now() / 1000) / 3600;
+  expect(hoursLeft, 'ไม่ติ๊ก "จดจำฉัน" → session ต้องสั้น ~1 ชั่วโมง').toBeGreaterThan(0.9);
+  expect(hoursLeft).toBeLessThanOrEqual(1.1);
 });
