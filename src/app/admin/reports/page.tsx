@@ -22,9 +22,10 @@ const PAGE_SIZE = 20;
 // ใช้ enum type แทนเพื่อ type safety กับ Drizzle query
 type DbCaseStatus = (typeof caseStatusEnum.enumValues)[number];
 
-const OPEN_STATUSES: DbCaseStatus[] = ['received', 'reviewing', 'assigned', 'in_progress'];
+const OPEN_STATUSES: DbCaseStatus[] = ['pending', 'received', 'reviewing', 'assigned', 'in_progress'];
 
 const VALID_STATUSES = new Set<string>([
+  'pending',
   'received',
   'reviewing',
   'assigned',

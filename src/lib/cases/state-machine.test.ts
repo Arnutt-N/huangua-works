@@ -10,6 +10,9 @@ import {
 
 describe('state-machine · assertTransition', () => {
   describe('valid forward transitions', () => {
+    it('allows pending → received', () => {
+      expect(assertTransition('pending', 'received')).toEqual({ ok: true });
+    });
     it('allows received → reviewing', () => {
       expect(assertTransition('received', 'reviewing')).toEqual({ ok: true });
     });
@@ -103,8 +106,8 @@ describe('state-machine · ALLOWED_TRANSITIONS', () => {
 });
 
 describe('state-machine · STATUS_LABELS_TH', () => {
-  it('covers all 7 statuses', () => {
-    expect(Object.keys(STATUS_LABELS_TH)).toHaveLength(7);
+  it('covers all 8 statuses', () => {
+    expect(Object.keys(STATUS_LABELS_TH)).toHaveLength(8);
   });
   it('uses Thai for received', () => {
     expect(STATUS_LABELS_TH.received).toBe('รับเรื่อง');
@@ -112,22 +115,25 @@ describe('state-machine · STATUS_LABELS_TH', () => {
 });
 
 describe('state-machine · ALL_STATUSES_ORDERED', () => {
-  it('has 7 entries', () => {
-    expect(ALL_STATUSES_ORDERED).toHaveLength(7);
+  it('has 8 entries', () => {
+    expect(ALL_STATUSES_ORDERED).toHaveLength(8);
   });
 });
 
 describe('state-machine · statusProgress', () => {
-  it('received = ~17% (1/6)', () => {
-    expect(statusProgress('received')).toBe(17);
+  it('pending = ~14% (1/7)', () => {
+    expect(statusProgress('pending')).toBe(14);
   });
-  it('closed = 100% (6/6)', () => {
+  it('received = ~29% (2/7)', () => {
+    expect(statusProgress('received')).toBe(29);
+  });
+  it('closed = 100% (7/7)', () => {
     expect(statusProgress('closed')).toBe(100);
   });
   it('rejected = 100% (terminal)', () => {
     expect(statusProgress('rejected')).toBe(100);
   });
-  it('in_progress = ~67% (4/6)', () => {
-    expect(statusProgress('in_progress')).toBe(67);
+  it('in_progress = ~71% (5/7)', () => {
+    expect(statusProgress('in_progress')).toBe(71);
   });
 });

@@ -19,6 +19,7 @@
 
 /** Single source of truth — ทุก enum/type/schema derive จากที่นี่ */
 export const ALL_STATUSES = [
+  'pending',
   'received',
   'reviewing',
   'assigned',
@@ -38,6 +39,7 @@ export const TERMINAL_STATUSES: readonly CaseStatus[] = ['closed', 'rejected'];
  * key = current, value = array ของที่ไปได้
  */
 export const ALLOWED_TRANSITIONS: Record<CaseStatus, readonly CaseStatus[]> = {
+  pending: ['received', 'rejected'],
   received: ['reviewing', 'rejected'],
   reviewing: ['assigned', 'rejected', 'received'],
   assigned: ['in_progress', 'reviewing'],
@@ -82,6 +84,7 @@ export function assertTransition(from: CaseStatus, to: CaseStatus): TransitionRe
 
 /** ลำดับ status ตาม state machine (เพื่อคำนวณ progress %) */
 export const STATUS_ORDER: readonly CaseStatus[] = [
+  'pending',
   'received',
   'reviewing',
   'assigned',
@@ -101,6 +104,7 @@ export function statusProgress(status: CaseStatus): number {
 
 /** label ภาษาไทย ของแต่ละ status */
 export const STATUS_LABELS_TH: Record<CaseStatus, string> = {
+  pending: 'รอรับเรื่อง',
   received: 'รับเรื่อง',
   reviewing: 'ตรวจสอบ',
   assigned: 'มอบหมาย',

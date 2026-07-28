@@ -84,7 +84,7 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
 
   await db.insert(cases).values({
     id: caseId,
-    status: 'received',
+    status: 'pending',
     priority: 'normal',
     title: input.title,
     description: input.description,

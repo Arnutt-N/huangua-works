@@ -24,7 +24,7 @@ import { formatThaiDateLong } from '@/lib/thai-date';
 export const metadata: Metadata = { title: 'แดชบอร์ดเจ้าหน้าที่' };
 export const dynamic = 'force-dynamic';
 
-const OPEN_STATUSES: CaseStatus[] = ['received', 'reviewing', 'assigned', 'in_progress'];
+const OPEN_STATUSES: CaseStatus[] = ['pending', 'received', 'reviewing', 'assigned', 'in_progress'];
 
 export default async function AdminDashboardPage() {
   const { user: staffUser } = await requireStaff();

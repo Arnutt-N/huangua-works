@@ -13,6 +13,7 @@ import { cn } from '../../lib/cn';
  */
 
 export type CaseStatus =
+  | 'pending' // รอรับเรื่อง
   | 'received' // รับเรื่อง
   | 'reviewing' // ตรวจสอบ
   | 'assigned' // มอบหมาย
@@ -23,6 +24,10 @@ export type CaseStatus =
   | 'urgent'; // ฉุกเฉิน (ใช้กับ priority ไม่ใช่ status)
 
 const statusMap: Record<CaseStatus, { label: string; class: string }> = {
+  pending: {
+    label: 'รอรับเรื่อง',
+    class: 'bg-ink/5 text-ink ring-ink/15',
+  },
   received: {
     label: 'รับเรื่อง',
     class: 'bg-accent-sunken text-accent-strong ring-accent-strong/20',
