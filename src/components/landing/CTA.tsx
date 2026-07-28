@@ -15,7 +15,7 @@ export function CTA() {
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="glass rounded-3xl p-8 text-center shadow-2xl lg:p-12"
+          className="glass rounded-xl p-8 text-center shadow-2xl lg:p-12"
         >
           <h2 className="text-3xl font-bold lg:text-4xl">
             <span className="gradient-text">พร้อมเริ่มใช้งานแล้วหรือยัง?</span>

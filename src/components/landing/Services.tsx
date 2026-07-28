@@ -75,7 +75,7 @@ export function Services() {
               viewport={{ once: true }}
               transition={{ delay: i * 0.1 }}
               whileHover={{ y: -5 }}
-              className="glass rounded-2xl p-6 shadow-lg transition-shadow hover:shadow-xl"
+              className="glass rounded-lg p-6 shadow-lg transition-shadow hover:shadow-xl"
             >
               <div
                 className="flex h-14 w-14 items-center justify-center rounded-xl"

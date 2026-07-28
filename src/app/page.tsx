@@ -28,7 +28,7 @@ function StatsFallback() {
           {[0, 1, 2, 3].map((i) => (
             <div
               key={i}
-              className="glass h-36 animate-pulse rounded-2xl"
+              className="glass h-36 animate-pulse rounded-lg"
               style={{ backgroundColor: 'oklch(96% 0.01 145 / 0.5)' }}
             />
           ))}

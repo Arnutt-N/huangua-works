@@ -215,7 +215,7 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
       <motion.div
         animate={reduce ? undefined : { y: [0, -10, 0] }}
         transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-        className="glass absolute -left-6 -top-6 z-20 hidden rounded-2xl p-3 shadow-lg sm:block"
+        className="glass absolute -left-6 -top-6 z-20 hidden rounded-lg p-3 shadow-lg sm:block"
       >
         <div className="flex items-center gap-2">
           <div
@@ -234,7 +234,7 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
       <motion.div
         animate={reduce ? undefined : { y: [0, 10, 0] }}
         transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
-        className="glass absolute -bottom-4 -right-4 z-20 hidden rounded-2xl p-3 shadow-lg sm:block"
+        className="glass absolute -bottom-4 -right-4 z-20 hidden rounded-lg p-3 shadow-lg sm:block"
       >
         <div className="flex items-center gap-2">
           <div
@@ -254,7 +254,7 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
       <motion.div
         whileHover={reduce ? undefined : { y: -5 }}
         transition={{ type: 'spring', stiffness: 200, damping: 20 }}
-        className="relative overflow-hidden rounded-3xl border bg-surface-raised shadow-2xl"
+        className="relative overflow-hidden rounded-xl border bg-surface-raised shadow-2xl"
         style={{ boxShadow: '0 25px 50px -12px oklch(55% 0.13 160 / 0.1)' }}
       >
         {/* Header */}

@@ -38,7 +38,7 @@ export function StatsClient({ stats, hasData }: { stats: StatItem[]; hasData: bo
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
-                className="glass rounded-2xl p-6 shadow-lg"
+                className="glass rounded-lg p-6 shadow-lg"
               >
                 <div className="flex items-start justify-between">
                   <div
