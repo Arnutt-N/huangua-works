@@ -111,6 +111,12 @@ motion:
 - Screen reader (NVDA/VoiceOver) ทั้ง `th` + `th-northeast` (H12)
 - **prefers-reduced-motion MUST respect** — disable float/pulse/shimmer/gradient-shift เมื่อ user ตั้ง reduce-motion
 
+**Anti-AI-Default Reflexes (ปฏิเสธดีไซน์โหลๆ ที่ AI มักเจนให้ — ดูรายละเอียดใน §2/§3/§4/§7):**
+- **No-Cream** — พื้นห้ามใช้ cream AI-default `oklch(98% 0.01 60)` → ใช้ off-white เอียง emerald
+- **No-Indigo** — ห้าม civic indigo `oklch(52% 0.12 245)` (ธีมเก่า) → emerald เท่านั้น
+- **No-Serif** — ห้าม serif display (Fraunces/DM Serif/Playfair) → Noto Sans Thai bold
+- **No-Flat** — ห้าม flat surface → glassmorphism + mesh gradient + glow
+
 ---
 
 ## §1. Overview — ศาลาประชาชนดิจิทัล
@@ -250,6 +256,20 @@ motion:
 
 ## §5. Components
 
+### Radius & Shape (การใช้จริง)
+
+Token radius ใน `src/styles/tokens.css` มีแค่ 5 ขั้น — ใช้เฉพาะชื่อในตารางนี้:
+
+| Token | ค่า | ใช้กับ |
+|---|---|---|
+| `rounded-sm` | 8px | checkbox, control เล็กๆ |
+| `rounded-md` | 12px | button, input, badge, alert (default ของ primitives) |
+| `rounded-lg` | 16px | card, dialog, glass-panel |
+| `rounded-xl` | 24px | glass card ขนาดใหญ่, hero panel |
+| `rounded-pill` | 9999px | status pill, chip, avatar, dot |
+
+**ห้าม:** `rounded-2xl` / `rounded-3xl` — ไม่ได้ถูก override ใน token จึงยังเป็นค่า default ของ Tailwind (1rem / 1.5rem) ทำให้สเกลไม่เรียงกัน (`rounded-2xl` เล็กกว่า `rounded-xl`) ใช้แล้วมุมจะ "หด" ลงแบบเงียบๆ
+
 ### CaseStatusBadge (H13)
 ```tsx
 // emerald/amber soft bg + strong text (ไม่ใช่ indigo)
@@ -323,9 +343,60 @@ export function Hero() {
 
 **CRITICAL:** ทุก motion component ต้องตรวจ `useReducedMotion()` และ disable animation เมื่อ user ตั้ง `prefers-reduced-motion: reduce` — ถ้าไม่ทำ fail H11/M-A1 gate
 
+### Input / Form Field
+
+Primitives อยู่ที่ `src/components/ui/field.tsx` (`Field` = label + input + error ในตัว):
+
+```tsx
+// label อยู่เหนือ field เสมอ (ไม่ float label — ผู้สูงอายุอ่านยาก)
+<Field label="อีเมล" name="email" type="email" icon={Mail} required />
+```
+
+- **Icon:** prop `icon?: LucideIcon` — ไอคอนอยู่ซ้ายของ input (`pl-11`, icon `left-3.5`)
+- **Focus:** `focus:border-accent-strong` + `focus-visible:ring-accent-strong/35` (emerald เท่านั้น — The One Emerald Rule)
+- **Error state:** `border-danger bg-danger-soft/40` + ข้อความ error สี `danger-ink` ใต้ field
+- **Touch:** input สูง ≥44px (C6) — ห้ามลดความสูงแม้ในตารางแอดมิน
+- **Radius:** `rounded-md` (12px) ตามตาราง Radius ด้านบน
+
+### Navigation
+
+- **Landing Navbar:** sticky + glassmorphism (`.glass` backdrop-blur) — ลอยทับ mesh gradient ของ hero, active link = emerald
+- **Admin Sidebar:** แบ่ง 3 กลุ่ม (ภาพรวม / จัดการเคส / บริหารระบบ) — session-aware (ซ่อนเมนูตาม role), active item = emerald accent + `accent-sunken` bg
+- **Touch:** nav item ทุกตัว ≥44px (C6) — รวมเมนูมือถือ (hamburger + drawer item)
+- **Keyboard:** ทุกลิงก์ focus ได้ตาม tab order, drawer ปิดด้วย Esc
+
 ---
 
 ## §6. Layout — Modular Sections
+
+### Spacing Scale
+
+ใช้สเกล default ของ Tailwind (ฐาน 4px: `p-1`=4px, `p-2`=8px, `p-4`=16px, `gap-10`=40px ...) — ไม่ได้ override ใน token จึงห้ามคิดสเกลเอง ให้ใช้ step ของ Tailwind เท่านั้น ค่า semantic ที่กำหนดเองอยู่ใน `src/styles/tokens.css`:
+
+| Token | ค่า | ใช้กับ |
+|---|---|---|
+| section spacing | `clamp(4rem, 3rem + 5vw, 10rem)` | ระยะห่างระหว่าง section ของ landing |
+| cardPadding | `1.25rem` (20px) | padding มาตรฐานของ card |
+| buttonPadding | `0.75rem 1.75rem` | padding ของ button |
+| `--touch-target-min` | 44px | min-height/width ของ interactive element (utility `min-h-touch` / `min-w-touch`) |
+
+### Breakpoints & Grid
+
+Breakpoints = ค่า default ของ Tailwind v4 (ไม่ได้ override):
+
+| Prefix | ≥ | ใช้กับ |
+|---|---|---|
+| `sm` | 640px | mobile landscape |
+| `md` | 768px | tablet — admin sidebar พับเป็น drawer |
+| `lg` | 1024px | desktop — hero แยก 2 คอลัมน์, sidebar ถาวร |
+| `xl` | 1280px | wide desktop |
+| `2xl` | 1536px | ultra-wide |
+
+**Pattern หลัก:**
+- Container: `container mx-auto px-4` (ทุก section ของ landing)
+- Hero / 2-col: `grid lg:grid-cols-2 gap-10 items-center`
+- Card grid: `grid sm:grid-cols-2 lg:grid-cols-3 gap-6`
+- ความกว้างที่ต้องเทสต์: 320 / 768 / 1024 / 1440 × {light, dark}
 
 **Landing Page Structure (อ้างอิง glm5-2-smart-service):**
 ```tsx
