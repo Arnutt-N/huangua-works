@@ -19,6 +19,7 @@ import {
 import { requireStaff } from '@/lib/auth/require-staff';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { STATUS_LABELS_TH } from '@/lib/cases/state-machine';
+import { formatThaiDateTime } from '@/lib/thai-date';
 import { CaseStatusBadge } from '@/components/ui/case-status-badge';
 import { CaseDetailClient, SuccessToast } from './case-detail-client';
 
@@ -33,13 +34,6 @@ interface PageProps {
 }
 
 const SUPERVISOR_ROLES = ['chief', 'head', 'superadmin'] as const;
-
-function formatDateTime(date: Date): string {
-  return new Intl.DateTimeFormat('th-TH', {
-    dateStyle: 'long',
-    timeStyle: 'short',
-  }).format(date);
-}
 
 function formatAge(date: Date, now: number): string {
   const diffHours = Math.floor((now - date.getTime()) / 3_600_000);
@@ -227,14 +221,14 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
         {/* meta grid */}
         <dl className="mt-6 grid gap-4 border-t border-border pt-5 sm:grid-cols-2 lg:grid-cols-4">
           <MetaItem icon={<Calendar className="h-4 w-4" />} label="วันที่รับเรื่อง">
-            {formatDateTime(caseRow.createdAt)}
+            {formatThaiDateTime(caseRow.createdAt)}
             <span className="ml-1 text-muted">
               ({formatAge(caseRow.createdAt, now)})
             </span>
           </MetaItem>
           {caseRow.dueDate && (
             <MetaItem icon={<Clock className="h-4 w-4" />} label="กำหนดเสร็จ">
-              {formatDateTime(caseRow.dueDate)}
+              {formatThaiDateTime(caseRow.dueDate)}
             </MetaItem>
           )}
           {caseRow.categoryName && (
@@ -319,7 +313,7 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
                         <span className="font-medium">{entry.updateType}</span>
                       </span>
                       <time dateTime={entry.createdAt.toISOString()}>
-                        {formatDateTime(entry.createdAt)}
+                        {formatThaiDateTime(entry.createdAt)}
                       </time>
                     </div>
                     <div className="mt-2 text-sm text-ink">

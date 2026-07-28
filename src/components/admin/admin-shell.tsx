@@ -14,7 +14,7 @@ import type { users } from '@/lib/db/schema';
  * § ส่งเฉพาะ field ที่ต้องใช้แสดงผลลง client
  * users.$inferSelect มี passwordHash อยู่ด้วย ถ้าส่งทั้ง row ให้ client component
  * ค่านั้นจะถูก serialize ลง RSC payload และอ่านได้จาก browser — จึงคัดเฉพาะ
- * fullName กับ role เท่านั้น
+ * fullName, email (ของเจ้าของบัญชีเอง — หน้า profile ก็แสดง) กับ role เท่านั้น
  *
  * `bleed` = ปิด container/padding ของ main สำหรับหน้าที่จัดพื้นที่เอง (เช่น /admin/chat)
  */
@@ -36,7 +36,7 @@ export function AdminShell({
 }) {
   return (
     <AdminLayout
-      user={{ fullName: user.fullName, role: user.role }}
+      user={{ fullName: user.fullName, email: user.email, role: user.role }}
       active={active}
       title={title}
     >

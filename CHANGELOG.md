@@ -5,6 +5,11 @@
 
 ## [2026-07-28]
 
+- **feat(admin): avatar dropdown user menu + confirm-logout + พ.ศ. dates** ([PR #41](https://github.com/Arnutt-N/huangua-works/pull/41))
+  - ย้าย "โปรไฟล์ของฉัน" + "ออกจากระบบ" จากท้าย sidebar ไป dropdown ของ avatar มุมขวาบน (เพิ่ม `@radix-ui/react-dropdown-menu` — shadcn-style wrapper `ui/dropdown-menu.tsx`)
+  - Dropdown แสดงชื่อ/อีเมล/badge บทบาท — เอา badge "ผู้ดูแลระบบ" ออกจาก topbar (แสดงที่เดียวใน dropdown)
+  - ออกจากระบบต้องยืนยันใน Dialog ก่อน ("คุณต้องการออกจากระบบจริงๆ ใช่ไหม") กันกดพลาด — default = ไม่ออก
+  - วันที่ทุกจุดที่แสดงให้ผู้ใช้เห็นเป็น พ.ศ. ผ่าน shared formatter `th-TH-u-ca-buddhist` ใน `lib/thai-date.ts` (DB ยังเก็บ ค.ศ.): case detail, audit, reports, timeline ติดตามเรื่อง, footer © พ.ศ.
 - **fix(auth): wrong-password login 500 in prod (minified err.name check)** ([PR #39](https://github.com/Arnutt-N/huangua-works/pull/39))
   - Production incident: กรอกรหัสผ่านผิดแล้วหน้า login 500 ทั้งหน้า (เกิดเฉพาะ prod — dev ไม่เป็น)
   - ต้นเหตุ: `@auth/core` ตั้ง `error.name` จาก `constructor.name` ซึ่งโดน minify เปลี่ยนชื่อใน prod build → เทียบ `err.name === 'CredentialsSignin'` ไม่ตรง → re-throw กลายเป็น 500

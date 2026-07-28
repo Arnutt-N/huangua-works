@@ -2,15 +2,11 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { Menu, X, LogOut, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
-import { logout } from '@/app/admin/actions';
+import { Menu, X, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { BrandMark } from '@/components/site/brand-mark';
-import { RoleBadge } from '@/components/admin/role-badge';
+import { UserMenu } from '@/components/admin/user-menu';
 import {
-  ADMIN_NAV_ACCOUNT,
-  initialsOf,
   visibleNavGroups,
-  visibleNavItems,
   type AdminNavItem,
   type AdminTab,
   type UserRole,
@@ -27,8 +23,8 @@ import { cn } from '@/lib/cn';
  * ก็อ่านเป็นปุ่มแปลกปลอมเพราะไม่มีกลุ่มรองรับ
  *
  * โครงใหม่แยกหน้าที่ชัดเจน:
- *   - sidebar = นำทางทั้งระบบ (แบ่ง 3 กลุ่ม) + บัญชีของฉันแยกไว้ท้าย
- *   - topbar  = ชื่อหน้าปัจจุบัน + ตัวตนผู้ใช้ (บางแถวเดียว)
+ *   - sidebar = นำทางทั้งระบบ (แบ่ง 3 กลุ่ม) — งานล้วน ไม่มีเรื่องของบัญชี
+ *   - topbar  = ชื่อหน้าปัจจุบัน + เมนูผู้ใช้ (avatar dropdown: โปรไฟล์/ออกจากระบบ)
  *   - เนื้อหา = ตัวกรอง/ข้อมูลของหน้านั้น อยู่ในพื้นที่ของตัวเองชัดเจน
  *
  * § ความปลอดภัย: component นี้เป็น client จึงรับเฉพาะ field ที่ต้องแสดงผล
@@ -37,6 +33,7 @@ import { cn } from '@/lib/cn';
  */
 export interface AdminLayoutUser {
   fullName: string;
+  email: string;
   role: UserRole;
 }
 
@@ -81,7 +78,6 @@ export function AdminLayout({
   }, [mobileOpen]);
 
   const groups = visibleNavGroups(user.role);
-  const accountItems = visibleNavItems(user.role, ADMIN_NAV_ACCOUNT);
 
   return (
     <div className="mesh-gradient relative min-h-dvh text-ink">
@@ -194,36 +190,6 @@ export function AdminLayout({
             </div>
           ))}
         </nav>
-
-        {/* บัญชีของฉัน + ออกจากระบบ
-            แยกจากกลุ่มงานด้านบนเพราะเป็นเรื่องของ "ตัวฉัน" ไม่ใช่ของระบบ
-            (ลิงก์ "เปิดหน้าเว็บสาธารณะ" ถูกตัดออก — กินพื้นที่หนึ่งแถวเพื่อสิ่งที่
-            พิมพ์ URL เอาก็ได้ และไม่ใช่งานที่เจ้าหน้าที่ทำระหว่างใช้ระบบ) */}
-        <div className="flex-none space-y-1 border-t border-border p-3">
-          {accountItems.map((item) => (
-            <SidebarLink
-              key={item.key}
-              item={item}
-              isActive={item.key === active}
-              collapsed={collapsed}
-              onNavigate={() => setMobileOpen(false)}
-            />
-          ))}
-
-          <form action={logout}>
-            <button
-              type="submit"
-              title={collapsed ? 'ออกจากระบบ' : undefined}
-              className={cn(
-                'flex w-full min-h-touch items-center gap-3 rounded-md px-3 text-sm font-medium text-muted transition-colors duration-normal ease-out-expo hover:bg-danger-soft hover:text-danger-ink',
-                collapsed && 'lg:justify-center lg:px-0',
-              )}
-            >
-              <LogOut className="h-5 w-5 flex-none" aria-hidden="true" />
-              <span className={cn('truncate', collapsed && 'lg:hidden')}>ออกจากระบบ</span>
-            </button>
-          </form>
-        </div>
       </aside>
 
       {/* ── พื้นที่เนื้อหา ── */}
@@ -249,21 +215,9 @@ export function AdminLayout({
             {title}
           </h1>
 
-          {/* ตัวตนผู้ใช้อย่างเดียว — ไม่มีปุ่มสั่งการ (ย้ายไปรวมที่ sidebar แล้ว) */}
-          <div className="flex flex-none items-center gap-2">
-            <span className="hidden text-right sm:block">
-              <span className="block max-w-[12rem] truncate text-sm font-semibold text-ink">
-                {user.fullName}
-              </span>
-            </span>
-            <RoleBadge role={user.role} className="hidden md:inline-flex" />
-            <span
-              aria-hidden="true"
-              className="bg-accent-gradient-br flex h-9 w-9 flex-none items-center justify-center rounded-full text-xs font-bold text-on-accent"
-            >
-              {initialsOf(user.fullName)}
-            </span>
-          </div>
+          {/* เมนูผู้ใช้ — avatar dropdown: โปรไฟล์ของฉัน / ออกจากระบบ (ยืนยันก่อนออก)
+              badge บทบาทแสดงใน dropdown ที่เดียว ไม่ซ้ำบน topbar */}
+          <UserMenu fullName={user.fullName} email={user.email} role={user.role} />
         </header>
 
         <main className="flex-1">{children}</main>

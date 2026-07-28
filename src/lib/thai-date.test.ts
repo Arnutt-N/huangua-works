@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'vitest';
 import {
   formatThaiDate,
+  formatThaiDateLong,
+  formatThaiDateTime,
+  formatThaiDateTimeShort,
   getFiscalYear,
   getFiscalYearBE,
   toBuddhistYear,
@@ -50,6 +53,27 @@ describe('toThaiDateString', () => {
 describe('formatThaiDate', () => {
   test('formats as DD/MM/BBBB', () => {
     expect(formatThaiDate(new Date(2026, 0, 5))).toBe('05/01/2569');
+  });
+});
+
+describe('formatThaiDateTime', () => {
+  test('renders Buddhist year + Thai month name + time', () => {
+    const result = formatThaiDateTime(new Date(2026, 0, 5, 14, 30));
+    expect(result).toContain('2569');
+    expect(result).toContain('มกราคม');
+    expect(result).toContain('14:30');
+  });
+});
+
+describe('formatThaiDateLong', () => {
+  test('renders day, full Thai month name and Buddhist year', () => {
+    expect(formatThaiDateLong(new Date(2026, 0, 5))).toBe('5 มกราคม 2569');
+  });
+});
+
+describe('formatThaiDateTimeShort', () => {
+  test('renders abbreviated Thai month, Buddhist year and time', () => {
+    expect(formatThaiDateTimeShort(new Date(2026, 0, 5, 14, 30))).toBe('5 ม.ค. 2569 14:30');
   });
 });
 

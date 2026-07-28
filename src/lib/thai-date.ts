@@ -58,6 +58,45 @@ export function formatThaiDate(date: Date): string {
   return `${day}/${month}/${year}`;
 }
 
+/* ---------- Display formatters (พ.ศ.) ----------
+ * ทุกวันที่ "แสดงให้ผู้ใช้เห็น" ต้องผ่านชุดนี้ — DB เก็บ ค.ศ. (timestamp ปกติ)
+ * แต่ UI แสดง พ.ศ. ตามราชการไทย ผ่าน locale extension 'u-ca-buddhist'
+ * (สร้าง formatter ครั้งเดียวระดับ module — Intl.DateTimeFormat สร้างแพง) */
+
+const dateTimeFormatter = new Intl.DateTimeFormat('th-TH-u-ca-buddhist', {
+  dateStyle: 'long',
+  timeStyle: 'short',
+});
+
+const dateLongFormatter = new Intl.DateTimeFormat('th-TH-u-ca-buddhist', {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+});
+
+const dateTimeShortFormatter = new Intl.DateTimeFormat('th-TH-u-ca-buddhist', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+/** วันที่+เวลาแบบเต็ม → "5 มกราคม 2569 14:30" (หน้ารายละเอียดเคส, audit) */
+export function formatThaiDateTime(date: Date): string {
+  return dateTimeFormatter.format(date);
+}
+
+/** วันที่แบบยาว ไม่มีเวลา → "5 มกราคม 2569" (รายงานสรุป) */
+export function formatThaiDateLong(date: Date): string {
+  return dateLongFormatter.format(date);
+}
+
+/** วันที่+เวลาแบบย่อ → "5 ม.ค. 2569 14:30" (timeline ติดตามเรื่อง) */
+export function formatThaiDateTimeShort(date: Date): string {
+  return dateTimeShortFormatter.format(date);
+}
+
 /**
  * ปีงบประมาณไทย พ.ศ. (fiscal year in Buddhist Era)
  */

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Mail, Phone, MapPin } from 'lucide-react';
+import { toBuddhistYear } from '@/lib/thai-date';
 
 export function Footer() {
   return (
@@ -97,7 +98,7 @@ export function Footer() {
 
         <div className="mt-12 border-t pt-8 text-center text-sm text-muted">
           <p>
-            © {new Date().getFullYear()} องค์การบริหารส่วนตำบลหัวงัว อ.ยางตลาด จ.กาฬสินธุ์
+            © {toBuddhistYear(new Date())} องค์การบริหารส่วนตำบลหัวงัว อ.ยางตลาด จ.กาฬสินธุ์
             | สงวนลิขสิทธิ์
           </p>
           <p className="mt-2">

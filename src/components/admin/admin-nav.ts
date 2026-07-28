@@ -5,7 +5,6 @@ import {
   ScrollText,
   MessageSquare,
   FolderCog,
-  UserCircle,
   type LucideIcon,
 } from 'lucide-react';
 import type { userRoleEnum } from '@/lib/db/schema';
@@ -78,14 +77,6 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       { key: 'audit', label: 'ประวัติการกระทำ', href: '/admin/audit', icon: ScrollText },
     ],
   },
-];
-
-/**
- * เมนูท้าย sidebar — แยกจากกลุ่มงานเพราะเป็นเรื่องของ "ตัวฉัน" ไม่ใช่ของระบบ
- * เจ้าหน้าที่ทุกบทบาทเข้าได้ (ไม่เหมือน /admin/users ที่จำกัดสิทธิ์)
- */
-export const ADMIN_NAV_ACCOUNT: AdminNavItem[] = [
-  { key: 'profile', label: 'โปรไฟล์ของฉัน', href: '/admin/profile', icon: UserCircle },
 ];
 
 const SUPERVISOR_ROLES: UserRole[] = ['head', 'superadmin'];

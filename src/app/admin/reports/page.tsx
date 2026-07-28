@@ -19,6 +19,7 @@ import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import { KpiCard } from '@/components/admin/kpi-card';
 import { CaseStatusBadge } from '@/components/ui/case-status-badge';
 import { STATUS_LABELS_TH, type CaseStatus } from '@/lib/cases/state-machine';
+import { formatThaiDateLong } from '@/lib/thai-date';
 
 export const metadata: Metadata = { title: 'รายงานสรุป' };
 export const dynamic = 'force-dynamic';
@@ -128,7 +129,7 @@ export default async function ReportsPage() {
       <div className="space-y-6">
         <p className="text-sm text-muted">
           {latest
-            ? `อัปเดตล่าสุด: ${new Date(latest.date).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}`
+            ? `อัปเดตล่าสุด: ${formatThaiDateLong(new Date(latest.date))}`
             : 'สรุปภาพรวมเคสทั้งระบบ (ยังไม่มีข้อมูลรายวัน)'}
         </p>
 
