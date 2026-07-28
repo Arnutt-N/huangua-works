@@ -66,6 +66,15 @@ export function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLD
   return <div className={cn('mb-4 flex flex-col gap-1 pr-8', className)} {...props} />;
 }
 
+export function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn('mt-6 flex flex-wrap items-center justify-end gap-3', className)}
+      {...props}
+    />
+  );
+}
+
 export function DialogTitle({
   className,
   ...props

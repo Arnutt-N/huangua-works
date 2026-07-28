@@ -6,6 +6,7 @@ import { CaseStatusBadge, type CaseStatus } from '../../components/ui/case-statu
 import { Button } from '../../components/ui/button';
 import { FieldHint, Input, Label } from '../../components/ui/field';
 import { cn } from '../../lib/cn';
+import { formatThaiDateTimeShort } from '../../lib/thai-date';
 
 interface CaseDetail {
   case: {
@@ -26,16 +27,6 @@ interface CaseDetail {
 interface TimelineEntry {
   status: CaseStatus;
   at: string;
-}
-
-function formatThaiDateTime(iso: string): string {
-  return new Intl.DateTimeFormat('th-TH-u-ca-buddhist', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(iso));
 }
 
 function buildTimeline(detail: CaseDetail): TimelineEntry[] {
@@ -164,7 +155,7 @@ export function TrackForm({ initialId }: { initialId?: string }) {
                 <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted">
                   <span className="inline-flex items-center gap-1">
                     <Clock className="h-3.5 w-3.5" aria-hidden="true" />
-                    แจ้ง {formatThaiDateTime(result.case.createdAt)}
+                    แจ้ง {formatThaiDateTimeShort(new Date(result.case.createdAt))}
                   </span>
                 </p>
               </div>
@@ -197,7 +188,7 @@ export function TrackForm({ initialId }: { initialId?: string }) {
                       </span>
                       <div className="pt-1.5">
                         <CaseStatusBadge status={entry.status} />
-                        <p className="mt-1 text-sm text-muted">{formatThaiDateTime(entry.at)}</p>
+                        <p className="mt-1 text-sm text-muted">{formatThaiDateTimeShort(new Date(entry.at))}</p>
                       </div>
                     </div>
                   </li>

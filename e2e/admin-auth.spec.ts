@@ -1,9 +1,19 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { decode } from 'next-auth/jwt';
 import { resetRateLimits } from './helpers/reset-rate-limits';
 
 const ADMIN_EMAIL = 'admin@huangua.go.th';
 const ADMIN_PASSWORD = 'ChangeMe123!'; // local dev seed password (scripts/seed.ts)
+
+/**
+ * Logout flow ใหม่: ปุ่มออกจากระบบย้ายจากท้าย sidebar ไปอยู่ใน dropdown ของ
+ * avatar มุมขวาบน และต้องยืนยันใน dialog ก่อนออกจริง (กันกดพลาด)
+ */
+async function logoutViaUserMenu(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'เมนูผู้ใช้' }).click();
+  await page.getByRole('menuitem', { name: 'ออกจากระบบ' }).click();
+  await page.getByRole('button', { name: 'ออกจากระบบ' }).click();
+}
 
 test.beforeEach(async () => {
   // § reset rate-limit counter ก่อนแต่ละ test — ทุก test login จาก IP ::1 เดียวกัน
@@ -51,7 +61,7 @@ test('full session lifecycle: login -> dashboard -> bounce-back -> logout -> re-
   await expect(page).toHaveURL(/\/admin$/, { timeout: 10_000 });
 
   // logout clears the session and re-gates the route
-  await page.getByRole('button', { name: 'ออกจากระบบ' }).click();
+  await logoutViaUserMenu(page);
   await expect(page).toHaveURL(/\/admin\/login(\?.*)?$/, { timeout: 10_000 });
 
   await page.goto('/admin');
@@ -102,7 +112,7 @@ test('remember-me is on by default and controls session lifetime (30d vs 1h)', a
     })) as { expiresAt?: number } | null;
     expect(payload?.expiresAt, 'expiresAt claim missing in session JWT').toBeTruthy();
 
-    await page.getByRole('button', { name: 'ออกจากระบบ' }).click();
+    await logoutViaUserMenu(page);
     await expect(page).toHaveURL(/\/admin\/login(\?.*)?$/, { timeout: 10_000 });
     return payload!.expiresAt!;
   }

@@ -9,6 +9,7 @@ import { AdminCard } from '@/components/admin/admin-card';
 import { EmptyState } from '@/components/admin/empty-state';
 import { Pagination } from '@/components/admin/pagination';
 import { RoleBadge } from '@/components/admin/role-badge';
+import { formatThaiDateTime } from '@/lib/thai-date';
 import { AuditFilterBar } from './audit-filter-bar';
 
 export const metadata: Metadata = { title: 'ประวัติการกระทำ' };
@@ -31,13 +32,6 @@ const VALID_RESOURCES = new Set([
   'consent',
   'categories',
 ]);
-
-function formatDateTime(date: Date): string {
-  return new Intl.DateTimeFormat('th-TH', {
-    dateStyle: 'long',
-    timeStyle: 'short',
-  }).format(date);
-}
 
 export default async function AuditPage({
   searchParams,
@@ -182,7 +176,7 @@ export default async function AuditPage({
                     <div className="flex flex-wrap items-center gap-4 text-xs text-muted">
                       <span className="inline-flex items-center gap-1">
                         <Clock className="h-3.5 w-3.5" aria-hidden="true" />
-                        {formatDateTime(row.createdAt)}
+                        {formatThaiDateTime(row.createdAt)}
                       </span>
                       {row.ipAddress && (
                         <span className="inline-flex items-center gap-1">
