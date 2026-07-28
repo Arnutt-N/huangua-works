@@ -3,7 +3,7 @@
  * ใช้ HMAC-SHA256 hash ของ (CID + title + description)
  */
 
-import { getDb } from './db';
+import { getDb, type Db } from './db';
 import { firstOrUndefined } from './db/query-helpers';
 import { dedupHashes } from './db/schema';
 import { generateId } from './id';
@@ -18,14 +18,15 @@ const DEDUP_WINDOW_DAYS = 7;
 export async function checkDuplicate(
   cid: string,
   title: string,
-  description: string
+  description: string,
+  db?: Db,
 ): Promise<{ isDuplicate: boolean; caseId?: string }> {
-  const db = await getDb();
+  const _db = db ?? await getDb();
   const hash = generateDedupHash(cid, title, description);
   const now = Date.now();
 
   const existing = await firstOrUndefined(
-    db
+    _db
       .select()
       .from(dedupHashes)
       .where(and(eq(dedupHashes.hash, hash), gt(dedupHashes.expiresAt, new Date(now))))
@@ -46,13 +47,14 @@ export async function recordDedupHash(
   cid: string,
   title: string,
   description: string,
-  caseId: string
+  caseId: string,
+  db?: Db,
 ): Promise<void> {
-  const db = await getDb();
+  const _db = db ?? await getDb();
   const hash = generateDedupHash(cid, title, description);
   const expiresAt = new Date(Date.now() + DEDUP_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
-  await db.insert(dedupHashes).values({
+  await _db.insert(dedupHashes).values({
     id: generateId(),
     hash,
     caseId,
@@ -63,11 +65,11 @@ export async function recordDedupHash(
 /**
  * ลบ hash ที่หมดอายุ (cleanup — เรียกจาก cron)
  */
-export async function cleanupExpiredHashes(): Promise<number> {
-  const db = await getDb();
+export async function cleanupExpiredHashes(db?: Db): Promise<number> {
+  const _db = db ?? await getDb();
   const now = new Date();
 
-  const result = await db
+  const result = await _db
     .delete(dedupHashes)
     .where(lte(dedupHashes.expiresAt, now));
 

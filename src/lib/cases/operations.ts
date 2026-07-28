@@ -101,7 +101,7 @@ export async function applyCaseUpdate(
         ipAddress: actor.ipAddress,
         userAgent: actor.userAgent,
         metadata: { title: current.title, ...timeline.auditMeta },
-      });
+      }, tx);
     });
   } catch (err) {
     console.error(`[applyCaseUpdate:${patch.kind}] failed`, err);

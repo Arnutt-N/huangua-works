@@ -3,7 +3,7 @@
  * ใช้สำหรับตรวจสอบว่าใครเข้าถึงข้อมูลอะไร เมื่อไร
  */
 
-import { getDb } from './db';
+import { getDb, type DbOrTx } from './db';
 import { auditLogs } from './db/schema';
 import { generateId } from './id';
 import { and, eq, type SQL } from 'drizzle-orm';
@@ -56,10 +56,10 @@ export interface AuditLogEntry {
   metadata?: Record<string, unknown>;
 }
 
-export async function logAudit(entry: AuditLogEntry): Promise<void> {
-  const db = await getDb();
+export async function logAudit(entry: AuditLogEntry, db?: DbOrTx): Promise<void> {
+  const _db = db ?? await getDb();
 
-  await db.insert(auditLogs).values({
+  await _db.insert(auditLogs).values({
     id: generateId(),
     userId: entry.userId,
     action: entry.action,

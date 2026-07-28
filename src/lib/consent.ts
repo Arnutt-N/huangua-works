@@ -3,7 +3,7 @@
  * จัดการความยินยอมในการเก็บ/ใช้/เปิดเผยข้อมูล
  */
 
-import { getDb } from './db';
+import { getDb, type Db } from './db';
 import { consentRecords } from './db/schema';
 import { generateId } from './id';
 import { eq, and, desc } from 'drizzle-orm';
@@ -28,10 +28,10 @@ export interface ConsentGrant {
 /**
  * บันทึกความยินยอม
  */
-export async function grantConsent(grant: ConsentGrant): Promise<void> {
-  const db = await getDb();
+export async function grantConsent(grant: ConsentGrant, db?: Db): Promise<void> {
+  const _db = db ?? await getDb();
 
-  await db.insert(consentRecords).values({
+  await _db.insert(consentRecords).values({
     id: generateId(),
     userId: grant.userId,
     consentType: grant.consentType,
@@ -50,11 +50,12 @@ export async function grantConsent(grant: ConsentGrant): Promise<void> {
 export async function revokeConsent(
   userId: string,
   consentType: ConsentType,
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
+  db?: Db,
 ): Promise<void> {
-  const db = await getDb();
+  const _db = db ?? await getDb();
 
-  await db.insert(consentRecords).values({
+  await _db.insert(consentRecords).values({
     id: generateId(),
     userId,
     consentType,
@@ -70,11 +71,12 @@ export async function revokeConsent(
  */
 export async function hasConsent(
   userId: string,
-  consentType: ConsentType
+  consentType: ConsentType,
+  db?: Db,
 ): Promise<boolean> {
-  const db = await getDb();
+  const _db = db ?? await getDb();
 
-  const rows = await db
+  const rows = await _db
     .select()
     .from(consentRecords)
     .where(and(eq(consentRecords.userId, userId), eq(consentRecords.consentType, consentType)))
@@ -89,10 +91,10 @@ export async function hasConsent(
 /**
  * ดึงประวัติความยินยอมทั้งหมด
  */
-export async function getConsentHistory(userId: string) {
-  const db = await getDb();
+export async function getConsentHistory(userId: string, db?: Db) {
+  const _db = db ?? await getDb();
 
-  return db
+  return _db
     .select()
     .from(consentRecords)
     .where(eq(consentRecords.userId, userId))

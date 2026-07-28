@@ -42,4 +42,7 @@ export async function closeDb(): Promise<void> {
 }
 
 export { schema };
+export type Db = PostgresJsDatabase<typeof schema>;
+export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
+export type DbOrTx = Db | Tx;
 export type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
