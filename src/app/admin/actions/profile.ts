@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { users } from '@/lib/db/schema';
-import { logAudit } from '@/lib/audit';
+import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
 import { hashPassword, verifyPassword } from '@/lib/password';
 import { requireStaff } from '@/lib/auth/require-staff';
 import { checkRateLimit } from '@/lib/upstash';
@@ -56,7 +56,7 @@ export async function updateProfile(
 
     await logAudit({
       userId: actor.id,
-      action: 'profile_update',
+      action: AUDIT_ACTIONS.PROFILE_UPDATE,
       resource: 'users',
       resourceId: actor.id,
       ipAddress,
@@ -112,7 +112,7 @@ export async function changeOwnPassword(
   if (!ok) {
     await logAudit({
       userId: actor.id,
-      action: 'password_change_failure',
+      action: AUDIT_ACTIONS.PASSWORD_CHANGE_FAILURE,
       resource: 'auth',
       resourceId: actor.id,
       ipAddress,
@@ -131,7 +131,7 @@ export async function changeOwnPassword(
 
     await logAudit({
       userId: actor.id,
-      action: 'password_change',
+      action: AUDIT_ACTIONS.PASSWORD_CHANGE,
       resource: 'auth',
       resourceId: actor.id,
       ipAddress,

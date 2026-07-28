@@ -30,7 +30,7 @@ import { eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { cases, caseUpdates } from '@/lib/db/schema';
-import { logAudit } from '@/lib/audit';
+import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
 import { generateId } from '@/lib/id';
 import { requireStaff } from '@/lib/auth/require-staff';
 import { assertTransition, type CaseStatus } from '@/lib/cases/state-machine';
@@ -71,7 +71,7 @@ export async function PATCH(
   ) {
     await logAudit({
       userId: user.id,
-      action: 'access_denied',
+      action: AUDIT_ACTIONS.ACCESS_DENIED,
       resource: 'cases',
       resourceId: caseId,
       ipAddress,
@@ -220,7 +220,7 @@ export async function PATCH(
 
       await logAudit({
         userId: user.id,
-        action: 'patch_case',
+        action: AUDIT_ACTIONS.PATCH_CASE,
         resource: 'cases',
         resourceId: caseId,
         ipAddress,

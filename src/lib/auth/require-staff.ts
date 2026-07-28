@@ -5,7 +5,7 @@ import { auth, signOut } from '@/auth';
 import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { users, type userRoleEnum } from '@/lib/db/schema';
-import { logAudit } from '@/lib/audit';
+import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
 
 type UserRole = (typeof userRoleEnum.enumValues)[number];
 
@@ -66,7 +66,7 @@ export async function requireStaff(allowedRoles?: readonly UserRole[]): Promise<
     // § ต้อง signOut ก่อน redirect ไม่งั้น cookie ยังอยู่ → proxy bounce กลับ → วนลูป (H1)
     await signOut({ redirect: false });
     await logAudit({
-      action: 'access_denied',
+      action: AUDIT_ACTIONS.ACCESS_DENIED,
       resource: 'auth',
       userId: staffUser?.id,
       ipAddress,
@@ -85,7 +85,7 @@ export async function requireStaff(allowedRoles?: readonly UserRole[]): Promise<
   // role whitelist check (optional)
   if (allowedRoles && !allowedRoles.includes(staffUser.role)) {
     await logAudit({
-      action: 'access_denied',
+      action: AUDIT_ACTIONS.ACCESS_DENIED,
       resource: 'auth',
       userId: staffUser.id,
       ipAddress,

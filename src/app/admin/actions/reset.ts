@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { users } from '@/lib/db/schema';
-import { logAudit } from '@/lib/audit';
+import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
 import { hashPassword } from '@/lib/password';
 import { getClientIp, getClientUserAgent } from '@/lib/auth/require-staff';
 import { checkRateLimit } from '@/lib/upstash';
@@ -104,7 +104,7 @@ export async function requestPasswordReset(
         buildResetEmailHtml(user.fullName, resetUrl),
       );
       await logAudit({
-        action: 'password_reset_requested',
+        action: AUDIT_ACTIONS.PASSWORD_RESET_REQUESTED,
         resource: 'auth',
         userId: user.id,
         ipAddress: ip,
@@ -114,7 +114,7 @@ export async function requestPasswordReset(
       // § ส่งอีเมล/DB ล้มเหลว — ไม่บอกผู้ใช้ (กัน enumeration) แต่ log ให้ operator
       console.error('[requestPasswordReset] failed to issue/send reset', err);
       await logAudit({
-        action: 'password_reset_failure',
+        action: AUDIT_ACTIONS.PASSWORD_RESET_FAILURE,
         resource: 'auth',
         userId: user.id,
         ipAddress: ip,
@@ -125,7 +125,7 @@ export async function requestPasswordReset(
   } else {
     // ไม่เข้าเงื่อนไข (ไม่มี user / citizen / inactive) — ไม่ส่งลิงก์ แต่คืนค่าเดียวกัน
     await logAudit({
-      action: 'password_reset_requested',
+      action: AUDIT_ACTIONS.PASSWORD_RESET_REQUESTED,
       resource: 'auth',
       ipAddress: ip,
       userAgent,
@@ -162,7 +162,7 @@ export async function completePasswordReset(
   const tokenRow = await validateResetToken(token);
   if (!tokenRow) {
     await logAudit({
-      action: 'password_reset_failure',
+      action: AUDIT_ACTIONS.PASSWORD_RESET_FAILURE,
       resource: 'auth',
       ipAddress: ip,
       userAgent,
@@ -183,7 +183,7 @@ export async function completePasswordReset(
 
   if (!user || user.role === 'citizen' || !user.isActive) {
     await logAudit({
-      action: 'password_reset_failure',
+      action: AUDIT_ACTIONS.PASSWORD_RESET_FAILURE,
       resource: 'auth',
       userId: tokenRow.userId,
       ipAddress: ip,
@@ -204,7 +204,7 @@ export async function completePasswordReset(
     await consumeResetToken(tokenRow.id);
 
     await logAudit({
-      action: 'password_reset_success',
+      action: AUDIT_ACTIONS.PASSWORD_RESET_SUCCESS,
       resource: 'auth',
       userId: user.id,
       ipAddress: ip,

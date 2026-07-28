@@ -2,7 +2,7 @@
 
 import { eq } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
-import { logAudit } from '@/lib/audit';
+import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
 import { auth, signIn, signOut } from '@/auth';
 import { CredentialsSignin } from 'next-auth';
 import { getDb } from '@/lib/db';
@@ -75,7 +75,7 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
     // กลายเป็น 500 ทั้งหน้า (dev ไม่ minify จึงไม่เกิด — เจอใน prod อย่างเดียว)
     if (!(err instanceof CredentialsSignin)) throw err;
     await logAudit({
-      action: 'login_failure',
+      action: AUDIT_ACTIONS.LOGIN_FAILURE,
       resource: 'auth',
       ipAddress: ip,
       metadata: { email: normalizedEmail, reason: 'invalid_credentials' },
@@ -99,7 +99,7 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
     // § ใช้ access_denied (ไม่ใช่ login_failure) เพราะตัวตนยืนยันผ่านแล้ว — ปฏิเสธการเข้าถึง
     // (login_failure เก็บไว้สำหรับ credential ไม่ถูก เพื่อให้ SIEM คำนวณ brute-force rate แยกจาก suspended-login)
     await logAudit({
-      action: 'access_denied',
+      action: AUDIT_ACTIONS.ACCESS_DENIED,
       resource: 'auth',
       userId: staffUser?.id,
       ipAddress: ip,
@@ -116,7 +116,7 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
   }
 
   await logAudit({
-    action: 'login_success',
+    action: AUDIT_ACTIONS.LOGIN_SUCCESS,
     resource: 'auth',
     userId: staffUser.id,
     ipAddress: ip,
@@ -136,7 +136,7 @@ export async function logout(): Promise<void> {
   await signOut({ redirect: false });
 
   await logAudit({
-    action: 'logout',
+    action: AUDIT_ACTIONS.LOGOUT,
     resource: 'auth',
     userId: session?.user.userId,
     metadata: session?.user ? { email: session.user.email } : undefined,

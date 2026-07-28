@@ -16,7 +16,7 @@ import { and, eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { cases, users } from '@/lib/db/schema';
-import { logAudit } from '@/lib/audit';
+import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
 import { checkRateLimit } from '@/lib/upstash';
 import { normalizeTrackingCode } from '@/lib/case-tracking';
 import { generateCidHash } from '@/lib/cid-hmac';
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
   if (userRow.email !== cidEmail) {
     // CID ไม่ตรงกับเจ้าของเคส — ไม่เปิดเผยข้อมูล
     await logAudit({
-      action: 'consent_withdraw_denied',
+      action: AUDIT_ACTIONS.CONSENT_WITHDRAW_DENIED,
       resource: 'consent',
       resourceId: caseRow.id,
       ipAddress: ip,
@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
 
   await logAudit({
     userId: userRow.id,
-    action: 'consent_withdrawn',
+    action: AUDIT_ACTIONS.CONSENT_WITHDRAWN,
     resource: 'consent',
     resourceId: caseRow.id,
     ipAddress: ip,

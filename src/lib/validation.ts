@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ALL_STATUSES } from './cases/state-machine';
 
 /**
  * Validation schemas — source of truth สำหรับทุก input boundary
@@ -89,15 +90,7 @@ export const trackingCodeSchema = z
 // § Enums (mirror DB pgEnum)
 // ────────────────────────────────────────────────────────────────────────────
 
-export const caseStatusSchema = z.enum([
-  'received',
-  'reviewing',
-  'assigned',
-  'in_progress',
-  'done',
-  'closed',
-  'rejected',
-]);
+export const caseStatusSchema = z.enum(ALL_STATUSES);
 
 export const casePrioritySchema = z.enum(['normal', 'urgent']);
 

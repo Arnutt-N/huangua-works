@@ -5,7 +5,7 @@ import { and, eq, ne, or } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { categories, departments } from '@/lib/db/schema';
-import { logAudit } from '@/lib/audit';
+import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
 import { generateId } from '@/lib/id';
 import { requireStaff } from '@/lib/auth/require-staff';
 import {
@@ -87,7 +87,7 @@ export async function saveDepartment(
     }
     await logAudit({
       userId: actor.id,
-      action: id ? 'department_update' : 'department_create',
+      action: id ? AUDIT_ACTIONS.DEPARTMENT_UPDATE : AUDIT_ACTIONS.DEPARTMENT_CREATE,
       resource: 'departments',
       resourceId: id,
       ipAddress,
@@ -174,7 +174,7 @@ export async function saveCategory(
     }
     await logAudit({
       userId: actor.id,
-      action: id ? 'category_update' : 'category_create',
+      action: id ? AUDIT_ACTIONS.CATEGORY_UPDATE : AUDIT_ACTIONS.CATEGORY_CREATE,
       resource: 'categories',
       resourceId: id,
       ipAddress,
@@ -213,7 +213,9 @@ export async function toggleActive(formData: FormData): Promise<void> {
 
   await logAudit({
     userId: actor.id,
-    action: next ? `${kind}_activate` : `${kind}_deactivate`,
+    action: next
+      ? (kind === 'department' ? AUDIT_ACTIONS.DEPARTMENT_ACTIVATE : AUDIT_ACTIONS.CATEGORY_ACTIVATE)
+      : (kind === 'department' ? AUDIT_ACTIONS.DEPARTMENT_DEACTIVATE : AUDIT_ACTIONS.CATEGORY_DEACTIVATE),
     resource: kind === 'department' ? 'departments' : 'categories',
     resourceId: id,
     ipAddress,

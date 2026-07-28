@@ -6,7 +6,7 @@ import { eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { cases, caseUpdates } from '@/lib/db/schema';
-import { logAudit } from '@/lib/audit';
+import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
 import { generateId } from '@/lib/id';
 import { requireStaff } from '@/lib/auth/require-staff';
 import {
@@ -104,7 +104,7 @@ export async function changeStatus(
 
       await logAudit({
         userId: user.id,
-        action: 'update_case_status',
+        action: AUDIT_ACTIONS.UPDATE_CASE_STATUS,
         resource: 'cases',
         resourceId: caseId,
         ipAddress,
@@ -181,7 +181,7 @@ export async function assignOfficer(
 
       await logAudit({
         userId: user.id,
-        action: 'assign_case',
+        action: AUDIT_ACTIONS.ASSIGN_CASE,
         resource: 'cases',
         resourceId: caseId,
         ipAddress,
@@ -262,7 +262,7 @@ export async function changeDepartment(
 
       await logAudit({
         userId: user.id,
-        action: 'change_case_department',
+        action: AUDIT_ACTIONS.CHANGE_CASE_DEPARTMENT,
         resource: 'cases',
         resourceId: caseId,
         ipAddress,
@@ -339,7 +339,7 @@ export async function setPriority(
 
       await logAudit({
         userId: user.id,
-        action: 'update_case_priority',
+        action: AUDIT_ACTIONS.UPDATE_CASE_PRIORITY,
         resource: 'cases',
         resourceId: caseId,
         ipAddress,
@@ -409,7 +409,7 @@ export async function addUpdate(
 
       await logAudit({
         userId: user.id,
-        action: 'add_case_comment',
+        action: AUDIT_ACTIONS.ADD_CASE_COMMENT,
         resource: 'cases',
         resourceId: caseId,
         ipAddress,

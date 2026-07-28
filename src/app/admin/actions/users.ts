@@ -6,7 +6,7 @@ import { eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { users, userRoleEnum } from '@/lib/db/schema';
-import { logAudit } from '@/lib/audit';
+import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
 import { generateId } from '@/lib/id';
 import { hashPassword } from '@/lib/password';
 import { requireStaff } from '@/lib/auth/require-staff';
@@ -80,7 +80,7 @@ export async function createUser(
 
     await logAudit({
       userId: actor.id,
-      action: 'create_user',
+      action: AUDIT_ACTIONS.CREATE_USER,
       resource: 'users',
       resourceId: newUserId,
       ipAddress,
@@ -140,7 +140,7 @@ export async function toggleUserActive(
 
     await logAudit({
       userId: actor.id,
-      action: newActive ? 'activate_user' : 'deactivate_user',
+      action: newActive ? AUDIT_ACTIONS.ACTIVATE_USER : AUDIT_ACTIONS.DEACTIVATE_USER,
       resource: 'users',
       resourceId: userId,
       ipAddress,
@@ -199,7 +199,7 @@ export async function updateUserRole(
 
     await logAudit({
       userId: actor.id,
-      action: 'update_user_role',
+      action: AUDIT_ACTIONS.UPDATE_USER_ROLE,
       resource: 'users',
       resourceId: userId,
       ipAddress,
@@ -257,7 +257,7 @@ export async function resetPassword(
 
     await logAudit({
       userId: actor.id,
-      action: 'reset_user_password',
+      action: AUDIT_ACTIONS.RESET_USER_PASSWORD,
       resource: 'users',
       resourceId: userId,
       ipAddress,

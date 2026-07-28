@@ -16,7 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { cases, caseUpdates, categories } from '@/lib/db/schema';
-import { logAudit } from '@/lib/audit';
+import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
 import { checkRateLimit } from '@/lib/upstash';
 import { normalizeTrackingCode } from '@/lib/case-tracking';
 import { hasConsent } from '@/lib/consent';
@@ -80,7 +80,7 @@ export async function GET(
 
   // § Audit log
   await logAudit({
-    action: 'view_case',
+    action: AUDIT_ACTIONS.VIEW_CASE,
     resource: 'cases',
     resourceId: caseRecord.id,
     ipAddress: ip,

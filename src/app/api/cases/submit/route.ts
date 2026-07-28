@@ -11,7 +11,7 @@ import { cases, categories, users } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import { isValidCid } from '@/lib/cid-checksum';
 import { checkDuplicate, recordDedupHash } from '@/lib/dedup';
-import { logAudit } from '@/lib/audit';
+import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
 import { checkRateLimit } from '@/lib/upstash';
 import { getFiscalYear } from '@/lib/thai-date';
 import { generateTrackingCode } from '@/lib/case-tracking';
@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
   // § Audit log
   await logAudit({
     userId: citizenUser.id,
-    action: 'submit_case',
+    action: AUDIT_ACTIONS.SUBMIT_CASE,
     resource: 'cases',
     resourceId: caseId,
     ipAddress: ip,

@@ -17,14 +17,18 @@
  * - สถานะปลายทาง (closed/rejected) ไม่อนุญาตให้เปลี่ยนอีก (ต้อง reopen ผ่าน superadmin เท่านั้น)
  */
 
-export type CaseStatus =
-  | 'received'
-  | 'reviewing'
-  | 'assigned'
-  | 'in_progress'
-  | 'done'
-  | 'closed'
-  | 'rejected';
+/** Single source of truth — ทุก enum/type/schema derive จากที่นี่ */
+export const ALL_STATUSES = [
+  'received',
+  'reviewing',
+  'assigned',
+  'in_progress',
+  'done',
+  'closed',
+  'rejected',
+] as const;
+
+export type CaseStatus = (typeof ALL_STATUSES)[number];
 
 /** terminal states — ไม่สามารถเปลี่ยนต่อได้ (ต้อง reopen) */
 export const TERMINAL_STATUSES: readonly CaseStatus[] = ['closed', 'rejected'];
@@ -106,13 +110,5 @@ export const STATUS_LABELS_TH: Record<CaseStatus, string> = {
   rejected: 'ไม่ดำเนินการ',
 };
 
-/** รายการ status ทั้งหมด เรียงตาม state machine (สำหรับ dropdown) */
-export const ALL_STATUSES_ORDERED: readonly CaseStatus[] = [
-  'received',
-  'reviewing',
-  'assigned',
-  'in_progress',
-  'done',
-  'closed',
-  'rejected',
-];
+/** @deprecated ใช้ ALL_STATUSES แทน */
+export const ALL_STATUSES_ORDERED = ALL_STATUSES;

@@ -11,6 +11,7 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
+import { ALL_STATUSES } from '../cases/state-machine';
 
 /**
  * Schema — อบต.หัวงัว citizen-help (PostgreSQL)
@@ -36,15 +37,7 @@ export const userRoleEnum = pgEnum('user_role', [
   'superadmin',
 ]);
 
-export const caseStatusEnum = pgEnum('case_status', [
-  'received',
-  'reviewing',
-  'assigned',
-  'in_progress',
-  'done',
-  'closed',
-  'rejected',
-]);
+export const caseStatusEnum = pgEnum('case_status', ALL_STATUSES);
 
 export const casePriorityEnum = pgEnum('case_priority', ['normal', 'urgent']);
 

@@ -6,11 +6,49 @@
 import { getDb } from './db';
 import { auditLogs } from './db/schema';
 import { generateId } from './id';
-import { eq } from 'drizzle-orm';
+import { and, eq, type SQL } from 'drizzle-orm';
+
+export const AUDIT_ACTIONS = {
+  ACCESS_DENIED: 'access_denied',
+  LOGIN_SUCCESS: 'login_success',
+  LOGIN_FAILURE: 'login_failure',
+  LOGOUT: 'logout',
+  SUBMIT_CASE: 'submit_case',
+  VIEW_CASE: 'view_case',
+  PATCH_CASE: 'patch_case',
+  UPDATE_CASE_STATUS: 'update_case_status',
+  ASSIGN_CASE: 'assign_case',
+  CHANGE_CASE_DEPARTMENT: 'change_case_department',
+  UPDATE_CASE_PRIORITY: 'update_case_priority',
+  ADD_CASE_COMMENT: 'add_case_comment',
+  CREATE_USER: 'create_user',
+  UPDATE_USER_ROLE: 'update_user_role',
+  RESET_USER_PASSWORD: 'reset_user_password',
+  PROFILE_UPDATE: 'profile_update',
+  PASSWORD_CHANGE: 'password_change',
+  PASSWORD_CHANGE_FAILURE: 'password_change_failure',
+  PASSWORD_RESET_REQUESTED: 'password_reset_requested',
+  PASSWORD_RESET_FAILURE: 'password_reset_failure',
+  PASSWORD_RESET_SUCCESS: 'password_reset_success',
+  CONSENT_WITHDRAWN: 'consent_withdrawn',
+  CONSENT_WITHDRAW_DENIED: 'consent_withdraw_denied',
+  DEPARTMENT_CREATE: 'department_create',
+  DEPARTMENT_UPDATE: 'department_update',
+  DEPARTMENT_ACTIVATE: 'department_activate',
+  DEPARTMENT_DEACTIVATE: 'department_deactivate',
+  CATEGORY_CREATE: 'category_create',
+  CATEGORY_UPDATE: 'category_update',
+  CATEGORY_ACTIVATE: 'category_activate',
+  CATEGORY_DEACTIVATE: 'category_deactivate',
+  ACTIVATE_USER: 'activate_user',
+  DEACTIVATE_USER: 'deactivate_user',
+} as const;
+
+export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
 
 export interface AuditLogEntry {
   userId?: string;
-  action: string;
+  action: AuditAction;
   resource: string;
   resourceId?: string;
   ipAddress?: string;
@@ -18,9 +56,6 @@ export interface AuditLogEntry {
   metadata?: Record<string, unknown>;
 }
 
-/**
- * บันทึก audit log
- */
 export async function logAudit(entry: AuditLogEntry): Promise<void> {
   const db = await getDb();
 
@@ -36,9 +71,6 @@ export async function logAudit(entry: AuditLogEntry): Promise<void> {
   });
 }
 
-/**
- * Query audit logs (สำหรับ admin dashboard)
- */
 export async function getAuditLogs(filters: {
   userId?: string;
   action?: string;
@@ -49,18 +81,15 @@ export async function getAuditLogs(filters: {
   const db = await getDb();
   const { userId, action, resource, limit = 50, offset = 0 } = filters;
 
-  let query = db.select().from(auditLogs);
+  const conditions: SQL[] = [];
+  if (userId) conditions.push(eq(auditLogs.userId, userId));
+  if (action) conditions.push(eq(auditLogs.action, action));
+  if (resource) conditions.push(eq(auditLogs.resource, resource));
 
-  if (userId) {
-    query = query.where(eq(auditLogs.userId, userId)) as typeof query;
-  }
+  const query = db.select().from(auditLogs);
 
-  if (action) {
-    query = query.where(eq(auditLogs.action, action)) as typeof query;
-  }
-
-  if (resource) {
-    query = query.where(eq(auditLogs.resource, resource)) as typeof query;
+  if (conditions.length > 0) {
+    return await query.where(and(...conditions)).limit(limit).offset(offset);
   }
 
   return await query.limit(limit).offset(offset);
