@@ -11,7 +11,6 @@ import { generateId } from '@/lib/id';
 import { requireStaff } from '@/lib/auth/require-staff';
 import {
   assertTransition,
-  STATUS_LABELS_TH,
   type CaseStatus,
 } from '@/lib/cases/state-machine';
 import {
@@ -431,9 +430,3 @@ export async function addUpdate(
 
   redirect(`/admin/cases/${caseId}?ok=comment`);
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// helper: แปลง status enum เป็น label ไทย (export สำหรับ UI)
-// ────────────────────────────────────────────────────────────────────────────
-
-export { STATUS_LABELS_TH };

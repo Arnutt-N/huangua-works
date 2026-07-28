@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard,
+  ClipboardList,
   BarChart3,
   Users,
   ScrollText,
@@ -47,8 +47,8 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
   {
     label: 'งานหลัก',
     items: [
-      { key: 'dashboard', label: 'แดชบอร์ด', href: '/admin', icon: LayoutDashboard },
-      { key: 'reports', label: 'รายงานสรุป', href: '/admin/reports', icon: BarChart3 },
+      { key: 'dashboard', label: 'แดชบอร์ด', href: '/admin', icon: BarChart3 },
+      { key: 'reports', label: 'จัดการคำร้อง / แจ้งเหตุ', href: '/admin/reports', icon: ClipboardList },
     ],
   },
   {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { Search, X, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -16,13 +16,13 @@ import { STATUS_LABELS_TH } from '@/lib/cases/state-machine';
 import type { CaseStatus } from '@/lib/cases/state-machine';
 
 /**
- * CaseFilterBar — filter สำหรับ /admin dashboard
+ * CaseFilterBar — filter สำหรับหน้าคิวเรื่อง
  *
  * ใช้ URL search params เป็น source of truth (bookmarkable + shareable)
  * ส่ง form แบบ GET → Next.js searchParams อ่านที่ server
  *
  * ทุกการเปลี่ยน filter จะ reset page=1 (ไม่ค้างหน้าเดิม)
- * ปุ่ม "ล้าง" กลับไป /admin เปล่า
+ * ปุ่ม "ล้าง" กลับไป path ปัจจุบันแบบไม่มี params (ไม่ hardcode path)
  *
  * Props: categories (สำหรับ dropdown) — ส่งจาก server component
  */
@@ -54,6 +54,7 @@ const PRIORITY_OPTIONS = [
 
 export function CaseFilterBar({ categories }: { categories: CategoryOption[] }) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
@@ -79,8 +80,9 @@ export function CaseFilterBar({ categories }: { categories: CategoryOption[] }) 
       params.set(key, value);
     }
     params.delete('page'); // reset pagination เมื่อ filter เปลี่ยน
+    const query = params.toString();
     startTransition(() => {
-      router.push(`/admin?${params.toString()}`);
+      router.push(query ? `${pathname}?${query}` : pathname);
     });
   }
 
@@ -92,7 +94,7 @@ export function CaseFilterBar({ categories }: { categories: CategoryOption[] }) 
   function handleClear() {
     setQ('');
     startTransition(() => {
-      router.push('/admin');
+      router.push(pathname);
     });
   }
 

@@ -182,14 +182,14 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
   );
 
   return (
-    <AdminShell user={staffUser} active="dashboard" title="รายละเอียดเรื่อง">
+    <AdminShell user={staffUser} active="reports" title="รายละเอียดเรื่อง">
       {/* breadcrumb */}
       <Link
-        href="/admin"
+        href="/admin/reports"
         className="inline-flex min-h-touch items-center gap-2 text-sm font-medium text-muted transition-colors hover:text-accent-strong"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        กลับไปแดชบอร์ด
+        กลับไปหน้าจัดการคำร้อง
       </Link>
 
       <SuccessToast ok={ok ?? null} />
