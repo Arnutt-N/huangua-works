@@ -14,9 +14,10 @@ import { POST } from './route';
  * ip แต่ละ test derive จาก Date.now() ตอนไฟล์นี้ load เพื่อไม่ให้ rate-limit
  * ค้างข้ามการรันซ้ำ (5 นาที window) — เลข offset คงที่แค่กันชนกันเองภายในรันเดียว
  */
-const RUN_SEED = (Date.now() % 200) + 10;
+const RUN_SEED = Date.now() % 60000;
 function testIp(offset: number): string {
-  return `203.0.113.${((RUN_SEED + offset) % 250) + 1}`;
+  const n = (RUN_SEED + offset * 97) % 65000;
+  return `203.0.${Math.floor(n / 255) + 1}.${(n % 255) + 1}`;
 }
 
 const VALID_CID = '1101200563040';

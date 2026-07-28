@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { NextRequest } from 'next/server';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { closeDb, getDb } from '@/lib/db';
-import { caseUpdates, cases, categories, users } from '@/lib/db/schema';
+import { caseUpdates, cases, categories, consentRecords, users } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import { GET } from './route';
 
@@ -12,8 +12,14 @@ let testUserId: string;
 let testCaseId: string;
 let categoryId: string;
 
+const RUN_SEED = Date.now() % 60000;
+const TEST_IP = `203.0.${Math.floor(RUN_SEED / 255) + 1}.${(RUN_SEED % 255) + 1}`;
+
 function buildRequest(id: string): NextRequest {
-  return new NextRequest(`http://localhost:3000/api/cases/${id}`, { method: 'GET' });
+  return new NextRequest(`http://localhost:3000/api/cases/${id}`, {
+    method: 'GET',
+    headers: { 'x-forwarded-for': TEST_IP },
+  });
 }
 
 beforeAll(async () => {
@@ -30,6 +36,14 @@ beforeAll(async () => {
     role: 'citizen',
     isActive: true,
     fullName: 'ผู้แจ้งทดสอบ Integration',
+  });
+
+  await db.insert(consentRecords).values({
+    id: generateId(),
+    userId: testUserId,
+    consentType: 'data_collection',
+    version: '1.0',
+    isGranted: true,
   });
 
   testCaseId = generateId();
@@ -70,6 +84,7 @@ afterAll(async () => {
   const db = await getDb();
   await db.delete(caseUpdates).where(eq(caseUpdates.caseId, testCaseId));
   await db.delete(cases).where(eq(cases.id, testCaseId));
+  await db.delete(consentRecords).where(eq(consentRecords.userId, testUserId));
   await db.delete(users).where(eq(users.id, testUserId));
   await closeDb();
 });
