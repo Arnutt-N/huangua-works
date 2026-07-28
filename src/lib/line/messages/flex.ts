@@ -2,6 +2,7 @@ import type { LineOutgoingMessage } from '../types';
 
 export function caseStatusFlex(trackingCode: string, status: string, title: string): LineOutgoingMessage {
   const statusLabels: Record<string, string> = {
+    pending: 'รอรับเรื่อง',
     received: 'รับเรื่องแล้ว',
     reviewing: 'กำลังตรวจสอบ',
     assigned: 'มอบหมายแล้ว',
@@ -12,6 +13,7 @@ export function caseStatusFlex(trackingCode: string, status: string, title: stri
   };
 
   const statusColors: Record<string, string> = {
+    pending: '#9B9B9B',
     received: '#4A90D9',
     reviewing: '#F5A623',
     assigned: '#7B68EE',

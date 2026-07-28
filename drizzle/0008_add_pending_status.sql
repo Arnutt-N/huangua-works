@@ -1,0 +1,1 @@
+ALTER TYPE "public"."case_status" ADD VALUE 'pending' BEFORE 'received';

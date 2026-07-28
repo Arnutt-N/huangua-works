@@ -35,6 +35,7 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: 'all', label: 'ทุกสถานะ' },
   ...(
     [
+      'pending',
       'received',
       'reviewing',
       'assigned',

@@ -30,7 +30,7 @@ interface TimelineEntry {
 }
 
 function buildTimeline(detail: CaseDetail): TimelineEntry[] {
-  const entries: TimelineEntry[] = [{ status: 'received', at: detail.case.createdAt }];
+  const entries: TimelineEntry[] = [{ status: 'pending', at: detail.case.createdAt }];
   for (const u of detail.updates) {
     if (u.updateType === 'status_change' && u.newValue) {
       entries.push({ status: u.newValue as CaseStatus, at: u.createdAt });

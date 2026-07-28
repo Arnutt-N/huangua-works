@@ -46,8 +46,8 @@ describe('caseStatusFlex', () => {
     expect(msg.altText).toContain('unknown_status');
   });
 
-  it('maps all 7 known statuses to Thai labels', () => {
-    const statuses = ['received', 'reviewing', 'assigned', 'in_progress', 'done', 'closed', 'rejected'];
+  it('maps all 8 known statuses to Thai labels', () => {
+    const statuses = ['pending', 'received', 'reviewing', 'assigned', 'in_progress', 'done', 'closed', 'rejected'];
     for (const s of statuses) {
       const msg = asFlex(caseStatusFlex('HN000000000', s, 't'));
       expect(msg.altText).not.toContain(s + ':');
