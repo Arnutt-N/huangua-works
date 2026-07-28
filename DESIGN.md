@@ -406,6 +406,68 @@ Breakpoints = ค่า default ของ Tailwind v4 (ไม่ได้ overri
 - Card grid: `grid sm:grid-cols-2 lg:grid-cols-3 gap-6`
 - ความกว้างที่ต้องเทสต์: 320 / 768 / 1024 / 1440 × {light, dark}
 
+### Layout Patterns (ภาพตัวอย่าง)
+
+Wireframe ASCII + className จริง — ให้ agent สร้างเลย์เอาต์ตามได้โดยไม่ต้องดูรูป
+
+**1) Hero 2 คอลัมน์ (lg ขึ้นไป) — ซ้ายข้อความ/CTA, ขวา tracking demo card:**
+```
+┌───────────────────────────┬───────────────────────────┐
+│  badge                    │      ┌───────────────┐    │
+│  H1 gradient-text         │      │ tracking demo │    │
+│  subtitle + description   │      │ card (.glass) │    │
+│  [service chips]          │      │  floating     │    │
+│  [CTA primary][outline]   │      └───────────────┘    │
+│  trust badges             │                           │
+└───────────────────────────┴───────────────────────────┘
+        grid lg:grid-cols-2 gap-10 items-center
+```
+```tsx
+<div className="container mx-auto px-4 relative z-10">
+  <div className="grid lg:grid-cols-2 gap-10 items-center">
+    <div>{/* text + CTA + chips */}</div>
+    <HeroTrackingCard />
+  </div>
+</div>
+```
+ต่ำกว่า `lg` = stack คอลัมน์เดียว (ข้อความก่อน, card ทีหลัง)
+
+**2) Card grid (responsive 1/2/3 คอลัมน์):**
+```
+mobile(<sm)      tablet(sm–lg)        desktop(≥lg)
+┌────┐          ┌────┬────┐          ┌────┬────┬────┐
+│card│          │card│card│          │card│card│card│
+└────┘          ├────┼────┤          └────┴────┴────┘
+┌────┐          │card│card│           grid sm:grid-cols-2
+└────┘          └────┴────┘                lg:grid-cols-3 gap-6
+```
+```tsx
+<div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+  <div className="glass rounded-lg p-6 shadow-lg">…</div>
+</div>
+```
+
+**3) Admin shell (lg ขึ้นไป) — sidebar ถาวร + content:**
+```
+┌──────────┬──────────────────────────────────┐
+│ sidebar  │  topbar (h-16, breadcrumb/user)  │
+│ งานหลัก  ├──────────────────────────────────┤
+│ แชท LINE │                                  │
+│ ระบบ     │  content (glass-panel cards)     │
+│ ───────  │                                  │
+│ โปรไฟล์  │                                  │
+└──────────┴──────────────────────────────────┘
+ sidebar = fixed/col; ต่ำกว่า lg พับเป็น drawer (hamburger)
+```
+```tsx
+{/* sidebar = glass-panel fixed + เลื่อนเข้า/ออกด้วย translate (drawer);
+    แสดงถาวรตั้งแต่ lg ด้วย lg:translate-x-0, ย่อได้เป็น lg:w-[4.5rem] */}
+<aside className="glass-panel fixed inset-y-0 left-0 z-50 flex flex-col border-r shadow-lg
+                  w-72 -translate-x-full lg:translate-x-0 lg:w-64 …">…</aside>
+{/* content เว้นที่ตาม sidebar (ย่อแล้ว = lg:pl-[4.5rem]) */}
+<div className="flex min-h-screen flex-col lg:pl-64">…<main className="flex-1">{children}</main></div>
+```
+
 **Landing Page Structure (อ้างอิง glm5-2-smart-service):**
 ```tsx
 <main>
