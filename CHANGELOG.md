@@ -5,6 +5,12 @@
 
 ## [2026-07-28]
 
+- **fix(auth): wrong-password login 500 in prod (minified err.name check)** ([PR #39](https://github.com/Arnutt-N/huangua-works/pull/39))
+  - Production incident: กรอกรหัสผ่านผิดแล้วหน้า login 500 ทั้งหน้า (เกิดเฉพาะ prod — dev ไม่เป็น)
+  - ต้นเหตุ: `@auth/core` ตั้ง `error.name` จาก `constructor.name` ซึ่งโดน minify เปลี่ยนชื่อใน prod build → เทียบ `err.name === 'CredentialsSignin'` ไม่ตรง → re-throw กลายเป็น 500
+  - แก้เป็น `instanceof CredentialsSignin` (next-auth re-export class object เดียวกัน — ปลอดภัยจาก minification)
+  - ฟื้น audit log `login_failure` ที่เคยถูกข้ามเพราะ error หลุดก่อนถึงจุดบันทึก; ยืนยันบน production build จริง (ผิด→200+alert, ถูก→redirect `/admin`)
+- **docs(changelog): start CHANGELOG.md with auth fixes** ([PR #38](https://github.com/Arnutt-N/huangua-works/pull/38))
 - **fix(auth): in-button login spinner + remember-me checked by default** ([PR #37](https://github.com/Arnutt-N/huangua-works/pull/37))
   - Spinner + "กำลังเข้าระบบ..." ย้ายเข้าไปในปุ่ม submit แล้ว redirect ไป `/admin` โดยตรง — เลิกแสดงการ์ด spinner แทนที่ทั้งฟอร์ม
   - "จดจำฉัน" ติ๊กเป็นค่าเริ่มต้น (session 30 วัน) — แก้อาการ "remember me แต่ไม่ keep me" ที่ไม่ติ๊กมาทำให้ session หมดอายุใน 1 ชม. (JWT `expiresAt` claim)
