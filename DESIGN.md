@@ -345,23 +345,25 @@ export function Hero() {
 
 ### Input / Form Field
 
-Primitives อยู่ที่ `src/components/ui/field.tsx` (`Field` = label + input + error ในตัว):
+Primitives อยู่ที่ `src/components/ui/field.tsx` — แยกเป็น `Input` / `Textarea` / `Label` / `FieldError` / `FieldHint` (ไม่มี composite `Field`; ประกอบเองในฟอร์ม):
 
 ```tsx
-// label อยู่เหนือ field เสมอ (ไม่ float label — ผู้สูงอายุอ่านยาก)
-<Field label="อีเมล" name="email" type="email" icon={Mail} required />
+<Label htmlFor="email">อีเมล</Label>
+<Input id="email" name="email" type="email" icon={Mail} invalid={!!error} aria-describedby={error ? 'email-err' : undefined} />
+{error && <FieldError id="email-err">{error}</FieldError>}
 ```
 
-- **Icon:** prop `icon?: LucideIcon` — ไอคอนอยู่ซ้ายของ input (`pl-11`, icon `left-3.5`)
+- **Label:** อยู่เหนือ field เสมอ (`block mb-1.5`, ไม่ float label — ผู้สูงอายุอ่านยาก), ห้ามใช้ placeholder แทน label
+- **Icon:** prop `icon?: LucideIcon` — ไอคอนอยู่ซ้ายของ input (`pl-11`, icon `left-3.5`, `text-muted`)
 - **Focus:** `focus:border-accent-strong` + `focus-visible:ring-accent-strong/35` (emerald เท่านั้น — The One Emerald Rule)
-- **Error state:** `border-danger bg-danger-soft/40` + ข้อความ error สี `danger-ink` ใต้ field
-- **Touch:** input สูง ≥44px (C6) — ห้ามลดความสูงแม้ในตารางแอดมิน
+- **Error state:** `invalid` prop → `border-danger bg-danger-soft/40` + `FieldError` สี `danger-ink` ใต้ field (`role="alert"`)
+- **Touch:** `min-h-touch` ใน fieldBase บังคับ ≥44px (C6) — ห้ามลดความสูงแม้ในตารางแอดมิน
 - **Radius:** `rounded-md` (12px) ตามตาราง Radius ด้านบน
 
 ### Navigation
 
-- **Landing Navbar:** sticky + glassmorphism (`.glass` backdrop-blur) — ลอยทับ mesh gradient ของ hero, active link = emerald
-- **Admin Sidebar:** แบ่ง 3 กลุ่ม (ภาพรวม / จัดการเคส / บริหารระบบ) — session-aware (ซ่อนเมนูตาม role), active item = emerald accent + `accent-sunken` bg
+- **Landing Navbar:** `fixed top-0 z-50` + glassmorphism (`.glass` backdrop-blur) — ลอยทับ mesh gradient ของ hero, active link = emerald
+- **Admin Sidebar:** แบ่ง 3 กลุ่ม (งานหลัก / แชท LINE / ระบบ) — กรองตาม role ผ่าน `visibleNavGroups` (เมนู `supervisorOnly` ซ่อนจากเจ้าหน้าที่), active item = `bg-accent-strong text-on-accent` (emerald ทึบ), hover = `bg-accent-sunken`
 - **Touch:** nav item ทุกตัว ≥44px (C6) — รวมเมนูมือถือ (hamburger + drawer item)
 - **Keyboard:** ทุกลิงก์ focus ได้ตาม tab order, drawer ปิดด้วย Esc
 
@@ -371,14 +373,20 @@ Primitives อยู่ที่ `src/components/ui/field.tsx` (`Field` = label 
 
 ### Spacing Scale
 
-ใช้สเกล default ของ Tailwind (ฐาน 4px: `p-1`=4px, `p-2`=8px, `p-4`=16px, `gap-10`=40px ...) — ไม่ได้ override ใน token จึงห้ามคิดสเกลเอง ให้ใช้ step ของ Tailwind เท่านั้น ค่า semantic ที่กำหนดเองอยู่ใน `src/styles/tokens.css`:
+ใช้สเกล default ของ Tailwind (ฐาน 4px: `p-1`=4px, `p-2`=8px, `p-4`=16px, `gap-10`=40px ...) — ไม่ได้ override ใน token จึงห้ามคิดสเกลเอง ให้ใช้ step ของ Tailwind เท่านั้น
+
+**Token spacing ที่มีจริงใน `src/styles/tokens.css` (มีตัวเดียว):**
 
 | Token | ค่า | ใช้กับ |
 |---|---|---|
-| section spacing | `clamp(4rem, 3rem + 5vw, 10rem)` | ระยะห่างระหว่าง section ของ landing |
-| cardPadding | `1.25rem` (20px) | padding มาตรฐานของ card |
-| buttonPadding | `0.75rem 1.75rem` | padding ของ button |
-| `--touch-target-min` | 44px | min-height/width ของ interactive element (utility `min-h-touch` / `min-w-touch`) |
+| `--touch-target-min` | 44px | min-height/width ของ interactive element — utility `min-h-touch` / `min-w-touch` |
+
+**Pattern ที่ใช้จริงในโค้ด (Tailwind step):**
+- Section landing: `py-16 lg:py-24` (64/96px) — ไม่ใช่ clamp
+- Card padding: `p-6` (24px), card ใหญ่/CTA: `p-8`
+- Grid gap: `gap-6` (card grid), `gap-8` (feature grid)
+
+> ⚠️ ค่า `section: clamp(4rem, 3rem + 5vw, 10rem)`, `cardPadding: 1.25rem`, `buttonPadding: 0.75rem 1.75rem` ใน YAML frontmatter เป็นแค่ค่าอ้างอิงเชิงอุดมคติ — **ยังไม่ได้ implement เป็น token** และโค้ดจริงไม่ได้ใช้ อย่าอ้างว่าเป็นค่าจาก tokens.css
 
 ### Breakpoints & Grid
 
