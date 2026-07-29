@@ -2,8 +2,7 @@ import { ArrowLeft } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getDb } from '@/lib/db';
-import { categories as categoriesTable } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { getActiveCategories } from '@/lib/queries/lookups';
 import { Navbar } from '@/components/landing/Navbar';
 import { SiteFooter } from '../../components/site/site-footer';
 import { IntakeForm } from './intake-form';
@@ -22,11 +21,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function IntakePage() {
   const db = await getDb();
-  const categories = await db
-    .select({ id: categoriesTable.id, name: categoriesTable.name })
-    .from(categoriesTable)
-    .where(eq(categoriesTable.isActive, true))
-    .orderBy(categoriesTable.name);
+  const categories = await getActiveCategories(db);
 
   return (
     <div className="min-h-dvh bg-surface text-ink">

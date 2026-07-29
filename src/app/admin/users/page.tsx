@@ -3,6 +3,7 @@ import { asc, eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { users, departments } from '@/lib/db/schema';
 import { requireStaff } from '@/lib/auth/require-staff';
+import { getActiveDepartments } from '@/lib/queries/lookups';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { UsersClient, UserSuccessToast } from './users-client';
 
@@ -40,11 +41,7 @@ export default async function UsersPage({
     .leftJoin(departments, eq(users.departmentId, departments.id))
     .orderBy(asc(users.fullName));
 
-  const deptOptions = await db
-    .select({ id: departments.id, name: departments.name })
-    .from(departments)
-    .where(eq(departments.isActive, true))
-    .orderBy(departments.name);
+  const deptOptions = await getActiveDepartments(db);
 
   return (
     <AdminShell user={staffUser} active="users" title="จัดการผู้ใช้">

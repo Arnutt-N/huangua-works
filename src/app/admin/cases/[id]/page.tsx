@@ -17,6 +17,7 @@ import {
   villages,
 } from '@/lib/db/schema';
 import { requireStaff } from '@/lib/auth/require-staff';
+import { getActiveDepartments, getActiveOfficers } from '@/lib/queries/lookups';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { STATUS_LABELS_TH } from '@/lib/cases/state-machine';
 import { formatThaiDateTime } from '@/lib/thai-date';
@@ -154,11 +155,7 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
   const actorMap = new Map(actorRows.map((a) => [a.id, a]));
 
   // fetch officers ในระบบ (active, role != citizen) สำหรับ dropdown มอบหมาย
-  const officers = await db
-    .select({ id: users.id, fullName: users.fullName, role: users.role, departmentId: users.departmentId })
-    .from(users)
-    .where(and(eq(users.isActive, true), ne(users.role, 'citizen')))
-    .orderBy(users.fullName);
+  const officers = await getActiveOfficers(db);
 
   // filter officers: เจ้าหน้าที่ทั่วไปเห็นทุกคน (admin สามารถมอบหมายข้ามหน่วยงานได้ใน MVP)
   const officerOptions = officers.map((o) => ({
@@ -168,11 +165,7 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
   }));
 
   // fetch departments สำหรับ dropdown (เฉพาะ active)
-  const deptRows = await db
-    .select({ id: departments.id, name: departments.name })
-    .from(departments)
-    .where(eq(departments.isActive, true))
-    .orderBy(departments.name);
+  const deptRows = await getActiveDepartments(db);
 
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now();

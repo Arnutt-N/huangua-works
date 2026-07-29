@@ -5,6 +5,7 @@ import { and, desc, eq, ilike, or, count } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { cases, categories, users, caseStatusEnum } from '@/lib/db/schema';
 import { requireStaff } from '@/lib/auth/require-staff';
+import { getActiveCategories } from '@/lib/queries/lookups';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { EmptyState } from '@/components/admin/empty-state';
 import { Pagination } from '@/components/admin/pagination';
@@ -125,11 +126,7 @@ export default async function CaseManagementPage({
     .offset(offset);
 
   // fetch categories สำหรับ filter dropdown (active เท่านั้น)
-  const categoryOptions = await db
-    .select({ id: categories.id, name: categories.name })
-    .from(categories)
-    .where(eq(categories.isActive, true))
-    .orderBy(categories.name);
+  const categoryOptions = await getActiveCategories(db);
 
   // Server Component รันครั้งเดียวต่อ request — timestamp สดตอน render คือพฤติกรรมที่ต้องการจริง
   // eslint-disable-next-line react-hooks/purity
