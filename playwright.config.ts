@@ -11,6 +11,7 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   reporter: 'list',
+  timeout: 120_000, // cold Turbopack compilation ใช้ 30-60s ต่อหน้า
   use: {
     baseURL: 'http://localhost:3000',
     trace: 'retain-on-failure',

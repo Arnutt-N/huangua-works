@@ -3,6 +3,23 @@
 การเปลี่ยนแปลงสำคัญของ huangua-works — เรียงจากใหม่ไปเก่า (รูปแบบปรับจาก [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) ให้จับกลุ่มตามวันที่)
 บันทึกย้อนหลังถึง PR #1 (2026-07-16); รายละเอียดเชิงเทคนิคเต็มอยู่ใน git history และ PR ที่อ้างอิง
 
+## [2026-07-29]
+
+- **feat(cases): add 'pending' (รอรับเรื่อง) status before admin accepts** ([PR #42](https://github.com/Arnutt-N/huangua-works/pull/42))
+  - เรื่องใหม่เริ่มที่สถานะ "รอรับเรื่อง" แทน "รับเรื่อง" — เจ้าหน้าที่ต้องกดรับเอง (pending → received)
+  - อัปเดตทุกจุด: state machine, badge (สีเทา), dashboard/reports (นับเป็น open), filter bar, LINE flex, timeline ติดตามเรื่อง
+  - Migration: `ALTER TYPE case_status ADD VALUE 'pending' BEFORE 'received'`
+- **refactor(lib): architecture deepening — 4 modules** (pushed to main directly)
+  - Single-source CaseStatus: pgEnum + zod + TypeScript derive จาก `ALL_STATUSES` ที่เดียว (`state-machine.ts`)
+  - Case Intake module: `createCase()` รวม logic สร้างเคสจาก web + LINE ไว้ที่เดียว (เดิมซ้ำ 2 ที่)
+  - Case Operations module: `applyCaseUpdate()` + `checkPermission()` รวม 5 server actions ที่ซ้ำกัน
+  - DI seam: `logAudit(entry, tx)` แก้ bug ที่ audit ไม่อยู่ใน transaction + typed `AUDIT_ACTIONS` catalog
+- **fix(test): integration tests — consent record + unique rate-limit IPs** (pushed to main directly)
+  - เพิ่ม consent record ใน test setup (route เช็ค `hasConsent` ก่อนคืนข้อมูล)
+  - ใช้ IP ไม่ซ้ำกันแต่ละรัน กัน rate-limit ค้างข้ามรัน (window 5 นาที)
+- **feat(admin): swap dashboard/reports content + rename** (pushed to main directly)
+  - `/admin` = แดชบอร์ด (KPI + charts), `/admin/reports` = จัดการคำร้อง / แจ้งเหตุ (คิวเรื่อง + filter)
+
 ## [2026-07-28]
 
 - **feat(admin): avatar dropdown user menu + confirm-logout + พ.ศ. dates** ([PR #41](https://github.com/Arnutt-N/huangua-works/pull/41))

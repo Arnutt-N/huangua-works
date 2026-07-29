@@ -57,9 +57,11 @@ test('submitting an empty form shows validation errors without a network call', 
 test('golden path: filling and submitting creates a real case', async ({ page }) => {
   test.slow();
   await page.goto('/intake');
+  await page.waitForLoadState('networkidle');
 
   await page.getByLabel('ชื่อ - นามสกุล').fill('ทดสอบ E2E Playwright');
   await page.getByLabel('เลขบัตรประชาชน 13 หลัก').fill(TEST_CID);
+  await expect(page.getByLabel('หมวดเรื่อง')).toBeVisible({ timeout: 30_000 });
   await page.getByLabel('หมวดเรื่อง').click();
   await page.getByRole('option').first().click();
   await page.getByLabel('หัวเรื่อง').fill(`ทดสอบ E2E intake ${Date.now()}`);

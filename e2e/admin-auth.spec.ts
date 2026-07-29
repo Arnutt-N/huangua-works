@@ -76,7 +76,7 @@ test('login page exposes remember-me, forgot-password link, and contact text', a
   await expect(page.getByText('ยังไม่มีบัญชี? ติดต่อผู้ดูแลระบบ')).toBeVisible();
 
   await page.getByRole('link', { name: 'ลืมรหัสผ่าน?' }).click();
-  await expect(page).toHaveURL(/\/admin\/forgot-password$/);
+  await expect(page).toHaveURL(/\/admin\/forgot-password$/, { timeout: 60_000 });
 });
 
 test('remember-me is on by default and controls session lifetime (30d vs 1h)', async ({

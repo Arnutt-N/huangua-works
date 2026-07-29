@@ -94,9 +94,9 @@ test('selecting subdistrict loads its villages', async ({ page }) => {
   await page.locator('#subdistrict').click();
   await page.getByRole('option', { name: testSubdistrict.nameTh }).click();
 
-  await expect(page.locator('#villageId')).toBeEnabled({ timeout: 10_000 });
+  await expect(page.locator('#villageId')).toBeEnabled({ timeout: 30_000 });
   await page.locator('#villageId').click();
-  await expect(page.getByRole('option', { name: testVillage.nameTh })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('option', { name: testVillage.nameTh })).toBeVisible({ timeout: 30_000 });
 });
 
 test('changing province resets downstream selects', async ({ page }) => {
