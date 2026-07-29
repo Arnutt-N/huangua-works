@@ -1,0 +1,1 @@
+ALTER TABLE "cases" ALTER COLUMN "status" SET DEFAULT 'pending';

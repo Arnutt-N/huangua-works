@@ -252,7 +252,7 @@ export const villages = pgTable(
 );
 
 // ────────────────────────────────────────────────────────────────────────────
-// § Cases (เรื่องแจ้งเหตุ — state machine: received→reviewing→assigned→in_progress→done→closed/rejected)
+// § Cases (เรื่องแจ้งเหตุ — state machine: pending→received→reviewing→assigned→in_progress→done→closed/rejected)
 // ────────────────────────────────────────────────────────────────────────────
 
 export const cases = pgTable(
@@ -267,7 +267,7 @@ export const cases = pgTable(
       .defaultNow(),
 
     // Status
-    status: caseStatusEnum().notNull().default('received'),
+    status: caseStatusEnum().notNull().default('pending'),
     priority: casePriorityEnum().notNull().default('normal'),
 
     // Content
