@@ -24,6 +24,9 @@ export interface CaseActor {
 
 export type CaseOperationResult = { ok: true } | { ok: false; error: string };
 
+// § actor สำหรับงานอัตโนมัติ (cron) — caseUpdates.userId/auditLogs.userId ไม่มี FK จริง
+export const SYSTEM_ACTOR: CaseActor = { userId: 'system', role: 'system' };
+
 const SUPERVISOR_ROLES = ['chief', 'head', 'superadmin'];
 
 const PATCH_PERMISSIONS: Record<CasePatch['kind'], string[] | null> = {
