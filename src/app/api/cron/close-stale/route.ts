@@ -1,12 +1,12 @@
 /**
  * GET /api/cron/close-stale — ปิดเรื่องเก่าอัตโนมัติ (เรียกทุก 1 วัน)
- * เรื่องที่ status='done' เกิน 7 วัน → auto close
+ * เรื่องที่ status='done' เกิน 7 วัน → auto close ผ่าน applyCaseUpdate
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
-import { cases, caseUpdates } from '@/lib/db/schema';
-import { generateId } from '@/lib/id';
+import { cases } from '@/lib/db/schema';
+import { applyCaseUpdate, SYSTEM_ACTOR } from '@/lib/cases/operations';
 import { eq, and, lt } from 'drizzle-orm';
 
 const STALE_DAYS = 7;
@@ -24,46 +24,40 @@ export async function GET(req: NextRequest) {
   }
 
   const db = await getDb();
-  const now = new Date();
-  const staleThreshold = new Date(now.getTime() - STALE_DAYS * 24 * 60 * 60 * 1000);
+  const staleThreshold = new Date(Date.now() - STALE_DAYS * 24 * 60 * 60 * 1000);
 
-  // § Find cases status='done' + updatedAt < 7 วันที่แล้ว
   const staleCases = await db
-    .select()
+    .select({ id: cases.id })
     .from(cases)
     .where(and(eq(cases.status, 'done'), lt(cases.updatedAt, staleThreshold)));
 
   let closedCount = 0;
+  const failures: string[] = [];
 
   for (const c of staleCases) {
-    // Update case status → closed
-    await db
-      .update(cases)
-      .set({
-        status: 'closed',
-        closedAt: now,
-        updatedAt: now,
-      })
-      .where(eq(cases.id, c.id));
+    const result = await applyCaseUpdate(
+      c.id,
+      {
+        kind: 'status',
+        newStatus: 'closed',
+        comment: `ปิดเรื่องอัตโนมัติ (เกิน ${STALE_DAYS} วัน)`,
+        isPublic: true,
+      },
+      SYSTEM_ACTOR,
+    );
 
-    // Log update
-    await db.insert(caseUpdates).values({
-      id: generateId(),
-      caseId: c.id,
-      userId: 'system',
-      updateType: 'status_change',
-      oldValue: 'done',
-      newValue: 'closed',
-      comment: 'ปิดเรื่องอัตโนมัติ (เกิน 7 วัน)',
-      isPublic: true,
-    });
-
-    closedCount++;
+    if (result.ok) {
+      closedCount++;
+    } else {
+      console.error(`[cron/close-stale] case ${c.id}: ${result.error}`);
+      failures.push(c.id);
+    }
   }
 
   return NextResponse.json({
-    success: true,
+    success: failures.length === 0,
     closedCount,
+    failedCount: failures.length,
     message: `ปิดเรื่องอัตโนมัติ ${closedCount} รายการ`,
   });
 }

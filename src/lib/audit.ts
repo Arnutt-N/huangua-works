@@ -15,7 +15,6 @@ export const AUDIT_ACTIONS = {
   LOGOUT: 'logout',
   SUBMIT_CASE: 'submit_case',
   VIEW_CASE: 'view_case',
-  PATCH_CASE: 'patch_case',
   UPDATE_CASE_STATUS: 'update_case_status',
   ASSIGN_CASE: 'assign_case',
   CHANGE_CASE_DEPARTMENT: 'change_case_department',

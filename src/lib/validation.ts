@@ -140,17 +140,6 @@ export const submitCaseSchema = z.object({
 });
 
 /**
- * PATCH /api/admin/cases/[id] — admin update case
- */
-export const patchCaseSchema = z.object({
-  status: caseStatusSchema.optional(),
-  assignedTo: uuidSchema.nullable().optional(),
-  departmentId: uuidSchema.nullable().optional(),
-  priority: casePrioritySchema.optional(),
-  comment: commentSchema.optional(),
-});
-
-/**
  * POST /api/consent/withdraw — citizen withdraws PDPA consent
  */
 export const consentWithdrawSchema = z.object({
