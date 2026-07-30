@@ -39,7 +39,7 @@ export function ChatHeader({
   const isHuman = mode === 'human_active';
 
   return (
-    <header className="h-20 flex-none border-b border-border bg-surface-raised/80 px-5 backdrop-blur-sm">
+    <header className="h-14 flex-none border-b border-border bg-surface-raised/80 px-4 backdrop-blur-sm">
       <div className="flex h-full items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <button
@@ -56,22 +56,24 @@ export function ChatHeader({
             <img
               src={customerPicture}
               alt=""
-              className="h-12 w-12 flex-none rounded-pill object-cover ring-2 ring-accent/20"
+              className="h-9 w-9 flex-none rounded-pill object-cover ring-2 ring-accent/20"
             />
           ) : (
             <span
-              className="inline-flex h-12 w-12 flex-none items-center justify-center rounded-pill bg-accent-sunken text-accent-strong ring-2 ring-accent/20"
+              className="inline-flex h-9 w-9 flex-none items-center justify-center rounded-pill bg-accent-sunken text-accent-strong ring-2 ring-accent/20"
               aria-hidden="true"
             >
-              <UserRound className="h-6 w-6" />
+              <UserRound className="h-5 w-5" />
             </span>
           )}
 
-          <div className="min-w-0">
-            <p className="truncate text-base font-bold text-ink">
+          <div className="flex min-w-0 items-center gap-2">
+            <p className="truncate text-sm font-bold text-ink">
               {customerName ?? 'ผู้ใช้ LINE'}
             </p>
-            <p className="truncate text-xs text-muted">{MODE_LABELS[mode] ?? mode}</p>
+            <span className="flex-none rounded-pill bg-surface-sunken px-1.5 py-0.5 text-[10px] font-medium text-muted">
+              {MODE_LABELS[mode] ?? mode}
+            </span>
           </div>
         </div>
 
