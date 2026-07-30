@@ -29,7 +29,7 @@ test.describe('admin chat page', () => {
     await expect(page).toHaveURL(/\/admin\/chat$/);
 
     // Chat header visible
-    await expect(page.getByRole('heading', { name: 'การสนทนา LINE' })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByLabel('ค้นหาการสนทนา')).toBeVisible({ timeout: 20_000 });
 
     // Should show the test conversation created by webhook test (U_test_local_webhook_user)
     // or empty state if DB was cleaned
@@ -93,10 +93,10 @@ test.describe('admin chat page', () => {
     await expect(page).toHaveURL(/\/admin$/, { timeout: 10_000 });
 
     await page.goto('/admin/chat', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('heading', { name: 'การสนทนา LINE' })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByLabel('ค้นหาการสนทนา')).toBeVisible({ timeout: 20_000 });
 
     const allChip = page.getByRole('button', { name: /ทั้งหมด/ });
-    const waitingChip = page.getByRole('button', { name: /รอรับเรื่อง/ });
+    const waitingChip = page.getByRole('button', { name: /รอรับ/ });
     await expect(allChip).toHaveAttribute('aria-pressed', 'true');
 
     await waitingChip.click();
@@ -118,7 +118,7 @@ test.describe('admin chat page', () => {
     await expect(page).toHaveURL(/\/admin$/, { timeout: 10_000 });
 
     await page.goto('/admin/chat', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('heading', { name: 'การสนทนา LINE' })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByLabel('ค้นหาการสนทนา')).toBeVisible({ timeout: 20_000 });
 
     const convButton = page.locator('button:has-text("U_test_local")');
     const hasConversation = await convButton.isVisible().catch(() => false);

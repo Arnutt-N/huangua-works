@@ -1,7 +1,6 @@
 'use client';
 
-import Link from 'next/link';
-import { ArrowDownWideNarrow, Home, Inbox, Search } from 'lucide-react';
+import { ArrowDownWideNarrow, Inbox, Search } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import type { ConversationFilter, ConversationSort } from '../_hooks/use-conversations';
 import type { Conversation, MessageSearchResult } from '../_lib/types';
@@ -10,7 +9,7 @@ import { SearchResults } from './search-results';
 
 const FILTER_CHIPS: { key: ConversationFilter; label: string }[] = [
   { key: 'all', label: 'ทั้งหมด' },
-  { key: 'waiting', label: 'รอรับเรื่อง' },
+  { key: 'waiting', label: 'รอรับ' },
   { key: 'active', label: 'กำลังคุย' },
 ];
 
@@ -84,6 +83,7 @@ export function ConversationList({
 
   return (
     <aside
+      aria-label="การสนทนา LINE"
       className={cn(
         'w-full flex-none flex-col overflow-hidden border-r border-border',
         'bg-surface-raised text-ink md:flex md:w-80',
@@ -91,22 +91,7 @@ export function ConversationList({
       )}
     >
       <div className="flex h-full flex-col">
-        <div className="flex h-20 flex-none items-center gap-3 border-b border-border px-4">
-          <Link
-            href="/admin"
-            aria-label="กลับหน้าแดชบอร์ดผู้ดูแล"
-            title="กลับหน้าแดชบอร์ดผู้ดูแล"
-            className="inline-flex h-10 w-10 flex-none items-center justify-center rounded-lg bg-accent-gradient text-on-accent shadow-lg ring-4 ring-accent/10 transition-shadow duration-normal ease-out-expo hover:shadow-accent-glow focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
-          >
-            <Home className="h-5 w-5" aria-hidden="true" />
-          </Link>
-          <h2 className="flex-1 truncate text-center text-base font-bold tracking-wide text-ink">
-            การสนทนา LINE
-          </h2>
-          <span className="h-10 w-10 flex-none" aria-hidden="true" />
-        </div>
-
-        <div className="flex-none space-y-2.5 px-3 py-3">
+        <div className="flex-none space-y-2.5 px-3 pb-3 pt-3">
           <div className="relative">
             <Search
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
@@ -210,7 +195,7 @@ export function ConversationList({
             </span>
             <span className="inline-flex items-center gap-1.5 text-warning">
               <span className="h-1.5 w-1.5 rounded-pill bg-warning" aria-hidden="true" />
-              รอรับเรื่อง {counts.waiting}
+              รอรับ {counts.waiting}
             </span>
             <span className="inline-flex items-center gap-1.5 text-muted">
               <span className="h-1.5 w-1.5 rounded-pill bg-muted" aria-hidden="true" />
