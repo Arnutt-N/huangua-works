@@ -43,7 +43,7 @@ export const ConversationItem = memo(function ConversationItem({
         'group relative rounded-lg',
         'transition-colors duration-normal ease-out-expo',
         isSelected
-          ? 'bg-accent-gradient text-on-accent shadow-lg'
+          ? 'bg-accent-sunken text-ink ring-1 ring-accent/30'
           : 'text-ink hover:bg-accent-sunken',
       )}
     >
@@ -64,7 +64,7 @@ export const ConversationItem = memo(function ConversationItem({
           <span
             className={cn(
               'inline-flex h-10 w-10 flex-none items-center justify-center rounded-pill text-sm font-bold',
-              isSelected ? 'bg-white/20 text-on-accent' : 'bg-accent-sunken text-accent-strong',
+              isSelected ? 'bg-accent text-on-accent' : 'bg-accent-sunken text-accent-strong',
             )}
             aria-hidden="true"
           >
@@ -76,7 +76,7 @@ export const ConversationItem = memo(function ConversationItem({
           <span className="flex items-center gap-1.5">
             {pinned && (
               <Pin
-                className={cn('h-3 w-3 flex-none', isSelected ? 'text-on-accent' : 'text-accent-gold')}
+                className={cn('h-3 w-3 flex-none', 'text-accent-gold')}
                 aria-label="ปักหมุด"
               />
             )}
@@ -84,7 +84,7 @@ export const ConversationItem = memo(function ConversationItem({
               <VolumeX
                 className={cn(
                   'h-3 w-3 flex-none',
-                  isSelected ? 'text-on-accent/80' : 'text-muted',
+                  'text-muted',
                 )}
                 aria-label="ปิดการแจ้งเตือน"
               />
@@ -92,7 +92,7 @@ export const ConversationItem = memo(function ConversationItem({
             <span
               className={cn(
                 'truncate text-sm font-semibold',
-                isSelected ? 'text-on-accent' : 'text-ink',
+                'text-ink',
               )}
             >
               {name}
@@ -100,7 +100,7 @@ export const ConversationItem = memo(function ConversationItem({
             <span
               className={cn(
                 'ml-auto flex-none text-[10px] tabular-nums',
-                isSelected ? 'text-on-accent/80' : 'text-muted',
+                'text-muted',
               )}
             >
               {formatRelativeTime(conv.lastMessageAt)}
@@ -111,7 +111,7 @@ export const ConversationItem = memo(function ConversationItem({
             <span
               className={cn(
                 'truncate text-xs',
-                isSelected ? 'text-on-accent/80' : 'text-muted',
+                'text-muted',
               )}
             >
               {conv.lastMessageText ?? '—'}
@@ -120,11 +120,9 @@ export const ConversationItem = memo(function ConversationItem({
               <span
                 className={cn(
                   'inline-flex items-center gap-0.5 rounded-pill px-1.5 py-0.5 text-[10px] font-medium',
-                  isSelected
-                    ? 'bg-white/20 text-on-accent'
-                    : isBot
-                      ? 'bg-accent-sunken text-accent-strong'
-                      : 'bg-success-soft text-success-ink',
+                  isBot
+                    ? 'bg-accent-sunken text-accent-strong'
+                    : 'bg-success-soft text-success-ink',
                 )}
               >
                 {isBot ? (
@@ -149,7 +147,7 @@ export const ConversationItem = memo(function ConversationItem({
                   key={tag.id}
                   className={cn(
                     'inline-block rounded-pill px-1.5 py-0.5 text-[10px] font-medium',
-                    isSelected ? 'bg-white/20 text-on-accent' : 'bg-surface-sunken text-muted',
+                    'bg-surface-sunken text-muted',
                   )}
                 >
                   {tag.name}
@@ -159,7 +157,7 @@ export const ConversationItem = memo(function ConversationItem({
                 <span
                   className={cn(
                     'text-[10px] font-medium',
-                    isSelected ? 'text-on-accent/80' : 'text-muted',
+                    'text-muted',
                   )}
                 >
                   +{extraTags}
@@ -177,9 +175,7 @@ export const ConversationItem = memo(function ConversationItem({
             'absolute right-1.5 top-3 inline-flex h-7 w-7 items-center justify-center rounded-sm',
             'opacity-0 transition-opacity duration-fast focus-visible:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100',
             'focus-visible:outline focus-visible:outline-2',
-            isSelected
-              ? 'text-on-accent/80 hover:bg-white/20 hover:text-on-accent focus-visible:outline-on-accent'
-              : 'text-muted hover:bg-accent-sunken hover:text-ink focus-visible:outline-accent',
+            'text-muted hover:bg-accent-sunken hover:text-ink focus-visible:outline-accent',
           )}
         >
           <MoreVertical className="h-4 w-4" aria-hidden="true" />
