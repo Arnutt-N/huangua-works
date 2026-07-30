@@ -53,7 +53,7 @@ Before writing any implementation code:
 ### 6. Review & Ship
 ```bash
 # Self-review
-- Run: pnpm lint && pnpm typecheck && pnpm test (or project equivalents)
+- Run the gates in "CI / Verification" below
 - Review diff for unintended changes
 
 # Commit (conventional commits)
