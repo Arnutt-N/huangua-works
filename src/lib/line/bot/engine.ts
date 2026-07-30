@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { lineUsers, chatConversations, chatMessages, cases } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
@@ -79,8 +79,9 @@ async function handleMessageEvent(
     : msg.type === 'sticker' ? 'sticker'
     : 'text';
 
+  const messageId = generateId();
   await db.insert(chatMessages).values({
-    id: generateId(),
+    id: messageId,
     conversationId,
     sender: 'user',
     messageType,
@@ -97,7 +98,10 @@ async function handleMessageEvent(
       lastMessageText: textContent ?? `[${messageType}]`,
       lastMessageAt: new Date(),
       lastMessageSender: 'user',
-      unreadAdmin: mode === 'human_active' ? 1 : 0,
+      unreadAdmin:
+        mode === 'human_active' || mode === 'waiting_handoff'
+          ? sql`${chatConversations.unreadAdmin} + 1`
+          : 0,
       updatedAt: new Date(),
     })
     .where(eq(chatConversations.id, conversationId));
@@ -105,7 +109,7 @@ async function handleMessageEvent(
   broadcast({
     type: 'new_message',
     conversationId,
-    payload: { sender: 'user', messageType, textContent, createdAt: new Date().toISOString() },
+    payload: { id: messageId, sender: 'user', messageType, textContent, createdAt: new Date().toISOString() },
   });
   broadcast({ type: 'conversation_update', conversationId, payload: { lastMessageText: textContent ?? `[${messageType}]` } });
 
