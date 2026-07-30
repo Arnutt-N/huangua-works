@@ -7,9 +7,9 @@ import {
   FolderCog,
   type LucideIcon,
 } from 'lucide-react';
-import type { userRoleEnum } from '@/lib/db/schema';
+import { ADMIN_ROLES, type UserRole } from '@/lib/auth/roles';
 
-export type UserRole = (typeof userRoleEnum.enumValues)[number];
+export type { UserRole } from '@/lib/auth/roles';
 
 export type AdminTab =
   | 'dashboard'
@@ -79,10 +79,8 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
   },
 ];
 
-const SUPERVISOR_ROLES: UserRole[] = ['head', 'superadmin'];
-
 export function isSupervisor(role: UserRole): boolean {
-  return SUPERVISOR_ROLES.includes(role);
+  return ADMIN_ROLES.includes(role);
 }
 
 export function visibleNavItems(role: UserRole, items: AdminNavItem[]): AdminNavItem[] {

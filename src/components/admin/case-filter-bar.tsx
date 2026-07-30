@@ -12,8 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { STATUS_LABELS_TH } from '@/lib/cases/state-machine';
-import type { CaseStatus } from '@/lib/cases/state-machine';
+import { ALL_STATUSES, STATUS_LABELS_TH } from '@/lib/cases/state-machine';
 
 /**
  * CaseFilterBar — filter สำหรับหน้าคิวเรื่อง
@@ -33,18 +32,7 @@ interface CategoryOption {
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: 'all', label: 'ทุกสถานะ' },
-  ...(
-    [
-      'pending',
-      'received',
-      'reviewing',
-      'assigned',
-      'in_progress',
-      'done',
-      'closed',
-      'rejected',
-    ] as CaseStatus[]
-  ).map((s) => ({ value: s, label: STATUS_LABELS_TH[s] })),
+  ...ALL_STATUSES.map((s) => ({ value: s, label: STATUS_LABELS_TH[s] })),
 ];
 
 const PRIORITY_OPTIONS = [

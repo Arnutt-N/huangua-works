@@ -12,6 +12,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { ALL_STATUSES } from '../cases/state-machine';
+import { ALL_ROLES } from '../auth/roles';
 
 /**
  * Schema — อบต.หัวงัว citizen-help (PostgreSQL)
@@ -29,13 +30,7 @@ import { ALL_STATUSES } from '../cases/state-machine';
 // § Enums
 // ────────────────────────────────────────────────────────────────────────────
 
-export const userRoleEnum = pgEnum('user_role', [
-  'citizen',
-  'officer',
-  'chief',
-  'head',
-  'superadmin',
-]);
+export const userRoleEnum = pgEnum('user_role', ALL_ROLES);
 
 export const caseStatusEnum = pgEnum('case_status', ALL_STATUSES);
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireStaff } from '@/lib/auth/require-staff';
+import { CASE_SUPERVISOR_ROLES } from '@/lib/auth/roles';
 import { applyCaseUpdate, type CaseActor } from '@/lib/cases/operations';
 import {
   changeStatusFormSchema,
@@ -75,7 +76,7 @@ export async function changeDepartment(
   _prevState: CaseActionState,
   formData: FormData
 ): Promise<CaseActionState> {
-  const auth = await requireStaff(['chief', 'head', 'superadmin']);
+  const auth = await requireStaff(CASE_SUPERVISOR_ROLES);
   const v = validateFormData(changeDepartmentFormSchema, formData);
   if (!v.success) return { error: v.error };
   const { caseId, departmentId } = v.data;

@@ -53,7 +53,7 @@ Before writing any implementation code:
 ### 6. Review & Ship
 ```bash
 # Self-review
-- Run: pnpm lint && pnpm typecheck && pnpm test (or project equivalents)
+- Run the gates in "CI / Verification" below
 - Review diff for unintended changes
 
 # Commit (conventional commits)
@@ -64,7 +64,7 @@ git commit -m "<type>(<scope>): <description>"
 git push -u origin <branch>
 gh pr create --title "..." --body "..."
 
-# Merge (after CI green + approval)
+# Merge (after local gates green + approval)
 gh pr merge --squash
 ```
 
@@ -79,5 +79,18 @@ gh pr merge --squash
 [ ] Tests pass, lint clean, typecheck clean
 [ ] Committed with conventional message
 [ ] PR created
-[ ] Merged after CI green
+[ ] Merged after local gates green + Vercel preview OK
 ```
+
+## CI / Verification
+
+GitHub Actions is **intentionally paused** to avoid billing — a PR with no Actions run
+is expected, not a broken setup. Do not go hunting for CI runs.
+
+Verification gates are local + Vercel:
+```bash
+npx tsc --noEmit     # pnpm is not in PATH — use npx
+npx eslint .
+npx vitest run       # integration tests need Docker Desktop started (Postgres :5433 + Redis)
+```
+Plus the Vercel / Vercel Preview Comments checks on the PR.

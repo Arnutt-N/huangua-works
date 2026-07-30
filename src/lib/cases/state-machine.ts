@@ -114,5 +114,31 @@ export const STATUS_LABELS_TH: Record<CaseStatus, string> = {
   rejected: 'ไม่ดำเนินการ',
 };
 
-/** @deprecated ใช้ ALL_STATUSES แทน */
-export const ALL_STATUSES_ORDERED = ALL_STATUSES;
+/**
+ * label ภาษาไทยสำหรับประชาชน (LINE) — คนละ register กับ STATUS_LABELS_TH
+ * ใช้รูปประโยคสมบูรณ์กว่า เช่น "รับเรื่องแล้ว" แทน "รับเรื่อง"
+ */
+export const STATUS_LABELS_TH_CITIZEN: Record<CaseStatus, string> = {
+  pending: 'รอรับเรื่อง',
+  received: 'รับเรื่องแล้ว',
+  reviewing: 'กำลังตรวจสอบ',
+  assigned: 'มอบหมายแล้ว',
+  in_progress: 'กำลังดำเนินการ',
+  done: 'ดำเนินการเสร็จ',
+  closed: 'ปิดเรื่อง',
+  rejected: 'ไม่รับเรื่อง',
+};
+
+/** สถานะที่ยังไม่จบงาน (ยังไม่ done และไม่ terminal) */
+export const OPEN_STATUSES: readonly CaseStatus[] = [
+  'pending',
+  'received',
+  'reviewing',
+  'assigned',
+  'in_progress',
+];
+
+/** type guard สำหรับ string ที่ไม่ trust (query params, LINE payloads) */
+export function isCaseStatus(value: string): value is CaseStatus {
+  return (ALL_STATUSES as readonly string[]).includes(value);
+}

@@ -3,6 +3,7 @@ import { asc, eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { users, departments } from '@/lib/db/schema';
 import { requireStaff } from '@/lib/auth/require-staff';
+import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { getActiveDepartments } from '@/lib/queries/lookups';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { UsersClient, UserSuccessToast } from './users-client';
@@ -21,7 +22,7 @@ export default async function UsersPage({
 }: {
   searchParams: Promise<{ ok?: string }>;
 }) {
-  const { user: staffUser } = await requireStaff(['head', 'superadmin']);
+  const { user: staffUser } = await requireStaff(ADMIN_ROLES);
   const { ok } = await searchParams;
   const db = await getDb();
 

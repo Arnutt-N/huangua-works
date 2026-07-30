@@ -3,6 +3,7 @@ import { asc, eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { categories, departments } from '@/lib/db/schema';
 import { requireStaff } from '@/lib/auth/require-staff';
+import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { CategoriesCard, DepartmentsCard } from './master-data-client';
 
@@ -17,7 +18,7 @@ export const dynamic = 'force-dynamic';
  * /admin/users ส่วนการปิดใช้งานใช้แทนการลบเพื่อไม่ให้เรื่องเก่าอ้างถึงของที่หายไป
  */
 export default async function MasterDataPage() {
-  const { user: staffUser } = await requireStaff(['head', 'superadmin']);
+  const { user: staffUser } = await requireStaff(ADMIN_ROLES);
   const db = await getDb();
 
   const deptRows = await db

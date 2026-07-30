@@ -4,10 +4,9 @@ import { eq } from 'drizzle-orm';
 import { auth, signOut } from '@/auth';
 import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
-import { users, type userRoleEnum } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema';
 import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
-
-type UserRole = (typeof userRoleEnum.enumValues)[number];
+import type { UserRole } from '@/lib/auth/roles';
 
 /**
  * ดึง IP address จาก request headers

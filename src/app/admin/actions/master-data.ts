@@ -14,9 +14,7 @@ import {
   toggleActiveFormSchema,
   validateFormData,
 } from '@/lib/validation';
-import type { userRoleEnum } from '@/lib/db/schema';
-
-type UserRole = (typeof userRoleEnum.enumValues)[number];
+import { ADMIN_ROLES } from '@/lib/auth/roles';
 
 /**
  * Server actions สำหรับข้อมูลหลัก — หน่วยงาน (departments) และหมวดหมู่ (categories)
@@ -29,8 +27,6 @@ type UserRole = (typeof userRoleEnum.enumValues)[number];
  * อ้างถึงของที่ไม่มีอยู่ และรายงานย้อนหลังจะอ่านไม่ออก การปิดใช้งานทำให้หมวดนั้น
  * หายจาก dropdown ของฟอร์มแจ้งเหตุ แต่เรื่องเดิมยังแสดงชื่อได้ถูกต้อง
  */
-
-const SUPERVISOR_ROLES: UserRole[] = ['head', 'superadmin'];
 
 export interface MasterDataActionState {
   error: string | null;
@@ -45,7 +41,7 @@ export async function saveDepartment(
   _prevState: MasterDataActionState,
   formData: FormData,
 ): Promise<MasterDataActionState> {
-  const { user: actor, ipAddress, userAgent } = await requireStaff(SUPERVISOR_ROLES);
+  const { user: actor, ipAddress, userAgent } = await requireStaff(ADMIN_ROLES);
 
   const v = validateFormData(departmentFormSchema, formData);
   if (!v.success) return { error: v.error };
@@ -110,7 +106,7 @@ export async function saveCategory(
   _prevState: MasterDataActionState,
   formData: FormData,
 ): Promise<MasterDataActionState> {
-  const { user: actor, ipAddress, userAgent } = await requireStaff(SUPERVISOR_ROLES);
+  const { user: actor, ipAddress, userAgent } = await requireStaff(ADMIN_ROLES);
 
   const v = validateFormData(categoryFormSchema, formData);
   if (!v.success) return { error: v.error };
@@ -194,7 +190,7 @@ export async function saveCategory(
 // ────────────────────────────────────────────────────────────────────────────
 
 export async function toggleActive(formData: FormData): Promise<void> {
-  const { user: actor, ipAddress, userAgent } = await requireStaff(SUPERVISOR_ROLES);
+  const { user: actor, ipAddress, userAgent } = await requireStaff(ADMIN_ROLES);
 
   const v = validateFormData(toggleActiveFormSchema, formData);
   if (!v.success) return;

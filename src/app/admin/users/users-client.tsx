@@ -28,7 +28,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { RoleBadge } from '@/components/admin/role-badge';
+import { RoleBadge, ROLE_LABELS_TH } from '@/components/admin/role-badge';
 import {
   createUser,
   toggleUserActive,
@@ -36,9 +36,7 @@ import {
   resetPassword,
   type UserActionState,
 } from '@/app/admin/actions/users';
-import type { userRoleEnum } from '@/lib/db/schema';
-
-type UserRole = (typeof userRoleEnum.enumValues)[number];
+import { STAFF_ROLES, type UserRole } from '@/lib/auth/roles';
 
 interface UserRow {
   id: string;
@@ -65,12 +63,10 @@ interface UsersClientProps {
 
 const initial: UserActionState = { error: null };
 
-const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
-  { value: 'officer', label: 'เจ้าหน้าที่' },
-  { value: 'chief', label: 'หัวหน้างาน' },
-  { value: 'head', label: 'หัวหน้ากอง' },
-  { value: 'superadmin', label: 'ผู้ดูแลระบบ' },
-];
+const ROLE_OPTIONS: { value: UserRole; label: string }[] = STAFF_ROLES.map((r) => ({
+  value: r,
+  label: ROLE_LABELS_TH[r],
+}));
 
 export function UsersClient({
   users,

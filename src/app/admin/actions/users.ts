@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
-import { users, userRoleEnum } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema';
 import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
 import { generateId } from '@/lib/id';
 import { hashPassword } from '@/lib/password';
@@ -16,8 +16,7 @@ import {
   resetPasswordFormSchema,
   validateFormData,
 } from '@/lib/validation';
-
-type UserRole = (typeof userRoleEnum.enumValues)[number];
+import { ADMIN_ROLES, SUPERADMIN_ONLY, type UserRole } from '@/lib/auth/roles';
 
 /**
  * Server actions สำหรับจัดการ users (admin panel)
@@ -28,9 +27,6 @@ type UserRole = (typeof userRoleEnum.enumValues)[number];
  *
  * ทุก action: requireStaff(supervisor) → validate → DB update → audit → revalidate
  */
-
-const SUPERVISOR_ROLES: UserRole[] = ['head', 'superadmin'];
-const SUPERADMIN_ONLY: UserRole[] = ['superadmin'];
 
 export interface UserActionState {
   error: string | null;
@@ -45,7 +41,7 @@ export async function createUser(
   _prevState: UserActionState,
   formData: FormData,
 ): Promise<UserActionState> {
-  const { user: actor, ipAddress, userAgent } = await requireStaff(SUPERVISOR_ROLES);
+  const { user: actor, ipAddress, userAgent } = await requireStaff(ADMIN_ROLES);
 
   // § validate ด้วย zod (แทน manual email regex / role check / password length)
   const v = validateFormData(createUserFormSchema, formData);
@@ -104,7 +100,7 @@ export async function toggleUserActive(
   _prevState: UserActionState,
   formData: FormData,
 ): Promise<UserActionState> {
-  const { user: actor, ipAddress, userAgent } = await requireStaff(SUPERVISOR_ROLES);
+  const { user: actor, ipAddress, userAgent } = await requireStaff(ADMIN_ROLES);
 
   const userId = formData.get('userId');
   if (typeof userId !== 'string') {
@@ -164,7 +160,7 @@ export async function updateUserRole(
   _prevState: UserActionState,
   formData: FormData,
 ): Promise<UserActionState> {
-  const { user: actor, ipAddress, userAgent } = await requireStaff(SUPERVISOR_ROLES);
+  const { user: actor, ipAddress, userAgent } = await requireStaff(ADMIN_ROLES);
 
   const v = validateFormData(updateUserRoleFormSchema, formData);
   if (!v.success) return { error: v.error };

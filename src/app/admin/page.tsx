@@ -18,13 +18,16 @@ import { AdminShell } from '@/components/admin/admin-shell';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import { KpiCard } from '@/components/admin/kpi-card';
 import { CaseStatusBadge } from '@/components/ui/case-status-badge';
-import { STATUS_LABELS_TH, type CaseStatus } from '@/lib/cases/state-machine';
+import {
+  ALL_STATUSES,
+  OPEN_STATUSES,
+  STATUS_LABELS_TH,
+  type CaseStatus,
+} from '@/lib/cases/state-machine';
 import { formatThaiDateLong } from '@/lib/thai-date';
 
 export const metadata: Metadata = { title: 'แดชบอร์ดเจ้าหน้าที่' };
 export const dynamic = 'force-dynamic';
-
-const OPEN_STATUSES: CaseStatus[] = ['pending', 'received', 'reviewing', 'assigned', 'in_progress'];
 
 export default async function AdminDashboardPage() {
   const { user: staffUser } = await requireStaff();
@@ -98,17 +101,7 @@ export default async function AdminDashboardPage() {
   const avgResolutionDays = latest?.avgResolutionDays;
 
   // § สถานะ breakdown สำหรับ bar chart
-  const statusBreakdown = (
-    [
-      'received',
-      'reviewing',
-      'assigned',
-      'in_progress',
-      'done',
-      'closed',
-      'rejected',
-    ] as CaseStatus[]
-  )
+  const statusBreakdown = ALL_STATUSES
     .map((s) => ({
       status: s,
       count: statusMap.get(s) ?? 0,

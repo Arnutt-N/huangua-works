@@ -20,14 +20,12 @@ import {
   type CaseActionState,
 } from '@/app/admin/actions/cases';
 import {
-  ALL_STATUSES_ORDERED,
+  ALL_STATUSES,
   STATUS_LABELS_TH,
   assertTransition,
   type CaseStatus,
 } from '@/lib/cases/state-machine';
-import type { userRoleEnum } from '@/lib/db/schema';
-
-type UserRole = (typeof userRoleEnum.enumValues)[number];
+import type { UserRole } from '@/lib/auth/roles';
 
 interface OfficerOption {
   id: string;
@@ -106,7 +104,7 @@ export function CaseDetailClient({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {ALL_STATUSES_ORDERED.map((s) => {
+                {ALL_STATUSES.map((s) => {
                   const check = assertTransition(currentStatus, s);
                   return (
                     <SelectItem

@@ -1,31 +1,28 @@
+import {
+  STATUS_LABELS_TH_CITIZEN,
+  isCaseStatus,
+  type CaseStatus,
+} from '../../cases/state-machine';
 import type { LineOutgoingMessage } from '../types';
 
-export function caseStatusFlex(trackingCode: string, status: string, title: string): LineOutgoingMessage {
-  const statusLabels: Record<string, string> = {
-    pending: 'รอรับเรื่อง',
-    received: 'รับเรื่องแล้ว',
-    reviewing: 'กำลังตรวจสอบ',
-    assigned: 'มอบหมายแล้ว',
-    in_progress: 'กำลังดำเนินการ',
-    done: 'ดำเนินการเสร็จ',
-    closed: 'ปิดเรื่อง',
-    rejected: 'ไม่รับเรื่อง',
-  };
+const STATUS_COLORS: Record<CaseStatus, string> = {
+  pending: '#9B9B9B',
+  received: '#4A90D9',
+  reviewing: '#F5A623',
+  assigned: '#7B68EE',
+  in_progress: '#F5A623',
+  done: '#7ED321',
+  closed: '#9B9B9B',
+  rejected: '#D0021B',
+};
 
-  const statusColors: Record<string, string> = {
-    pending: '#9B9B9B',
-    received: '#4A90D9',
-    reviewing: '#F5A623',
-    assigned: '#7B68EE',
-    in_progress: '#F5A623',
-    done: '#7ED321',
-    closed: '#9B9B9B',
-    rejected: '#D0021B',
-  };
+export function caseStatusFlex(trackingCode: string, status: string, title: string): LineOutgoingMessage {
+  const label = isCaseStatus(status) ? STATUS_LABELS_TH_CITIZEN[status] : status;
+  const headerColor = isCaseStatus(status) ? STATUS_COLORS[status] : '#4A90D9';
 
   return {
     type: 'flex',
-    altText: `สถานะเรื่อง ${trackingCode}: ${statusLabels[status] ?? status}`,
+    altText: `สถานะเรื่อง ${trackingCode}: ${label}`,
     contents: {
       type: 'bubble',
       header: {
@@ -35,7 +32,7 @@ export function caseStatusFlex(trackingCode: string, status: string, title: stri
           { type: 'text', text: 'สถานะเรื่องร้องเรียน', color: '#FFFFFF', size: 'sm' },
           { type: 'text', text: trackingCode, color: '#FFFFFF', size: 'lg', weight: 'bold' },
         ],
-        backgroundColor: statusColors[status] ?? '#4A90D9',
+        backgroundColor: headerColor,
       },
       body: {
         type: 'box',
@@ -49,7 +46,7 @@ export function caseStatusFlex(trackingCode: string, status: string, title: stri
             margin: 'md',
             contents: [
               { type: 'text', text: 'สถานะ', size: 'sm', color: '#9B9B9B' },
-              { type: 'text', text: statusLabels[status] ?? status, size: 'sm', align: 'end', weight: 'bold' },
+              { type: 'text', text: label, size: 'sm', align: 'end', weight: 'bold' },
             ],
           },
         ],
