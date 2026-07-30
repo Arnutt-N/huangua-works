@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { CaseStatusBadge, type CaseStatus } from './case-status-badge';
+import { ALL_STATUSES } from '../../lib/cases/state-machine';
+import { CaseStatusBadge } from './case-status-badge';
 
 const meta: Meta<typeof CaseStatusBadge> = {
   title: 'ui/CaseStatusBadge',
@@ -10,20 +11,10 @@ export default meta;
 
 type Story = StoryObj<typeof CaseStatusBadge>;
 
-const all: CaseStatus[] = [
-  'received',
-  'reviewing',
-  'assigned',
-  'in_progress',
-  'done',
-  'closed',
-  'urgent',
-];
-
 export const AllStatuses: Story = {
   render: () => (
     <ul className="flex flex-wrap gap-3">
-      {all.map((s) => (
+      {ALL_STATUSES.map((s) => (
         <li key={s}>
           <CaseStatusBadge status={s} />
         </li>
@@ -31,5 +22,3 @@ export const AllStatuses: Story = {
     </ul>
   ),
 };
-
-export const Urgent: Story = { args: { status: 'urgent' } };

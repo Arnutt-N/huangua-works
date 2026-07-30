@@ -2,10 +2,11 @@
 
 import { AlertCircle, CheckCircle2, Clock, Loader2, Search } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
-import { CaseStatusBadge, type CaseStatus } from '../../components/ui/case-status-badge';
+import { CaseStatusBadge } from '../../components/ui/case-status-badge';
 import { Button } from '../../components/ui/button';
 import { FieldHint, Input, Label } from '../../components/ui/field';
 import { cn } from '../../lib/cn';
+import type { CaseStatus } from '../../lib/cases/state-machine';
 import { formatThaiDateTimeShort } from '../../lib/thai-date';
 
 interface CaseDetail {
