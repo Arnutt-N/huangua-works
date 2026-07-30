@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ALL_STATUSES,
   ALL_STATUSES_ORDERED,
   ALLOWED_TRANSITIONS,
+  OPEN_STATUSES,
   STATUS_LABELS_TH,
+  STATUS_LABELS_TH_CITIZEN,
   TERMINAL_STATUSES,
   assertTransition,
+  isCaseStatus,
   statusProgress,
 } from './state-machine';
 
@@ -111,6 +115,44 @@ describe('state-machine · STATUS_LABELS_TH', () => {
   });
   it('uses Thai for received', () => {
     expect(STATUS_LABELS_TH.received).toBe('รับเรื่อง');
+  });
+});
+
+describe('state-machine · STATUS_LABELS_TH_CITIZEN', () => {
+  it('covers all 8 statuses', () => {
+    expect(Object.keys(STATUS_LABELS_TH_CITIZEN)).toHaveLength(8);
+  });
+  it('pins citizen wording where it differs from admin register', () => {
+    expect(STATUS_LABELS_TH_CITIZEN.received).toBe('รับเรื่องแล้ว');
+    expect(STATUS_LABELS_TH_CITIZEN.reviewing).toBe('กำลังตรวจสอบ');
+    expect(STATUS_LABELS_TH_CITIZEN.assigned).toBe('มอบหมายแล้ว');
+    expect(STATUS_LABELS_TH_CITIZEN.done).toBe('ดำเนินการเสร็จ');
+    expect(STATUS_LABELS_TH_CITIZEN.rejected).toBe('ไม่รับเรื่อง');
+  });
+});
+
+describe('state-machine · OPEN_STATUSES', () => {
+  it('contains the 5 open statuses', () => {
+    expect(OPEN_STATUSES).toEqual(['pending', 'received', 'reviewing', 'assigned', 'in_progress']);
+  });
+  it('is disjoint from TERMINAL_STATUSES', () => {
+    expect(OPEN_STATUSES.filter((s) => TERMINAL_STATUSES.includes(s))).toEqual([]);
+  });
+  it('excludes done', () => {
+    expect(OPEN_STATUSES).not.toContain('done');
+  });
+});
+
+describe('state-machine · isCaseStatus', () => {
+  it('accepts every known status', () => {
+    for (const s of ALL_STATUSES) {
+      expect(isCaseStatus(s)).toBe(true);
+    }
+  });
+  it('rejects unknown strings', () => {
+    expect(isCaseStatus('urgent')).toBe(false);
+    expect(isCaseStatus('unknown_status')).toBe(false);
+    expect(isCaseStatus('')).toBe(false);
   });
 });
 
