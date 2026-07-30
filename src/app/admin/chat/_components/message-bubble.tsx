@@ -1,81 +1,123 @@
 'use client';
 
-import { Bot, User, UserCheck } from 'lucide-react';
+import { AlertCircle, Bot, CheckCheck, RefreshCw, User, UserCheck } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { formatTime } from '../_lib/format';
 import type { Message } from '../_lib/types';
 
+const SENDER_LABELS: Record<string, string> = {
+  admin: 'เจ้าหน้าที่',
+  bot: 'บอท',
+};
+
 export function MessageBubble({
   message: msg,
-  grouped = false,
+  customerName,
+  customerPicture,
+  showSender = true,
+  showAvatar = true,
   onRetry,
 }: {
   message: Message;
-  grouped?: boolean;
+  customerName: string | null;
+  customerPicture: string | null;
+  /** ข้อความแรกของชุด — โชว์ชื่อผู้ส่ง */
+  showSender?: boolean;
+  /** ข้อความสุดท้ายของชุด — โชว์ avatar (ตาม jsk avatar อยู่ล่างสุดของชุด) */
+  showAvatar?: boolean;
   onRetry: (msg: Message) => void;
 }) {
   const isAdmin = msg.sender === 'admin';
   const isBot = msg.sender === 'bot';
+  // ฝั่งขวา = ข้อความที่ออกจากเรา (เจ้าหน้าที่ + บอทตอบแทนเรา), ฝั่งซ้าย = ลูกค้า
+  const outgoing = isAdmin || isBot;
+  const senderLabel = SENDER_LABELS[msg.sender] ?? customerName ?? 'ผู้ใช้ LINE';
+
+  const avatar = !showAvatar ? (
+    <span className="h-7 w-7 flex-none" aria-hidden="true" />
+  ) : outgoing ? (
+    <span
+      className={cn(
+        'inline-flex h-7 w-7 flex-none items-center justify-center rounded-pill',
+        isAdmin ? 'bg-success-soft text-success-ink' : 'bg-accent-sunken text-accent-strong',
+      )}
+      aria-hidden="true"
+    >
+      {isAdmin ? <UserCheck className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
+    </span>
+  ) : customerPicture ? (
+    // eslint-disable-next-line @next/next/no-img-element -- รูปโปรไฟล์ LINE เป็น external URL ไม่ fix โดเมน
+    <img src={customerPicture} alt="" className="h-7 w-7 flex-none rounded-pill object-cover" />
+  ) : (
+    <span
+      className="inline-flex h-7 w-7 flex-none items-center justify-center rounded-pill bg-surface-sunken text-muted"
+      aria-hidden="true"
+    >
+      <User className="h-3.5 w-3.5" />
+    </span>
+  );
+
   return (
     <div
       className={cn(
-        'flex items-start gap-2',
-        isAdmin ? 'flex-row-reverse' : 'flex-row',
+        'flex items-end gap-2',
+        outgoing ? 'justify-end' : 'justify-start',
         msg.status === 'pending' && 'opacity-60',
       )}
     >
-      {grouped ? (
-        <span className="h-7 w-7 flex-none" aria-hidden="true" />
-      ) : (
-        <span
-          className={cn(
-            'flex h-7 w-7 flex-none items-center justify-center rounded-full ring-1 ring-inset',
-            isAdmin
-              ? 'bg-success-soft text-success-ink ring-success-ink/20'
-              : isBot
-                ? 'bg-accent-sunken text-accent-strong ring-accent-strong/20'
-                : 'bg-surface-sunken text-muted ring-border-strong/30',
-          )}
-          aria-hidden="true"
-        >
-          {isAdmin ? (
-            <UserCheck className="h-3.5 w-3.5" />
-          ) : isBot ? (
-            <Bot className="h-3.5 w-3.5" />
-          ) : (
-            <User className="h-3.5 w-3.5" />
-          )}
-        </span>
-      )}
+      {!outgoing && avatar}
       <div
         className={cn(
-          'max-w-[70%] rounded-xl px-3.5 py-2 text-sm',
-          isAdmin
-            ? 'bg-accent-strong text-on-accent'
-            : isBot
-              ? 'border border-accent-strong/20 bg-accent-sunken text-ink'
-              : 'border border-border bg-surface-sunken text-ink',
+          'flex max-w-[65%] flex-col gap-0.5',
+          outgoing ? 'items-end' : 'items-start',
         )}
       >
-        <p className="whitespace-pre-wrap break-words">
-          {msg.textContent ?? `[${msg.messageType}]`}
-        </p>
-        <p className={cn('mt-1 text-[10px]', isAdmin ? 'text-on-accent/75' : 'text-muted')}>
-          {msg.status === 'pending' ? 'กำลังส่ง...' : formatTime(msg.createdAt)}
-        </p>
-        {msg.status === 'failed' && (
-          <button
-            type="button"
-            onClick={() => onRetry(msg)}
+        {showSender && (
+          <span
             className={cn(
-              'mt-1 text-[11px] font-semibold underline underline-offset-2',
-              isAdmin ? 'text-on-accent' : 'text-danger',
+              'px-1 text-[10px] font-medium',
+              isAdmin ? 'text-success-ink' : isBot ? 'text-accent-strong' : 'text-muted',
             )}
           >
-            ส่งไม่สำเร็จ — ลองอีกครั้ง
-          </button>
+            {senderLabel}
+          </span>
         )}
+        <div
+          className={cn(
+            'relative whitespace-pre-wrap break-words rounded-lg px-4 py-2.5 text-sm leading-relaxed shadow-sm',
+            isAdmin
+              ? 'bg-accent-gradient text-on-accent'
+              : isBot
+                ? 'border border-accent-strong/20 bg-accent-sunken text-ink'
+                : 'border border-border bg-surface-raised text-ink',
+          )}
+        >
+          {msg.textContent ?? `[${msg.messageType}]`}
+        </div>
+        <span className="flex items-center gap-1 px-1 text-[10px] text-muted">
+          {msg.status === 'pending' ? (
+            <>
+              <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />
+              กำลังส่ง...
+            </>
+          ) : msg.status === 'failed' ? (
+            <button
+              type="button"
+              onClick={() => onRetry(msg)}
+              className="inline-flex items-center gap-1 font-semibold text-danger underline underline-offset-2"
+            >
+              <AlertCircle className="h-3 w-3" aria-hidden="true" />
+              ส่งไม่สำเร็จ — ลองอีกครั้ง
+            </button>
+          ) : (
+            <>
+              <span className="tabular-nums">{formatTime(msg.createdAt)}</span>
+              {isAdmin && <CheckCheck className="h-3 w-3 text-accent-strong" aria-hidden="true" />}
+            </>
+          )}
+        </span>
       </div>
+      {outgoing && avatar}
     </div>
   );
 }

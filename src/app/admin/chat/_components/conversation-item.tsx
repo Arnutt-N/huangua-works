@@ -1,7 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import { BellOff, MoreHorizontal, Pin } from 'lucide-react';
+import { Bot, CheckCheck, MoreVertical, Pin, PinOff, User, Volume2, VolumeX } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import {
   DropdownMenu,
@@ -10,8 +10,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { formatRelativeTime } from '../_lib/format';
-import { FALLBACK_BADGE, MODE_BADGE, MODE_LABELS, TAG_BADGE } from '../_lib/labels';
+import { MODE_SHORT } from '../_lib/labels';
 import type { Conversation } from '../_lib/types';
+
+const MAX_TAGS = 2;
 
 export const ConversationItem = memo(function ConversationItem({
   conversation: conv,
@@ -30,92 +32,178 @@ export const ConversationItem = memo(function ConversationItem({
 }) {
   const pinned = conv.pinned ?? false;
   const muted = conv.muted ?? false;
+  const name = conv.displayName ?? conv.lineUserId;
+  const isBot = conv.mode === 'bot_active';
+  const tags = conv.tags ?? [];
+  const extraTags = tags.length - MAX_TAGS;
 
   return (
     <div
       className={cn(
-        'group relative border-b border-l-4 border-border',
+        'group relative rounded-lg',
         'transition-colors duration-normal ease-out-expo',
         isSelected
-          ? 'border-l-accent-strong bg-accent-sunken'
-          : 'border-l-transparent hover:bg-accent-sunken/50',
+          ? 'bg-accent-gradient text-on-accent shadow-lg'
+          : 'text-sidebar-text-muted hover:bg-white/5',
       )}
     >
       <button
         type="button"
         onClick={() => onSelect(conv.id)}
         aria-current={isSelected ? 'true' : undefined}
-        className="flex w-full flex-col gap-1.5 px-3 py-3 pr-10 text-left"
+        className="flex w-full items-center gap-3 p-3 pr-9 text-left"
       >
-        <div className="flex items-center justify-between gap-2">
-          <span className="flex min-w-0 items-center gap-1.5">
-            {pinned && (
-              <Pin className="h-3 w-3 flex-none text-accent-strong" aria-label="ปักหมุด" />
-            )}
-            {muted && (
-              <BellOff className="h-3 w-3 flex-none text-muted" aria-label="ปิดการแจ้งเตือน" />
-            )}
-            <span className="truncate text-sm font-semibold text-ink">
-              {conv.displayName ?? conv.lineUserId}
-            </span>
-          </span>
-          <span className="flex flex-none items-center gap-1.5">
-            <span className="text-[10px] text-muted">
-              {formatRelativeTime(conv.lastMessageAt)}
-            </span>
-            {conv.unreadAdmin > 0 && (
-              <span className="flex h-5 min-w-5 items-center justify-center rounded-pill bg-accent-strong px-1.5 text-[10px] font-bold text-on-accent">
-                {conv.unreadAdmin > 9 ? '9+' : conv.unreadAdmin}
-              </span>
-            )}
-          </span>
-        </div>
-        <span className="truncate text-xs text-muted">{conv.lastMessageText ?? '—'}</span>
-        <span className="flex flex-wrap items-center gap-1">
+        {conv.pictureUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- รูปโปรไฟล์ LINE เป็น external URL ไม่ fix โดเมน
+          <img
+            src={conv.pictureUrl}
+            alt=""
+            className="h-10 w-10 flex-none rounded-pill object-cover"
+          />
+        ) : (
           <span
             className={cn(
-              'inline-block w-fit rounded-pill px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset',
-              MODE_BADGE[conv.mode] ?? FALLBACK_BADGE,
+              'inline-flex h-10 w-10 flex-none items-center justify-center rounded-pill text-sm font-bold',
+              isSelected ? 'bg-white/20 text-on-accent' : 'bg-white/10 text-sidebar-fg',
             )}
+            aria-hidden="true"
           >
-            {MODE_LABELS[conv.mode] ?? conv.mode}
+            {name.slice(0, 1).toUpperCase()}
           </span>
-          {(conv.tags ?? []).map((tag) => (
+        )}
+
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="flex items-center gap-1.5">
+            {pinned && (
+              <Pin
+                className={cn('h-3 w-3 flex-none', isSelected ? 'text-on-accent' : 'text-accent-gold')}
+                aria-label="ปักหมุด"
+              />
+            )}
+            {muted && (
+              <VolumeX
+                className={cn(
+                  'h-3 w-3 flex-none',
+                  isSelected ? 'text-on-accent/80' : 'text-sidebar-text-muted',
+                )}
+                aria-label="ปิดการแจ้งเตือน"
+              />
+            )}
             <span
-              key={tag.id}
               className={cn(
-                'inline-block rounded-pill px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset',
-                TAG_BADGE[tag.color] ?? TAG_BADGE.muted,
+                'truncate text-sm font-semibold',
+                isSelected ? 'text-on-accent' : 'text-sidebar-fg',
               )}
             >
-              {tag.name}
+              {name}
             </span>
-          ))}
+            <span
+              className={cn(
+                'ml-auto flex-none text-[10px] tabular-nums',
+                isSelected ? 'text-on-accent/80' : 'text-sidebar-text-muted',
+              )}
+            >
+              {formatRelativeTime(conv.lastMessageAt)}
+            </span>
+          </span>
+
+          <span className="flex items-center gap-1.5">
+            <span
+              className={cn(
+                'truncate text-xs',
+                isSelected ? 'text-on-accent/80' : 'text-sidebar-text-muted',
+              )}
+            >
+              {conv.lastMessageText ?? '—'}
+            </span>
+            <span className="ml-auto flex flex-none items-center gap-1">
+              <span
+                className={cn(
+                  'inline-flex items-center gap-0.5 rounded-pill px-1.5 py-0.5 text-[10px] font-medium',
+                  isSelected
+                    ? 'bg-white/20 text-on-accent'
+                    : isBot
+                      ? 'bg-accent/20 text-sidebar-fg'
+                      : 'bg-success/20 text-sidebar-fg',
+                )}
+              >
+                {isBot ? (
+                  <Bot className="h-2.5 w-2.5" aria-hidden="true" />
+                ) : (
+                  <User className="h-2.5 w-2.5" aria-hidden="true" />
+                )}
+                {MODE_SHORT[conv.mode] ?? conv.mode}
+              </span>
+              {conv.unreadAdmin > 0 && (
+                <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-pill bg-danger px-1 text-[10px] font-bold tabular-nums text-white">
+                  {conv.unreadAdmin > 9 ? '9+' : conv.unreadAdmin}
+                </span>
+              )}
+            </span>
+          </span>
+
+          {tags.length > 0 && (
+            <span className="flex flex-wrap items-center gap-1">
+              {tags.slice(0, MAX_TAGS).map((tag) => (
+                <span
+                  key={tag.id}
+                  className={cn(
+                    'inline-block rounded-pill px-1.5 py-0.5 text-[10px] font-medium',
+                    isSelected ? 'bg-white/20 text-on-accent' : 'bg-white/10 text-sidebar-fg',
+                  )}
+                >
+                  {tag.name}
+                </span>
+              ))}
+              {extraTags > 0 && (
+                <span
+                  className={cn(
+                    'text-[10px] font-medium',
+                    isSelected ? 'text-on-accent/80' : 'text-sidebar-text-muted',
+                  )}
+                >
+                  +{extraTags}
+                </span>
+              )}
+            </span>
+          )}
         </span>
       </button>
 
       <DropdownMenu>
         <DropdownMenuTrigger
-          aria-label={`ตัวเลือกของ ${conv.displayName ?? conv.lineUserId}`}
+          aria-label={`ตัวเลือกของ ${name}`}
           className={cn(
-            'absolute right-1.5 top-2.5 inline-flex h-7 w-7 items-center justify-center rounded-md text-muted',
+            'absolute right-1.5 top-3 inline-flex h-7 w-7 items-center justify-center rounded-sm',
             'opacity-0 transition-opacity duration-fast focus-visible:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100',
-            'hover:bg-accent-sunken hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong',
+            'focus-visible:outline focus-visible:outline-2',
+            isSelected
+              ? 'text-on-accent/80 hover:bg-white/20 hover:text-on-accent focus-visible:outline-on-accent'
+              : 'text-sidebar-text-muted hover:bg-white/10 hover:text-sidebar-fg focus-visible:outline-accent',
           )}
         >
-          <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+          <MoreVertical className="h-4 w-4" aria-hidden="true" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onSelect={() => onTogglePin(conv.id, !pinned)}>
-            <Pin className="h-4 w-4" aria-hidden="true" />
+            {pinned ? (
+              <PinOff className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <Pin className="h-4 w-4" aria-hidden="true" />
+            )}
             {pinned ? 'เลิกปักหมุด' : 'ปักหมุด'}
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => onToggleMute(conv.id, !muted)}>
-            <BellOff className="h-4 w-4" aria-hidden="true" />
+            {muted ? (
+              <Volume2 className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <VolumeX className="h-4 w-4" aria-hidden="true" />
+            )}
             {muted ? 'เปิดการแจ้งเตือน' : 'ปิดการแจ้งเตือน'}
           </DropdownMenuItem>
           {conv.unreadAdmin > 0 && (
             <DropdownMenuItem onSelect={() => onMarkRead(conv.id)}>
+              <CheckCheck className="h-4 w-4" aria-hidden="true" />
               ทำเป็นอ่านแล้ว
             </DropdownMenuItem>
           )}

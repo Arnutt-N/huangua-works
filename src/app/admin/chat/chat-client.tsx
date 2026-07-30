@@ -133,8 +133,8 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
   const showPanel = panelOpen && !!selectedId && !!detail;
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
-      <div className="glass-panel flex h-[calc(100dvh-13rem)] min-h-[28rem] overflow-hidden rounded-xl shadow-sm">
+    <>
+      <div className="flex h-dvh w-full overflow-hidden bg-surface font-sans">
         {/* มือถือ: แสดงรายการเต็มจอ แล้วสลับไปหน้าต่างแชทเมื่อเลือกห้อง */}
         <ConversationList
           visible={visible}
@@ -160,6 +160,7 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
         <ChatArea
           selectedId={selectedId}
           customerName={customerName}
+          customerPicture={selectedConv?.pictureUrl ?? null}
           mode={selectedMode}
           messages={messages}
           hasMore={hasMore}
@@ -180,7 +181,7 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
         />
         {/* คอลัมน์ขวา: ข้อมูลลูกค้า (desktop เท่านั้น — mobile ใช้ dialog) */}
         {showPanel && (
-          <aside className="hidden w-72 flex-none border-l border-border lg:block">
+          <aside className="hidden w-72 flex-none border-l border-border bg-surface-raised md:block">
             <CustomerPanel
               conversation={selectedConv}
               detail={detail}
@@ -222,6 +223,6 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
         items={cannedResponses}
         onChanged={loadCanned}
       />
-    </div>
+    </>
   );
 }

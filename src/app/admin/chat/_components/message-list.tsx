@@ -17,13 +17,25 @@ function sameDay(a: string, b: string): boolean {
   );
 }
 
+/** ข้อความติดกันจากคนเดิมภายใน ≤5 นาที = ชุดเดียวกัน (โชว์ชื่อครั้งเดียว, avatar ตัวท้าย) */
+function isGrouped(a: Message | undefined, b: Message): boolean {
+  if (!a || a.sender !== b.sender || !sameDay(a.createdAt, b.createdAt)) return false;
+  return (
+    Math.abs(new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) <= GROUP_WINDOW_MS
+  );
+}
+
 export function MessageList({
   messages,
+  customerName,
+  customerPicture,
   hasMore,
   onLoadOlder,
   onRetry,
 }: {
   messages: Message[];
+  customerName: string | null;
+  customerPicture: string | null;
   hasMore: boolean;
   onLoadOlder: () => void;
   onRetry: (msg: Message) => void;
@@ -83,7 +95,7 @@ export function MessageList({
     <div
       ref={containerRef}
       onScroll={handleScroll}
-      className="flex-1 space-y-3 overflow-y-auto p-4"
+      className="flex-1 space-y-2 overflow-y-auto bg-surface p-4"
       aria-live="polite"
       aria-label="ข้อความในการสนทนา"
     >
@@ -94,26 +106,30 @@ export function MessageList({
       )}
       {messages.map((msg, i) => {
         const prev = messages[i - 1];
+        const next = messages[i + 1];
         const showDate = !prev || !sameDay(prev.createdAt, msg.createdAt);
-        // ข้อความติดกันจากคนเดิมภายใน ≤5 นาที → ซ่อน avatar ให้อ่านเป็นกลุ่ม
-        const grouped =
-          !showDate &&
-          !!prev &&
-          prev.sender === msg.sender &&
-          new Date(msg.createdAt).getTime() - new Date(prev.createdAt).getTime() <=
-            GROUP_WINDOW_MS;
+        // ป้ายชื่อที่ข้อความแรกของชุด, avatar ที่ข้อความสุดท้ายของชุด (ตาม jsk)
+        const showSender = showDate || !isGrouped(prev, msg);
+        const showAvatar = !next || !isGrouped(msg, next);
         return (
-          <div key={msg.id} className="space-y-3">
+          <div key={msg.id}>
             {showDate && (
-              <div className="flex items-center gap-3 py-1" role="separator">
+              <div className="flex items-center gap-3 pb-3" role="separator">
                 <span className="h-px flex-1 bg-border" />
-                <span className="rounded-pill bg-surface-sunken px-2.5 py-0.5 text-[10px] font-semibold text-muted">
+                <span className="rounded-pill border border-border bg-surface-raised px-3 py-1 text-xs font-medium text-muted shadow-sm">
                   {formatDateSeparator(msg.createdAt)}
                 </span>
                 <span className="h-px flex-1 bg-border" />
               </div>
             )}
-            <MessageBubble message={msg} grouped={grouped} onRetry={onRetry} />
+            <MessageBubble
+              message={msg}
+              customerName={customerName}
+              customerPicture={customerPicture}
+              showSender={showSender}
+              showAvatar={showAvatar}
+              onRetry={onRetry}
+            />
           </div>
         );
       })}

@@ -83,6 +83,13 @@
     var(--color-accent-strong)
   );
 
+  /* live-chat dark sidebar (emerald เข้ม — เทียบเท่า navy ของ jsk, เข้มทั้ง light/dark) */
+  --color-sidebar-bg: oklch(24% 0.04 165);
+  --color-sidebar-fg: oklch(98% 0.005 145);
+  --color-sidebar-accent: oklch(30% 0.05 163);
+  --color-sidebar-border: oklch(34% 0.04 160);
+  --color-sidebar-text-muted: oklch(72% 0.03 160);
+
   /* touch (C6 enforce) + motion */
   --touch-target-min: 44px;
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
@@ -149,6 +156,12 @@
   --color-danger-soft: var(--color-danger-soft);
   --color-danger-ink: var(--color-danger-ink);
   --color-info: var(--color-info);
+
+  --color-sidebar-bg: var(--color-sidebar-bg);
+  --color-sidebar-fg: var(--color-sidebar-fg);
+  --color-sidebar-accent: var(--color-sidebar-accent);
+  --color-sidebar-border: var(--color-sidebar-border);
+  --color-sidebar-text-muted: var(--color-sidebar-text-muted);
 
   --font-sans: var(--font-sans);
 

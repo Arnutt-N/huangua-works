@@ -5,6 +5,14 @@ export const MODE_LABELS: Record<string, string> = {
   resolved: 'ปิดเรื่อง',
 };
 
+/** ป้ายสั้นสำหรับแถวใน sidebar (MODE_LABELS ยาวเกินพื้นที่ pill ในแถว) */
+export const MODE_SHORT: Record<string, string> = {
+  bot_active: 'Bot',
+  waiting_handoff: 'รอคน',
+  human_active: 'เจ้าหน้าที่',
+  resolved: 'ปิดแล้ว',
+};
+
 /**
  * § สีโหมดสนทนา — ใช้ design token เท่านั้น
  * แมป: emerald = ระบบ/บอท, amber = รอคน, success = คนกำลังคุย, muted = ปิดแล้ว

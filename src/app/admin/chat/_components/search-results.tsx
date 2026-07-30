@@ -14,14 +14,16 @@ export function SearchResults({
   onOpen: (conversationId: string) => void;
 }) {
   if (searching && results.length === 0) {
-    return <p className="p-4 text-center text-sm text-muted">กำลังค้นหา...</p>;
+    return <p className="px-2 py-2 text-center text-xs text-sidebar-text-muted">กำลังค้นหา...</p>;
   }
   if (results.length === 0) {
-    return <p className="p-4 text-center text-sm text-muted">ไม่พบข้อความที่ค้นหา</p>;
+    return (
+      <p className="px-2 py-2 text-center text-xs text-sidebar-text-muted">ไม่พบข้อความที่ค้นหา</p>
+    );
   }
   return (
-    <div>
-      <p className="border-b border-border bg-surface-sunken/60 px-3 py-1.5 text-[11px] font-semibold text-muted">
+    <div className="space-y-1 pb-2">
+      <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-sidebar-text-muted">
         ผลค้นหาข้อความ ({results.length})
       </p>
       {results.map((r) => (
@@ -30,17 +32,19 @@ export function SearchResults({
           type="button"
           onClick={() => onOpen(r.conversationId)}
           className={cn(
-            'flex w-full flex-col gap-1 border-b border-border px-3 py-2.5 text-left',
-            'transition-colors duration-normal ease-out-expo hover:bg-accent-sunken/50',
+            'flex w-full flex-col gap-1 rounded-md border border-white/10 bg-white/5 p-2 text-left',
+            'transition-colors duration-normal ease-out-expo hover:bg-white/10',
           )}
         >
           <span className="flex items-center justify-between gap-2">
-            <span className="truncate text-xs font-semibold text-ink">
+            <span className="truncate text-[11px] font-medium text-sidebar-fg">
               {r.displayName ?? r.lineUserId.slice(0, 8)}
             </span>
-            <span className="flex-none text-[10px] text-muted">{formatTime(r.createdAt)}</span>
+            <span className="flex-none text-[11px] text-sidebar-text-muted tabular-nums">
+              {formatTime(r.createdAt)}
+            </span>
           </span>
-          <span className="line-clamp-2 text-xs text-muted">{r.snippet}</span>
+          <span className="line-clamp-2 text-[11px] text-sidebar-text-muted">{r.snippet}</span>
         </button>
       ))}
     </div>

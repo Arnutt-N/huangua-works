@@ -44,51 +44,51 @@ export function CustomerPanel({
 
   return (
     <div className="flex h-full flex-col overflow-y-auto">
-      <div className="flex items-center justify-between gap-2 border-b border-border bg-surface-sunken/60 px-4 py-2.5">
-        <h2 className="text-sm font-bold text-ink">ข้อมูลลูกค้า</h2>
+      <div className="flex h-20 flex-none items-center justify-between gap-2 border-b border-border px-4">
+        <h2 className="text-xs font-bold uppercase tracking-widest text-ink">ข้อมูลลูกค้า</h2>
         {onClose && (
           <button
             type="button"
             onClick={onClose}
             aria-label="ปิดแผงข้อมูลลูกค้า"
-            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted hover:bg-accent-sunken hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-sm text-muted hover:bg-accent-sunken hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
           >
             <X className="h-4 w-4" aria-hidden="true" />
           </button>
         )}
       </div>
 
-      <div className="space-y-5 p-4">
-        {/* โปรไฟล์ */}
-        <div className="flex flex-col items-center gap-2 text-center">
-          {conversation.pictureUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- รูปโปรไฟล์ LINE เป็น external URL ไม่ fix โดเมน
-            <img
-              src={conversation.pictureUrl}
-              alt=""
-              className="h-16 w-16 rounded-pill object-cover ring-1 ring-border"
-            />
-          ) : (
-            <span className="inline-flex h-16 w-16 items-center justify-center rounded-pill bg-accent-sunken text-accent-strong ring-1 ring-border">
-              <UserRound className="h-8 w-8" aria-hidden="true" />
-            </span>
-          )}
-          <div>
-            <p className="text-sm font-bold text-ink">{name}</p>
-            <p className="text-[11px] text-muted" title="LINE user id (ปิดบังบางส่วน)">
-              {maskLineUserId(conversation.lineUserId)}
-            </p>
-          </div>
-          <span
-            className={cn(
-              'rounded-pill px-2.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset',
-              MODE_BADGE[detail.mode] ?? FALLBACK_BADGE,
-            )}
-          >
-            {MODE_LABELS[detail.mode] ?? detail.mode}
+      {/* โปรไฟล์ */}
+      <div className="flex flex-none flex-col items-center gap-2 border-b border-border p-5 text-center">
+        {conversation.pictureUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- รูปโปรไฟล์ LINE เป็น external URL ไม่ fix โดเมน
+          <img
+            src={conversation.pictureUrl}
+            alt=""
+            className="h-20 w-20 rounded-pill object-cover shadow-md ring-4 ring-surface-raised"
+          />
+        ) : (
+          <span className="inline-flex h-20 w-20 items-center justify-center rounded-pill bg-accent-gradient-br text-on-accent shadow-md ring-4 ring-surface-raised">
+            <UserRound className="h-10 w-10" aria-hidden="true" />
           </span>
+        )}
+        <div>
+          <p className="text-sm font-bold text-ink">{name}</p>
+          <p className="text-[11px] text-muted" title="LINE user id (ปิดบังบางส่วน)">
+            {maskLineUserId(conversation.lineUserId)}
+          </p>
         </div>
+        <span
+          className={cn(
+            'rounded-pill px-2.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset',
+            MODE_BADGE[detail.mode] ?? FALLBACK_BADGE,
+          )}
+        >
+          {MODE_LABELS[detail.mode] ?? detail.mode}
+        </span>
+      </div>
 
+      <div className="space-y-5 p-4">
         {/* เคสที่ผูก */}
         <div className="space-y-2">
           <h3 className="text-xs font-bold uppercase tracking-wide text-muted">เคสที่ผูกไว้</h3>

@@ -1,7 +1,6 @@
 'use client';
 
 import { MessagesSquare } from 'lucide-react';
-import { EmptyState } from '@/components/admin/empty-state';
 import { cn } from '@/lib/cn';
 import type { CannedResponse, Message } from '../_lib/types';
 import { ChatHeader } from './chat-header';
@@ -11,6 +10,7 @@ import { MessageList } from './message-list';
 export function ChatArea({
   selectedId,
   customerName,
+  customerPicture,
   mode,
   messages,
   hasMore,
@@ -31,6 +31,7 @@ export function ChatArea({
 }: {
   selectedId: string | null;
   customerName: string | null;
+  customerPicture: string | null;
   mode: string;
   messages: Message[];
   hasMore: boolean;
@@ -53,19 +54,32 @@ export function ChatArea({
   const canReply = mode === 'human_active' && !ownershipBanner;
 
   return (
-    <div className={cn('min-w-0 flex-1 flex-col sm:flex', selectedId ? 'flex' : 'hidden')}>
+    <main className={cn('min-w-0 flex-1 flex-col bg-surface md:flex', selectedId ? 'flex' : 'hidden')}>
       {!selectedId ? (
-        <div className="flex flex-1 items-center justify-center">
-          <EmptyState
-            icon={MessagesSquare}
-            title="เลือกการสนทนา"
-            description="เลือกรายการจากด้านซ้ายเพื่อดูข้อความและตอบกลับผู้ใช้ LINE"
-          />
-        </div>
+        <>
+          <header className="flex h-20 flex-none items-center border-b border-border bg-surface-raised/80 px-5 backdrop-blur-sm">
+            <span className="text-base font-bold text-ink">แชท LINE</span>
+          </header>
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
+            <span
+              className="inline-flex h-20 w-20 items-center justify-center rounded-lg border border-border bg-surface-raised shadow-lg"
+              aria-hidden="true"
+            >
+              <MessagesSquare className="h-9 w-9 text-accent" />
+            </span>
+            <div className="space-y-1">
+              <p className="text-base font-bold text-ink">เลือกการสนทนา</p>
+              <p className="max-w-sm text-sm text-muted">
+                เลือกรายการจากด้านซ้ายเพื่อดูข้อความและตอบกลับผู้ใช้ LINE
+              </p>
+            </div>
+          </div>
+        </>
       ) : (
         <>
           <ChatHeader
             customerName={customerName}
+            customerPicture={customerPicture}
             mode={mode}
             panelOpen={panelOpen}
             onBack={onBack}
@@ -76,12 +90,15 @@ export function ChatArea({
           />
           <MessageList
             messages={messages}
+            customerName={customerName}
+            customerPicture={customerPicture}
             hasMore={hasMore}
             onLoadOlder={onLoadOlder}
             onRetry={onRetry}
           />
           <Composer
             canReply={canReply}
+            mode={mode}
             ownershipBanner={ownershipBanner}
             actionError={actionError}
             cannedResponses={cannedResponses}
@@ -91,6 +108,6 @@ export function ChatArea({
           />
         </>
       )}
-    </div>
+    </main>
   );
 }
