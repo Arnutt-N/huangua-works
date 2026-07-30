@@ -17,6 +17,7 @@ import {
   villages,
 } from '@/lib/db/schema';
 import { requireStaff } from '@/lib/auth/require-staff';
+import { CASE_SUPERVISOR_ROLES } from '@/lib/auth/roles';
 import { getActiveDepartments, getActiveOfficers } from '@/lib/queries/lookups';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { STATUS_LABELS_TH } from '@/lib/cases/state-machine';
@@ -33,8 +34,6 @@ interface PageProps {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ ok?: string }>;
 }
-
-const SUPERVISOR_ROLES = ['chief', 'head', 'superadmin'] as const;
 
 function formatAge(date: Date, now: number): string {
   const diffHours = Math.floor((now - date.getTime()) / 3_600_000);
@@ -170,9 +169,7 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
 
-  const canChangeDepartment = SUPERVISOR_ROLES.includes(
-    staffUser.role as (typeof SUPERVISOR_ROLES)[number]
-  );
+  const canChangeDepartment = CASE_SUPERVISOR_ROLES.includes(staffUser.role);
 
   return (
     <AdminShell user={staffUser} active="reports" title="รายละเอียดเรื่อง">

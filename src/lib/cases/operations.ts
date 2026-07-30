@@ -4,6 +4,7 @@ import { firstOrUndefined } from '../db/query-helpers';
 import { cases, caseUpdates, type updateTypeEnum } from '../db/schema';
 import { generateId } from '../id';
 import { AUDIT_ACTIONS, logAudit, type AuditAction } from '../audit';
+import { CASE_SUPERVISOR_ROLES } from '../auth/roles';
 import { assertTransition, type CaseStatus } from './state-machine';
 
 type UpdateType = (typeof updateTypeEnum.enumValues)[number];
@@ -27,12 +28,10 @@ export type CaseOperationResult = { ok: true } | { ok: false; error: string };
 // § actor สำหรับงานอัตโนมัติ (cron) — caseUpdates.userId/auditLogs.userId ไม่มี FK จริง
 export const SYSTEM_ACTOR: CaseActor = { userId: 'system', role: 'system' };
 
-const SUPERVISOR_ROLES = ['chief', 'head', 'superadmin'];
-
-const PATCH_PERMISSIONS: Record<CasePatch['kind'], string[] | null> = {
+const PATCH_PERMISSIONS: Record<CasePatch['kind'], readonly string[] | null> = {
   status: null,
   assignment: null,
-  department: SUPERVISOR_ROLES,
+  department: CASE_SUPERVISOR_ROLES,
   priority: null,
   comment: null,
 };

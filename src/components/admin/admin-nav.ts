@@ -7,7 +7,7 @@ import {
   FolderCog,
   type LucideIcon,
 } from 'lucide-react';
-import type { UserRole } from '@/lib/auth/roles';
+import { ADMIN_ROLES, type UserRole } from '@/lib/auth/roles';
 
 export type { UserRole } from '@/lib/auth/roles';
 
@@ -79,10 +79,8 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
   },
 ];
 
-const SUPERVISOR_ROLES: UserRole[] = ['head', 'superadmin'];
-
 export function isSupervisor(role: UserRole): boolean {
-  return SUPERVISOR_ROLES.includes(role);
+  return ADMIN_ROLES.includes(role);
 }
 
 export function visibleNavItems(role: UserRole, items: AdminNavItem[]): AdminNavItem[] {
