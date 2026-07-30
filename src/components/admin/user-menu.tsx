@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { ChevronDown, LogOut, UserCircle } from 'lucide-react';
 import { logout } from '@/app/admin/actions';
@@ -47,6 +47,19 @@ export function UserMenu({
   role: UserRole;
 }) {
   const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false);
+  const [loggingOut, startLogout] = useTransition();
+
+  // § ปิด Dialog ก่อน navigate — logout() เป็น server action ที่ redirect ทำให้ทั้ง
+  // layout (รวม Dialog) unmount ระหว่างที่ Dialog ยัง open; Radix จึงไม่ทันคืนค่า
+  // pointer-events บน <body> → หน้า login คลิก input ไม่ได้จนกว่าจะ hard reload
+  // การ setState(false) ก่อน แล้วค่อยยิง action (มี round-trip) ให้ React unmount
+  // Dialog + คืน pointer-events เสร็จก่อน redirect จะมาถึงเสมอ
+  function handleConfirmLogout() {
+    setConfirmLogoutOpen(false);
+    startLogout(async () => {
+      await logout();
+    });
+  }
 
   return (
     <>
@@ -110,11 +123,15 @@ export function UserMenu({
                 ยกเลิก
               </Button>
             </DialogClose>
-            <form action={logout}>
-              <Button type="submit" variant="destructive" size="sm">
-                ออกจากระบบ
-              </Button>
-            </form>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={handleConfirmLogout}
+              disabled={loggingOut}
+            >
+              ออกจากระบบ
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
