@@ -18,11 +18,14 @@ function SkeletonRows() {
   return (
     <div className="space-y-1 py-2" aria-hidden="true">
       {[0, 1, 2, 3].map((i) => (
-        <div key={i} className="flex animate-pulse items-center gap-3 rounded-xl bg-white/5 p-3">
-          <div className="h-10 w-10 flex-none rounded-pill bg-white/10" />
+        <div
+          key={i}
+          className="flex animate-pulse items-center gap-3 rounded-xl bg-surface-sunken p-3"
+        >
+          <div className="h-10 w-10 flex-none rounded-pill bg-border" />
           <div className="min-w-0 flex-1 space-y-2">
-            <div className="h-3.5 w-2/3 rounded-sm bg-white/10" />
-            <div className="h-3 w-full rounded-sm bg-white/10" />
+            <div className="h-3.5 w-2/3 rounded-sm bg-border" />
+            <div className="h-3 w-full rounded-sm bg-border" />
           </div>
         </div>
       ))}
@@ -82,27 +85,22 @@ export function ConversationList({
   return (
     <aside
       className={cn(
-        'relative w-full flex-none flex-col overflow-hidden border-r border-white/10',
-        'bg-sidebar-bg text-sidebar-fg md:flex md:w-80',
+        'w-full flex-none flex-col overflow-hidden border-r border-border',
+        'bg-surface-raised text-ink md:flex md:w-80',
         selectedId ? 'hidden md:flex' : 'flex',
       )}
     >
-      <div
-        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-sidebar-bg via-sidebar-accent to-sidebar-border"
-        aria-hidden="true"
-      />
-
-      <div className="relative z-10 flex h-full flex-col">
-        <div className="flex h-20 flex-none items-center gap-3 border-b border-white/10 px-4">
+      <div className="flex h-full flex-col">
+        <div className="flex h-20 flex-none items-center gap-3 border-b border-border px-4">
           <Link
             href="/admin"
             aria-label="กลับหน้าแดชบอร์ดผู้ดูแล"
             title="กลับหน้าแดชบอร์ดผู้ดูแล"
-            className="inline-flex h-10 w-10 flex-none items-center justify-center rounded-lg bg-accent-gradient text-on-accent shadow-lg ring-4 ring-accent/10 transition-shadow duration-normal ease-out-expo hover:shadow-accent-glow focus-visible:outline focus-visible:outline-2 focus-visible:outline-on-accent"
+            className="inline-flex h-10 w-10 flex-none items-center justify-center rounded-lg bg-accent-gradient text-on-accent shadow-lg ring-4 ring-accent/10 transition-shadow duration-normal ease-out-expo hover:shadow-accent-glow focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
           >
             <Home className="h-5 w-5" aria-hidden="true" />
           </Link>
-          <h2 className="flex-1 truncate text-center text-base font-bold tracking-wide text-sidebar-fg">
+          <h2 className="flex-1 truncate text-center text-base font-bold tracking-wide text-ink">
             การสนทนา LINE
           </h2>
           <span className="h-10 w-10 flex-none" aria-hidden="true" />
@@ -111,7 +109,7 @@ export function ConversationList({
         <div className="flex-none space-y-2.5 px-3 py-3">
           <div className="relative">
             <Search
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-sidebar-text-muted"
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
               aria-hidden="true"
             />
             <input
@@ -121,7 +119,7 @@ export function ConversationList({
               placeholder="ค้นหาชื่อหรือข้อความ..."
               aria-label="ค้นหาการสนทนา"
               className={cn(
-                'w-full rounded-md border border-white/10 bg-white/5 py-2 pl-10 pr-3 text-sm text-sidebar-fg placeholder:text-sidebar-text-muted',
+                'w-full rounded-md border border-border bg-surface py-2 pl-10 pr-3 text-sm text-ink placeholder:text-muted',
                 'transition-colors duration-normal ease-out-expo',
                 'focus:border-accent/40 focus:outline-none focus-visible:ring focus-visible:ring-accent/40',
               )}
@@ -148,14 +146,14 @@ export function ConversationList({
                     'transition-colors duration-normal ease-out-expo',
                     active
                       ? 'bg-accent-gradient text-on-accent shadow-lg'
-                      : 'bg-white/5 text-sidebar-text-muted hover:text-sidebar-fg',
+                      : 'bg-surface-sunken text-muted hover:text-ink',
                   )}
                 >
                   {chip.label}
                   <span
                     className={cn(
                       'inline-flex h-4 min-w-4 items-center justify-center rounded-pill px-1 text-[10px] tabular-nums',
-                      active ? 'bg-white/20 text-on-accent' : 'bg-white/10 text-sidebar-text-muted',
+                      active ? 'bg-white/20 text-on-accent' : 'bg-surface-raised text-muted',
                     )}
                   >
                     {count}
@@ -178,7 +176,7 @@ export function ConversationList({
                 'transition-colors duration-normal ease-out-expo',
                 sort === 'oldest'
                   ? 'bg-accent-gradient text-on-accent shadow-lg'
-                  : 'bg-white/5 text-sidebar-text-muted hover:text-sidebar-fg',
+                  : 'bg-surface-sunken text-muted hover:text-ink',
               )}
             >
               <ArrowDownWideNarrow className="h-4 w-4" aria-hidden="true" />
@@ -196,15 +194,15 @@ export function ConversationList({
             </>
           ) : visible.length === 0 ? (
             <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
-              <Inbox className="h-10 w-10 text-sidebar-text-muted" aria-hidden="true" />
-              <p className="text-sm text-sidebar-text-muted">ยังไม่มีการสนทนา</p>
+              <Inbox className="h-10 w-10 text-muted" aria-hidden="true" />
+              <p className="text-sm text-muted">ยังไม่มีการสนทนา</p>
             </div>
           ) : (
             <div className="space-y-1 py-2">{rows}</div>
           )}
         </div>
 
-        <div className="flex-none border-t border-white/10 bg-black/20 px-3 py-2.5">
+        <div className="flex-none border-t border-border bg-surface-sunken px-3 py-2.5">
           <div className="flex items-center justify-between gap-2 text-[11px]">
             <span className="inline-flex items-center gap-1.5 text-success">
               <span className="h-1.5 w-1.5 rounded-pill bg-success" aria-hidden="true" />
@@ -214,8 +212,8 @@ export function ConversationList({
               <span className="h-1.5 w-1.5 rounded-pill bg-warning" aria-hidden="true" />
               รอรับเรื่อง {counts.waiting}
             </span>
-            <span className="inline-flex items-center gap-1.5 text-sidebar-text-muted">
-              <span className="h-1.5 w-1.5 rounded-pill bg-white/20" aria-hidden="true" />
+            <span className="inline-flex items-center gap-1.5 text-muted">
+              <span className="h-1.5 w-1.5 rounded-pill bg-muted" aria-hidden="true" />
               ทั้งหมด {counts.all}
             </span>
           </div>
