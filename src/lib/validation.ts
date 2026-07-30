@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ALL_STATUSES } from './cases/state-machine';
+import { STAFF_ROLES } from './auth/roles';
 
 /**
  * Validation schemas — source of truth สำหรับทุก input boundary
@@ -188,14 +189,14 @@ export const addUpdateFormSchema = z.object({
 export const createUserFormSchema = z.object({
   email: emailSchema,
   fullName: fullNameSchema,
-  role: z.enum(['officer', 'chief', 'head', 'superadmin']),
+  role: z.enum(STAFF_ROLES),
   departmentId: z.string().optional(),
   password: z.string().min(8, 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร').max(128),
 });
 
 export const updateUserRoleFormSchema = z.object({
   userId: uuidSchema,
-  role: z.enum(['officer', 'chief', 'head', 'superadmin']),
+  role: z.enum(STAFF_ROLES),
   departmentId: z.string().optional(),
 });
 
