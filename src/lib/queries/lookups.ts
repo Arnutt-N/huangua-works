@@ -1,13 +1,12 @@
 import { and, eq, ne } from 'drizzle-orm';
 import { getDb, type Db } from '../db';
-import { categories, departments, users, type userRoleEnum } from '../db/schema';
+import { categories, departments, users } from '../db/schema';
+import type { UserRole } from '../auth/roles';
 
 export interface OptionRow {
   id: string;
   name: string;
 }
-
-type UserRole = (typeof userRoleEnum.enumValues)[number];
 
 export interface OfficerRow {
   id: string;

@@ -7,9 +7,9 @@ import {
   FolderCog,
   type LucideIcon,
 } from 'lucide-react';
-import type { userRoleEnum } from '@/lib/db/schema';
+import type { UserRole } from '@/lib/auth/roles';
 
-export type UserRole = (typeof userRoleEnum.enumValues)[number];
+export type { UserRole } from '@/lib/auth/roles';
 
 export type AdminTab =
   | 'dashboard'

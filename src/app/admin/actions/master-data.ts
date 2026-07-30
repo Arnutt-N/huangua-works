@@ -14,9 +14,7 @@ import {
   toggleActiveFormSchema,
   validateFormData,
 } from '@/lib/validation';
-import type { userRoleEnum } from '@/lib/db/schema';
-
-type UserRole = (typeof userRoleEnum.enumValues)[number];
+import type { UserRole } from '@/lib/auth/roles';
 
 /**
  * Server actions สำหรับข้อมูลหลัก — หน่วยงาน (departments) และหมวดหมู่ (categories)

@@ -36,9 +36,7 @@ import {
   resetPassword,
   type UserActionState,
 } from '@/app/admin/actions/users';
-import type { userRoleEnum } from '@/lib/db/schema';
-
-type UserRole = (typeof userRoleEnum.enumValues)[number];
+import type { UserRole } from '@/lib/auth/roles';
 
 interface UserRow {
   id: string;

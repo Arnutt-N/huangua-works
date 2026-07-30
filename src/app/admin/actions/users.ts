@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
-import { users, userRoleEnum } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema';
 import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
 import { generateId } from '@/lib/id';
 import { hashPassword } from '@/lib/password';
@@ -16,8 +16,7 @@ import {
   resetPasswordFormSchema,
   validateFormData,
 } from '@/lib/validation';
-
-type UserRole = (typeof userRoleEnum.enumValues)[number];
+import type { UserRole } from '@/lib/auth/roles';
 
 /**
  * Server actions สำหรับจัดการ users (admin panel)

@@ -1,7 +1,5 @@
 import { cn } from '@/lib/cn';
-import type { userRoleEnum } from '@/lib/db/schema';
-
-type UserRole = (typeof userRoleEnum.enumValues)[number];
+import type { UserRole } from '@/lib/auth/roles';
 
 /**
  * RoleBadge — แสดง role ของ user ในรูปแบบ badge

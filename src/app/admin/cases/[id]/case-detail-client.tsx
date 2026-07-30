@@ -25,9 +25,7 @@ import {
   assertTransition,
   type CaseStatus,
 } from '@/lib/cases/state-machine';
-import type { userRoleEnum } from '@/lib/db/schema';
-
-type UserRole = (typeof userRoleEnum.enumValues)[number];
+import type { UserRole } from '@/lib/auth/roles';
 
 interface OfficerOption {
   id: string;

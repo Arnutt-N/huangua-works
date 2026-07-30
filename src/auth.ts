@@ -7,7 +7,7 @@ import { authConfig } from '@/auth.config';
 import { isTokenExpired } from '@/lib/auth/token-expiry';
 import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
-import { users, userRoleEnum } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema';
 
 /**
  * Auth.js v5 — staff login (Node runtime)
@@ -23,8 +23,8 @@ import { users, userRoleEnum } from '@/lib/db/schema';
  * (ตรวจ role/isActive หลังยืนยันรหัสผ่านผ่านแล้ว จึงไม่เปิดให้เดา email จาก error ที่ต่างกัน)
  */
 
-// § type ของ role ที่ใช้ใน session/JWT — derive จาก pgEnum เพื่อซิงค์กับ schema.ts อัตโนมัติ
-type UserRole = (typeof userRoleEnum.enumValues)[number];
+// § type ของ role ที่ใช้ใน session/JWT — single source of truth ใน lib/auth/roles.ts
+import type { UserRole } from '@/lib/auth/roles';
 
 // § shape ของข้อมูลที่ authorize() คืน (ฝังลง JWT ใน jwt callback)
 // แยกเป็น type ตรงๆ แทนการ augment @auth/core/jwt ซึ่ง resolve ยากใน pnpm strict layout
