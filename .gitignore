@@ -89,3 +89,9 @@ data/
 *.db
 *.sqlite
 *.sqlite3
+
+# ---- 🛠️ One-off ops scripts (อ่าน secrets/ — ห้าม commit) ----
+scripts/prod-migrate-0011.mjs
+scripts/line-webhook-diagnose.mjs
+scripts/prod-probe-insert.mjs
+scripts/prod-probe-drizzle.ts

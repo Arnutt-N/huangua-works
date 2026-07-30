@@ -52,6 +52,7 @@ export async function sendTypingIndicator(chatId: string, loadingSeconds = 10): 
 export async function getProfile(userId: string): Promise<LineProfile | null> {
   const res = await fetch(`${LINE_API_BASE}/profile/${userId}`, {
     headers: getHeaders(),
+    signal: AbortSignal.timeout(3000),
   });
   if (!res.ok) return null;
   return res.json();

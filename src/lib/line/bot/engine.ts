@@ -2,7 +2,7 @@ import { eq, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { lineUsers, chatConversations, chatMessages, cases } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
-import { replyMessage, sendTypingIndicator } from '../client';
+import { getProfile, replyMessage, sendTypingIndicator } from '../client';
 import type { LineWebhookEvent, LineMessageEvent, LineFollowEvent, LinePostbackEvent, LineOutgoingMessage } from '../types';
 import { matchFaq } from './faq-matcher';
 import { startCaseFlow, processCaseFlow, type CaseFlowState } from './case-flow';
@@ -36,6 +36,8 @@ export async function handleEvent(event: LineWebhookEvent) {
   }
 }
 
+const PROFILE_RETRY_MS = 24 * 60 * 60 * 1000; // ลองดึงโปรไฟล์ที่พลาดซ้ำได้วันละครั้ง
+
 async function getOrCreateLineUser(db: Db, lineUserId: string) {
   const [existing] = await db
     .select()
@@ -43,10 +45,36 @@ async function getOrCreateLineUser(db: Db, lineUserId: string) {
     .where(eq(lineUsers.lineUserId, lineUserId))
     .limit(1);
 
-  if (existing) return existing;
+  if (existing) {
+    // backfill โปรไฟล์ให้ user เก่าที่ยังไม่มีชื่อ (best-effort — พังไม่ล้ม flow)
+    // gate ด้วย profileCheckedAt กันยิง LINE API ซ้ำทุกข้อความเมื่อดึงไม่สำเร็จ
+    const meta = (existing.metadata as { profileCheckedAt?: string } | null) ?? null;
+    const lastCheck = meta?.profileCheckedAt ? Date.parse(meta.profileCheckedAt) : 0;
+    const due = Date.now() - lastCheck > PROFILE_RETRY_MS;
+    if (!existing.displayName && due) {
+      const profile = await getProfile(lineUserId).catch(() => null);
+      await db
+        .update(lineUsers)
+        .set({
+          ...(profile
+            ? { displayName: profile.displayName, pictureUrl: profile.pictureUrl ?? null }
+            : {}),
+          metadata: { ...(meta ?? {}), profileCheckedAt: new Date().toISOString() },
+        })
+        .where(eq(lineUsers.id, existing.id));
+    }
+    return existing;
+  }
 
   const id = generateId();
-  await db.insert(lineUsers).values({ id, lineUserId });
+  const profile = await getProfile(lineUserId).catch(() => null);
+  await db.insert(lineUsers).values({
+    id,
+    lineUserId,
+    displayName: profile?.displayName ?? null,
+    pictureUrl: profile?.pictureUrl ?? null,
+    metadata: { profileCheckedAt: new Date().toISOString() },
+  });
   return { id, lineUserId, botState: null };
 }
 
