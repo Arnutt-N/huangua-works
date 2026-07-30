@@ -3,7 +3,9 @@ import { eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { chatMessages, chatConversations } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
-import { auth } from '@/auth';
+import { requireStaffApi } from '@/lib/auth/require-staff';
+import { STAFF_ROLES } from '@/lib/auth/roles';
+import { chatReplySchema, validateOrError } from '@/lib/validation';
 import { pushMessage } from '@/lib/line/client';
 import { broadcast } from '@/lib/line/sse/broadcaster';
 
@@ -13,18 +15,23 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const authz = await requireStaffApi(STAFF_ROLES);
+  if (!authz.ok) return authz.response;
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
+  const validation = validateOrError(chatReplySchema, body);
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
+  }
+
+  const { text } = validation.data;
   const { id } = await params;
-  const body = await request.json();
-  const text = (body.text as string)?.trim();
-
-  if (!text) {
-    return NextResponse.json({ error: 'text is required' }, { status: 400 });
-  }
 
   const db = await getDb();
 
@@ -45,7 +52,7 @@ export async function POST(
     sender: 'admin',
     messageType: 'text',
     textContent: text,
-    adminUserId: session.user.id,
+    adminUserId: authz.ctx.user.id,
   });
 
   await db

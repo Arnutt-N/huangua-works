@@ -2,15 +2,14 @@ import { NextResponse } from 'next/server';
 import { desc, eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { chatConversations, lineUsers } from '@/lib/db/schema';
-import { auth } from '@/auth';
+import { requireStaffApi } from '@/lib/auth/require-staff';
+import { STAFF_ROLES } from '@/lib/auth/roles';
 
 export const runtime = 'nodejs';
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const authz = await requireStaffApi(STAFF_ROLES);
+  if (!authz.ok) return authz.response;
 
   const db = await getDb();
 

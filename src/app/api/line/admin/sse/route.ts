@@ -1,14 +1,13 @@
-import { auth } from '@/auth';
+import { requireStaffApi } from '@/lib/auth/require-staff';
+import { STAFF_ROLES } from '@/lib/auth/roles';
 import { subscribe } from '@/lib/line/sse/broadcaster';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user) {
-    return new Response('Unauthorized', { status: 401 });
-  }
+  const authz = await requireStaffApi(STAFF_ROLES);
+  if (!authz.ok) return authz.response;
 
   const encoder = new TextEncoder();
   let cleanup: (() => void) | null = null;

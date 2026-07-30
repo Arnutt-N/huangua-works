@@ -1,5 +1,6 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { auth, signOut } from '@/auth';
 import { getDb } from '@/lib/db';
@@ -28,28 +29,27 @@ export interface StaffContext {
   userAgent: string | undefined;
 }
 
+type StaffDenialReason =
+  | 'no_session'
+  | 'no_staff_record'
+  | 'citizen_role'
+  | 'inactive'
+  | 'insufficient_role';
+
+type StaffResolution =
+  | { ok: true; ctx: StaffContext }
+  | { ok: false; reason: StaffDenialReason };
+
 /**
- * ตรวจสอบว่า request ปัจจุบันมาจากเจ้าหน้าที่ที่ login แล้วและมีสิทธิ์
+ * การตัดสินสิทธิ์จริง — ไม่ redirect ไม่ signOut ไม่ตอบ HTTP
  *
- * - อ่าน session จาก JWT cookie (auth())
- * - re-fetch user row จาก DB เพื่อตรวจ role/isActive แบบสด (defense-in-depth)
- *   (JWT เป็น snapshot ตอน login — role/isActive เปลี่ยนกลางคันจะไม่เห็นใน JWT)
- * - ถ้าไม่ผ่าน: signOut + audit + redirect '/admin/login'
- * - ถ้าผ่าน: คืน StaffContext (user + ipAddress + userAgent)
- *
- * @param allowedRoles optional whitelist — ถ้าระบุ จะเช็คเพิ่มว่า role อยู่ใน list
- *   (เช่น `requireStaff(['superadmin'])` สำหรับการจัดการ user)
- *
- * Extract จาก pattern ที่ duplicate ใน admin/page.tsx + admin/actions.ts (login)
- * — เพื่อให้ทุก admin route/action เช็คสิทธิ์เหมือนกันและลดความซ้ำซ้อน
+ * เจ้าของ audit log ของทุก denial (ยกเว้น no_session ที่ไม่มี user ให้บันทึก)
+ * เพื่อให้ทั้ง requireStaff (redirect) และ requireStaffApi (JSON) ตัดสินเหมือนกัน
  */
-export async function requireStaff(allowedRoles?: readonly UserRole[]): Promise<StaffContext> {
+async function resolveStaff(allowedRoles?: readonly UserRole[]): Promise<StaffResolution> {
   const session = await auth();
   if (!session?.user.userId) {
-    // § session หมดอายุ (jwt คืน null จาก expiresAt) แต่ cookie 30d อาจยังค้างอยู่ —
-    // ต้อง signOut ล้าง cookie ก่อน redirect กัน authorized เห็น cookie แล้ว bounce กลับ (H1)
-    await signOut({ redirect: false });
-    redirect('/admin/login');
+    return { ok: false, reason: 'no_session' };
   }
 
   const db = await getDb();
@@ -61,24 +61,20 @@ export async function requireStaff(allowedRoles?: readonly UserRole[]): Promise<
   const userAgent = await getClientUserAgent();
 
   if (!staffUser || staffUser.role === 'citizen' || !staffUser.isActive) {
-    // § session ยัง valid แต่ role/isActive ไม่ผ่าน — เกิดขึ้นได้เมื่อบัญชีถูกระงับหลัง login
-    // § ต้อง signOut ก่อน redirect ไม่งั้น cookie ยังอยู่ → proxy bounce กลับ → วนลูป (H1)
-    await signOut({ redirect: false });
+    const reason: StaffDenialReason = !staffUser
+      ? 'no_staff_record'
+      : staffUser.role === 'citizen'
+        ? 'citizen_role'
+        : 'inactive';
     await logAudit({
       action: AUDIT_ACTIONS.ACCESS_DENIED,
       resource: 'auth',
       userId: staffUser?.id,
       ipAddress,
       userAgent,
-      metadata: {
-        reason: !staffUser
-          ? 'no_staff_record'
-          : staffUser.role === 'citizen'
-            ? 'citizen_role'
-            : 'inactive',
-      },
+      metadata: { reason },
     });
-    redirect('/admin/login');
+    return { ok: false, reason };
   }
 
   // role whitelist check (optional)
@@ -95,8 +91,64 @@ export async function requireStaff(allowedRoles?: readonly UserRole[]): Promise<
         required: allowedRoles,
       },
     });
+    return { ok: false, reason: 'insufficient_role' };
+  }
+
+  return { ok: true, ctx: { user: staffUser, ipAddress, userAgent } };
+}
+
+/**
+ * ตรวจสอบว่า request ปัจจุบันมาจากเจ้าหน้าที่ที่ login แล้วและมีสิทธิ์
+ *
+ * - อ่าน session จาก JWT cookie (auth())
+ * - re-fetch user row จาก DB เพื่อตรวจ role/isActive แบบสด (defense-in-depth)
+ *   (JWT เป็น snapshot ตอน login — role/isActive เปลี่ยนกลางคันจะไม่เห็นใน JWT)
+ * - ถ้าไม่ผ่าน: signOut + audit + redirect '/admin/login'
+ * - ถ้าผ่าน: คืน StaffContext (user + ipAddress + userAgent)
+ *
+ * @param allowedRoles optional whitelist — ถ้าระบุ จะเช็คเพิ่มว่า role อยู่ใน list
+ *   (เช่น `requireStaff(['superadmin'])` สำหรับการจัดการ user)
+ *
+ * สำหรับ API route handler ใช้ requireStaffApi() แทน — redirect() ที่นี่จะกลายเป็น
+ * 307 ไปหน้า HTML login ซึ่ง fetch caller อ่านไม่ได้
+ */
+export async function requireStaff(allowedRoles?: readonly UserRole[]): Promise<StaffContext> {
+  const result = await resolveStaff(allowedRoles);
+  if (result.ok) return result.ctx;
+
+  if (result.reason === 'insufficient_role') {
     redirect('/admin'); // ไม่ใช่ login — ส่งกลับ dashboard เพราะ login ผ่านแล้ว
   }
 
-  return { user: staffUser, ipAddress, userAgent };
+  // § session หมดอายุ/ถูกระงับ แต่ cookie 30d อาจยังค้างอยู่ — ต้อง signOut ล้าง cookie
+  // ก่อน redirect กัน unauthorized เห็น cookie แล้ว bounce กลับ (H1)
+  await signOut({ redirect: false });
+  redirect('/admin/login');
+}
+
+/**
+ * requireStaff เวอร์ชันสำหรับ API route handler — ตอบ JSON แทน redirect
+ *
+ * ใช้คู่กับ early return:
+ * ```ts
+ * const authz = await requireStaffApi(STAFF_ROLES);
+ * if (!authz.ok) return authz.response;
+ * ```
+ *
+ * ไม่ signOut โดยเจตนา — API call ที่หลุดมาไม่ควรล้าง session ของ browser
+ */
+export async function requireStaffApi(
+  allowedRoles?: readonly UserRole[]
+): Promise<{ ok: true; ctx: StaffContext } | { ok: false; response: NextResponse }> {
+  const result = await resolveStaff(allowedRoles);
+  if (result.ok) return result;
+
+  const forbidden = result.reason === 'insufficient_role';
+  return {
+    ok: false,
+    response: NextResponse.json(
+      { error: forbidden ? 'Forbidden' : 'Unauthorized' },
+      { status: forbidden ? 403 : 401 }
+    ),
+  };
 }
