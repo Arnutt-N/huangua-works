@@ -142,6 +142,3 @@ export const OPEN_STATUSES: readonly CaseStatus[] = [
 export function isCaseStatus(value: string): value is CaseStatus {
   return (ALL_STATUSES as readonly string[]).includes(value);
 }
-
-/** @deprecated ใช้ ALL_STATUSES แทน */
-export const ALL_STATUSES_ORDERED = ALL_STATUSES;

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   ALL_STATUSES,
-  ALL_STATUSES_ORDERED,
   ALLOWED_TRANSITIONS,
   OPEN_STATUSES,
   STATUS_LABELS_TH,
@@ -156,9 +155,9 @@ describe('state-machine · isCaseStatus', () => {
   });
 });
 
-describe('state-machine · ALL_STATUSES_ORDERED', () => {
+describe('state-machine · ALL_STATUSES', () => {
   it('has 8 entries', () => {
-    expect(ALL_STATUSES_ORDERED).toHaveLength(8);
+    expect(ALL_STATUSES).toHaveLength(8);
   });
 });
 

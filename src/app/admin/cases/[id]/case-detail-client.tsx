@@ -20,7 +20,7 @@ import {
   type CaseActionState,
 } from '@/app/admin/actions/cases';
 import {
-  ALL_STATUSES_ORDERED,
+  ALL_STATUSES,
   STATUS_LABELS_TH,
   assertTransition,
   type CaseStatus,
@@ -106,7 +106,7 @@ export function CaseDetailClient({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {ALL_STATUSES_ORDERED.map((s) => {
+                {ALL_STATUSES.map((s) => {
                   const check = assertTransition(currentStatus, s);
                   return (
                     <SelectItem
