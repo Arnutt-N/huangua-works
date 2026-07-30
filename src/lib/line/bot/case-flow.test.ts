@@ -64,6 +64,23 @@ describe('case-flow · processCaseFlow · category step', () => {
     expect(result.state?.categoryName).toBe('ถนน-ทางเท้า');
   });
 
+  it('stores the real DB category id, not the category name', async () => {
+    const result = await flow('ถนน', state('category'));
+    expect(result.state?.categoryId).toBe('cat-road');
+  });
+
+  it('accepts a category id tapped from the flex list', async () => {
+    const result = await flow('cat-elec', state('category'));
+    expect(result.state?.step).toBe('title');
+    expect(result.state?.categoryId).toBe('cat-elec');
+    expect(result.state?.categoryName).toBe('ไฟฟ้า-แสงสว่าง');
+  });
+
+  it('accepts the exact category name typed by the user', async () => {
+    const result = await flow('ไฟฟ้า-แสงสว่าง', state('category'));
+    expect(result.state?.categoryId).toBe('cat-elec');
+  });
+
   it('accumulates missCount on unmatched input', async () => {
     const result = await flow('สวัสดี', state('category'));
     expect(result.state?.step).toBe('category');
