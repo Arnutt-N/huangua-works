@@ -82,4 +82,69 @@ test.describe('admin chat page', () => {
     const fatalErrors = errors.filter((e) => !e.includes('replyToken'));
     expect(fatalErrors).toHaveLength(0);
   });
+
+  test('filter chips switch active state and keep the list rendered', async ({ page }) => {
+    test.slow();
+
+    await page.goto('/admin/login');
+    await page.getByLabel('อีเมล').fill(ADMIN_EMAIL);
+    await page.getByLabel('รหัสผ่าน').fill(ADMIN_PASSWORD);
+    await page.getByRole('button', { name: /เข้าระบบ/ }).click();
+    await expect(page).toHaveURL(/\/admin$/, { timeout: 10_000 });
+
+    await page.goto('/admin/chat', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: 'การสนทนา LINE' })).toBeVisible({ timeout: 20_000 });
+
+    const allChip = page.getByRole('button', { name: /ทั้งหมด/ });
+    const waitingChip = page.getByRole('button', { name: /รอรับเรื่อง/ });
+    await expect(allChip).toHaveAttribute('aria-pressed', 'true');
+
+    await waitingChip.click();
+    await expect(waitingChip).toHaveAttribute('aria-pressed', 'true');
+    await expect(allChip).toHaveAttribute('aria-pressed', 'false');
+
+    await allChip.click();
+    await expect(allChip).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('customer panel toggles and canned picker opens with "/"', async ({ page }) => {
+    test.slow();
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/admin/login');
+    await page.getByLabel('อีเมล').fill(ADMIN_EMAIL);
+    await page.getByLabel('รหัสผ่าน').fill(ADMIN_PASSWORD);
+    await page.getByRole('button', { name: /เข้าระบบ/ }).click();
+    await expect(page).toHaveURL(/\/admin$/, { timeout: 10_000 });
+
+    await page.goto('/admin/chat', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: 'การสนทนา LINE' })).toBeVisible({ timeout: 20_000 });
+
+    const convButton = page.locator('button:has-text("U_test_local")');
+    const hasConversation = await convButton.isVisible().catch(() => false);
+    if (!hasConversation) return; // DB was cleaned — nothing to open
+
+    await convButton.click();
+    await expect(
+      page.getByText(/Bot ตอบอัตโนมัติ|รอเจ้าหน้าที่|เจ้าหน้าที่ตอบ|ปิดเรื่อง/).first(),
+    ).toBeVisible({ timeout: 15_000 });
+
+    // Customer panel visible on desktop → toggle off/on from header
+    await expect(page.getByRole('heading', { name: 'ข้อมูลลูกค้า' })).toBeVisible({ timeout: 15_000 });
+    const panelToggle = page.getByRole('button', { name: 'ซ่อนข้อมูลลูกค้า' });
+    await panelToggle.click();
+    await expect(page.getByRole('heading', { name: 'ข้อมูลลูกค้า' })).toBeHidden();
+    await page.getByRole('button', { name: 'แสดงข้อมูลลูกค้า' }).first().click();
+    await expect(page.getByRole('heading', { name: 'ข้อมูลลูกค้า' })).toBeVisible();
+
+    // Canned picker opens with "/" when composer is enabled (human_active)
+    const composer = page.getByLabel('พิมพ์ข้อความ');
+    const composerEnabled = await composer.isEnabled().catch(() => false);
+    if (composerEnabled) {
+      await composer.fill('/');
+      await expect(page.getByRole('listbox', { name: 'ข้อความสำเร็จรูป' })).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('listbox', { name: 'ข้อความสำเร็จรูป' })).toBeHidden();
+    }
+  });
 });

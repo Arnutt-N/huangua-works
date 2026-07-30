@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { lineUsers, chatConversations, chatMessages, cases } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
@@ -98,7 +98,10 @@ async function handleMessageEvent(
       lastMessageText: textContent ?? `[${messageType}]`,
       lastMessageAt: new Date(),
       lastMessageSender: 'user',
-      unreadAdmin: mode === 'human_active' ? 1 : 0,
+      unreadAdmin:
+        mode === 'human_active' || mode === 'waiting_handoff'
+          ? sql`${chatConversations.unreadAdmin} + 1`
+          : 0,
       updatedAt: new Date(),
     })
     .where(eq(chatConversations.id, conversationId));

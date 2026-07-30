@@ -495,6 +495,9 @@ export const chatConversations = pgTable(
     lastMessageSender: chatSenderEnum('last_message_sender'),
 
     resolvedAt: timestamp('resolved_at', { mode: 'date' }),
+    adminNote: text('admin_note'),
+    adminNoteUpdatedAt: timestamp('admin_note_updated_at', { mode: 'date' }),
+    adminNoteUpdatedBy: text('admin_note_updated_by'),
     metadata: jsonb('metadata'),
   },
   (table) => ({
@@ -568,5 +571,81 @@ export const chatSettings = pgTable(
   },
   (table) => ({
     keyIdx: uniqueIndex('chat_settings_key_idx').on(table.key),
+  })
+);
+
+export const chatCannedResponses = pgTable(
+  'chat_canned_responses',
+  {
+    id: text('id').primaryKey(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+
+    title: text('title').notNull(),
+    shortcut: text('shortcut'),
+    content: text('content').notNull(),
+    createdBy: text('created_by'),
+    isActive: boolean('is_active').notNull().default(true),
+  },
+  (table) => ({
+    shortcutIdx: uniqueIndex('chat_canned_responses_shortcut_idx')
+      .on(table.shortcut)
+      .where(sql`shortcut is not null`),
+    activeIdx: index('chat_canned_responses_is_active_idx').on(table.isActive),
+  })
+);
+
+export const chatAdminPrefs = pgTable(
+  'chat_admin_prefs',
+  {
+    id: text('id').primaryKey(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+
+    adminUserId: text('admin_user_id').notNull(),
+    conversationId: text('conversation_id').notNull(),
+    pinned: boolean('pinned').notNull().default(false),
+    muted: boolean('muted').notNull().default(false),
+  },
+  (table) => ({
+    adminConvIdx: uniqueIndex('chat_admin_prefs_admin_conv_idx').on(
+      table.adminUserId,
+      table.conversationId,
+    ),
+    conversationIdx: index('chat_admin_prefs_conversation_id_idx').on(table.conversationId),
+  })
+);
+
+// § color เก็บเป็น token variant key (accent/gold/success/warning/danger/muted)
+// ไม่เก็บ hex — บังคับให้ tag ทุกอันอยู่ในพาเลตของระบบและรองรับ dark mode ฟรี
+export const chatTags = pgTable(
+  'chat_tags',
+  {
+    id: text('id').primaryKey(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+
+    name: text('name').notNull().unique(),
+    color: text('color').notNull().default('accent'),
+  },
+  (table) => ({
+    nameIdx: uniqueIndex('chat_tags_name_idx').on(table.name),
+  })
+);
+
+export const chatConversationTags = pgTable(
+  'chat_conversation_tags',
+  {
+    id: text('id').primaryKey(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+
+    conversationId: text('conversation_id').notNull(),
+    tagId: text('tag_id').notNull(),
+  },
+  (table) => ({
+    convTagIdx: uniqueIndex('chat_conversation_tags_conv_tag_idx').on(
+      table.conversationId,
+      table.tagId,
+    ),
+    tagIdx: index('chat_conversation_tags_tag_id_idx').on(table.tagId),
   })
 );

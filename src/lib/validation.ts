@@ -150,17 +150,26 @@ export const consentWithdrawSchema = z.object({
 });
 
 /**
- * PATCH /api/line/admin/conversations/[id] — เจ้าหน้าที่เปลี่ยนโหมด/ผูกเรื่องแจ้ง
- * linkedCaseId = null คือถอดการผูกออก
+ * PATCH /api/line/admin/conversations/[id] — เจ้าหน้าที่เปลี่ยนโหมด/ผูกเรื่องแจ้ง/
+ * โอนแชท (assignedAdminId) / บันทึกโน้ตภายใน (adminNote)
+ * linkedCaseId = null คือถอดการผูกออก, adminNote = null คือลบโน้ต
  */
 export const updateConversationSchema = z
   .object({
     mode: z.enum(CONVERSATION_MODES).optional(),
     linkedCaseId: uuidSchema.nullable().optional(),
+    assignedAdminId: uuidSchema.optional(),
+    transferReason: z.string().trim().max(500).optional(),
+    adminNote: z.string().max(2000, 'โน้ตยาวเกิน 2,000 ตัวอักษร').nullable().optional(),
   })
-  .refine((v) => v.mode !== undefined || v.linkedCaseId !== undefined, {
-    message: 'ต้องระบุ mode หรือ linkedCaseId',
-  });
+  .refine(
+    (v) =>
+      v.mode !== undefined ||
+      v.linkedCaseId !== undefined ||
+      v.assignedAdminId !== undefined ||
+      v.adminNote !== undefined,
+    { message: 'ต้องระบุ mode, linkedCaseId, assignedAdminId หรือ adminNote' },
+  );
 
 /**
  * POST /api/line/admin/conversations/[id]/messages — ข้อความที่เจ้าหน้าที่ส่งออก LINE
@@ -179,6 +188,69 @@ export const chatReplySchema = z.object({
     .min(1)
     .max(64)
     .optional(),
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// § Live chat — canned responses / prefs / tags / search / paging
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * POST/PATCH /api/line/admin/canned-responses — ข้อความสำเร็จรูป
+ * shortcut เป็น natural key สำหรับพิมพ์ "/xxx" ใน composer
+ */
+export const cannedResponseSchema = z.object({
+  title: z.string().trim().min(1, 'กรุณากรอกชื่อ').max(100, 'ชื่อยาวเกิน 100 ตัวอักษร'),
+  shortcut: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9-]{1,30}$/, 'shortcut ใช้ได้เฉพาะ a-z, 0-9 และ - (ยาวไม่เกิน 30)')
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
+  content: z
+    .string()
+    .trim()
+    .min(1, 'กรุณากรอกข้อความ')
+    .max(5000, 'ข้อความยาวเกิน 5,000 ตัวอักษร'),
+});
+
+export const cannedResponseUpdateSchema = cannedResponseSchema.partial().refine(
+  (v) => Object.values(v).some((x) => x !== undefined),
+  { message: 'ต้องระบุอย่างน้อย 1 ฟิลด์' },
+);
+
+/** PUT /api/line/admin/conversations/[id]/prefs — pin/mute ต่อแอดมิน */
+export const chatPrefsSchema = z
+  .object({
+    pinned: z.boolean().optional(),
+    muted: z.boolean().optional(),
+  })
+  .refine((v) => v.pinned !== undefined || v.muted !== undefined, {
+    message: 'ต้องระบุ pinned หรือ muted',
+  });
+
+/** สีของ tag = design token variant เท่านั้น — ไม่รับ hex เพื่อคงพาเลตระบบ */
+export const TAG_COLORS = ['accent', 'gold', 'success', 'warning', 'danger', 'muted'] as const;
+
+/** POST /api/line/admin/tags */
+export const chatTagSchema = z.object({
+  name: z.string().trim().min(1, 'กรุณากรอกชื่อป้าย').max(30, 'ชื่อป้ายยาวเกิน 30 ตัวอักษร'),
+  color: z.enum(TAG_COLORS).default('accent'),
+});
+
+/** PUT /api/line/admin/conversations/[id]/tags — replace-set */
+export const conversationTagsSchema = z.object({
+  tagIds: z.array(uuidSchema).max(10, 'ติดป้ายได้สูงสุด 10 ป้าย'),
+});
+
+/** GET /api/line/admin/search?q= — ค้นหาข้อความในแชท */
+export const chatSearchQuerySchema = z.object({
+  q: z.string().trim().min(1, 'กรุณากรอกคำค้นหา').max(100, 'คำค้นหายาวเกินไป'),
+});
+
+/** GET /api/line/admin/conversations/[id]?before=&limit= — cursor paging */
+export const chatPagingQuerySchema = z.object({
+  before: uuidSchema.optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
 });
 
 // ────────────────────────────────────────────────────────────────────────────

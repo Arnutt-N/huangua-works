@@ -1,480 +1,227 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  Bot,
-  User,
-  Send,
-  CheckCircle,
-  UserCheck,
-  MessagesSquare,
-  ChevronLeft,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/field';
-import { EmptyState } from '@/components/admin/empty-state';
-import { cn } from '@/lib/cn';
-
-interface Conversation {
-  id: string;
-  mode: string;
-  lastMessageText: string | null;
-  lastMessageAt: string | null;
-  lastMessageSender: string | null;
-  unreadAdmin: number;
-  displayName: string | null;
-  lineUserId: string;
-}
-
-interface Message {
-  id: string;
-  sender: string;
-  messageType: string;
-  textContent: string | null;
-  createdAt: string;
-  clientTempId?: string | null;
-  status?: 'pending' | 'failed';
-}
-
-const MODE_LABELS: Record<string, string> = {
-  bot_active: 'Bot ตอบอัตโนมัติ',
-  waiting_handoff: 'รอเจ้าหน้าที่',
-  human_active: 'เจ้าหน้าที่ตอบ',
-  resolved: 'ปิดเรื่อง',
-};
-
-/**
- * § สีโหมดสนทนา — ใช้ design token เท่านั้น
- * ของเดิมเป็นสี Tailwind ดิบ (bg-blue-100/bg-green-600/bg-purple-50/bg-gray-100) ซึ่ง
- *   (ก) ไม่อยู่ในพาเลต emerald+amber ของระบบเลย หน้านี้จึงดูหลุดจากหน้าอื่นทั้งหมด
- *   (ข) ไม่ตอบสนอง dark theme เพราะเป็นค่าคงที่
- * แมปใหม่: emerald = ระบบ/บอท, amber = รอคน, success = คนกำลังคุย, muted = ปิดแล้ว
- */
-const MODE_BADGE: Record<string, string> = {
-  bot_active: 'bg-accent-sunken text-accent-strong ring-accent-strong/20',
-  waiting_handoff: 'bg-warning-soft text-warning-ink ring-warning-ink/20',
-  human_active: 'bg-success-soft text-success-ink ring-success-ink/20',
-  resolved: 'bg-surface-sunken text-muted ring-border-strong/30',
-};
-
-const FALLBACK_BADGE = 'bg-surface-sunken text-muted ring-border-strong/30';
+import { useCallback, useEffect, useState } from 'react';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { fetchCannedResponses, fetchStaff, markConversationRead } from './_lib/api';
+import type { CannedResponse, Message, SseChatEvent, StaffMember } from './_lib/types';
+import { useChatSse } from './_hooks/use-chat-sse';
+import { useConversations } from './_hooks/use-conversations';
+import { useMessages } from './_hooks/use-messages';
+import { useMessageSearch } from './_hooks/use-message-search';
+import { CannedManageDialog } from './_components/canned-manage-dialog';
+import { ChatArea } from './_components/chat-area';
+import { ConversationList } from './_components/conversation-list';
+import { CustomerPanel } from './_components/customer-panel';
+import { TransferDialog } from './_components/transfer-dialog';
 
 export function ChatClient({ adminUserId }: { adminUserId: string }) {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [selectedMode, setSelectedMode] = useState<string>('bot_active');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const eventSourceRef = useRef<EventSource | null>(null);
+  const [panelOpen, setPanelOpen] = useState(true);
+  const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [cannedManageOpen, setCannedManageOpen] = useState(false);
+  const [cannedResponses, setCannedResponses] = useState<CannedResponse[]>([]);
+  const [staff, setStaff] = useState<StaffMember[]>([]);
 
-  const loadConversations = useCallback(async () => {
-    const res = await fetch('/api/line/admin/conversations');
-    if (res.ok) setConversations(await res.json());
-  }, []);
+  const {
+    conversations,
+    visible,
+    counts,
+    loading,
+    filter,
+    setFilter,
+    sort,
+    setSort,
+    query,
+    setQuery,
+    loadConversations,
+    togglePref,
+    markReadLocal,
+  } = useConversations();
 
-  const loadMessages = useCallback(async (id: string) => {
-    const res = await fetch(`/api/line/admin/conversations/${id}`);
-    if (res.ok) {
-      const data = await res.json();
-      setMessages(data.messages);
-      setSelectedMode(data.conversation.mode);
-    }
+  const {
+    messages,
+    detail,
+    setDetail,
+    selectedMode,
+    setSelectedMode,
+    actionError,
+    hasMore,
+    loadMessages,
+    loadOlder,
+    applyIncoming,
+    send,
+    retry,
+    changeMode,
+    transfer,
+  } = useMessages(loadConversations);
+
+  const { results: searchResults, searching } = useMessageSearch(query);
+
+  const loadCanned = useCallback(() => {
+    void fetchCannedResponses().then(setCannedResponses);
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch conversations on mount; loadConversations is also reused by the SSE handler and manual refresh below, so it can't be inlined
-    loadConversations();
-  }, [loadConversations]);
+    loadCanned();
+    void fetchStaff().then(setStaff);
+  }, [loadCanned]);
 
-  useEffect(() => {
-    const es = new EventSource('/api/line/admin/sse');
-    eventSourceRef.current = es;
-
-    // SSE เป็น invalidation hint — reconnect แล้ว refetch เก็บ event ที่พลาดระหว่างหลุด
-    es.onopen = () => {
+  useChatSse({
+    onOpen: () => {
       loadConversations();
       if (selectedId) loadMessages(selectedId);
-    };
-
-    es.onmessage = (e) => {
-      let event: { type?: string; conversationId?: string; payload?: { mode?: string } & Record<string, unknown> };
-      try {
-        event = JSON.parse(e.data);
-      } catch {
-        return;
-      }
-      if (event.type === 'connected') return;
-
+    },
+    onEvent: (event: SseChatEvent) => {
       if (event.type === 'new_message') {
         if (event.conversationId === selectedId) {
-          const incoming = event.payload as unknown as Message;
-          setMessages((prev) => {
-            // dedup 2 ทาง: id (event ซ้ำ) + clientTempId (แทนที่ optimistic bubble)
-            const matches = (m: Message) =>
-              m.id === incoming.id ||
-              Boolean(incoming.clientTempId && m.clientTempId === incoming.clientTempId);
-            if (prev.some(matches)) {
-              return prev.map((m) => (matches(m) ? { ...incoming, status: undefined } : m));
-            }
-            return [...prev, incoming];
-          });
+          applyIncoming(event.payload as unknown as Message);
+          markConversationRead(selectedId);
         }
         loadConversations();
       }
       if (event.type === 'mode_change' || event.type === 'conversation_update') {
         loadConversations();
-        if (event.conversationId === selectedId && event.payload?.mode) {
-          setSelectedMode(event.payload.mode);
+        if (event.conversationId === selectedId) {
+          if (event.payload?.mode) setSelectedMode(event.payload.mode);
+          // อัปเดตเจ้าของห้องทันที (โอนแชท/รับเรื่องจากเครื่องอื่น) — banner สลับถูกต้อง
+          setDetail((prev) =>
+            prev && prev.id === event.conversationId
+              ? {
+                  ...prev,
+                  mode: event.payload?.mode ?? prev.mode,
+                  assignedAdminId: event.payload?.assignedAdminId ?? prev.assignedAdminId,
+                }
+              : prev,
+          );
         }
-      }
-    };
-
-    return () => es.close();
-  }, [selectedId, loadConversations, loadMessages]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  const handleSelect = (id: string) => {
-    setSelectedId(id);
-    loadMessages(id);
-  };
-
-  const deliverMessage = useCallback(
-    async (conversationId: string, text: string, tempId: string) => {
-      const markFailed = () =>
-        setMessages((prev) =>
-          prev.map((m) => (m.clientTempId === tempId ? { ...m, status: 'failed' as const } : m)),
-        );
-      try {
-        const res = await fetch(`/api/line/admin/conversations/${conversationId}/messages`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, clientTempId: tempId }),
-        });
-        const data: { messageId?: string; error?: string } | null = await res
-          .json()
-          .catch(() => null);
-        if (!res.ok) {
-          markFailed();
-          setActionError(data?.error ?? 'ส่งข้อความไม่สำเร็จ');
-          return;
-        }
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.clientTempId === tempId
-              ? { ...m, id: data?.messageId ?? m.id, status: undefined }
-              : m,
-          ),
-        );
-        loadConversations();
-      } catch {
-        markFailed();
-        setActionError('ส่งข้อความไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ');
       }
     },
-    [loadConversations],
+  });
+
+  const handleSelect = useCallback(
+    (id: string) => {
+      setSelectedId(id);
+      loadMessages(id);
+      markConversationRead(id);
+      markReadLocal(id);
+    },
+    [loadMessages, markReadLocal],
   );
 
-  const handleSend = () => {
-    const text = input.trim();
-    if (!text || !selectedId) return;
-    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-    setActionError(null);
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: tempId,
-        sender: 'admin',
-        messageType: 'text',
-        textContent: text,
-        createdAt: new Date().toISOString(),
-        clientTempId: tempId,
-        status: 'pending',
-      },
-    ]);
-    setInput('');
-    void deliverMessage(selectedId, text, tempId);
-  };
+  const selectedConv = conversations.find((c) => c.id === selectedId) ?? null;
+  const customerName = selectedConv?.displayName ?? null;
 
-  // retry ปลอดภัยเพราะ server dedup ด้วย clientTempId เดิม — ไม่ push ซ้ำหาลูกค้า
-  const handleRetry = (msg: Message) => {
-    if (!selectedId || !msg.clientTempId || !msg.textContent) return;
-    setActionError(null);
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.clientTempId === msg.clientTempId ? { ...m, status: 'pending' as const } : m,
-      ),
-    );
-    void deliverMessage(selectedId, msg.textContent, msg.clientTempId);
-  };
+  // human_active แต่คนถือห้องเป็นแอดมินคนอื่น → โชว์ banner + ปิดช่องพิมพ์
+  const ownedByOther =
+    selectedMode === 'human_active' &&
+    !!detail?.assignedAdminId &&
+    detail.assignedAdminId !== adminUserId;
+  const ownershipBanner = ownedByOther
+    ? {
+        ownerName:
+          selectedConv?.assignedAdminName ??
+          staff.find((s) => s.id === detail?.assignedAdminId)?.fullName ??
+          null,
+      }
+    : null;
 
-  const handleModeChange = async (mode: string) => {
-    if (!selectedId) return;
-    setActionError(null);
-    const res = await fetch(`/api/line/admin/conversations/${selectedId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode }),
-    });
-    if (res.ok) {
-      setSelectedMode(mode);
-    } else {
-      const data: { error?: string } | null = await res.json().catch(() => null);
-      setActionError(data?.error ?? 'เปลี่ยนโหมดไม่สำเร็จ');
-      // sync สถานะจริงจาก server (เช่น แพ้ race รับเรื่อง → เห็นว่าใครถืออยู่)
-      loadMessages(selectedId);
-    }
-    loadConversations();
-  };
+  const handleTakeover = useCallback(() => {
+    if (selectedId) void transfer(selectedId, adminUserId);
+  }, [selectedId, transfer, adminUserId]);
 
-  const canReply = selectedMode === 'human_active';
+  const showPanel = panelOpen && !!selectedId && !!detail;
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
+    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
       <div className="glass-panel flex h-[calc(100dvh-13rem)] min-h-[28rem] overflow-hidden rounded-xl shadow-sm">
-        {/* ── รายการสนทนา ──
-             มือถือ: แสดงเต็มความกว้าง แล้วสลับไปหน้าต่างแชทเมื่อเลือกห้อง
-             (ของเดิมตรึง w-72 ทุกจอ ทำให้บนมือถือเหลือที่แชทไม่ถึงครึ่งจอ) */}
-        <div
-          className={cn(
-            'flex-col border-r border-border sm:flex sm:w-72 sm:flex-none',
-            selectedId ? 'hidden' : 'flex w-full',
-          )}
-        >
-          <div className="flex items-center gap-2 border-b border-border bg-surface-sunken/60 px-4 py-3">
-            <MessagesSquare className="h-4 w-4 flex-none text-accent-strong" aria-hidden="true" />
-            <h2 className="truncate text-sm font-bold text-ink">การสนทนา LINE</h2>
-          </div>
-
-          <div className="flex-1 overflow-y-auto">
-            {conversations.length === 0 ? (
-              <p className="p-4 text-center text-sm text-muted">ยังไม่มีการสนทนา</p>
-            ) : (
-              conversations.map((conv) => {
-                const isSelected = selectedId === conv.id;
-                return (
-                  <button
-                    key={conv.id}
-                    type="button"
-                    onClick={() => handleSelect(conv.id)}
-                    aria-current={isSelected ? 'true' : undefined}
-                    className={cn(
-                      'flex w-full flex-col gap-1.5 border-b border-l-4 border-border px-3 py-3 text-left',
-                      'transition-colors duration-normal ease-out-expo',
-                      isSelected
-                        ? 'border-l-accent-strong bg-accent-sunken'
-                        : 'border-l-transparent hover:bg-accent-sunken/50',
-                    )}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="truncate text-sm font-semibold text-ink">
-                        {conv.displayName ?? conv.lineUserId.slice(0, 8)}
-                      </span>
-                      {conv.unreadAdmin > 0 && (
-                        <span className="flex h-5 min-w-5 flex-none items-center justify-center rounded-pill bg-accent-strong px-1.5 text-[10px] font-bold text-on-accent">
-                          {conv.unreadAdmin}
-                        </span>
-                      )}
-                    </div>
-                    <span className="truncate text-xs text-muted">
-                      {conv.lastMessageText ?? '—'}
-                    </span>
-                    <span
-                      className={cn(
-                        'inline-block w-fit rounded-pill px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset',
-                        MODE_BADGE[conv.mode] ?? FALLBACK_BADGE,
-                      )}
-                    >
-                      {MODE_LABELS[conv.mode] ?? conv.mode}
-                    </span>
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </div>
-
-        {/* ── หน้าต่างแชท ── */}
-        <div
-          className={cn(
-            'min-w-0 flex-1 flex-col sm:flex',
-            selectedId ? 'flex' : 'hidden',
-          )}
-        >
-          {!selectedId ? (
-            <div className="flex flex-1 items-center justify-center">
-              <EmptyState
-                icon={MessagesSquare}
-                title="เลือกการสนทนา"
-                description="เลือกรายการจากด้านซ้ายเพื่อดูข้อความและตอบกลับผู้ใช้ LINE"
-              />
-            </div>
-          ) : (
-            <>
-              {/* Header */}
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-surface-sunken/60 px-4 py-2.5">
-                <button
-                  type="button"
-                  onClick={() => setSelectedId(null)}
-                  className="inline-flex min-h-touch items-center gap-1 text-sm font-medium text-muted hover:text-accent-strong sm:hidden"
-                >
-                  <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-                  รายการ
-                </button>
-                <span
-                  className={cn(
-                    'rounded-pill px-3 py-1 text-xs font-semibold ring-1 ring-inset',
-                    MODE_BADGE[selectedMode] ?? FALLBACK_BADGE,
-                  )}
-                >
-                  {MODE_LABELS[selectedMode] ?? selectedMode}
-                </span>
-                <div className="flex flex-wrap gap-2">
-                  {selectedMode !== 'human_active' && selectedMode !== 'resolved' && (
-                    <Button type="button" size="sm" onClick={() => handleModeChange('human_active')}>
-                      <UserCheck className="h-4 w-4" aria-hidden="true" />
-                      รับเรื่อง
-                    </Button>
-                  )}
-                  {selectedMode === 'human_active' && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => handleModeChange('resolved')}
-                    >
-                      <CheckCircle className="h-4 w-4" aria-hidden="true" />
-                      ปิดเรื่อง
-                    </Button>
-                  )}
-                  {selectedMode === 'resolved' && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleModeChange('bot_active')}
-                    >
-                      <Bot className="h-4 w-4" aria-hidden="true" />
-                      คืนให้ Bot
-                    </Button>
-                  )}
-                </div>
-              </div>
-
-              {/* Messages */}
-              <div className="flex-1 space-y-3 overflow-y-auto p-4">
-                {messages.map((msg) => {
-                  const isAdmin = msg.sender === 'admin';
-                  const isBot = msg.sender === 'bot';
-                  return (
-                    <div
-                      key={msg.id}
-                      className={cn(
-                        'flex items-start gap-2',
-                        isAdmin ? 'flex-row-reverse' : 'flex-row',
-                        msg.status === 'pending' && 'opacity-60',
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          'flex h-7 w-7 flex-none items-center justify-center rounded-full ring-1 ring-inset',
-                          isAdmin
-                            ? 'bg-success-soft text-success-ink ring-success-ink/20'
-                            : isBot
-                              ? 'bg-accent-sunken text-accent-strong ring-accent-strong/20'
-                              : 'bg-surface-sunken text-muted ring-border-strong/30',
-                        )}
-                        aria-hidden="true"
-                      >
-                        {isAdmin ? (
-                          <UserCheck className="h-3.5 w-3.5" />
-                        ) : isBot ? (
-                          <Bot className="h-3.5 w-3.5" />
-                        ) : (
-                          <User className="h-3.5 w-3.5" />
-                        )}
-                      </span>
-                      <div
-                        className={cn(
-                          'max-w-[70%] rounded-xl px-3.5 py-2 text-sm',
-                          isAdmin
-                            ? 'bg-accent-strong text-on-accent'
-                            : isBot
-                              ? 'border border-accent-strong/20 bg-accent-sunken text-ink'
-                              : 'border border-border bg-surface-sunken text-ink',
-                        )}
-                      >
-                        <p className="whitespace-pre-wrap break-words">
-                          {msg.textContent ?? `[${msg.messageType}]`}
-                        </p>
-                        <p
-                          className={cn(
-                            'mt-1 text-[10px]',
-                            isAdmin ? 'text-on-accent/75' : 'text-muted',
-                          )}
-                        >
-                          {msg.status === 'pending'
-                            ? 'กำลังส่ง...'
-                            : new Date(msg.createdAt).toLocaleTimeString('th-TH', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
-                        </p>
-                        {msg.status === 'failed' && (
-                          <button
-                            type="button"
-                            onClick={() => handleRetry(msg)}
-                            className={cn(
-                              'mt-1 text-[11px] font-semibold underline underline-offset-2',
-                              isAdmin ? 'text-on-accent' : 'text-danger',
-                            )}
-                          >
-                            ส่งไม่สำเร็จ — ลองอีกครั้ง
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-                <div ref={messagesEndRef} />
-              </div>
-
-              {/* Input */}
-              <div className="border-t border-border p-3">
-                {actionError && (
-                  <p className="mb-2 rounded-md bg-danger-soft px-3 py-1.5 text-xs font-medium text-danger" role="alert">
-                    {actionError}
-                  </p>
-                )}
-                <div className="flex gap-2">
-                  <Input
-                    aria-label="พิมพ์ข้อความ"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
-                    placeholder={canReply ? 'พิมพ์ข้อความ...' : 'รับเรื่องก่อนเพื่อตอบผู้ใช้'}
-                    disabled={!canReply}
-                    className="flex-1 disabled:bg-surface-sunken"
-                  />
-                  <Button
-                    type="button"
-                    onClick={handleSend}
-                    disabled={!input.trim() || !canReply}
-                    aria-label="ส่งข้อความ"
-                    className="px-4"
-                  >
-                    <Send className="h-4 w-4" aria-hidden="true" />
-                  </Button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+        {/* มือถือ: แสดงรายการเต็มจอ แล้วสลับไปหน้าต่างแชทเมื่อเลือกห้อง */}
+        <ConversationList
+          visible={visible}
+          counts={counts}
+          loading={loading}
+          filter={filter}
+          setFilter={setFilter}
+          sort={sort}
+          setSort={setSort}
+          query={query}
+          setQuery={setQuery}
+          searchResults={searchResults}
+          searching={searching}
+          selectedId={selectedId}
+          onSelect={handleSelect}
+          onTogglePin={(id, pinned) => togglePref(id, { pinned })}
+          onToggleMute={(id, muted) => togglePref(id, { muted })}
+          onMarkRead={(id) => {
+            markConversationRead(id);
+            markReadLocal(id);
+          }}
+        />
+        <ChatArea
+          selectedId={selectedId}
+          customerName={customerName}
+          mode={selectedMode}
+          messages={messages}
+          hasMore={hasMore}
+          actionError={actionError}
+          ownershipBanner={ownershipBanner}
+          cannedResponses={cannedResponses}
+          panelOpen={panelOpen}
+          onBack={() => setSelectedId(null)}
+          onModeChange={(mode) => selectedId && changeMode(selectedId, mode)}
+          onSend={(text) => selectedId && send(selectedId, text)}
+          onRetry={(msg) => selectedId && retry(selectedId, msg)}
+          onLoadOlder={() => selectedId && loadOlder(selectedId)}
+          onTakeover={handleTakeover}
+          onTransfer={() => setTransferOpen(true)}
+          onManageCanned={() => setCannedManageOpen(true)}
+          onTogglePanel={() => setPanelOpen((v) => !v)}
+          onOpenPanelMobile={() => setMobilePanelOpen(true)}
+        />
+        {/* คอลัมน์ขวา: ข้อมูลลูกค้า (desktop เท่านั้น — mobile ใช้ dialog) */}
+        {showPanel && (
+          <aside className="hidden w-72 flex-none border-l border-border lg:block">
+            <CustomerPanel
+              conversation={selectedConv}
+              detail={detail}
+              staff={staff}
+              onTagsSaved={loadConversations}
+              onClose={() => setPanelOpen(false)}
+            />
+          </aside>
+        )}
       </div>
+
+      {/* mobile: ข้อมูลลูกค้าเป็น dialog */}
+      <Dialog open={mobilePanelOpen} onOpenChange={setMobilePanelOpen}>
+        <DialogContent className="max-h-[85dvh] overflow-y-auto p-0">
+          <DialogTitle className="sr-only">ข้อมูลลูกค้า</DialogTitle>
+          <CustomerPanel
+            conversation={selectedConv}
+            detail={detail}
+            staff={staff}
+            onTagsSaved={loadConversations}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <TransferDialog
+        open={transferOpen}
+        onOpenChange={setTransferOpen}
+        staff={staff}
+        currentOwnerId={detail?.assignedAdminId ?? null}
+        onConfirm={async (toAdminId, reason) => {
+          if (!selectedId) return false;
+          return transfer(selectedId, toAdminId, reason);
+        }}
+      />
+
+      <CannedManageDialog
+        open={cannedManageOpen}
+        onOpenChange={setCannedManageOpen}
+        items={cannedResponses}
+        onChanged={loadCanned}
+      />
     </div>
   );
 }
