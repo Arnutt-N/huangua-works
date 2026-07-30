@@ -49,7 +49,7 @@ export async function processCaseFlow(
 
   switch (state.step) {
     case 'category': {
-      const matched = matchCategory(text);
+      const matched = await resolveCategory(text);
       if (!matched) {
         const missCount = (state.missCount ?? 0) + 1;
         if (missCount >= 3) {
@@ -115,33 +115,47 @@ export async function processCaseFlow(
   }
 }
 
-function matchCategory(input: string): { id: string; name: string } | null {
+/**
+ * แปลง input ของผู้ใช้ → หมวดหมู่จริงใน DB
+ *
+ * เรียงตามความแม่น: กดจากรายการ (ได้ id) → พิมพ์ชื่อตรง → keyword
+ * คืน row จริงเสมอ เพื่อให้ state.categoryId ใช้สร้างเรื่องได้ตรงๆ
+ */
+async function resolveCategory(input: string): Promise<{ id: string; name: string } | null> {
+  const db = await getDb();
+  const cats = await db
+    .select({ id: categories.id, name: categories.name })
+    .from(categories)
+    .where(eq(categories.isActive, true));
+
+  const tapped = cats.find((c) => c.id === input);
+  if (tapped) return tapped;
+
   const normalized = input.toLowerCase();
+
+  const byName = cats.find((c) => c.name.toLowerCase() === normalized);
+  if (byName) return byName;
+
   for (const [name, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
-    for (const kw of keywords) {
-      if (normalized.includes(kw)) {
-        return { id: name, name };
-      }
-    }
+    if (!keywords.some((kw) => normalized.includes(kw))) continue;
+    const byKeyword = cats.find((c) => c.name === name);
+    if (byKeyword) return byKeyword;
   }
+
   return null;
 }
 
 async function submitLineCase(state: CaseFlowState, lineUserId: string): Promise<string> {
-  const db = await getDb();
-
-  const [cat] = await db
-    .select()
-    .from(categories)
-    .where(eq(categories.name, state.categoryName!))
-    .limit(1);
+  if (!state.categoryId) {
+    throw new Error('LINE case creation failed: missing categoryId');
+  }
 
   const result = await createCase({
     channel: 'line',
     title: state.title!,
     description: state.description!,
     location: state.location,
-    categoryId: cat?.id ?? '',
+    categoryId: state.categoryId,
     lineUserId,
   });
 

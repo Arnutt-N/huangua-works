@@ -13,6 +13,7 @@ import {
 import { sql } from 'drizzle-orm';
 import { ALL_STATUSES } from '../cases/state-machine';
 import { ALL_ROLES } from '../auth/roles';
+import { CONVERSATION_MODES } from '../line/chat-modes';
 
 /**
  * Schema — อบต.หัวงัว citizen-help (PostgreSQL)
@@ -44,12 +45,7 @@ export const updateTypeEnum = pgEnum('update_type', [
   'metadata_change',
 ]);
 
-export const conversationModeEnum = pgEnum('conversation_mode', [
-  'bot_active',
-  'waiting_handoff',
-  'human_active',
-  'resolved',
-]);
+export const conversationModeEnum = pgEnum('conversation_mode', CONVERSATION_MODES);
 
 export const chatMessageTypeEnum = pgEnum('chat_message_type', [
   'text',

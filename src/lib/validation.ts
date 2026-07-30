@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ALL_STATUSES } from './cases/state-machine';
 import { STAFF_ROLES } from './auth/roles';
+import { CONVERSATION_MODES } from './line/chat-modes';
 
 /**
  * Validation schemas — source of truth สำหรับทุก input boundary
@@ -146,6 +147,31 @@ export const submitCaseSchema = z.object({
 export const consentWithdrawSchema = z.object({
   trackingCode: trackingCodeSchema,
   cid: cidSchema,
+});
+
+/**
+ * PATCH /api/line/admin/conversations/[id] — เจ้าหน้าที่เปลี่ยนโหมด/ผูกเรื่องแจ้ง
+ * linkedCaseId = null คือถอดการผูกออก
+ */
+export const updateConversationSchema = z
+  .object({
+    mode: z.enum(CONVERSATION_MODES).optional(),
+    linkedCaseId: uuidSchema.nullable().optional(),
+  })
+  .refine((v) => v.mode !== undefined || v.linkedCaseId !== undefined, {
+    message: 'ต้องระบุ mode หรือ linkedCaseId',
+  });
+
+/**
+ * POST /api/line/admin/conversations/[id]/messages — ข้อความที่เจ้าหน้าที่ส่งออก LINE
+ * 5,000 = เพดานของ LINE text message
+ */
+export const chatReplySchema = z.object({
+  text: z
+    .string()
+    .trim()
+    .min(1, 'กรุณากรอกข้อความ')
+    .max(5000, 'ข้อความยาวเกิน 5,000 ตัวอักษร'),
 });
 
 // ────────────────────────────────────────────────────────────────────────────
