@@ -134,7 +134,7 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
 
   return (
     <>
-      <div className="flex h-dvh w-full overflow-hidden bg-surface font-sans">
+      <div className="flex h-[calc(100dvh-4rem)] w-full overflow-hidden bg-surface font-sans">
         {/* มือถือ: แสดงรายการเต็มจอ แล้วสลับไปหน้าต่างแชทเมื่อเลือกห้อง */}
         <ConversationList
           visible={visible}
