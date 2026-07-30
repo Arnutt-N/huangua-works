@@ -57,7 +57,7 @@ export function ChatArea({
     <main className={cn('min-w-0 flex-1 flex-col bg-surface md:flex', selectedId ? 'flex' : 'hidden')}>
       {!selectedId ? (
         <>
-          <header className="flex h-20 flex-none items-center border-b border-border bg-surface-raised/80 px-5 backdrop-blur-sm">
+          <header className="flex h-14 flex-none items-center border-b border-border bg-surface-raised/80 px-4 backdrop-blur-sm">
             <span className="text-base font-bold text-ink">แชท LINE</span>
           </header>
           <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">

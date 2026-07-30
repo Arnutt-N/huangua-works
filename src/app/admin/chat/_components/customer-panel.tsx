@@ -44,7 +44,7 @@ export function CustomerPanel({
 
   return (
     <div className="flex h-full flex-col overflow-y-auto">
-      <div className="flex h-20 flex-none items-center justify-between gap-2 border-b border-border px-4">
+      <div className="flex h-14 flex-none items-center justify-between gap-2 border-b border-border px-4">
         <h2 className="text-xs font-bold uppercase tracking-widest text-ink">ข้อมูลลูกค้า</h2>
         {onClose && (
           <button
