@@ -522,12 +522,16 @@ export const chatMessages = pgTable(
 
     lineMessageId: text('line_message_id'),
     adminUserId: text('admin_user_id'),
+    clientTempId: text('client_temp_id'),
     metadata: jsonb('metadata'),
   },
   (table) => ({
     conversationIdx: index('chat_messages_conversation_id_idx').on(table.conversationId),
     createdAtIdx: index('chat_messages_created_at_idx').on(table.createdAt),
     lineMessageIdIdx: index('chat_messages_line_message_id_idx').on(table.lineMessageId),
+    clientTempIdIdx: uniqueIndex('chat_messages_client_temp_id_idx')
+      .on(table.clientTempId)
+      .where(sql`client_temp_id is not null`),
   })
 );
 

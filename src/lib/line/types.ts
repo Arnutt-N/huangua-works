@@ -14,6 +14,8 @@ interface LineEventBase {
   replyToken: string;
   timestamp: number;
   mode: 'active' | 'standby';
+  webhookEventId: string;
+  deliveryContext?: { isRedelivery: boolean };
   source: {
     type: 'user' | 'group' | 'room';
     userId: string;

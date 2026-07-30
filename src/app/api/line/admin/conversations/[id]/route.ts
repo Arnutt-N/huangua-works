@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { chatMessages, chatConversations } from '@/lib/db/schema';
 import { requireStaffApi } from '@/lib/auth/require-staff';
@@ -78,14 +78,40 @@ export async function PATCH(
     updates.linkedCaseId = linkedCaseId;
   }
 
+  // claim ต้องเป็น atomic — guard mode ใน WHERE กันสองแอดมินกดรับพร้อมกันแล้วคนหลังทับเงียบๆ
+  const claimGuard =
+    mode === 'human_active'
+      ? inArray(chatConversations.mode, ['bot_active', 'waiting_handoff'])
+      : undefined;
+
   const [updated] = await db
     .update(chatConversations)
     .set(updates)
-    .where(eq(chatConversations.id, id))
+    .where(and(eq(chatConversations.id, id), claimGuard))
     .returning({ id: chatConversations.id });
 
   if (!updated) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    const [existing] = await db
+      .select({
+        mode: chatConversations.mode,
+        assignedAdminId: chatConversations.assignedAdminId,
+      })
+      .from(chatConversations)
+      .where(eq(chatConversations.id, id))
+      .limit(1);
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
+    if (existing.mode === 'human_active' && existing.assignedAdminId === authz.ctx.user.id) {
+      return NextResponse.json({ ok: true });
+    }
+
+    return NextResponse.json(
+      { error: 'มีเจ้าหน้าที่รับเรื่องนี้แล้ว' },
+      { status: 409 },
+    );
   }
 
   broadcast({ type: 'mode_change', conversationId: id, payload: updates });

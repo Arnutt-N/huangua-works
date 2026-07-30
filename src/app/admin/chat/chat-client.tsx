@@ -5,7 +5,6 @@ import {
   Bot,
   User,
   Send,
-  RefreshCw,
   CheckCircle,
   UserCheck,
   MessagesSquare,
@@ -33,6 +32,8 @@ interface Message {
   messageType: string;
   textContent: string | null;
   createdAt: string;
+  clientTempId?: string | null;
+  status?: 'pending' | 'failed';
 }
 
 const MODE_LABELS: Record<string, string> = {
@@ -63,7 +64,7 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
-  const [sending, setSending] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [selectedMode, setSelectedMode] = useState<string>('bot_active');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -91,6 +92,12 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
     const es = new EventSource('/api/line/admin/sse');
     eventSourceRef.current = es;
 
+    // SSE เป็น invalidation hint — reconnect แล้ว refetch เก็บ event ที่พลาดระหว่างหลุด
+    es.onopen = () => {
+      loadConversations();
+      if (selectedId) loadMessages(selectedId);
+    };
+
     es.onmessage = (e) => {
       let event: { type?: string; conversationId?: string; payload?: { mode?: string } & Record<string, unknown> };
       try {
@@ -102,7 +109,17 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
 
       if (event.type === 'new_message') {
         if (event.conversationId === selectedId) {
-          setMessages((prev) => [...prev, event.payload as unknown as Message]);
+          const incoming = event.payload as unknown as Message;
+          setMessages((prev) => {
+            // dedup 2 ทาง: id (event ซ้ำ) + clientTempId (แทนที่ optimistic bubble)
+            const matches = (m: Message) =>
+              m.id === incoming.id ||
+              Boolean(incoming.clientTempId && m.clientTempId === incoming.clientTempId);
+            if (prev.some(matches)) {
+              return prev.map((m) => (matches(m) ? { ...incoming, status: undefined } : m));
+            }
+            return [...prev, incoming];
+          });
         }
         loadConversations();
       }
@@ -115,7 +132,7 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
     };
 
     return () => es.close();
-  }, [selectedId, loadConversations]);
+  }, [selectedId, loadConversations, loadMessages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -126,30 +143,91 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
     loadMessages(id);
   };
 
-  const handleSend = async () => {
-    if (!input.trim() || !selectedId) return;
-    setSending(true);
-    try {
-      await fetch(`/api/line/admin/conversations/${selectedId}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: input.trim() }),
-      });
-      setInput('');
-      await loadMessages(selectedId);
-    } finally {
-      setSending(false);
-    }
+  const deliverMessage = useCallback(
+    async (conversationId: string, text: string, tempId: string) => {
+      const markFailed = () =>
+        setMessages((prev) =>
+          prev.map((m) => (m.clientTempId === tempId ? { ...m, status: 'failed' as const } : m)),
+        );
+      try {
+        const res = await fetch(`/api/line/admin/conversations/${conversationId}/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, clientTempId: tempId }),
+        });
+        const data: { messageId?: string; error?: string } | null = await res
+          .json()
+          .catch(() => null);
+        if (!res.ok) {
+          markFailed();
+          setActionError(data?.error ?? 'ส่งข้อความไม่สำเร็จ');
+          return;
+        }
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.clientTempId === tempId
+              ? { ...m, id: data?.messageId ?? m.id, status: undefined }
+              : m,
+          ),
+        );
+        loadConversations();
+      } catch {
+        markFailed();
+        setActionError('ส่งข้อความไม่สำเร็จ — ตรวจสอบการเชื่อมต่อ');
+      }
+    },
+    [loadConversations],
+  );
+
+  const handleSend = () => {
+    const text = input.trim();
+    if (!text || !selectedId) return;
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    setActionError(null);
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: tempId,
+        sender: 'admin',
+        messageType: 'text',
+        textContent: text,
+        createdAt: new Date().toISOString(),
+        clientTempId: tempId,
+        status: 'pending',
+      },
+    ]);
+    setInput('');
+    void deliverMessage(selectedId, text, tempId);
+  };
+
+  // retry ปลอดภัยเพราะ server dedup ด้วย clientTempId เดิม — ไม่ push ซ้ำหาลูกค้า
+  const handleRetry = (msg: Message) => {
+    if (!selectedId || !msg.clientTempId || !msg.textContent) return;
+    setActionError(null);
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.clientTempId === msg.clientTempId ? { ...m, status: 'pending' as const } : m,
+      ),
+    );
+    void deliverMessage(selectedId, msg.textContent, msg.clientTempId);
   };
 
   const handleModeChange = async (mode: string) => {
     if (!selectedId) return;
-    await fetch(`/api/line/admin/conversations/${selectedId}`, {
+    setActionError(null);
+    const res = await fetch(`/api/line/admin/conversations/${selectedId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mode }),
     });
-    setSelectedMode(mode);
+    if (res.ok) {
+      setSelectedMode(mode);
+    } else {
+      const data: { error?: string } | null = await res.json().catch(() => null);
+      setActionError(data?.error ?? 'เปลี่ยนโหมดไม่สำเร็จ');
+      // sync สถานะจริงจาก server (เช่น แพ้ race รับเรื่อง → เห็นว่าใครถืออยู่)
+      loadMessages(selectedId);
+    }
     loadConversations();
   };
 
@@ -298,6 +376,7 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
                       className={cn(
                         'flex items-start gap-2',
                         isAdmin ? 'flex-row-reverse' : 'flex-row',
+                        msg.status === 'pending' && 'opacity-60',
                       )}
                     >
                       <span
@@ -338,11 +417,25 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
                             isAdmin ? 'text-on-accent/75' : 'text-muted',
                           )}
                         >
-                          {new Date(msg.createdAt).toLocaleTimeString('th-TH', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
+                          {msg.status === 'pending'
+                            ? 'กำลังส่ง...'
+                            : new Date(msg.createdAt).toLocaleTimeString('th-TH', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
                         </p>
+                        {msg.status === 'failed' && (
+                          <button
+                            type="button"
+                            onClick={() => handleRetry(msg)}
+                            className={cn(
+                              'mt-1 text-[11px] font-semibold underline underline-offset-2',
+                              isAdmin ? 'text-on-accent' : 'text-danger',
+                            )}
+                          >
+                            ส่งไม่สำเร็จ — ลองอีกครั้ง
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -352,6 +445,11 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
 
               {/* Input */}
               <div className="border-t border-border p-3">
+                {actionError && (
+                  <p className="mb-2 rounded-md bg-danger-soft px-3 py-1.5 text-xs font-medium text-danger" role="alert">
+                    {actionError}
+                  </p>
+                )}
                 <div className="flex gap-2">
                   <Input
                     aria-label="พิมพ์ข้อความ"
@@ -365,15 +463,11 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
                   <Button
                     type="button"
                     onClick={handleSend}
-                    disabled={sending || !input.trim() || !canReply}
+                    disabled={!input.trim() || !canReply}
                     aria-label="ส่งข้อความ"
                     className="px-4"
                   >
-                    {sending ? (
-                      <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" />
-                    ) : (
-                      <Send className="h-4 w-4" aria-hidden="true" />
-                    )}
+                    <Send className="h-4 w-4" aria-hidden="true" />
                   </Button>
                 </div>
               </div>

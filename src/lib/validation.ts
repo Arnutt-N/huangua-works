@@ -172,6 +172,13 @@ export const chatReplySchema = z.object({
     .trim()
     .min(1, 'กรุณากรอกข้อความ')
     .max(5000, 'ข้อความยาวเกิน 5,000 ตัวอักษร'),
+  // idempotency key จาก client — retry ด้วยค่าเดิมจะไม่สร้างข้อความ/push ซ้ำ
+  clientTempId: z
+    .string()
+    .trim()
+    .min(1)
+    .max(64)
+    .optional(),
 });
 
 // ────────────────────────────────────────────────────────────────────────────

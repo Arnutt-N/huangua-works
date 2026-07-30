@@ -79,8 +79,9 @@ async function handleMessageEvent(
     : msg.type === 'sticker' ? 'sticker'
     : 'text';
 
+  const messageId = generateId();
   await db.insert(chatMessages).values({
-    id: generateId(),
+    id: messageId,
     conversationId,
     sender: 'user',
     messageType,
@@ -105,7 +106,7 @@ async function handleMessageEvent(
   broadcast({
     type: 'new_message',
     conversationId,
-    payload: { sender: 'user', messageType, textContent, createdAt: new Date().toISOString() },
+    payload: { id: messageId, sender: 'user', messageType, textContent, createdAt: new Date().toISOString() },
   });
   broadcast({ type: 'conversation_update', conversationId, payload: { lastMessageText: textContent ?? `[${messageType}]` } });
 
