@@ -3,7 +3,7 @@ import { AlertTriangle, Clock, ChevronRight, MapPin, Inbox } from 'lucide-react'
 import type { Metadata } from 'next';
 import { and, desc, eq, ilike, or, count } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
-import { cases, categories, users, caseStatusEnum } from '@/lib/db/schema';
+import { cases, categories, users } from '@/lib/db/schema';
 import { requireStaff } from '@/lib/auth/require-staff';
 import { getActiveCategories } from '@/lib/queries/lookups';
 import { AdminShell } from '@/components/admin/admin-shell';
@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/admin/empty-state';
 import { Pagination } from '@/components/admin/pagination';
 import { CaseFilterBar } from '@/components/admin/case-filter-bar';
 import { CaseStatusBadge } from '@/components/ui/case-status-badge';
+import { OPEN_STATUSES, isCaseStatus, type CaseStatus } from '@/lib/cases/state-machine';
 import { cn } from '@/lib/cn';
 
 export const metadata: Metadata = { title: 'จัดการคำร้อง / แจ้งเหตุ' };
@@ -18,23 +19,6 @@ export const metadata: Metadata = { title: 'จัดการคำร้อง
 export const dynamic = 'force-dynamic';
 
 const PAGE_SIZE = 20;
-
-// § CaseStatusBadge รับ 'urgent' ด้วย แต่ DB cases.status ไม่มี 'urgent'
-// ใช้ enum type แทนเพื่อ type safety กับ Drizzle query
-type DbCaseStatus = (typeof caseStatusEnum.enumValues)[number];
-
-const OPEN_STATUSES: DbCaseStatus[] = ['pending', 'received', 'reviewing', 'assigned', 'in_progress'];
-
-const VALID_STATUSES = new Set<string>([
-  'pending',
-  'received',
-  'reviewing',
-  'assigned',
-  'in_progress',
-  'done',
-  'closed',
-  'rejected',
-]);
 
 const VALID_PRIORITIES = new Set(['normal', 'urgent']);
 
@@ -64,8 +48,8 @@ export default async function CaseManagementPage({
 
   // § parse + validate filter params (defense-in-depth — ไม่ trust input)
   const filters: ReturnType<typeof and>[] = [];
-  const statusFilter =
-    params.status && VALID_STATUSES.has(params.status) ? params.status : null;
+  const statusFilter: CaseStatus | null =
+    params.status && isCaseStatus(params.status) ? params.status : null;
   const priorityFilter =
     params.priority && VALID_PRIORITIES.has(params.priority) ? params.priority : null;
   const categoryFilter = params.category ?? null;
@@ -73,7 +57,7 @@ export default async function CaseManagementPage({
   const page = Math.max(1, parseInt(params.page ?? '1', 10) || 1);
 
   if (statusFilter) {
-    filters.push(eq(cases.status, statusFilter as DbCaseStatus));
+    filters.push(eq(cases.status, statusFilter));
   }
   if (priorityFilter) {
     filters.push(eq(cases.priority, priorityFilter as 'normal' | 'urgent'));
