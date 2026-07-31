@@ -10,9 +10,9 @@ import {
   User,
   UserRound,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
 import { MODE_LABELS } from '../_lib/labels';
+import { LineAvatar } from './line-avatar';
 
 export function ChatHeader({
   customerName,
@@ -51,21 +51,18 @@ export function ChatHeader({
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
           </button>
 
-          {customerPicture ? (
-            // eslint-disable-next-line @next/next/no-img-element -- รูปโปรไฟล์ LINE เป็น external URL ไม่ fix โดเมน
-            <img
-              src={customerPicture}
-              alt=""
-              className="h-9 w-9 flex-none rounded-pill object-cover ring-2 ring-accent/20"
-            />
-          ) : (
-            <span
-              className="inline-flex h-9 w-9 flex-none items-center justify-center rounded-pill bg-accent-sunken text-accent-strong ring-2 ring-accent/20"
-              aria-hidden="true"
-            >
-              <UserRound className="h-5 w-5" />
-            </span>
-          )}
+          <LineAvatar
+            src={customerPicture}
+            className="h-9 w-9 flex-none rounded-pill object-cover ring-2 ring-accent/20"
+            fallback={
+              <span
+                className="inline-flex h-9 w-9 flex-none items-center justify-center rounded-pill bg-accent-sunken text-accent-strong ring-2 ring-accent/20"
+                aria-hidden="true"
+              >
+                <UserRound className="h-5 w-5" />
+              </span>
+            }
+          />
 
           <div className="flex min-w-0 items-center gap-2">
             <p className="truncate text-sm font-bold text-ink">
@@ -117,38 +114,35 @@ export function ChatHeader({
           {isHuman && (
             <>
               <span className="hidden h-6 w-px bg-border sm:block" aria-hidden="true" />
-              <Button
+              <button
                 type="button"
-                size="sm"
-                variant="outline"
                 onClick={onTransfer}
                 title="โอนแชทให้เจ้าหน้าที่ท่านอื่น"
+                className="inline-flex items-center gap-1 rounded-md border border-border-strong px-2.5 py-1.5 text-xs font-bold text-ink transition-colors duration-normal ease-out-expo hover:bg-accent-sunken focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
               >
-                <ArrowRightLeft className="h-4 w-4" aria-hidden="true" />
+                <ArrowRightLeft className="h-3.5 w-3.5" aria-hidden="true" />
                 โอนแชท
-              </Button>
-              <Button
+              </button>
+              <button
                 type="button"
-                size="sm"
-                variant="secondary"
                 onClick={() => onModeChange('resolved')}
+                className="inline-flex items-center gap-1 rounded-md border border-border-strong px-2.5 py-1.5 text-xs font-bold text-accent-strong transition-colors duration-normal ease-out-expo hover:bg-accent-sunken focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
               >
-                <CheckCircle className="h-4 w-4" aria-hidden="true" />
+                <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
                 ปิดเรื่อง
-              </Button>
+              </button>
             </>
           )}
 
           {mode === 'resolved' && (
-            <Button
+            <button
               type="button"
-              size="sm"
-              variant="outline"
               onClick={() => onModeChange('bot_active')}
+              className="inline-flex items-center gap-1 rounded-md border border-border-strong px-2.5 py-1.5 text-xs font-bold text-ink transition-colors duration-normal ease-out-expo hover:bg-accent-sunken focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
             >
-              <Bot className="h-4 w-4" aria-hidden="true" />
+              <Bot className="h-3.5 w-3.5" aria-hidden="true" />
               คืนให้ Bot
-            </Button>
+            </button>
           )}
 
           {/* toggle panel — desktop พับ/กาง aside, mobile เปิดเป็น dialog */}

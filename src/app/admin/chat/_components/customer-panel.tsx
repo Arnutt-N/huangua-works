@@ -7,6 +7,7 @@ import { formatRelativeTime, maskLineUserId } from '../_lib/format';
 import { FALLBACK_BADGE, MODE_BADGE, MODE_LABELS } from '../_lib/labels';
 import type { Conversation, ConversationDetail, StaffMember } from '../_lib/types';
 import { useNoteAutosave } from '../_hooks/use-note-autosave';
+import { LineAvatar } from './line-avatar';
 import { TagPicker } from './tag-picker';
 
 const SAVE_LABEL: Record<string, string> = {
@@ -60,18 +61,15 @@ export function CustomerPanel({
 
       {/* โปรไฟล์ */}
       <div className="flex flex-none flex-col items-center gap-2 border-b border-border p-5 text-center">
-        {conversation.pictureUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- รูปโปรไฟล์ LINE เป็น external URL ไม่ fix โดเมน
-          <img
-            src={conversation.pictureUrl}
-            alt=""
-            className="h-20 w-20 rounded-pill object-cover shadow-md ring-4 ring-surface-raised"
-          />
-        ) : (
-          <span className="inline-flex h-20 w-20 items-center justify-center rounded-pill bg-accent-gradient-br text-on-accent shadow-md ring-4 ring-surface-raised">
-            <UserRound className="h-10 w-10" aria-hidden="true" />
-          </span>
-        )}
+        <LineAvatar
+          src={conversation.pictureUrl}
+          className="h-20 w-20 rounded-pill object-cover shadow-md ring-4 ring-surface-raised"
+          fallback={
+            <span className="inline-flex h-20 w-20 items-center justify-center rounded-pill bg-accent-gradient-br text-on-accent shadow-md ring-4 ring-surface-raised">
+              <UserRound className="h-10 w-10" aria-hidden="true" />
+            </span>
+          }
+        />
         <div>
           <p className="text-sm font-bold text-ink">{name}</p>
           <p className="text-[11px] text-muted" title="LINE user id (ปิดบังบางส่วน)">
