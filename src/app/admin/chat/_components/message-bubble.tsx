@@ -4,6 +4,7 @@ import { AlertCircle, Bot, CheckCheck, RefreshCw, User, UserCheck } from 'lucide
 import { cn } from '@/lib/cn';
 import { formatTime } from '../_lib/format';
 import type { Message } from '../_lib/types';
+import { LineAvatar } from './line-avatar';
 
 const SENDER_LABELS: Record<string, string> = {
   admin: 'เจ้าหน้าที่',
@@ -45,16 +46,19 @@ export function MessageBubble({
     >
       {isAdmin ? <UserCheck className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
     </span>
-  ) : customerPicture ? (
-    // eslint-disable-next-line @next/next/no-img-element -- รูปโปรไฟล์ LINE เป็น external URL ไม่ fix โดเมน
-    <img src={customerPicture} alt="" className="h-7 w-7 flex-none rounded-pill object-cover" />
   ) : (
-    <span
-      className="inline-flex h-7 w-7 flex-none items-center justify-center rounded-pill bg-surface-sunken text-muted"
-      aria-hidden="true"
-    >
-      <User className="h-3.5 w-3.5" />
-    </span>
+    <LineAvatar
+      src={customerPicture}
+      className="h-7 w-7 flex-none rounded-pill object-cover"
+      fallback={
+        <span
+          className="inline-flex h-7 w-7 flex-none items-center justify-center rounded-pill bg-surface-sunken text-muted"
+          aria-hidden="true"
+        >
+          <User className="h-3.5 w-3.5" />
+        </span>
+      }
+    />
   );
 
   return (

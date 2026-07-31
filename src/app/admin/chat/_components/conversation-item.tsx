@@ -12,6 +12,7 @@ import {
 import { formatRelativeTime, maskLineUserId } from '../_lib/format';
 import { MODE_SHORT } from '../_lib/labels';
 import type { Conversation } from '../_lib/types';
+import { LineAvatar } from './line-avatar';
 
 const MAX_TAGS = 2;
 
@@ -53,24 +54,21 @@ export const ConversationItem = memo(function ConversationItem({
         aria-current={isSelected ? 'true' : undefined}
         className="flex w-full items-center gap-3 p-3 pr-9 text-left"
       >
-        {conv.pictureUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- รูปโปรไฟล์ LINE เป็น external URL ไม่ fix โดเมน
-          <img
-            src={conv.pictureUrl}
-            alt=""
-            className="h-10 w-10 flex-none rounded-pill object-cover"
-          />
-        ) : (
-          <span
-            className={cn(
-              'inline-flex h-10 w-10 flex-none items-center justify-center rounded-pill text-sm font-bold',
-              isSelected ? 'bg-accent text-on-accent' : 'bg-accent-sunken text-accent-strong',
-            )}
-            aria-hidden="true"
-          >
-            {name.slice(0, 1).toUpperCase()}
-          </span>
-        )}
+        <LineAvatar
+          src={conv.pictureUrl}
+          className="h-10 w-10 flex-none rounded-pill object-cover"
+          fallback={
+            <span
+              className={cn(
+                'inline-flex h-10 w-10 flex-none items-center justify-center rounded-pill text-sm font-bold',
+                isSelected ? 'bg-accent text-on-accent' : 'bg-accent-sunken text-accent-strong',
+              )}
+              aria-hidden="true"
+            >
+              {name.slice(0, 1).toUpperCase()}
+            </span>
+          }
+        />
 
         <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="flex items-center gap-1.5">
