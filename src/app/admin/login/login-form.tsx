@@ -24,6 +24,14 @@ export function LoginForm() {
   const submitting = isPending || !!state.success;
 
   useEffect(() => {
+    // Radix Dialog sets pointer-events:none on <body> while open. If logout redirects
+    // mid-transition, the Dialog unmounts without restoring it — clear defensively.
+    if (document.body.style.pointerEvents === 'none') {
+      document.body.style.pointerEvents = '';
+    }
+  }, []);
+
+  useEffect(() => {
     // § navigate ฝั่ง client หลัง response ของ server action (พร้อม Set-Cookie) ถึง browser
     // แล้วเท่านั้น — ไม่ redirect() ใน server action เดียวกับที่ signIn() ตั้ง cookie (ดู actions.ts)
     // § ไม่เรียก router.refresh() — refresh จะ re-render หน้า login ปัจจุบันทันที ทำให้

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { flushSync } from 'react-dom';
 import Link from 'next/link';
 import { ChevronDown, LogOut, UserCircle } from 'lucide-react';
 import { logout } from '@/app/admin/actions';
@@ -55,7 +56,7 @@ export function UserMenu({
   // การ setState(false) ก่อน แล้วค่อยยิง action (มี round-trip) ให้ React unmount
   // Dialog + คืน pointer-events เสร็จก่อน redirect จะมาถึงเสมอ
   function handleConfirmLogout() {
-    setConfirmLogoutOpen(false);
+    flushSync(() => setConfirmLogoutOpen(false));
     startLogout(async () => {
       await logout();
     });
