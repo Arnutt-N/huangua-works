@@ -3,6 +3,15 @@
 การเปลี่ยนแปลงสำคัญของ huangua-works — เรียงจากใหม่ไปเก่า (รูปแบบปรับจาก [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) ให้จับกลุ่มตามวันที่)
 บันทึกย้อนหลังถึง PR #1 (2026-07-16); รายละเอียดเชิงเทคนิคเต็มอยู่ใน git history และ PR ที่อ้างอิง
 
+## [2026-08-02]
+
+- **chore(hooks): ติดตั้ง Stop hook ฉบับแก้ไขกลับอัตโนมัติ — กันเตือนผิดหลัง squash-merge** (pushed to main directly)
+  - อาการ: หลัง PR ถูก squash-merge เข้า main แล้วรีสตาร์ท branch จาก main ใหม่ (flow สำหรับงานต่อเนื่องที่เอกสารกำหนดเอง) `origin/<branch>` ยังชี้ประวัติก่อน merge → `$upstream..HEAD` กวาดทุก commit ที่ main ได้มาหลังจากนั้น รวม PR ของคนอื่น
+  - commit เหล่านั้นมี `committer=GitHub <noreply@github.com>` จาก squash-merge จึงสะดุดด่านตรวจลายเซ็น แล้วสั่งให้ rebase เขียนทับประวัติที่เผยแพร่แล้ว + เปลี่ยนผู้เขียนงานคนอื่นเป็นของเรา (ครั้งล่าสุดกระทบ 28 commit ในนั้นเป็นงานของ `arnutt.n@gmail.com` 12 รายการ)
+  - แก้ที่ hook: กันประวัติที่อยู่ใน default branch แล้วออกจากการตรวจ (`git rev-list HEAD --not "$upstream" "$default_ref"`) + ข้าม `noreply@github.com` เป็นชั้นสำรอง
+  - `~/.claude/` ถูก settings sync เขียนทับ **กลาง session** ด้วย (วัดได้: คอนเทนเนอร์เริ่ม 23:15 ไฟล์ถูกรีเซ็ต 23:29) จึงเก็บฉบับแก้ไว้ใน `.claude/hooks/stop-hook-git-check.sh` แล้วติดตั้งกลับผ่าน `restore-stop-hook.sh` ที่ผูกกับทั้ง `SessionStart` และ `UserPromptSubmit`
+  - ติดตั้งทับเฉพาะเมื่อไฟล์ปลายทาง sha256 ตรงกับต้นฉบับที่ patch นี้สร้างจาก — ถ้าต้นทางอัปเดตเวอร์ชันใหม่จะถอยแล้วเตือน ไม่กลืนการแก้ของเขา
+
 ## [2026-07-29]
 
 - **feat(cases): add 'pending' (รอรับเรื่อง) status before admin accepts** ([PR #42](https://github.com/Arnutt-N/huangua-works/pull/42))
