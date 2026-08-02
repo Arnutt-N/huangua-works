@@ -649,3 +649,191 @@ export const chatConversationTags = pgTable(
     tagIdx: index('chat_conversation_tags_tag_id_idx').on(table.tagId),
   })
 );
+
+// ────────────────────────────────────────────────────────────────────────────
+// § Chatbot Management (intent engine, reply objects, broadcast, rich menus)
+// ────────────────────────────────────────────────────────────────────────────
+
+export const replyObjectTypeEnum = pgEnum('reply_object_type', [
+  'flex',
+  'template',
+  'text',
+  'image',
+]);
+
+export const matchTypeEnum = pgEnum('match_type', [
+  'exact',
+  'starts_with',
+  'contains',
+  'regex',
+]);
+
+export const intentReplyTypeEnum = pgEnum('intent_reply_type', [
+  'text',
+  'reply_object',
+]);
+
+export const broadcastStatusEnum = pgEnum('broadcast_status', [
+  'draft',
+  'scheduled',
+  'sending',
+  'sent',
+  'failed',
+]);
+
+export const richMenuStatusEnum = pgEnum('rich_menu_status', [
+  'draft',
+  'active',
+  'inactive',
+]);
+
+export const mediaCategoryEnum = pgEnum('media_category', [
+  'rich_menu',
+  'image_message',
+  'general',
+]);
+
+export const chatReplyObjects = pgTable(
+  'chat_reply_objects',
+  {
+    id: text('id').primaryKey(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+
+    objectId: text('object_id').notNull().unique(),
+    objectType: replyObjectTypeEnum('object_type').notNull(),
+    payload: jsonb('payload').notNull(),
+    altText: text('alt_text'),
+    isActive: boolean('is_active').notNull().default(true),
+    createdBy: text('created_by'),
+  },
+  (table) => ({
+    objectIdIdx: uniqueIndex('chat_reply_objects_object_id_idx').on(table.objectId),
+    activeIdx: index('chat_reply_objects_is_active_idx').on(table.isActive),
+  })
+);
+
+export const chatIntents = pgTable(
+  'chat_intents',
+  {
+    id: text('id').primaryKey(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+
+    name: text('name').notNull().unique(),
+    description: text('description'),
+    isActive: boolean('is_active').notNull().default(true),
+  },
+  (table) => ({
+    nameIdx: uniqueIndex('chat_intents_name_idx').on(table.name),
+    activeIdx: index('chat_intents_is_active_idx').on(table.isActive),
+  })
+);
+
+export const chatIntentKeywords = pgTable(
+  'chat_intent_keywords',
+  {
+    id: text('id').primaryKey(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+
+    intentId: text('intent_id')
+      .notNull()
+      .references(() => chatIntents.id, { onDelete: 'cascade' }),
+    keyword: text('keyword').notNull(),
+    matchType: matchTypeEnum('match_type').notNull().default('contains'),
+  },
+  (table) => ({
+    intentIdx: index('chat_intent_keywords_intent_id_idx').on(table.intentId),
+  })
+);
+
+export const chatIntentResponses = pgTable(
+  'chat_intent_responses',
+  {
+    id: text('id').primaryKey(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+
+    intentId: text('intent_id')
+      .notNull()
+      .references(() => chatIntents.id, { onDelete: 'cascade' }),
+    replyType: intentReplyTypeEnum('reply_type').notNull().default('text'),
+    textContent: text('text_content'),
+    replyObjectId: text('reply_object_id').references(() => chatReplyObjects.id, {
+      onDelete: 'set null',
+    }),
+    displayOrder: integer('display_order').notNull().default(0),
+    isActive: boolean('is_active').notNull().default(true),
+  },
+  (table) => ({
+    intentIdx: index('chat_intent_responses_intent_id_idx').on(table.intentId),
+    replyObjectIdx: index('chat_intent_responses_reply_object_id_idx').on(table.replyObjectId),
+  })
+);
+
+export const chatBroadcasts = pgTable(
+  'chat_broadcasts',
+  {
+    id: text('id').primaryKey(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+
+    content: jsonb('content').notNull(),
+    status: broadcastStatusEnum().notNull().default('draft'),
+    target: text('target').notNull().default('all'),
+    scheduledAt: timestamp('scheduled_at', { mode: 'date' }),
+    sentAt: timestamp('sent_at', { mode: 'date' }),
+    totalRecipients: integer('total_recipients').notNull().default(0),
+    successCount: integer('success_count').notNull().default(0),
+    failedCount: integer('failed_count').notNull().default(0),
+    createdBy: text('created_by'),
+    errorMessage: text('error_message'),
+  },
+  (table) => ({
+    statusIdx: index('chat_broadcasts_status_idx').on(table.status),
+    scheduledAtIdx: index('chat_broadcasts_scheduled_at_idx').on(table.scheduledAt),
+  })
+);
+
+export const richMenus = pgTable(
+  'rich_menus',
+  {
+    id: text('id').primaryKey(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+
+    name: text('name').notNull(),
+    chatBarText: text('chat_bar_text').notNull().default('เมนู'),
+    config: jsonb('config').notNull(),
+    lineRichMenuId: text('line_rich_menu_id').unique(),
+    imageUrl: text('image_url'),
+    status: richMenuStatusEnum().notNull().default('draft'),
+    syncStatus: text('sync_status').notNull().default('pending'),
+    lastSyncError: text('last_sync_error'),
+    createdBy: text('created_by'),
+  },
+  (table) => ({
+    statusIdx: index('rich_menus_status_idx').on(table.status),
+    lineRichMenuIdIdx: uniqueIndex('rich_menus_line_rich_menu_id_idx')
+      .on(table.lineRichMenuId)
+      .where(sql`line_rich_menu_id IS NOT NULL`),
+  })
+);
+
+export const mediaFiles = pgTable(
+  'media_files',
+  {
+    id: text('id').primaryKey(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+
+    url: text('url').notNull(),
+    filename: text('filename').notNull(),
+    mimeType: text('mime_type').notNull(),
+    sizeBytes: integer('size_bytes').notNull(),
+    category: mediaCategoryEnum().notNull().default('general'),
+    uploadedBy: text('uploaded_by'),
+  },
+  (table) => ({
+    categoryIdx: index('media_files_category_idx').on(table.category),
+    uploadedByIdx: index('media_files_uploaded_by_idx').on(table.uploadedBy),
+  })
+);

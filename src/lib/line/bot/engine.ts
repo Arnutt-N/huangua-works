@@ -5,9 +5,12 @@ import { generateId } from '@/lib/id';
 import { getProfile, replyMessage, sendTypingIndicator } from '../client';
 import type { LineWebhookEvent, LineMessageEvent, LineFollowEvent, LinePostbackEvent, LineOutgoingMessage } from '../types';
 import { matchFaq } from './faq-matcher';
+import { matchIntent } from './intent-matcher';
+import { parseResponseText } from './response-parser';
 import { startCaseFlow, processCaseFlow, type CaseFlowState } from './case-flow';
 import { isHandoffRequest, triggerHandoff } from './handoff';
 import { getWelcomeMessages } from './welcome';
+import { getChatSetting } from '../settings';
 import { caseStatusFlex } from '../messages/flex';
 import { broadcast } from '../sse/broadcaster';
 
@@ -163,7 +166,7 @@ async function handleMessageEvent(
   await replyMessage(event.replyToken, replies.slice(0, 5));
 }
 
-async function routeBotMessage(
+export async function routeBotMessage(
   db: Db,
   event: LineMessageEvent,
   text: string | null,
@@ -187,10 +190,6 @@ async function routeBotMessage(
 
   const normalized = text.trim().toLowerCase();
 
-  if (isHandoffRequest(text)) {
-    return triggerHandoff(conversationId);
-  }
-
   if (normalized.includes('แจ้งเรื่อง') || normalized.includes('ร้องเรียน') || normalized === 'แจ้ง') {
     const { state, reply } = await startCaseFlow();
     await updateBotState(db, lineUserPk, state);
@@ -212,9 +211,21 @@ async function routeBotMessage(
     return result.replies;
   }
 
+  const engineV2 = await getChatSetting('bot_engine_v2');
+  if (engineV2) {
+    const intentResult = await matchIntent(text);
+    if (intentResult) {
+      return intentResult.responses;
+    }
+  }
+
   const faqResult = await matchFaq(text);
   if (faqResult) {
-    return [{ type: 'text', text: faqResult.answer }];
+    return parseResponseText(faqResult.answer);
+  }
+
+  if (await isHandoffRequest(text)) {
+    return triggerHandoff(conversationId);
   }
 
   return [{
@@ -245,7 +256,7 @@ async function updateBotState(db: Db, lineUserPk: string, state: CaseFlowState |
 }
 
 async function handleFollowEvent(db: Db, event: LineFollowEvent, conversationId: string) {
-  const replies = getWelcomeMessages();
+  const replies = await getWelcomeMessages();
 
   await db.insert(chatMessages).values({
     id: generateId(),

@@ -5,6 +5,12 @@ import {
   ScrollText,
   MessageSquare,
   FolderCog,
+  Bot,
+  Send,
+  Image,
+  LayoutGrid,
+  HeartPulse,
+  Settings,
   type LucideIcon,
 } from 'lucide-react';
 import { ADMIN_ROLES, type UserRole } from '@/lib/auth/roles';
@@ -18,7 +24,16 @@ export type AdminTab =
   | 'users'
   | 'audit'
   | 'master-data'
-  | 'profile';
+  | 'profile'
+  | 'chatbot'
+  | 'auto-replies'
+  | 'reply-objects'
+  | 'broadcast'
+  | 'rich-menus'
+  | 'files'
+  | 'image-resize'
+  | 'health'
+  | 'settings';
 
 export interface AdminNavItem {
   key: AdminTab;
@@ -55,6 +70,20 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     label: 'แชท LINE',
     items: [
       { key: 'chat', label: 'การสนทนา', href: '/admin/chat', icon: MessageSquare },
+    ],
+  },
+  {
+    label: 'แชทบอท',
+    items: [
+      { key: 'chatbot', label: 'ภาพรวมบอท', href: '/admin/chatbot', icon: Bot, supervisorOnly: true },
+      { key: 'auto-replies', label: 'ตอบอัตโนมัติ', href: '/admin/chatbot/auto-replies', icon: MessageSquare, supervisorOnly: true },
+      { key: 'reply-objects', label: 'ข้อความสำเร็จรูป', href: '/admin/chatbot/reply-objects', icon: LayoutGrid, supervisorOnly: true },
+      { key: 'broadcast', label: 'ส่งประกาศ', href: '/admin/chatbot/broadcast', icon: Send, supervisorOnly: true },
+      { key: 'rich-menus', label: 'Rich Menu', href: '/admin/chatbot/rich-menus', icon: LayoutGrid, supervisorOnly: true },
+      { key: 'files', label: 'ไฟล์สื่อ', href: '/admin/files', icon: Image, supervisorOnly: true },
+      { key: 'image-resize', label: 'ย่อรูป', href: '/admin/image-resize', icon: Image, supervisorOnly: true },
+      { key: 'health', label: 'สุขภาพระบบ', href: '/admin/health', icon: HeartPulse, supervisorOnly: true },
+      { key: 'settings', label: 'ตั้งค่าบอท', href: '/admin/settings', icon: Settings, supervisorOnly: true },
     ],
   },
   {

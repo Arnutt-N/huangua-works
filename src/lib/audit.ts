@@ -41,6 +41,23 @@ export const AUDIT_ACTIONS = {
   CATEGORY_DEACTIVATE: 'category_deactivate',
   ACTIVATE_USER: 'activate_user',
   DEACTIVATE_USER: 'deactivate_user',
+  CHATBOT_SETTINGS_UPDATE: 'chatbot_settings_update',
+  FAQ_CREATE: 'faq_create',
+  FAQ_UPDATE: 'faq_update',
+  FAQ_DELETE: 'faq_delete',
+  INTENT_CREATE: 'intent_create',
+  INTENT_UPDATE: 'intent_update',
+  INTENT_DELETE: 'intent_delete',
+  REPLY_OBJECT_CREATE: 'reply_object_create',
+  REPLY_OBJECT_UPDATE: 'reply_object_update',
+  REPLY_OBJECT_DELETE: 'reply_object_delete',
+  BROADCAST_CREATE: 'broadcast_create',
+  BROADCAST_SEND: 'broadcast_send',
+  RICH_MENU_CREATE: 'rich_menu_create',
+  RICH_MENU_SYNC: 'rich_menu_sync',
+  RICH_MENU_PUBLISH: 'rich_menu_publish',
+  MEDIA_UPLOAD: 'media_upload',
+  MEDIA_DELETE: 'media_delete',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
