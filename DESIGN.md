@@ -363,7 +363,7 @@ Primitives อยู่ที่ `src/components/ui/field.tsx` — แยกเ�
 ### Navigation
 
 - **Landing Navbar:** `fixed top-0 z-50` + glassmorphism (`.glass` backdrop-blur) — ลอยทับ mesh gradient ของ hero, active link = emerald
-- **Admin Sidebar:** แบ่ง 3 กลุ่ม (งานหลัก / แชท LINE / ระบบ) — กรองตาม role ผ่าน `visibleNavGroups` (เมนู `supervisorOnly` ซ่อนจากเจ้าหน้าที่), active item = `bg-accent-strong text-on-accent` (emerald ทึบ), hover = `bg-accent-sunken`
+- **Admin Sidebar:** แบ่ง 4 กลุ่ม (งานหลัก / แชท LINE / แชทบอท / ระบบ) — กรองตาม role ผ่าน `visibleNavGroups` (เมนู `supervisorOnly` ซ่อนจากเจ้าหน้าที่), active item = `bg-accent-strong text-on-accent` (emerald ทึบ), hover = `bg-accent-sunken`
 - **Touch:** nav item ทุกตัว ≥44px (C6) — รวมเมนูมือถือ (hamburger + drawer item)
 - **Keyboard:** ทุกลิงก์ focus ได้ตาม tab order, drawer ปิดด้วย Esc
 

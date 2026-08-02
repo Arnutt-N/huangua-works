@@ -3,12 +3,12 @@ import { getDb } from '@/lib/db';
 import { chatConversations } from '@/lib/db/schema';
 import type { LineOutgoingMessage } from '../types';
 import { handoffNotifyFlex } from '../messages/flex';
+import { getChatSetting } from '../settings';
 
-const HANDOFF_KEYWORDS = ['ติดต่อเจ้าหน้าที่', 'เจ้าหน้าที่', 'คุยกับคน', 'พบเจ้าหน้าที่', 'handoff', 'operator', 'admin'];
-
-export function isHandoffRequest(text: string): boolean {
+export async function isHandoffRequest(text: string): Promise<boolean> {
+  const keywords = await getChatSetting('handoff_keywords');
   const normalized = text.toLowerCase().trim();
-  return HANDOFF_KEYWORDS.some((kw) => normalized.includes(kw));
+  return keywords.some((kw) => normalized.includes(kw.toLowerCase()));
 }
 
 export async function triggerHandoff(conversationId: string): Promise<LineOutgoingMessage[]> {

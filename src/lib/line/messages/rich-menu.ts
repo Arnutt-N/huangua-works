@@ -1,13 +1,5 @@
 import type { LineOutgoingMessage } from '../types';
-
-const LINE_API_BASE = 'https://api.line.me/v2/bot';
-
-function getHeaders(): HeadersInit {
-  return {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`,
-  };
-}
+import { createLineRichMenu, uploadLineRichMenuImage, setDefaultLineRichMenu } from '../client';
 
 export const RICH_MENU_BODY = {
   size: { width: 2500, height: 1686 },
@@ -35,34 +27,29 @@ export const RICH_MENU_BODY = {
 };
 
 export async function createRichMenu(): Promise<string | null> {
-  const res = await fetch(`${LINE_API_BASE}/richmenu`, {
-    method: 'POST',
-    headers: getHeaders(),
-    body: JSON.stringify(RICH_MENU_BODY),
-  });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data.richMenuId;
+  try {
+    return await createLineRichMenu(RICH_MENU_BODY);
+  } catch {
+    return null;
+  }
 }
 
 export async function setDefaultRichMenu(richMenuId: string): Promise<boolean> {
-  const res = await fetch(`${LINE_API_BASE}/user/all/richmenu/${richMenuId}`, {
-    method: 'POST',
-    headers: getHeaders(),
-  });
-  return res.ok;
+  try {
+    await setDefaultLineRichMenu(richMenuId);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function uploadRichMenuImage(richMenuId: string, imageBuffer: Buffer): Promise<boolean> {
-  const res = await fetch(`https://api-data.line.me/v2/bot/richmenu/${richMenuId}/content`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'image/png',
-      Authorization: `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`,
-    },
-    body: new Uint8Array(imageBuffer),
-  });
-  return res.ok;
+  try {
+    await uploadLineRichMenuImage(richMenuId, imageBuffer);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function getFaqReply(): LineOutgoingMessage {
