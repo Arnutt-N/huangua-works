@@ -102,9 +102,9 @@ function SectionHeading({ icon: Icon, children }: { icon: typeof User; children:
     <h2 className="flex items-center gap-3 text-xl font-semibold">
       <span
         className="flex h-10 w-10 items-center justify-center rounded-xl"
-        style={{ backgroundColor: 'oklch(94% 0.04 160)' }}
+        style={{ backgroundColor: 'oklch(94% 0.04 255)' }}
       >
-        <Icon className="h-5 w-5" style={{ color: 'oklch(45% 0.15 160)' }} aria-hidden="true" />
+        <Icon className="h-5 w-5" style={{ color: 'oklch(42% 0.16 255)' }} aria-hidden="true" />
       </span>
       {children}
     </h2>
@@ -246,9 +246,9 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
       <div className="glass mt-8 rounded-xl px-6 py-10 text-center shadow-lg">
         <span
           className="mx-auto flex h-16 w-16 items-center justify-center rounded-full"
-          style={{ backgroundColor: 'oklch(94% 0.04 160)' }}
+          style={{ backgroundColor: 'oklch(94% 0.04 255)' }}
         >
-          <CheckCircle2 className="h-8 w-8" style={{ color: 'oklch(45% 0.15 160)' }} aria-hidden="true" />
+          <CheckCircle2 className="h-8 w-8" style={{ color: 'oklch(42% 0.16 255)' }} aria-hidden="true" />
         </span>
         <h2 className="mt-5 text-2xl font-bold text-ink">รับเรื่องเรียบร้อย</h2>
         <p className="mt-2 text-muted">{result.message}</p>
@@ -257,7 +257,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
           data-testid="tracking-code"
           data-case-id={result.caseId}
           className="mx-auto mt-2 inline-block rounded-xl border px-6 py-3 font-mono text-2xl font-bold tracking-widest text-ink"
-          style={{ borderColor: 'oklch(90% 0.01 145)', backgroundColor: 'oklch(96% 0.02 145 / 0.5)' }}
+          style={{ borderColor: 'oklch(90% 0.01 255)', backgroundColor: 'oklch(96% 0.02 255 / 0.5)' }}
         >
           {result.trackingCode}
         </p>
@@ -274,7 +274,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
           <Link
             href="/"
             className="inline-flex min-h-touch items-center justify-center gap-2 rounded-xl border-2 px-7 font-semibold text-accent-strong hover:bg-accent-sunken"
-            style={{ borderColor: 'oklch(80% 0.015 145)' }}
+            style={{ borderColor: 'oklch(80% 0.015 255)' }}
           >
             กลับหน้าหลัก
           </Link>
@@ -504,7 +504,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
       {/* ไฟล์แนบ */}
       <SectionCard>
         <SectionHeading icon={Paperclip}>รูปภาพประกอบ (ไม่จำเป็น)</SectionHeading>
-        <div className="mt-5 rounded-xl border border-dashed px-4 py-8 text-center" style={{ borderColor: 'oklch(80% 0.015 145)', backgroundColor: 'oklch(96% 0.02 145 / 0.3)' }}>
+        <div className="mt-5 rounded-xl border border-dashed px-4 py-8 text-center" style={{ borderColor: 'oklch(80% 0.015 255)', backgroundColor: 'oklch(96% 0.02 255 / 0.3)' }}>
           <p className="text-sm text-muted">ลากไฟล์มาวาง หรือเลือกจากเครื่อง (สูงสุด 5 รูป)</p>
           <p className="mt-1 text-xs text-muted">ยังไม่เปิดใช้งานในเฟสนี้</p>
         </div>
@@ -512,7 +512,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
 
       {/* PDPA consent */}
       <div className="glass rounded-xl p-6 shadow-sm sm:p-8">
-        <label className="flex items-start gap-3 rounded-xl border p-4" style={{ borderColor: 'oklch(90% 0.01 145)', backgroundColor: 'oklch(96% 0.02 145 / 0.3)' }}>
+        <label className="flex items-start gap-3 rounded-xl border p-4" style={{ borderColor: 'oklch(90% 0.01 255)', backgroundColor: 'oklch(96% 0.02 255 / 0.3)' }}>
           <input
             type="checkbox"
             aria-label="ยินยอมให้เก็บข้อมูลตามกฎหมายว่าด้วยการคุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562"

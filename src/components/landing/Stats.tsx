@@ -42,8 +42,8 @@ export async function Stats() {
       // change% ไม่แสดงเพราะต้องเทียบกับวันก่อนหน้า (เก็บไว้ทำใน PR #3 reports)
       change: null,
       icon: 'TrendingUp',
-      color: 'oklch(55% 0.13 160)',
-      bgColor: 'oklch(94% 0.04 160)',
+      color: 'oklch(51% 0.16 255)',
+      bgColor: 'oklch(94% 0.04 255)',
     },
     {
       label: 'เวลาตอบสนองเฉลี่ย',
@@ -58,16 +58,16 @@ export async function Stats() {
       value: hasData ? formatNumber(latest!.totalReceived) : '—',
       change: null,
       icon: 'Users',
-      color: 'oklch(55% 0.13 160)',
-      bgColor: 'oklch(94% 0.04 160)',
+      color: 'oklch(51% 0.16 255)',
+      bgColor: 'oklch(94% 0.04 255)',
     },
     {
       label: 'เรื่องปิดสำเร็จ',
       value: hasData ? formatNumber(latest!.totalClosed) : '—',
       change: null,
       icon: 'CheckCircle2',
-      color: 'oklch(55% 0.13 160)',
-      bgColor: 'oklch(94% 0.04 160)',
+      color: 'oklch(51% 0.16 255)',
+      bgColor: 'oklch(94% 0.04 255)',
     },
   ];
 

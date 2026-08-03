@@ -9,28 +9,28 @@ const steps = [
     title: 'แจ้งเหตุ',
     description: 'กรอกรายละเอียดปัญหา แนบรูปภาพ และระบุตำแหน่ง',
     icon: Bell,
-    color: 'oklch(55% 0.13 160)',
+    color: 'oklch(51% 0.16 255)',
   },
   {
     number: '02',
     title: 'ตรวจสอบ',
     description: 'เจ้าหน้าที่รับเรื่อง ตรวจสอบความถูกต้อง และจัดลำดับความสำคัญ',
     icon: Search,
-    color: 'oklch(45% 0.15 160)',
+    color: 'oklch(42% 0.16 255)',
   },
   {
     number: '03',
     title: 'มอบหมาย',
     description: 'มอบหมายงานให้หน่วยงานที่รับผิดชอบ พร้อมแผนการดำเนินงาน',
     icon: Users,
-    color: 'oklch(55% 0.13 160)',
+    color: 'oklch(51% 0.16 255)',
   },
   {
     number: '04',
     title: 'เสร็จสิ้น',
     description: 'ดำเนินการแก้ไข ถ่ายภาพหลักฐาน และปิดงานพร้อมรายงาน',
     icon: CheckCircle2,
-    color: 'oklch(55% 0.13 160)',
+    color: 'oklch(51% 0.16 255)',
   },
 ];
 
@@ -68,7 +68,7 @@ export function HowItWorks() {
                   className="absolute left-1/2 top-16 hidden h-px w-full lg:block"
                   style={{
                     background:
-                      'linear-gradient(to right, oklch(55% 0.13 160 / 0.3), oklch(45% 0.15 160 / 0.3))',
+                      'linear-gradient(to right, oklch(51% 0.16 255 / 0.3), oklch(42% 0.16 255 / 0.3))',
                   }}
                 />
               )}
@@ -77,7 +77,7 @@ export function HowItWorks() {
                 <div
                   className="flex h-32 w-32 items-center justify-center rounded-full border-4"
                   style={{
-                    backgroundColor: 'oklch(99% 0.005 145)',
+                    backgroundColor: 'oklch(99% 0.005 255)',
                     borderColor: step.color,
                   }}
                 >
@@ -89,7 +89,7 @@ export function HowItWorks() {
                   className="absolute top-28 flex h-12 w-12 items-center justify-center rounded-full font-bold shadow-lg ring-4 ring-white"
                   style={{
                     backgroundColor: step.color,
-                    color: 'oklch(99% 0.005 145)',
+                    color: 'oklch(99% 0.005 255)',
                   }}
                 >
                   {step.number}
