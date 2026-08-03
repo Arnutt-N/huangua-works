@@ -141,8 +141,8 @@ intent-matcher → response-parser → reply-objects API/UI → engine refactor 
 | CREATE | `src/app/admin/chatbot/broadcast/page.tsx` + `-client.tsx` | list + wizard สร้าง (content builder, target all/specific, ตั้งเวลา) |
 | CREATE | `src/app/admin/chatbot/broadcast/new/page.tsx` | wizard สร้าง |
 | CREATE | `src/app/api/line/admin/broadcasts/route.ts` + `[id]/route.ts` + `[id]/send/route.ts` | CRUD + send; `requireStaffApi(ADMIN_ROLES)`; audit |
-| CREATE | `src/app/api/cron/broadcast-send/route.ts` | Vercel Cron (ทุก 1 นาที): ส่ง broadcast ถึงกำหนด; Bearer `CRON_SECRET`; status guard กันซ้ำ |
-| MODIFY | `vercel.json` | เพิ่ม cron schedule `/api/cron/broadcast-send` |
+| CREATE | `src/app/api/cron/broadcast-send/route.ts` | cron-job.org (ทุก 1 นาที): ส่ง broadcast ถึงกำหนด; Bearer `CRON_SECRET`; status guard กันซ้ำ |
+| — | `vercel.json` | **ห้ามใส่ `crons`** — Hobby รันได้วันละครั้ง ใส่ถี่กว่านั้น deployment ถูกปฏิเสธ; ตั้ง schedule ที่ cron-job.org แทน |
 
 ### Test strategy
 - client fns: unit test (mock fetch) broadcast/multicast/followers

@@ -92,7 +92,7 @@
 1. **Settings** (`/admin/settings`) — LINE channel config, welcome message, handoff keywords, business hours (ใช้ตาราง `chat_settings` ที่ว่างอยู่)
 2. **FAQ + Intent management** (`/admin/chatbot/auto-replies`) — CRUD `chat_faq` + intent cascade engine (data-driven แทน hardcoded)
 3. **Reply Objects** (`/admin/chatbot/reply-objects`) — flex/template asset library อ้างด้วย `$object_id`
-4. **Broadcast** (`/admin/chatbot/broadcast`) — LINE broadcast/multicast + ตั้งเวลา (Vercel Cron)
+4. **Broadcast** (`/admin/chatbot/broadcast`) — LINE broadcast/multicast + ตั้งเวลา (cron-job.org)
 5. **Rich Menus** (`/admin/chatbot/rich-menus`) — ยก CLI script เป็น admin UI + DB persistence + sync
 6. **Chatbot Dashboard** (`/admin/chatbot`) — bot metrics (FAQ hit rate, handoff count, message volume)
 7. **Files** (`/admin/files`) — media library (Vercel Blob)
@@ -140,7 +140,7 @@
 ### 5.4 Broadcast — `/admin/chatbot/broadcast`
 - เพิ่ม `broadcastMessage()` + `multicast()` + `getFollowerIds()` ใน `src/lib/line/client.ts` (ปัจจุบันมีแค่ reply/push)
 - ตารางใหม่ `chat_broadcasts` (content jsonb, status enum, target, scheduled_at, sent_at, counts)
-- scheduler: **Vercel Cron route** (`api/cron/broadcast-send`) แทน asyncio loop ของ jsk (serverless ไม่มี long-running process)
+- scheduler: **cron route** (`api/cron/broadcast-send`) แทน asyncio loop ของ jsk (serverless ไม่มี long-running process) — ตัวเรียกคือ cron-job.org เพราะ Vercel Hobby รัน cron ได้แค่วันละครั้ง
 - gate: `requireStaffApi(ADMIN_ROLES)` + audit
 
 ### 5.5 Rich Menus — `/admin/chatbot/rich-menus`
@@ -172,7 +172,7 @@
 | Auth | JWT cookie/bearer + CSRF | **Auth.js v5** (`auth()` session) + `requireStaff`/`requireStaffApi` |
 | RBAC | 6 roles + DB `permission_settings` | **5 roles** (citizen/officer/chief/head/superadmin) + role constants; chatbot mgmt gate ที่ `ADMIN_ROLES` |
 | Real-time | WebSocket + Redis Pub/Sub | **SSE** + Upstash Redis Pub/Sub (`sse/broadcaster.ts`) |
-| Background task | asyncio loop (in-process) | **Vercel Cron** routes (`api/cron/*`) |
+| Background task | asyncio loop (in-process) | **cron-job.org** ยิง routes (`api/cron/*`) |
 | File storage | Postgres BLOB + disk | **Vercel Blob** (ต้องเพิ่ม dep) |
 | Secret | Fernet (ยกเว้น LINE plaintext) | **env-only** (LINE token), `chat_settings` เฉพาะ non-secret |
 | Design | (jsk theme) | **emerald/amber glassmorphism** + Noto Sans Thai + elderly floor 17px + touch 44px + reduced-motion |
@@ -218,7 +218,8 @@
 ```
 
 ### 8.2 Broadcast scheduling (serverless)
-- jsk ใช้ asyncio loop → huangua ใช้ **Vercel Cron** (`api/cron/broadcast-send` ทุก 1 นาที) + status guard `scheduled→sending` กันส่งซ้ำ (แบบ jsk `FOR UPDATE SKIP LOCKED`)
+- jsk ใช้ asyncio loop → huangua ใช้ **cron-job.org** ยิง `api/cron/broadcast-send` ทุก 1 นาที + status guard `scheduled→sending` กันส่งซ้ำ (แบบ jsk `FOR UPDATE SKIP LOCKED`)
+- ไม่ใส่ `crons` ใน `vercel.json`: Hobby รันได้วันละครั้ง ใส่ถี่กว่านั้น deployment ถูกปฏิเสธทั้ง build (ขึ้น Pro แล้วค่อยย้ายกลับได้)
 
 ### 8.3 File storage
 - Vercel Blob (`@vercel/blob`) สำหรับ rich menu image + media library — serverless-friendly, มี signed URL, ไม่ต้องจัดการ disk
