@@ -175,7 +175,7 @@
 | Background task | asyncio loop (in-process) | **cron-job.org** ยิง routes (`api/cron/*`) |
 | File storage | Postgres BLOB + disk | **Vercel Blob** (ต้องเพิ่ม dep) |
 | Secret | Fernet (ยกเว้น LINE plaintext) | **env-only** (LINE token), `chat_settings` เฉพาะ non-secret |
-| Design | (jsk theme) | **emerald/amber glassmorphism** + Noto Sans Thai + elderly floor 17px + touch 44px + reduced-motion |
+| Design | (jsk theme) | **blue/amber glassmorphism** + Noto Sans Thai + elderly floor 17px + touch 44px + reduced-motion |
 
 **Navigation:** เพิ่มกลุ่มใหม่ "แชทบอท" ใน `src/components/admin/admin-nav.ts` (ปัจจุบันมี 3 กลุ่ม: งานหลัก/แชท LINE/ระบบ) — เมนู chatbot management ทั้งหมด `supervisorOnly: true` (head/superadmin)
 
@@ -230,11 +230,11 @@
 ## 9. a11y + Design System (HARD gates จาก DESIGN.md)
 
 ทุกหน้าใหม่ต้องผ่าน:
-- **Contrast AA** (emerald/amber light+dark) — รัน `scripts/check-contrast.ts`
+- **Contrast AA** (blue/amber light+dark) — รัน `scripts/check-contrast.ts`
 - **Touch target ≥44px** (`min-h-touch`)
 - **Body text ≥17px** (elderly floor)
 - **Noto Sans Thai เท่านั้น** (ห้าม serif)
-- **Glassmorphism cards** + emerald primary (The One Emerald Rule)
+- **Glassmorphism cards** + primary น้ำเงิน (The One Blue Rule)
 - **prefers-reduced-motion** respect ทุก animation
 - ใช้ primitives ที่มี: `AdminShell`, `AdminCard`, `KpiCard`, `Pagination`, `EmptyState`, Radix (Dialog/Select/Tabs/Toast)
 - Pattern หน้า: `page.tsx` (server, `requireStaff`) + `*-client.tsx` (client interactivity)

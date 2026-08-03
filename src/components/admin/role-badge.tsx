@@ -5,7 +5,7 @@ import type { UserRole } from '@/lib/auth/roles';
  * RoleBadge — แสดง role ของ user ในรูปแบบ badge
  *
  * ใช้ soft bg + *-ink text (เหมือน CaseStatusBadge — unity กับ design language)
- * Palette: emerald (supervisor), amber (officer), muted (citizen)
+ * Palette: น้ำเงิน (supervisor), amber (officer), muted (citizen)
  *
  * § chief/officer เดิมใช้ text-warning บน bg-warning-soft = 1.52:1 (อ่านไม่ออก)
  * เปลี่ยนเป็น text-warning-ink = 6.5:1

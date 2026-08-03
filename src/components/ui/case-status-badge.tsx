@@ -5,7 +5,7 @@ import { STATUS_LABELS_TH, type CaseStatus } from '../../lib/cases/state-machine
  * CaseStatusBadge — signature component (DESIGN.md §5 Chips/Status Badge)
  * แมป state machine รับเรื่อง → ปิดเรื่อง ไปยังสีสถานะ
  * ใช้ soft พื้น + *-ink text (contrast ปลอดภัย ไม่ใช่ badge เต็มสี)
- * Palette: emerald (primary), amber (warning/progress), red (danger)
+ * Palette: น้ำเงิน (primary), amber (warning/progress), red (danger)
  *
  * § ใช้ token *-ink เท่านั้นเป็นสีข้อความ ห้ามใช้ text-warning/text-success/text-danger
  * ซึ่งเป็น "สีเต็ม" สำหรับ fill — ของเดิม text-warning บน bg-warning-soft ได้แค่ 1.52:1

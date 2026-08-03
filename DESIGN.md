@@ -371,8 +371,8 @@ Primitives อยู่ที่ `src/components/ui/field.tsx` — แยกเ�
 
 ### Navigation
 
-- **Landing Navbar:** `fixed top-0 z-50` + glassmorphism (`.glass` backdrop-blur) — ลอยทับ mesh gradient ของ hero, active link = emerald
-- **Admin Sidebar:** แบ่ง 4 กลุ่ม (งานหลัก / แชท LINE / แชทบอท / ระบบ) — กรองตาม role ผ่าน `visibleNavGroups` (เมนู `supervisorOnly` ซ่อนจากเจ้าหน้าที่), active item = `bg-accent-strong text-on-accent` (emerald ทึบ), hover = `bg-accent-sunken`
+- **Landing Navbar:** `fixed top-0 z-50` + glassmorphism (`.glass` backdrop-blur) — ลอยทับ mesh gradient ของ hero, active link = น้ำเงิน
+- **Admin Sidebar:** แบ่ง 4 กลุ่ม (งานหลัก / แชท LINE / แชทบอท / ระบบและเครื่องมือ) — กรองตาม role ผ่าน `visibleNavGroups` (เมนู `supervisorOnly` ซ่อนจากเจ้าหน้าที่), active item = `bg-accent-strong text-on-accent` (น้ำเงินทึบ), hover = `bg-accent-sunken`
 - **Touch:** nav item ทุกตัว ≥44px (C6) — รวมเมนูมือถือ (hamburger + drawer item)
 - **Keyboard:** ทุกลิงก์ focus ได้ตาม tab order, drawer ปิดด้วย Esc
 
@@ -487,7 +487,7 @@ mobile(<sm)      tablet(sm–lg)        desktop(≥lg)
   <LiveTracking />   {/* demo realtime tracking card (ใหญ่) */}
   <Testimonials />   {/* carousel 3-5 testimonials */}
   <FAQ />            {/* accordion 6-8 FAQs */}
-  <CTA />            {/* final CTA emerald gradient */}
+  <CTA />            {/* final CTA gradient น้ำเงิน */}
 </main>
 ```
 
@@ -495,7 +495,7 @@ mobile(<sm)      tablet(sm–lg)        desktop(≥lg)
 ```tsx
 <section className="relative pt-28 pb-16 overflow-hidden mesh-gradient">
   <div className="absolute inset-0 thai-pattern pointer-events-none" />
-  <div className="absolute top-32 -left-20 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl float-animate" />
+  <div className="absolute top-32 -left-20 w-72 h-72 bg-accent/10 rounded-full blur-3xl float-animate" />
   <div className="absolute bottom-0 -right-20 w-96 h-96 bg-amber-400/10 rounded-full blur-3xl float-animate" />
 
   <div className="container mx-auto px-4 relative z-10">
@@ -508,7 +508,7 @@ mobile(<sm)      tablet(sm–lg)        desktop(≥lg)
         <p className="description">ระบบรับแจ้งเหตุและติดตามงานบริการสาธารณูปโภคออนไลน์...</p>
         <div className="service-chips">{/* 5 chips */}</div>
         <div className="cta-buttons">
-          <Button emerald-gradient>แจ้งเหตุออนไลน์</Button>
+          <Button bg-accent-gradient>แจ้งเหตุออนไลน์</Button>
           <Button outline>ติดตามงาน</Button>
         </div>
         <div className="trust-badges">{/* 3 badges: โปร่งใส/ตอบสนอง 24 ชม./เรียลไทม์ */}</div>
@@ -526,10 +526,10 @@ mobile(<sm)      tablet(sm–lg)        desktop(≥lg)
 ## §7. Do's & Don'ts
 
 ### ✅ DO
-- ใช้ emerald-600 เป็น primary ทุกที่ (CTA, badge, progress, link hover)
+- ใช้น้ำเงิน `oklch(51%/42% 0.16 255)` เป็น primary ทุกที่ (CTA, badge, progress, link hover)
 - ใช้ amber-400 gold เป็น accent highlight (badge secondary, warning, trust badge icon)
 - Glassmorphism cards (backdrop-blur + border)
-- Mesh gradient background (radial-gradient emerald/amber)
+- Mesh gradient background (radial-gradient น้ำเงิน/amber)
 - Float/pulse animation **แต่ต้อง respect prefers-reduced-motion**
 - Gradient text animation (optional) **แต่ต้อง disable เมื่อ reduce-motion**
 - Touch target ≥44px ทุก interactive element
@@ -537,9 +537,9 @@ mobile(<sm)      tablet(sm–lg)        desktop(≥lg)
 - Contrast AA ทุกคู่สี
 
 ### ❌ DON'T
-- ห้ามใช้ civic indigo `oklch(52% 0.12 245)` (เก่า — เปลี่ยนเป็น emerald แล้ว)
+- ห้ามใช้น้ำเงินจืด chroma <0.14 (เช่น `oklch(35% 0.07 256)`) — ดูกฎ No-Muddy-Blue §2
 - ห้ามใช้ serif display headlines (Fraunces/DM Serif) — ใช้ Noto Sans Thai bold แทน
-- ห้ามใช้ cream AI-default `oklch(98% 0.01 60)` — ใช้ off-white `oklch(99% 0.005 145)`
+- ห้ามใช้ cream AI-default `oklch(98% 0.01 60)` — ใช้ off-white `oklch(99% 0.005 255)`
 - ห้ามใช้ flat surface (flat-by-default rule ยกเลิก) — ใช้ glassmorphism/mesh แทน
 - ห้าม animation ที่ไม่ respect `prefers-reduced-motion` (CRITICAL gate)
 - ห้าม body text <17px (fail elderly floor H12)
@@ -548,13 +548,18 @@ mobile(<sm)      tablet(sm–lg)        desktop(≥lg)
 
 ---
 
-## §8. Migration Checklist (จาก civic indigo → emerald/amber)
+## §8. Migration Checklist (ประวัติ — ทำเสร็จแล้ว)
 
-- [ ] `src/styles/tokens.css` — เปลี่ยน palette civic indigo → emerald-160/amber-80
+> ⚠️ **เอกสารส่วนนี้เป็นบันทึกประวัติ ไม่ใช่งานค้าง** — checklist ด้านล่างคือรอบ
+> migration แรก (civic indigo → emerald) ซึ่งทำเสร็จไปแล้ว ต่อมามี migration รอบสอง
+> (emerald → blue 255) ที่ทำเสร็จเช่นกัน ดู §2 สำหรับ palette ที่ใช้จริงตอนนี้
+> ชื่อสีในรายการด้านล่างจึงสะท้อนสถานะตอนนั้น ไม่ใช่ตอนนี้
+
+- [x] `src/styles/tokens.css` — เปลี่ยน palette civic indigo → emerald-160/amber-80
 - [ ] `src/app/layout.tsx` — Noto Sans Thai เท่านั้น (ไม่มี serif display)
 - [ ] `src/app/page.tsx` — ทำ modular sections (Stats/Services/HowItWorks/LiveTracking/Testimonials/FAQ/CTA)
-- [ ] `src/components/ui/button.tsx` — emerald gradient primary, outline secondary
-- [ ] `src/components/ui/case-status-badge.tsx` — emerald/amber soft bg
+- [x] `src/components/ui/button.tsx` — gradient primary, outline secondary
+- [x] `src/components/ui/case-status-badge.tsx` — accent/amber soft bg
 - [ ] `src/components/landing/Hero.tsx` — 2-col + tracking demo card + glassmorphism
 - [ ] `src/components/landing/Stats.tsx` — metrics cards
 - [ ] `src/components/landing/Services.tsx` — 5-6 service chips
@@ -562,7 +567,7 @@ mobile(<sm)      tablet(sm–lg)        desktop(≥lg)
 - [ ] `src/components/landing/LiveTracking.tsx` — realtime demo (ใหญ่)
 - [ ] `src/components/landing/Testimonials.tsx` — carousel
 - [ ] `src/components/landing/FAQ.tsx` — accordion
-- [ ] `src/components/landing/CTA.tsx` — final CTA emerald gradient
+- [x] `src/components/landing/CTA.tsx` — final CTA gradient
 - [ ] `src/components/landing/Navbar.tsx` — sticky glassmorphism nav
 - [ ] `src/components/landing/Footer.tsx` — 4-col footer
 - [ ] Install `framer-motion` — `pnpm add framer-motion`
@@ -573,4 +578,4 @@ mobile(<sm)      tablet(sm–lg)        desktop(≥lg)
 
 ---
 
-*ออกแบบโดยอ้างอิง glm5-2-smart-service (emerald tech + amber royal + glassmorphism + framer-motion) พร้อม a11y gates บังคับ (contrast AA, touch ≥44px, elderly ≥17px, reduced-motion respect)*
+*ออกแบบโดยอ้างอิง glm5-2-smart-service (glassmorphism + framer-motion) โดยปรับ palette เป็น blue civic + amber royal พร้อม a11y gates บังคับ (contrast AA, touch ≥44px, elderly ≥17px, reduced-motion respect)*

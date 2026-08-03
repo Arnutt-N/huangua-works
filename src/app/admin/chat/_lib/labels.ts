@@ -15,7 +15,7 @@ export const MODE_SHORT: Record<string, string> = {
 
 /**
  * § สีโหมดสนทนา — ใช้ design token เท่านั้น
- * แมป: emerald = ระบบ/บอท, amber = รอคน, success = คนกำลังคุย, muted = ปิดแล้ว
+ * แมป: น้ำเงิน = ระบบ/บอท, amber = รอคน, success = คนกำลังคุย, muted = ปิดแล้ว
  */
 export const MODE_BADGE: Record<string, string> = {
   bot_active: 'bg-accent-sunken text-accent-strong ring-accent-strong/20',

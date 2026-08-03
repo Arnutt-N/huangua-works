@@ -7,7 +7,7 @@ import { cn } from '@/lib/cn';
  * LayoutDashboard คนละตัว → สองฝั่งดูเป็นคนละผลิตภัณฑ์ แยกออกมาเป็น component เดียว
  * เพื่อให้ทุกหน้า (landing / admin / login) ใช้ตราเดียวกันจริง ๆ
  *
- * ใช้ gradient emerald เดียวกับปุ่ม primary ของ Hero (DESIGN.md §accent)
+ * ใช้ gradient น้ำเงินเดียวกับปุ่ม primary ของ Hero (DESIGN.md §accent)
  */
 export function BrandMark({
   size = 'md',

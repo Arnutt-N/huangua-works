@@ -5,11 +5,11 @@ import type { ReactNode } from 'react';
 /**
  * KpiCard — Key Performance Indicator card
  *
- * Unity กับ landing Stats: ใช้ glass + icon สี emerald/amber + value เด่น
+ * Unity กับ landing Stats: ใช้ glass + icon สีน้ำเงิน/amber + value เด่น
  * แตกต่างจาก Stats ตรงนี้คือเป็น data point เดียว (ไม่ใช่ชุด 4) และทำงานใน admin context
  *
  * Variants:
- *  - default: emerald accent (tech/smart)
+ *  - default: accent น้ำเงิน (tech/smart)
  *  - gold: amber accent (Thai royal — ใช้สำหรับ highlight KPI)
  *  - danger: red accent (SLA breach / warning)
  *
