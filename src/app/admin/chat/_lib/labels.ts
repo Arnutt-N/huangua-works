@@ -15,7 +15,7 @@ export const MODE_SHORT: Record<string, string> = {
 
 /**
  * § สีโหมดสนทนา — ใช้ design token เท่านั้น
- * แมป: emerald = ระบบ/บอท, amber = รอคน, success = คนกำลังคุย, muted = ปิดแล้ว
+ * แมป: น้ำเงิน = ระบบ/บอท, amber = รอคน, success = คนกำลังคุย, muted = ปิดแล้ว
  */
 export const MODE_BADGE: Record<string, string> = {
   bot_active: 'bg-accent-sunken text-accent-strong ring-accent-strong/20',
@@ -32,6 +32,6 @@ export const TAG_BADGE: Record<string, string> = {
   gold: 'bg-accent-gold-soft text-warning-ink ring-warning-ink/20',
   success: 'bg-success-soft text-success-ink ring-success-ink/20',
   warning: 'bg-warning-soft text-warning-ink ring-warning-ink/20',
-  danger: 'bg-danger-soft text-danger ring-danger/20',
+  danger: 'bg-danger-soft text-danger-ink ring-danger-ink/20',
   muted: 'bg-surface-sunken text-muted ring-border-strong/30',
 };

@@ -6,7 +6,7 @@ import { cn } from '../../lib/cn';
  * Button — primitive หลัก (DESIGN.md §5 Buttons)
  * - ปุ่ม primary = Emerald gradient + white text
  * - touch target ≥44px (C6) ทุก variant
- * - focus-visible ring emerald (ไม่ใช่ outline กรอบเดี่ยว)
+ * - focus-visible ring น้ำเงิน (ไม่ใช่ outline กรอบเดี่ยว)
  * - ใช้ Radix Slot สำหรับ asChild (render เป็น <a>/<Link> ได้)
  */
 export type ButtonVariant = 'primary' | 'secondary' | 'destructive' | 'ghost' | 'outline';
@@ -21,7 +21,7 @@ const base =
   'disabled:pointer-events-none disabled:opacity-50 motion-reduce:transition-none';
 
 const variantClass: Record<ButtonVariant, string> = {
-  // § primary = emerald gradient ตาม DESIGN.md §5 / §2 "The One Emerald Rule"
+  // § primary = gradient น้ำเงิน ตาม DESIGN.md §5 / §2 "The One Blue Rule"
   // ก่อนหน้านี้ variant นี้ถูก implement เป็นสีทึบ bg-accent-strong ซึ่งไม่ตรง spec
   // ผลคือทุกหน้าที่อยากได้ปุ่มจริงตาม design (Hero, CTA, Navbar, login, track,
   // intake) ต้องเขียน style={{ background: 'linear-gradient(...)' }} ทับเอง

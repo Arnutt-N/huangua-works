@@ -241,7 +241,7 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
             className="flex h-9 w-9 items-center justify-center rounded-full"
             style={{ backgroundColor: 'oklch(95% 0.05 80)' }}
           >
-            <Clock className="h-4 w-4" style={{ color: 'oklch(82% 0.14 80)' }} />
+            <Clock className="h-4 w-4" style={{ color: 'oklch(45% 0.12 70)' }} />
           </div>
           <div>
             <p className="text-xs font-semibold">เวลาตอบสนอง</p>
@@ -288,7 +288,7 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
               className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl"
               style={{ backgroundColor: 'oklch(95% 0.05 80)' }}
             >
-              <Zap className="h-5 w-5" style={{ color: 'oklch(82% 0.14 80)' }} />
+              <Zap className="h-5 w-5" style={{ color: 'oklch(45% 0.12 70)' }} />
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold">ไฟฟ้าสาธารณะ</p>

@@ -82,7 +82,7 @@
   --radius-xl: 24px;
   --radius-pill: 9999px;
 
-  /* gradient หลักของแบรนด์ (DESIGN.md §2 "The One Emerald Rule")
+  /* gradient หลักของแบรนด์ (DESIGN.md §2 "The One Blue Rule")
    * ประกาศจาก token เพื่อให้จุดเดียวคุมทั้งระบบ — ก่อนหน้านี้ gradient ชุดนี้
    * ถูกพิมพ์ค่า oklch ซ้ำด้วยมือ 12 จุดทั่วโปรเจกต์ ถ้าปรับ --color-accent
    * สำเนาทั้ง 12 จะไม่ตามและสีจะเพี้ยนกันเงียบ ๆ */
