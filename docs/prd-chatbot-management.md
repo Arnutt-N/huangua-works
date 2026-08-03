@@ -218,7 +218,8 @@
 ```
 
 ### 8.2 Broadcast scheduling (serverless)
-- jsk ใช้ asyncio loop → huangua ใช้ **cron-job.org** ยิง `api/cron/broadcast-send` ทุก 1 นาที + status guard `scheduled→sending` กันส่งซ้ำ (แบบ jsk `FOR UPDATE SKIP LOCKED`)
+- jsk ใช้ asyncio loop → huangua ใช้ **cron-job.org** ยิง `api/cron/broadcast-send` ทุก 30 นาที + status guard `scheduled→sending` กันส่งซ้ำ (แบบ jsk `FOR UPDATE SKIP LOCKED`)
+- รอบ 30 นาที (ไม่ใช่ 1 นาทีตามแผนเดิม): ปริมาณประกาศระดับตำบลต่ำ ความแม่นระดับนาทีไม่คุ้มกับการยิง 1,440 ครั้ง/วันบน free tier — UI แจ้งผู้ใช้ว่าประกาศอาจออกช้าได้ถึง 30 นาที (`SEND_WINDOW_MINUTES`) และมีปุ่มส่งทันทีเป็นทางออกกรณีเร่งด่วน
 - ไม่ใส่ `crons` ใน `vercel.json`: Hobby รันได้วันละครั้ง ใส่ถี่กว่านั้น deployment ถูกปฏิเสธทั้ง build (ขึ้น Pro แล้วค่อยย้ายกลับได้)
 
 ### 8.3 File storage

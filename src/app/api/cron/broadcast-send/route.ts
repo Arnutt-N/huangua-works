@@ -1,5 +1,8 @@
 /**
- * GET /api/cron/broadcast-send — ส่ง broadcast ที่ถึงกำหนด (เรียกทุก 1 นาที)
+ * GET /api/cron/broadcast-send — ส่ง broadcast ที่ถึงกำหนด (เรียกทุก 30 นาที)
+ *
+ * § รอบ 30 นาทีต้องตรงกับ SEND_WINDOW_MINUTES ใน broadcast-client.tsx ที่บอกผู้ใช้
+ * ว่าประกาศอาจออกช้ากว่าเวลาที่ตั้งได้แค่ไหน — แก้ที่ไหนต้องแก้อีกที่ด้วย
  *
  * § ตัวเรียกคือ cron-job.org ไม่ใช่ Vercel Cron — Hobby plan รันได้แค่วันละครั้ง
  * ซึ่งไม่พอกับ broadcast ตั้งเวลา (ดู docs/implementation-plan.md §Vercel config)
