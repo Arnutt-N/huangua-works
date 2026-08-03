@@ -32,6 +32,6 @@ export const TAG_BADGE: Record<string, string> = {
   gold: 'bg-accent-gold-soft text-warning-ink ring-warning-ink/20',
   success: 'bg-success-soft text-success-ink ring-success-ink/20',
   warning: 'bg-warning-soft text-warning-ink ring-warning-ink/20',
-  danger: 'bg-danger-soft text-danger ring-danger/20',
+  danger: 'bg-danger-soft text-danger-ink ring-danger-ink/20',
   muted: 'bg-surface-sunken text-muted ring-border-strong/30',
 };

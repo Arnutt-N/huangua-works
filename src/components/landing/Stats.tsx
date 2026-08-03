@@ -50,7 +50,11 @@ export async function Stats() {
       value: hasData && latest!.avgResolutionDays != null ? `${latest!.avgResolutionDays} วัน` : '—',
       change: null,
       icon: 'Clock',
-      color: 'oklch(82% 0.14 80)',
+      // § ใช้ค่าเดียวกับ --color-warning-ink ไม่ใช่ --color-warning (82% 0.14 80)
+      // เพราะ color ตัวนี้ถูกใช้เป็นสี "ตัวเลข KPI" ใน stats-client.tsx ด้วย ไม่ใช่แค่ไอคอน
+      // ทองสว่างบนพื้น gold-soft ให้ 1.52:1 ซึ่งอ่านไม่ออก (บั๊กเดียวกับที่ tokens.css
+      // แก้ไปแล้วด้วยการสร้าง token *-ink แต่ค่า hardcode ตรงนี้ไม่ได้ตามไปด้วย)
+      color: 'oklch(45% 0.12 70)',
       bgColor: 'oklch(95% 0.05 80)',
     },
     {

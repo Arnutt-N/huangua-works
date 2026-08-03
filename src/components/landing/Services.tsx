@@ -8,7 +8,9 @@ const services = [
     title: 'ไฟฟ้าสาธารณะ',
     description: 'หลอดไฟถนนชำรุด ไฟฟ้าสาธารณะขัดข้อง',
     icon: Zap,
-    color: 'oklch(82% 0.14 80)',
+    // § ค่าเดียวกับ --color-warning-ink — ทองสว่าง (82% 0.14 80) บนพื้น gold-soft
+    // ให้แค่ 1.52:1 ไอคอนจะจางจนแทบมองไม่เห็น โดยเฉพาะกับผู้สูงอายุซึ่งเป็นกลุ่มเป้าหมาย
+    color: 'oklch(45% 0.12 70)',
     bgColor: 'oklch(95% 0.05 80)',
   },
   {
@@ -36,7 +38,7 @@ const services = [
     title: 'ซ่อมบำรุง',
     description: 'สิ่งก่อสร้างสาธารณะ อาคาร สะพาน',
     icon: Wrench,
-    color: 'oklch(82% 0.14 80)',
+    color: 'oklch(45% 0.12 70)',
     bgColor: 'oklch(95% 0.05 80)',
   },
   {
