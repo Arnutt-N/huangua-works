@@ -5,6 +5,12 @@
 
 ## [2026-08-02]
 
+- **fix(deploy): เอา `crons` ออกจาก `vercel.json` — ปลด deploy ที่ค้างมา 7 ชม.** (pushed to main directly)
+  - อาการ: เมนูกลุ่ม "แชทบอท" 9 รายการไม่ขึ้นบน production ทั้งที่ #52 อยู่บน main แล้ว และผู้ใช้เป็น superadmin
+  - ต้นเหตุ: #52 เพิ่ม `"crons": [{ "path": "/api/cron/broadcast-send", "schedule": "* * * * *" }]` — Vercel Hobby จำกัด cron วันละครั้ง จึงปฏิเสธตั้งแต่ขั้นตรวจ `vercel.json` **ก่อนถึงขั้น build** production เลยค้างกับ deployment เก่าเงียบ ๆ ไม่มีอะไรฟ้องฝั่งโค้ด
+  - ขัดกับข้อจำกัดที่ `docs/implementation-plan.md` เขียนไว้เองว่า "no `crons` (ใช้ cron-job.org)" — `prp-chatbot-management.md` สั่งให้แก้ `vercel.json` สวนทาง
+  - ย้าย `broadcast-send` ไปเป็น cron-job.org job #5 (`* * * * *`) — route เป็น `GET` + `Bearer CRON_SECRET` เหมือนอีก 4 ตัวอยู่แล้ว ไม่ต้องแก้โค้ด และ `sendBroadcast()` มี compare-and-swap `status='sending' WHERE status='scheduled'` กันส่งซ้ำอยู่แล้ว
+  - อัปเดต DEPLOY.md (4→5 jobs + เหตุผลว่าห้ามย้ายกลับ) และแก้เอกสาร 5 จุดที่ยังบอกให้ใช้ Vercel Cron
 - **chore(hooks): ติดตั้ง Stop hook ฉบับแก้ไขกลับอัตโนมัติ — กันเตือนผิดหลัง squash-merge** (pushed to main directly)
   - อาการ: หลัง PR ถูก squash-merge เข้า main แล้วรีสตาร์ท branch จาก main ใหม่ (flow สำหรับงานต่อเนื่องที่เอกสารกำหนดเอง) `origin/<branch>` ยังชี้ประวัติก่อน merge → `$upstream..HEAD` กวาดทุก commit ที่ main ได้มาหลังจากนั้น รวม PR ของคนอื่น
   - commit เหล่านั้นมี `committer=GitHub <noreply@github.com>` จาก squash-merge จึงสะดุดด่านตรวจลายเซ็น แล้วสั่งให้ rebase เขียนทับประวัติที่เผยแพร่แล้ว + เปลี่ยนผู้เขียนงานคนอื่นเป็นของเรา (ครั้งล่าสุดกระทบ 28 commit ในนั้นเป็นงานของ `arnutt.n@gmail.com` 12 รายการ)
