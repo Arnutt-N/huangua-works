@@ -56,7 +56,14 @@ export interface AdminNavGroup {
  * เดิมเคยคิดจะใช้ชื่อกลุ่มว่า "Admin" แต่ในระบบนี้มีแค่ /admin/users กับ
  * /admin/master-data ที่จำกัด head/superadmin ส่วน /admin/audit เจ้าหน้าที่ทุกคน
  * เข้าได้ — ถ้าใช้ชื่อ "Admin" เจ้าหน้าที่ทั่วไปจะเห็นกลุ่มที่สื่อว่าตัวเองไม่มีสิทธิ์
- * ทั้งที่กดเข้าได้ จึงใช้ "ระบบ" ซึ่งบอกว่าเป็นเรื่องของระบบ ไม่ได้บอกระดับสิทธิ์
+ * ทั้งที่กดเข้าได้ จึงใช้ "ระบบและเครื่องมือ" ซึ่งบอกว่าเป็นเรื่องของระบบ
+ * ไม่ได้บอกระดับสิทธิ์
+ *
+ * § ทำไม ไฟล์สื่อ/ย่อรูป/สุขภาพระบบ/ตั้งค่า ไม่อยู่ในกลุ่ม "แชทบอท"
+ * ทั้งสี่ตัวไม่ได้ผูกกับบอทโดยเฉพาะ — ไฟล์สื่อใช้กับ Rich Menu ก็จริงแต่ใช้กับ
+ * งานอื่นได้ด้วย, ย่อรูปเป็นเครื่องมือทั่วไป, สุขภาพระบบตรวจ DB/Redis/LINE ทั้งระบบ
+ * และ /admin/settings จะมีการตั้งค่าอื่นนอกจากบอทตามมา จึงเลี่ยงชื่อ "ตั้งค่าบอท"
+ * ที่ผูกกับบอทเกินจริง
  */
 export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
   {
@@ -80,14 +87,10 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       { key: 'reply-objects', label: 'ข้อความสำเร็จรูป', href: '/admin/chatbot/reply-objects', icon: LayoutGrid, supervisorOnly: true },
       { key: 'broadcast', label: 'ส่งประกาศ', href: '/admin/chatbot/broadcast', icon: Send, supervisorOnly: true },
       { key: 'rich-menus', label: 'Rich Menu', href: '/admin/chatbot/rich-menus', icon: LayoutGrid, supervisorOnly: true },
-      { key: 'files', label: 'ไฟล์สื่อ', href: '/admin/files', icon: Image, supervisorOnly: true },
-      { key: 'image-resize', label: 'ย่อรูป', href: '/admin/image-resize', icon: Image, supervisorOnly: true },
-      { key: 'health', label: 'สุขภาพระบบ', href: '/admin/health', icon: HeartPulse, supervisorOnly: true },
-      { key: 'settings', label: 'ตั้งค่าบอท', href: '/admin/settings', icon: Settings, supervisorOnly: true },
     ],
   },
   {
-    label: 'ระบบ',
+    label: 'ระบบและเครื่องมือ',
     items: [
       {
         key: 'users',
@@ -103,6 +106,10 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         icon: FolderCog,
         supervisorOnly: true,
       },
+      { key: 'files', label: 'ไฟล์สื่อ', href: '/admin/files', icon: Image, supervisorOnly: true },
+      { key: 'image-resize', label: 'ย่อรูป', href: '/admin/image-resize', icon: Image, supervisorOnly: true },
+      { key: 'settings', label: 'ตั้งค่า', href: '/admin/settings', icon: Settings, supervisorOnly: true },
+      { key: 'health', label: 'สุขภาพระบบ', href: '/admin/health', icon: HeartPulse, supervisorOnly: true },
       { key: 'audit', label: 'ประวัติการกระทำ', href: '/admin/audit', icon: ScrollText },
     ],
   },
