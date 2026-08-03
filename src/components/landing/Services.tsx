@@ -15,8 +15,8 @@ const services = [
     title: 'ประปาหมู่บ้าน',
     description: 'ท่อประปารั่ว น้ำไม่ไหล คุณภาพน้ำ',
     icon: Droplets,
-    color: 'oklch(55% 0.13 160)',
-    bgColor: 'oklch(94% 0.04 160)',
+    color: 'oklch(51% 0.16 255)',
+    bgColor: 'oklch(94% 0.04 255)',
   },
   {
     title: 'ถนน',
@@ -29,8 +29,8 @@ const services = [
     title: 'การระบายน้ำ',
     description: 'ท่อระบายน้ำอุดตัน น้ำท่วมขัง',
     icon: Activity,
-    color: 'oklch(55% 0.13 160)',
-    bgColor: 'oklch(94% 0.04 160)',
+    color: 'oklch(51% 0.16 255)',
+    bgColor: 'oklch(94% 0.04 255)',
   },
   {
     title: 'ซ่อมบำรุง',
@@ -43,14 +43,14 @@ const services = [
     title: 'สิ่งแวดล้อม',
     description: 'ขยะสาธารณะ ต้นไม้หักโค่น',
     icon: TreePine,
-    color: 'oklch(55% 0.13 160)',
-    bgColor: 'oklch(94% 0.04 160)',
+    color: 'oklch(51% 0.16 255)',
+    bgColor: 'oklch(94% 0.04 255)',
   },
 ];
 
 export function Services() {
   return (
-    <section id="services" className="relative py-16 lg:py-24" style={{ backgroundColor: 'oklch(96% 0.02 145)' }}>
+    <section id="services" className="relative py-16 lg:py-24" style={{ backgroundColor: 'oklch(96% 0.02 255)' }}>
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}

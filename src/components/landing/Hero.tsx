@@ -36,7 +36,7 @@ export function Hero() {
       <div className="absolute inset-0 thai-pattern pointer-events-none" />
       <div
         className="absolute top-32 -left-20 w-72 h-72 rounded-full blur-3xl float-animate"
-        style={{ backgroundColor: 'oklch(55% 0.13 160 / 0.1)' }}
+        style={{ backgroundColor: 'oklch(51% 0.16 255 / 0.1)' }}
       />
       <div
         className="absolute bottom-0 -right-20 w-96 h-96 rounded-full blur-3xl float-animate"
@@ -62,19 +62,19 @@ export function Hero() {
               transition={{ delay: reduce ? 0 : 0.2 }}
               className="mb-6 inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-semibold"
               style={{
-                backgroundColor: 'oklch(94% 0.04 160)',
-                color: 'oklch(45% 0.15 160)',
-                borderColor: 'oklch(90% 0.05 160)',
+                backgroundColor: 'oklch(94% 0.04 255)',
+                color: 'oklch(42% 0.16 255)',
+                borderColor: 'oklch(90% 0.05 255)',
               }}
             >
               <span className="relative flex h-2 w-2">
                 <span
                   className="pulse-ring absolute inset-0 rounded-full"
-                  style={{ backgroundColor: 'oklch(55% 0.13 160)' }}
+                  style={{ backgroundColor: 'oklch(51% 0.16 255)' }}
                 />
                 <span
                   className="relative h-2 w-2 rounded-full"
-                  style={{ backgroundColor: 'oklch(45% 0.15 160)' }}
+                  style={{ backgroundColor: 'oklch(42% 0.16 255)' }}
                 />
               </span>
               ระบบออนไลน์ใหม่ ปี 2569
@@ -97,7 +97,7 @@ export function Hero() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: reduce ? 0 : 0.4, duration: reduce ? 0 : 0.6 }}
               className="mt-3 text-base font-semibold lg:text-lg"
-              style={{ color: 'oklch(55% 0.13 160)' }}
+              style={{ color: 'oklch(51% 0.16 255)' }}
             >
               กองช่าง องค์การบริหารส่วนตำบลหัวงัว
             </motion.p>
@@ -176,15 +176,15 @@ export function Hero() {
               className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-muted lg:justify-start"
             >
               <div className="flex items-center gap-1.5">
-                <ShieldCheck className="h-4 w-4" style={{ color: 'oklch(55% 0.13 160)' }} />
+                <ShieldCheck className="h-4 w-4" style={{ color: 'oklch(51% 0.16 255)' }} />
                 <span>ข้อมูลโปร่งใส</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <Clock className="h-4 w-4" style={{ color: 'oklch(55% 0.13 160)' }} />
+                <Clock className="h-4 w-4" style={{ color: 'oklch(51% 0.16 255)' }} />
                 <span>ตอบสนอง 24 ชม.</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <Activity className="h-4 w-4" style={{ color: 'oklch(55% 0.13 160)' }} />
+                <Activity className="h-4 w-4" style={{ color: 'oklch(51% 0.16 255)' }} />
                 <span>ติดตามเรียลไทม์</span>
               </div>
             </motion.div>
@@ -220,9 +220,9 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
         <div className="flex items-center gap-2">
           <div
             className="flex h-9 w-9 items-center justify-center rounded-full"
-            style={{ backgroundColor: 'oklch(94% 0.04 160)' }}
+            style={{ backgroundColor: 'oklch(94% 0.04 255)' }}
           >
-            <ShieldCheck className="h-4 w-4" style={{ color: 'oklch(55% 0.13 160)' }} />
+            <ShieldCheck className="h-4 w-4" style={{ color: 'oklch(51% 0.16 255)' }} />
           </div>
           <div>
             <p className="text-xs font-semibold">ดำเนินการเสร็จสิ้น</p>
@@ -255,7 +255,7 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
         whileHover={reduce ? undefined : { y: -5 }}
         transition={{ type: 'spring', stiffness: 200, damping: 20 }}
         className="relative overflow-hidden rounded-xl border bg-surface-raised shadow-2xl"
-        style={{ boxShadow: '0 25px 50px -12px oklch(55% 0.13 160 / 0.1)' }}
+        style={{ boxShadow: '0 25px 50px -12px oklch(51% 0.16 255 / 0.1)' }}
       >
         {/* Header */}
         <div
@@ -263,7 +263,7 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs" style={{ color: 'oklch(94% 0.04 160)' }}>
+              <p className="text-xs" style={{ color: 'oklch(94% 0.04 255)' }}>
                 เลขใบแจ้ง
               </p>
               <p className="text-sm font-bold">SSC-2026-0847</p>
@@ -299,8 +299,8 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
           </div>
 
           {/* Location */}
-          <div className="flex items-center gap-2 rounded-lg p-2.5 text-xs text-muted" style={{ backgroundColor: 'oklch(96% 0.02 145 / 0.5)' }}>
-            <MapPin className="h-3.5 w-3.5 flex-shrink-0" style={{ color: 'oklch(55% 0.13 160)' }} />
+          <div className="flex items-center gap-2 rounded-lg p-2.5 text-xs text-muted" style={{ backgroundColor: 'oklch(96% 0.02 255 / 0.5)' }}>
+            <MapPin className="h-3.5 w-3.5 flex-shrink-0" style={{ color: 'oklch(51% 0.16 255)' }} />
             <span className="truncate">หมู่ที่ 5 บ้านหัวงัว ต.หัวงัว อ.ยางตลาด จ.กาฬสินธุ์</span>
           </div>
 
@@ -308,11 +308,11 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
           <div className="space-y-2.5">
             <div className="flex items-center justify-between text-xs">
               <span className="font-medium">ความคืบหน้า</span>
-              <span className="font-bold" style={{ color: 'oklch(55% 0.13 160)' }}>
+              <span className="font-bold" style={{ color: 'oklch(51% 0.16 255)' }}>
                 65%
               </span>
             </div>
-            <div className="h-2 overflow-hidden rounded-full" style={{ backgroundColor: 'oklch(96% 0.02 145)' }}>
+            <div className="h-2 overflow-hidden rounded-full" style={{ backgroundColor: 'oklch(96% 0.02 255)' }}>
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: '65%' }}
@@ -349,10 +349,10 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
                     }`}
                     style={{
                       backgroundColor: step.done
-                        ? 'oklch(55% 0.13 160)'
-                        : 'oklch(96% 0.02 145)',
-                      color: step.done ? 'oklch(99% 0.005 145)' : 'oklch(50% 0.02 160)',
-                      ...(step.active && { outline: '3px solid oklch(94% 0.04 160)' }),
+                        ? 'oklch(51% 0.16 255)'
+                        : 'oklch(96% 0.02 255)',
+                      color: step.done ? 'oklch(99% 0.005 255)' : 'oklch(50% 0.02 255)',
+                      ...(step.active && { outline: '3px solid oklch(94% 0.04 255)' }),
                     }}
                   >
                     {step.done ? '✓' : i + 1}
@@ -364,7 +364,7 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
           </div>
 
           {/* Assignee */}
-          <div className="flex items-center justify-between border-t pt-2" style={{ borderColor: 'oklch(90% 0.01 145)' }}>
+          <div className="flex items-center justify-between border-t pt-2" style={{ borderColor: 'oklch(90% 0.01 255)' }}>
             <div className="flex items-center gap-2">
               <div
                 className="bg-accent-gradient-br flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold text-on-accent"
@@ -376,7 +376,7 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
                 <p className="text-[10px] text-muted">ช่างไฟฟ้า • เจ้าหน้าที่</p>
               </div>
             </div>
-            <span className="text-[10px] font-medium" style={{ color: 'oklch(55% 0.13 160)' }}>
+            <span className="text-[10px] font-medium" style={{ color: 'oklch(51% 0.16 255)' }}>
               อัปเดต 2 นาทีที่แล้ว
             </span>
           </div>

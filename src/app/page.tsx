@@ -29,7 +29,7 @@ function StatsFallback() {
             <div
               key={i}
               className="glass h-36 animate-pulse rounded-lg"
-              style={{ backgroundColor: 'oklch(96% 0.01 145 / 0.5)' }}
+              style={{ backgroundColor: 'oklch(96% 0.01 255 / 0.5)' }}
             />
           ))}
         </div>

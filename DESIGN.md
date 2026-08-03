@@ -1,19 +1,19 @@
-<!-- SEED: re-run $impeccable document once tokens.css + primitives exist to capture real rendered tokens and generate .impeccable/design.json sidecar. Anchor values ด้านล่างอ้างอิง glm5-2-smart-service emerald/amber palette + glassmorphism + framer-motion. ค้าง verify contrast AA ตอน implement. -->
+<!-- SEED: re-run $impeccable document once tokens.css + primitives exist to capture real rendered tokens and generate .impeccable/design.json sidecar. Anchor values ด้านล่างอ้างอิง glm5-2-smart-service blue/amber palette + glassmorphism + framer-motion. ค้าง verify contrast AA ตอน implement. -->
 ---
 name: กองช่าง องค์การบริหารส่วนตำบลหัวงัว
 description: ระบบรับแจ้งเหตุและติดตามงานบริการสาธารณูปโภคออนไลน์ — รวดเร็ว โปร่งใส มีประสิทธิภาพ (tech/smart + Thai royal vibe)
 colors:
-  surface: "oklch(99% 0.005 145)"
+  surface: "oklch(99% 0.005 255)"
   surface-raised: "oklch(100% 0 0)"
-  surface-sunken: "oklch(96% 0.02 145)"
-  text: "oklch(18% 0.02 160)"
-  text-muted: "oklch(50% 0.02 160)"
-  text-on-accent: "oklch(99% 0.005 145)"
-  border: "oklch(90% 0.01 145)"
-  border-strong: "oklch(80% 0.015 145)"
-  accent: "oklch(55% 0.13 160)"
-  accent-strong: "oklch(45% 0.15 160)"
-  accent-sunken: "oklch(96% 0.02 145)"
+  surface-sunken: "oklch(96% 0.02 255)"
+  text: "oklch(18% 0.02 255)"
+  text-muted: "oklch(47% 0.02 255)"
+  text-on-accent: "oklch(99% 0.005 255)"
+  border: "oklch(85% 0.015 255)"
+  border-strong: "oklch(64% 0.03 255)"
+  accent: "oklch(51% 0.16 255)"
+  accent-strong: "oklch(42% 0.16 255)"
+  accent-sunken: "oklch(96% 0.02 255)"
   accent-gold: "oklch(82% 0.14 80)"
   accent-gold-soft: "oklch(95% 0.05 80)"
   success: "oklch(55% 0.13 160)"
@@ -22,15 +22,15 @@ colors:
   warning-soft: "oklch(95% 0.05 80)"
   danger: "oklch(60% 0.22 25)"
   danger-soft: "oklch(95% 0.05 25)"
-  info: "oklch(55% 0.13 160)"
+  info: "oklch(51% 0.16 255)"
   dark:
-    surface: "oklch(15% 0.015 160)"
-    surface-raised: "oklch(20% 0.02 160)"
-    surface-sunken: "oklch(27% 0.02 160)"
-    text: "oklch(97% 0.005 145)"
-    text-muted: "oklch(70% 0.02 160)"
+    surface: "oklch(15% 0.015 255)"
+    surface-raised: "oklch(20% 0.02 255)"
+    surface-sunken: "oklch(27% 0.02 255)"
+    text: "oklch(97% 0.005 255)"
+    text-muted: "oklch(70% 0.02 255)"
     border: "oklch(100% 0 0 / 10%)"
-    accent: "oklch(70% 0.14 160)"
+    accent: "oklch(70% 0.14 255)"
     accent-gold: "oklch(78% 0.14 80)"
 typography:
   display:
@@ -87,7 +87,7 @@ elevation:
   card: "0 1px 3px 0 oklch(0% 0 0 / 0.1), 0 1px 2px -1px oklch(0% 0 0 / 0.1)"
   cardHover: "0 4px 6px -1px oklch(0% 0 0 / 0.1), 0 2px 4px -2px oklch(0% 0 0 / 0.1)"
   overlay: "0 25px 50px -12px oklch(0% 0 0 / 0.25)"
-  glowEmerald: "0 0 40px -10px oklch(55% 0.13 160 / 0.5)"
+  glowAccent: "0 0 40px -10px oklch(51% 0.16 255 / 0.5)"
   glowAmber: "0 0 40px -10px oklch(82% 0.14 80 / 0.5)"
 motion:
   durationFast: "150ms"
@@ -101,7 +101,7 @@ motion:
 
 **ตัวตน:** ระบบรับแจ้งเหตุและติดตามงานบริการสาธารณูปโภคออนไลน์ — น่าเชื่อถือ โปร่งใส มีประสิทธิภาพ (tech/smart vibe + Thai royal gold accent)
 
-**อ้างอิง:** glm5-2-smart-service (emerald-600 + amber-400 + glassmorphism + framer-motion)
+**อ้างอิง:** glm5-2-smart-service (glassmorphism + framer-motion) — palette ปรับเป็น blue 255 + amber 80
 
 **A11y Gates (HARD — ทุกอย่างต้องผ่าน):**
 - Contrast AA (WCAG 2.1 level AA) — ทุกสี light/dark
@@ -112,8 +112,8 @@ motion:
 - **prefers-reduced-motion MUST respect** — disable float/pulse/shimmer/gradient-shift เมื่อ user ตั้ง reduce-motion
 
 **Anti-AI-Default Reflexes (ปฏิเสธดีไซน์โหลๆ ที่ AI มักเจนให้ — ดูรายละเอียดใน §2/§3/§4/§7):**
-- **No-Cream** — พื้นห้ามใช้ cream AI-default `oklch(98% 0.01 60)` → ใช้ off-white เอียง emerald
-- **No-Indigo** — ห้าม civic indigo `oklch(52% 0.12 245)` (ธีมเก่า) → emerald เท่านั้น
+- **No-Cream** — พื้นห้ามใช้ cream AI-default `oklch(98% 0.01 60)` → ใช้ off-white เอียงน้ำเงิน
+- **No-Muddy-Blue** — น้ำเงินต้องมี chroma ≥0.14 → ห้าม navy จืด ๆ แบบ `oklch(35% 0.07 256)` ที่ให้ความรู้สึกราชการเก่า (แทนกฎ No-Indigo เดิมที่ถูกยกเลิกพร้อมการย้าย palette — ดู §2)
 - **No-Serif** — ห้าม serif display (Fraunces/DM Serif/Playfair) → Noto Sans Thai bold
 - **No-Flat** — ห้าม flat surface → glassmorphism + mesh gradient + glow
 
@@ -129,7 +129,7 @@ motion:
 - ไม่ใช่ editorial civic magazine (serif headlines, flat surface)
 
 **ใช่:**
-- ระบบ smart/tech ที่ทันสมัย (emerald primary = tech vibe)
+- ระบบ smart/tech ที่ทันสมัย (blue primary = ราชการที่น่าเชื่อถือ ไม่ใช่ราชการเก่า)
 - Thai royal elegance (amber gold accent)
 - Glassmorphism + mesh gradient (modern premium feel)
 - Modular sections (Stats/Services/HowItWorks/LiveTracking/Testimonials/FAQ/CTA)
@@ -137,33 +137,42 @@ motion:
 
 ---
 
-## §2. Colors — Emerald Tech + Amber Royal
+## §2. Colors — Blue Civic + Amber Royal
 
-**Primary: Emerald 160° (tech/smart vibe)**
-- `oklch(55% 0.13 160)` — emerald-600 หลัก
-- `oklch(45% 0.15 160)` — emerald-700 hover/strong
-- `oklch(70% 0.14 160)` — emerald-400 dark mode
+> **ประวัติ:** palette เดิมเป็น emerald 160° และมีกฎ "No-Indigo" ห้ามใช้ civic blue
+> กฎนั้นถูกยกเลิกแล้วเมื่อย้ายมาใช้ blue 255° เป็น primary เหตุผล: (1) น้ำเงินคือสีที่
+> หน่วยงานราชการไทยใช้สื่อความน่าเชื่อถือ (2) ตอน accent เป็น emerald มันมีค่าเท่ากับ
+> `--color-success` เป๊ะ ทำให้ "ปุ่มหลัก" กับ "สถานะสำเร็จ" แยกไม่ออก การย้าย accent
+> ไปน้ำเงินคืนความหมายให้เขียว = สำเร็จ อย่างเดียว
+> ข้อควรระวังที่กฎเดิมพูดถูกยังใช้ได้: civic blue ที่ chroma ต่ำจะดูจืดและเก่า จึงตั้ง
+> chroma ไว้ที่ 0.16 (สูงกว่า indigo เดิมที่ 0.12) เพื่อคงความสด
+
+**Primary: Blue 255° (ราชการที่น่าเชื่อถือ)**
+- `oklch(51% 0.16 255)` — หลัก (ไอคอน, ตัวคั่น, mesh gradient)
+- `oklch(42% 0.16 255)` — hover/strong (ปุ่ม primary, ลิงก์ — 8.51:1 บนการ์ดขาว)
+- `oklch(70% 0.14 255)` — dark mode
 
 **Accent: Amber 80° (Thai royal gold)**
 - `oklch(82% 0.14 80)` — amber-400 gold highlight
 - `oklch(78% 0.14 80)` — amber dark mode
 
 **Surface:**
-- Light: `oklch(99% 0.005 145)` off-white ไม่ใช่ pure white
-- Dark: `oklch(15% 0.015 160)` warm dark emerald tint
+- Light: `oklch(99% 0.005 255)` off-white ไม่ใช่ pure white
+- Dark: `oklch(15% 0.015 255)` cool dark blue tint
 
 **Text:**
-- Light: `oklch(18% 0.02 160)` warm ink
-- Dark: `oklch(97% 0.005 145)` off-white text
+- Light: `oklch(18% 0.02 255)` cool ink
+- Dark: `oklch(97% 0.005 255)` off-white text
 
 **Semantic:**
-- Success = emerald
+- Success = emerald `oklch(55% 0.13 160)` — คงเขียวไว้ ตอนนี้แยกจาก accent ได้แล้ว
 - Warning = amber gold
 - Danger = `oklch(60% 0.22 25)` red-orange
+- Info = blue (เท่ากับ accent)
 
-**The One Emerald Rule:** emerald ใช้เป็น primary ทุกที่ — CTA button, badge, progress bar, status active, link hover ห้ามใช้สีอื่นแทน (ยกเว้น amber gold accent เฉพาะ highlight/badge secondary)
+**The One Blue Rule:** blue ใช้เป็น primary ทุกที่ — CTA button, badge, progress bar, status active, link hover ห้ามใช้สีอื่นแทน (ยกเว้น amber gold accent เฉพาะ highlight/badge secondary)
 
-**The No-Cream Rule:** surface ห้ามใช้ cream AI-default `oklch(98% 0.01 60)` — ใช้ off-white `oklch(99% 0.005 145)` ที่เอียง emerald เล็กน้อยแทน
+**The No-Cream Rule:** surface ห้ามใช้ cream AI-default `oklch(98% 0.01 60)` — ใช้ off-white `oklch(99% 0.005 255)` ที่เอียงน้ำเงินเล็กน้อยแทน
 
 **Contrast Verification (MANDATORY):**
 - ตรวจ contrast ratio AA (4.5:1 text, 3:1 large text) ทุกคู่สี light/dark
@@ -215,7 +224,7 @@ motion:
   border: 1px solid oklch(100% 0 0 / 0.3);
 }
 .dark .glass {
-  background: oklch(20% 0.02 160 / 0.6);
+  background: oklch(20% 0.02 255 / 0.6);
   border: 1px solid oklch(100% 0 0 / 0.08);
 }
 ```
@@ -225,9 +234,9 @@ motion:
 .mesh-gradient {
   background-color: var(--background);
   background-image:
-    radial-gradient(at 12% 18%, oklch(55% 0.13 160 / 0.12) 0px, transparent 50%),
+    radial-gradient(at 12% 18%, oklch(51% 0.16 255 / 0.12) 0px, transparent 50%),
     radial-gradient(at 88% 12%, oklch(82% 0.14 80 / 0.10) 0px, transparent 50%),
-    radial-gradient(at 33% 88%, oklch(55% 0.13 160 / 0.12) 0px, transparent 50%),
+    radial-gradient(at 33% 88%, oklch(51% 0.16 255 / 0.12) 0px, transparent 50%),
     radial-gradient(at 78% 82%, oklch(82% 0.14 80 / 0.08) 0px, transparent 50%);
 }
 ```
@@ -246,7 +255,7 @@ motion:
 
 **Glow Effects:**
 ```css
-.glow-emerald { box-shadow: 0 0 40px -10px oklch(55% 0.13 160 / 0.5); }
+.glow-accent { box-shadow: 0 0 40px -10px oklch(51% 0.16 255 / 0.5); }
 .glow-amber { box-shadow: 0 0 40px -10px oklch(82% 0.14 80 / 0.5); }
 ```
 
@@ -272,20 +281,20 @@ Token radius ใน `src/styles/tokens.css` มีแค่ 5 ขั้น — �
 
 ### CaseStatusBadge (H13)
 ```tsx
-// emerald/amber soft bg + strong text (ไม่ใช่ indigo)
+// blue/amber soft bg + strong text 
 const statusMap: Record<CaseStatus, { label: string; class: string }> = {
-  received: { label: 'รับเรื่อง', class: 'bg-emerald-100 text-emerald-800' },
+  received: { label: 'รับเรื่อง', class: 'bg-accent-sunken text-accent-strong' },
   reviewing: { label: 'ตรวจสอบ', class: 'bg-amber-100 text-amber-800' },
   in_progress: { label: 'กำลังดำเนินการ', class: 'bg-amber-100 text-amber-800' },
-  done: { label: 'เสร็จสิ้น', class: 'bg-emerald-100 text-emerald-800' },
+  done: { label: 'เสร็จสิ้น', class: 'bg-accent-sunken text-accent-strong' },
   urgent: { label: 'ฉุกเฉิน', class: 'bg-red-100 text-red-800' },
 };
 ```
 
 ### Button
 ```tsx
-// Emerald gradient primary
-<Button className="bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white shadow-lg shadow-emerald-500/30">
+// Blue gradient primary
+<Button className="bg-gradient-to-r bg-accent-gradient hover:brightness-110 text-white shadow-accent-glow">
   แจ้งเหตุออนไลน์
 </Button>
 
@@ -299,11 +308,11 @@ Touch target ≥44px (C6) — `min-h-[44px] min-w-[44px]`
 ### Glassmorphism Card (Floating Demo)
 ```tsx
 <div className="glass rounded-3xl shadow-2xl border overflow-hidden">
-  {/* Emerald gradient header */}
-  <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 p-5 text-white">
+  {/* Blue gradient header */}
+  <div className="bg-gradient-to-r bg-accent-gradient p-5 text-white">
     <div className="flex items-center justify-between">
       <div>
-        <p className="text-xs text-emerald-100">เลขใบแจ้ง</p>
+        <p className="text-xs text-on-accent/80">เลขใบแจ้ง</p>
         <p className="text-sm font-bold">SSC-2026-0847</p>
       </div>
       <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 backdrop-blur">
@@ -355,7 +364,7 @@ Primitives อยู่ที่ `src/components/ui/field.tsx` — แยกเ�
 
 - **Label:** อยู่เหนือ field เสมอ (`block mb-1.5`, ไม่ float label — ผู้สูงอายุอ่านยาก), ห้ามใช้ placeholder แทน label
 - **Icon:** prop `icon?: LucideIcon` — ไอคอนอยู่ซ้ายของ input (`pl-11`, icon `left-3.5`, `text-muted`)
-- **Focus:** `focus:border-accent-strong` + `focus-visible:ring-accent-strong/35` (emerald เท่านั้น — The One Emerald Rule)
+- **Focus:** `focus:border-accent-strong` + `focus-visible:ring-accent-strong/35` (น้ำเงินเท่านั้น — The One Blue Rule)
 - **Error state:** `invalid` prop → `border-danger bg-danger-soft/40` + `FieldError` สี `danger-ink` ใต้ field (`role="alert"`)
 - **Touch:** `min-h-touch` ใน fieldBase บังคับ ≥44px (C6) — ห้ามลดความสูงแม้ในตารางแอดมิน
 - **Radius:** `rounded-md` (12px) ตามตาราง Radius ด้านบน
