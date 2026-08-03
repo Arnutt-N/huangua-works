@@ -11,7 +11,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Label, Textarea } from '@/components/ui/field';
+import { FieldHint, Label, Textarea } from '@/components/ui/field';
 
 interface BroadcastItem {
   id: string;
@@ -24,6 +24,12 @@ interface BroadcastItem {
   failedCount: number;
   createdAt: string;
 }
+
+/**
+ * รอบการตรวจคิวส่งประกาศ (นาที) — ต้องตรงกับ schedule ที่ตั้งไว้ใน cron-job.org
+ * ที่ยิง /api/cron/broadcast-send ใช้บอกผู้ใช้ว่าประกาศอาจออกช้ากว่าเวลาที่ตั้งได้แค่ไหน
+ */
+const SEND_WINDOW_MINUTES = 30;
 
 const STATUS_MAP: Record<string, { label: string; icon: typeof Clock; cls: string }> = {
   draft: { label: 'ร่าง', icon: Clock, cls: 'text-muted' },
@@ -172,8 +178,13 @@ export function BroadcastClient() {
                 type="datetime-local"
                 value={scheduleAt}
                 onChange={(e) => setScheduleAt(e.target.value)}
+                aria-describedby="bc-schedule-hint"
                 className="min-h-touch w-full rounded-md border border-border bg-surface-raised px-4 text-ink"
               />
+              <FieldHint id="bc-schedule-hint">
+                ระบบตรวจคิวทุก {SEND_WINDOW_MINUTES} นาที ประกาศจึงอาจออกช้ากว่าเวลาที่ตั้งได้ถึง{' '}
+                {SEND_WINDOW_MINUTES} นาที — ถ้าต้องการให้ออกทันที ให้สร้างเป็นร่างแล้วกดปุ่มส่ง
+              </FieldHint>
             </div>
           </div>
           <DialogFooter>
