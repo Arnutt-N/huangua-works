@@ -180,18 +180,42 @@ function runTheme(
   return failures;
 }
 
-function main(): void {
+/**
+ * นับคู่ที่ไม่ผ่านทั้งสองธีม — export เพื่อให้ vitest เรียกได้
+ *
+ * § แยกออกจาก main() เพราะ CI (`ci.yml`) เรียก `pnpm vitest run` ตรง ๆ ไม่ผ่าน
+ * `pnpm test` ดังนั้น npm lifecycle hook อย่าง `pretest` จะไม่ทำงาน การให้ gate
+ * อยู่ในรูป test file (`src/styles/tokens.contrast.test.ts`) คือทางเดียวที่ทำให้
+ * มันรันทุกครั้งโดยไม่ต้องพึ่งว่าใครจำได้ว่าต้องสั่ง `pnpm check-contrast`
+ *
+ * @param quiet ปิด console output ตอนรันใน test (ไม่งั้น log ท่วม)
+ */
+export function countFailures(quiet = false): number {
   const css = readFileSync(TOKENS_PATH, 'utf8');
   const { light, dark } = parseTokens(css);
 
+  const log = console.log;
+  const err = console.error;
+  if (quiet) {
+    console.log = () => {};
+    console.error = () => {};
+  }
+  try {
+    const lightFails = runTheme('light', light);
+    // dark override เฉพาะบางตัว ที่เหลือ inherit จาก :root
+    const darkFails = runTheme('dark', dark, light);
+    return lightFails + darkFails;
+  } finally {
+    console.log = log;
+    console.error = err;
+  }
+}
+
+function main(): void {
   console.log(`ตรวจ contrast จาก ${TOKENS_PATH.replace(process.cwd() + '/', '')}`);
   console.log(`คู่สีที่ตรวจ: ${PAIRS.length} คู่ × 2 ธีม`);
 
-  const lightFails = runTheme('light', light);
-  // dark override เฉพาะบางตัว ที่เหลือ inherit จาก :root
-  const darkFails = runTheme('dark', dark, light);
-
-  const total = lightFails + darkFails;
+  const total = countFailures();
   console.log(`\n${'═'.repeat(70)}`);
   if (total > 0) {
     console.error(`✗ contrast ไม่ผ่าน ${total} คู่ — แก้ lightness ใน tokens.css จนผ่าน`);
@@ -200,4 +224,7 @@ function main(): void {
   console.log('✓ ทุกคู่ผ่านเกณฑ์ WCAG');
 }
 
-main();
+// รันเป็น CLI เท่านั้น — ตอน import จาก test ไม่ให้ยิง process.exit
+if (process.argv[1]?.includes('check-contrast')) {
+  main();
+}

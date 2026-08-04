@@ -42,6 +42,23 @@
   --color-accent-strong: oklch(42% 0.16 255);
   --color-accent-sunken: oklch(96% 0.02 255);
 
+  /* ขั้นเสริมของ accent — เพิ่มเฉพาะที่มีที่ใช้จริง ไม่ทำครบ 10 ขั้นแบบ Material
+   *
+   * § chroma ของแต่ละขั้นถูกจำกัดด้วย sRGB gamut ที่ hue 255 ไม่ใช่ตัวเลือกอิสระ:
+   *   L97%→0.014  L94%→0.029  L90%→0.049  L83%→0.086  L72%→0.148
+   *   L60%→0.198  L51%→0.168  L46%→0.152  L42%→0.139  L35%→0.116
+   * ค่าที่เกินเพดานจะถูก browser gamut-map ให้เอง (ลด chroma) แปลว่าตัวเลขใน token
+   * ไม่ใช่สีที่ผู้ใช้เห็น — และ check-contrast.ts ใช้ naive clipping ต่อ channel
+   * จึงรายงานคลาดจากที่ browser ทำเล็กน้อย ค่าด้านล่างจึงคุมให้อยู่ในเพดานทุกตัว
+   *
+   * หมายเหตุ: --color-accent-strong (42% 0.16) เกินเพดาน 0.139 อยู่ก่อนแล้ว
+   * ไม่แก้เพราะเป็นค่าที่ใช้ใน production — การแก้จะทำให้สีที่เห็นขยับจริง
+   *
+   * เพิ่มขั้นใหม่: ดูเพดานข้างบน แล้วเพิ่มคู่ใน PAIRS ของ check-contrast.ts ด้วย */
+  --color-accent-100: oklch(94% 0.029 255);
+  --color-accent-200: oklch(90% 0.049 255);
+  --color-accent-700: oklch(46% 0.152 255);
+
   /* accent gold (amber — Thai royal) */
   --color-accent-gold: oklch(82% 0.14 80);
   --color-accent-gold-soft: oklch(95% 0.05 80);
@@ -56,7 +73,10 @@
   --color-warning-soft: oklch(95% 0.05 80);
   --color-danger: oklch(60% 0.22 25);
   --color-danger-soft: oklch(95% 0.05 25);
-  --color-info: oklch(51% 0.16 255);
+  /* § ไม่มี --color-info โดยตั้งใจ — เคยมีค่าเท่ากับ --color-accent เป๊ะในธีม light
+   * ซึ่งเป็นบั๊กแบบเดียวกับที่ accent เคยชนกับ success และไม่มีที่ไหนใช้เลย
+   * (ToastVariant มี 'info' แต่ map ไป bg-surface-raised ไม่ได้แตะ token นี้)
+   * ถ้าวันหน้าต้องการ info alert แยกจากปุ่ม primary ให้ออกแบบค่าใหม่โดยตั้งใจ */
 
   /* status ink — สีตัวอักษร/ไอคอน "บนพื้น *-soft" เท่านั้น
    * ห้ามใช้ --color-warning เป็นสีข้อความบน --color-warning-soft:
@@ -106,7 +126,11 @@
 
   /* elevation (glassmorphism + glow) */
   --shadow-overlay: 0 25px 50px -12px oklch(0% 0 0 / 0.25);
-  --shadow-glow-accent: 0 0 40px -10px oklch(51% 0.16 255 / 0.5);
+  /* § ค่านี้ต้องตรงกับ @utility shadow-accent-glow ท้ายไฟล์ — เดิมสองที่ค่าไม่เท่ากัน
+   * (0 0 40px/-10px/0.5 กับ 0 10px 40px/-10px/0.3) การให้ utility อ้าง var จึงเคย
+   * เท่ากับการเปลี่ยนเงาปุ่มทั่วระบบ 9 จุด แก้โดยยึดค่าของ utility ซึ่งเป็นค่าที่
+   * ใช้จริงบนหน้าจอ แล้วให้ utility อ้าง var นี้แทน */
+  --shadow-glow-accent: 0 10px 40px -10px oklch(51% 0.16 255 / 0.3);
   --shadow-glow-amber: 0 0 40px -10px oklch(82% 0.14 80 / 0.5);
 }
 
@@ -124,6 +148,11 @@
   --color-accent: oklch(70% 0.14 255);
   --color-accent-strong: oklch(75% 0.15 255);
   --color-accent-sunken: oklch(27% 0.03 255);
+  /* ขั้นเสริมกลับทิศเช่นกัน — 100/200 เป็นพื้นจึงเข้ม, 700 เป็น hover จึงสว่างกว่า strong
+   * ถ้าไม่ประกาศตรงนี้จะ inherit ค่า light (94%/90%) มาเป็นพื้นสว่างบนธีมมืด */
+  --color-accent-100: oklch(27% 0.04 255);
+  --color-accent-200: oklch(33% 0.05 255);
+  --color-accent-700: oklch(80% 0.13 255);
   --color-accent-gold: oklch(78% 0.14 80);
   --color-accent-gold-soft: oklch(30% 0.05 80);
   --color-success: oklch(70% 0.14 160);
@@ -132,7 +161,6 @@
   --color-warning-soft: oklch(30% 0.05 80);
   --color-danger: oklch(70% 0.19 22);
   --color-danger-soft: oklch(27% 0.05 25);
-  --color-info: oklch(70% 0.14 255);
   /* dark: กลับทิศ — ink สว่างกว่าพื้น soft ที่เข้ม */
   --color-success-ink: oklch(78% 0.14 160);
   --color-warning-ink: oklch(85% 0.12 80);
@@ -152,6 +180,9 @@
   --color-accent: var(--color-accent);
   --color-accent-strong: var(--color-accent-strong);
   --color-accent-sunken: var(--color-accent-sunken);
+  --color-accent-100: var(--color-accent-100);
+  --color-accent-200: var(--color-accent-200);
+  --color-accent-700: var(--color-accent-700);
   --color-accent-gold: var(--color-accent-gold);
   --color-accent-gold-soft: var(--color-accent-gold-soft);
   --color-success: var(--color-success);
@@ -163,7 +194,6 @@
   --color-danger: var(--color-danger);
   --color-danger-soft: var(--color-danger-soft);
   --color-danger-ink: var(--color-danger-ink);
-  --color-info: var(--color-info);
 
   --font-sans: var(--font-sans);
 
@@ -365,17 +395,30 @@
 /* ---------- Mesh gradient background ---------- */
 .mesh-gradient {
   background-color: var(--color-surface);
-  /* § ค่า oklch ตรงนี้พิมพ์ซ้ำแทนที่จะอ้าง var() เพราะต้องใส่ alpha ต่อสีในแต่ละจุด
-   * (color-mix ยังไม่คุ้มกับ browser matrix ของงานนี้) — ถ้าเปลี่ยน --color-accent
-   * ต้องตามมาแก้ 2 บรรทัดนี้ด้วย ไม่งั้น mesh จะค้างเป็นสีเดิม */
+  /* § ใช้ color-mix เพื่ออ้าง token ตรง ๆ ทั้งที่ต้องใส่ alpha ต่างกันในแต่ละจุด
+   * เดิมพิมพ์ค่า oklch ซ้ำ 4 บรรทัดพร้อม comment เตือนให้แก้ตามด้วยมือ ซึ่งเป็น
+   * รูปแบบเดียวกับที่ทำให้ favicon ค้างเป็นสีเขียวหลังเปลี่ยน palette
+   * (color-mix เป็น Baseline widely available ตั้งแต่ 2023) */
   background-image: radial-gradient(
       at 12% 18%,
-      oklch(51% 0.16 255 / 0.12) 0px,
+      color-mix(in oklab, var(--color-accent) 12%, transparent) 0px,
       transparent 50%
     ),
-    radial-gradient(at 88% 12%, oklch(82% 0.14 80 / 0.10) 0px, transparent 50%),
-    radial-gradient(at 33% 88%, oklch(51% 0.16 255 / 0.10) 0px, transparent 50%),
-    radial-gradient(at 78% 82%, oklch(82% 0.14 80 / 0.08) 0px, transparent 50%);
+    radial-gradient(
+      at 88% 12%,
+      color-mix(in oklab, var(--color-accent-gold) 10%, transparent) 0px,
+      transparent 50%
+    ),
+    radial-gradient(
+      at 33% 88%,
+      color-mix(in oklab, var(--color-accent) 10%, transparent) 0px,
+      transparent 50%
+    ),
+    radial-gradient(
+      at 78% 82%,
+      color-mix(in oklab, var(--color-accent-gold) 8%, transparent) 0px,
+      transparent 50%
+    );
 }
 
 /* ---------- Glassmorphism card ---------- */
@@ -421,7 +464,7 @@
 
 /* เงาเรืองแสงใต้ปุ่ม primary — เดิมพิมพ์ค่า oklch ซ้ำในทุก call site */
 @utility shadow-accent-glow {
-  box-shadow: 0 10px 40px -10px oklch(51% 0.16 255 / 0.3);
+  box-shadow: var(--shadow-glow-accent);
 }
 
 /* ซ่อน scrollbar สำหรับแถบแท็บที่เลื่อนแนวนอนบนมือถือ (ยังเลื่อนได้ปกติ) */
