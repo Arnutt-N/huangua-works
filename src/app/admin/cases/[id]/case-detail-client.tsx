@@ -275,8 +275,8 @@ export function CaseDetailClient({
             <span>เผยแพร่ให้ประชาชนเห็น</span>
           </label>
           <p id="comment-public-hint" className="-mt-1 text-xs text-muted">
-            ค่าเริ่มต้นคือหมายเหตุภายใน ติ๊กเฉพาะเมื่อต้องการให้ผู้แจ้งเห็นข้อความนี้ —
-            ห้ามระบุชื่อ เบอร์โทร หรือที่อยู่ของบุคคลอื่นในข้อความที่เผยแพร่
+            ค่าเริ่มต้นคือหมายเหตุภายใน — ติ๊กแล้วข้อความจะถูกส่งออกทาง API สาธารณะที่
+            ใครมีเลขติดตามก็เรียกดูได้ ห้ามระบุชื่อ เบอร์โทร หรือที่อยู่ของบุคคลอื่น
           </p>
           {commentState.error && <ErrorText>{commentState.error}</ErrorText>}
           <Button type="submit" size="sm" disabled={commentPending}>

@@ -331,7 +331,17 @@ export const caseUpdates = pgTable(
     comment: text('comment'),
     attachments: jsonb('attachments'), // JSON array
 
-    isPublic: boolean('is_public').notNull().default(true), // ประชาชนเห็นได้หรือไม่
+    /**
+     * ประชาชนเห็นได้หรือไม่ — default false (privacy by default)
+     *
+     * § เดิม default true ทำให้ทุก code path ที่ insert โดยไม่ระบุค่านี้กลายเป็น
+     * "เผยแพร่สู่สาธารณะ" โดยอัตโนมัติ ซึ่งเป็นทิศทางที่ผิดสำหรับข้อมูลที่แก้คืนไม่ได้
+     * — GET /api/cases/[id] เป็น endpoint สาธารณะที่ใครมีเลขติดตามก็เรียกได้
+     *
+     * ตอนนี้ call site ต้องระบุ true เองอย่างตั้งใจ (ปัจจุบันมีที่เดียวคือ
+     * status_change ซึ่งผู้แจ้งควรได้รู้ว่าเรื่องถึงขั้นไหนแล้ว)
+     */
+    isPublic: boolean('is_public').notNull().default(false),
   },
   (table) => ({
     caseIdx: index('case_updates_case_id_idx').on(table.caseId),

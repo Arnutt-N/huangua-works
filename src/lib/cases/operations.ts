@@ -125,7 +125,13 @@ type TimelineResult =
   | { entry: TimelineEntry; auditMeta: Record<string, unknown>; updateSet?: Record<string, unknown> }
   | { error: string };
 
-function buildTimeline(
+/**
+ * § export เพื่อให้ทดสอบ privacy invariant ได้โดยไม่ต้องมี DB
+ * ฟังก์ชันนี้เป็น pure — รับ patch + สถานะปัจจุบัน คืน entry ที่จะเขียน
+ * การที่มันเคยเป็น private ทำให้ invariant "assignment ต้องไม่ public" ทดสอบไม่ได้เลย
+ * นอกจากผ่าน integration test ที่ต้องมี Postgres จริง (ไม่รันใน CI)
+ */
+export function buildTimeline(
   patch: CasePatch,
   current: { status: string; priority: string; assignedTo: string | null; departmentId: string | null },
 ): TimelineResult {
