@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '../ui/button';
+import { cn } from '@/lib/cn';
 
 const serviceChips = [
   { label: 'ไฟฟ้าสาธารณะ', icon: Zap },
@@ -34,16 +35,11 @@ export function Hero() {
     >
       {/* Background decorative elements */}
       <div className="absolute inset-0 thai-pattern pointer-events-none" />
+      <div className="bg-accent/10 absolute top-32 -left-20 w-72 h-72 rounded-full blur-3xl float-animate" />
       <div
-        className="absolute top-32 -left-20 w-72 h-72 rounded-full blur-3xl float-animate"
-        style={{ backgroundColor: 'oklch(51% 0.16 255 / 0.1)' }}
-      />
-      <div
-        className="absolute bottom-0 -right-20 w-96 h-96 rounded-full blur-3xl float-animate"
-        style={{
-          backgroundColor: 'oklch(82% 0.14 80 / 0.1)',
-          animationDelay: '2s',
-        }}
+        className="bg-accent-gold/10 absolute bottom-0 -right-20 w-96 h-96 rounded-full blur-3xl float-animate"
+        // animationDelay ไม่ใช่สี — คงเป็น inline เพราะผูกกับ keyframe float-animate
+        style={{ animationDelay: '2s' }}
       />
 
       <div className="container relative z-10 mx-auto px-4 sm:px-6 lg:px-8">
@@ -60,22 +56,11 @@ export function Hero() {
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: reduce ? 0 : 0.2 }}
-              className="mb-6 inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-semibold"
-              style={{
-                backgroundColor: 'oklch(94% 0.04 255)',
-                color: 'oklch(42% 0.16 255)',
-                borderColor: 'oklch(90% 0.05 255)',
-              }}
+              className="bg-accent-100 text-accent-strong border-accent-200 mb-6 inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-semibold"
             >
               <span className="relative flex h-2 w-2">
-                <span
-                  className="pulse-ring absolute inset-0 rounded-full"
-                  style={{ backgroundColor: 'oklch(51% 0.16 255)' }}
-                />
-                <span
-                  className="relative h-2 w-2 rounded-full"
-                  style={{ backgroundColor: 'oklch(42% 0.16 255)' }}
-                />
+                <span className="pulse-ring bg-accent absolute inset-0 rounded-full" />
+                <span className="bg-accent-strong relative h-2 w-2 rounded-full" />
               </span>
               ระบบออนไลน์ใหม่ ปี 2569
             </motion.div>
@@ -96,8 +81,7 @@ export function Hero() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: reduce ? 0 : 0.4, duration: reduce ? 0 : 0.6 }}
-              className="mt-3 text-base font-semibold lg:text-lg"
-              style={{ color: 'oklch(51% 0.16 255)' }}
+              className="text-accent mt-3 text-base font-semibold lg:text-lg"
             >
               กองช่าง องค์การบริหารส่วนตำบลหัวงัว
             </motion.p>
@@ -176,15 +160,15 @@ export function Hero() {
               className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-muted lg:justify-start"
             >
               <div className="flex items-center gap-1.5">
-                <ShieldCheck className="h-4 w-4" style={{ color: 'oklch(51% 0.16 255)' }} />
+                <ShieldCheck className="text-accent h-4 w-4" />
                 <span>ข้อมูลโปร่งใส</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <Clock className="h-4 w-4" style={{ color: 'oklch(51% 0.16 255)' }} />
+                <Clock className="text-accent h-4 w-4" />
                 <span>ตอบสนอง 24 ชม.</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <Activity className="h-4 w-4" style={{ color: 'oklch(51% 0.16 255)' }} />
+                <Activity className="text-accent h-4 w-4" />
                 <span>ติดตามเรียลไทม์</span>
               </div>
             </motion.div>
@@ -218,11 +202,8 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
         className="glass absolute -left-6 -top-6 z-20 hidden rounded-lg p-3 shadow-lg sm:block"
       >
         <div className="flex items-center gap-2">
-          <div
-            className="flex h-9 w-9 items-center justify-center rounded-full"
-            style={{ backgroundColor: 'oklch(94% 0.04 255)' }}
-          >
-            <ShieldCheck className="h-4 w-4" style={{ color: 'oklch(51% 0.16 255)' }} />
+          <div className="bg-accent-100 flex h-9 w-9 items-center justify-center rounded-full">
+            <ShieldCheck className="text-accent h-4 w-4" />
           </div>
           <div>
             <p className="text-xs font-semibold">ดำเนินการเสร็จสิ้น</p>
@@ -237,11 +218,8 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
         className="glass absolute -bottom-4 -right-4 z-20 hidden rounded-lg p-3 shadow-lg sm:block"
       >
         <div className="flex items-center gap-2">
-          <div
-            className="flex h-9 w-9 items-center justify-center rounded-full"
-            style={{ backgroundColor: 'oklch(95% 0.05 80)' }}
-          >
-            <Clock className="h-4 w-4" style={{ color: 'oklch(45% 0.12 70)' }} />
+          <div className="bg-warning-soft flex h-9 w-9 items-center justify-center rounded-full">
+            <Clock className="text-warning-ink h-4 w-4" />
           </div>
           <div>
             <p className="text-xs font-semibold">เวลาตอบสนอง</p>
@@ -254,26 +232,26 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
       <motion.div
         whileHover={reduce ? undefined : { y: -5 }}
         transition={{ type: 'spring', stiffness: 200, damping: 20 }}
-        className="relative overflow-hidden rounded-xl border bg-surface-raised shadow-2xl"
-        style={{ boxShadow: '0 25px 50px -12px oklch(51% 0.16 255 / 0.1)' }}
+        className="shadow-accent-drop relative overflow-hidden rounded-xl border bg-surface-raised shadow-2xl"
       >
         {/* Header */}
-        <div
-          className="bg-accent-gradient p-5 text-on-accent"
-        >
+        <div className="bg-accent-gradient p-5 text-on-accent">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs" style={{ color: 'oklch(94% 0.04 255)' }}>
-                เลขใบแจ้ง
-              </p>
+              <p className="text-accent-100 text-xs">เลขใบแจ้ง</p>
               <p className="text-sm font-bold">SSC-2026-0847</p>
             </div>
-            <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1 backdrop-blur" style={{ backgroundColor: 'oklch(100% 0 0 / 0.2)' }}>
+            {/* § พื้นขาวโปร่งคงเป็น literal — surface-raised ไม่ใช่สีขาวในธีมมืด
+                การแทนด้วย token จะทำให้ป้ายนี้กลืนหายบน gradient (tokens.css ใช้
+                pattern เดียวกันใน .glass) */}
+            <div
+              className="flex items-center gap-1.5 rounded-full px-2.5 py-1 backdrop-blur"
+              style={{ backgroundColor: 'oklch(100% 0 0 / 0.2)' }}
+            >
               <motion.span
                 animate={reduce ? undefined : { opacity: [1, 0.3, 1] }}
                 transition={{ duration: 1.5, repeat: Infinity }}
-                className="h-2 w-2 rounded-full"
-                style={{ backgroundColor: 'oklch(82% 0.14 80)' }}
+                className="bg-accent-gold h-2 w-2 rounded-full"
               />
               <span className="text-[11px] font-medium">กำลังดำเนินการ</span>
             </div>
@@ -284,11 +262,8 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
         <div className="space-y-4 p-5">
           {/* Service info */}
           <div className="flex items-start gap-3">
-            <div
-              className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl"
-              style={{ backgroundColor: 'oklch(95% 0.05 80)' }}
-            >
-              <Zap className="h-5 w-5" style={{ color: 'oklch(45% 0.12 70)' }} />
+            <div className="bg-warning-soft flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl">
+              <Zap className="text-warning-ink h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold">ไฟฟ้าสาธารณะ</p>
@@ -299,8 +274,8 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
           </div>
 
           {/* Location */}
-          <div className="flex items-center gap-2 rounded-lg p-2.5 text-xs text-muted" style={{ backgroundColor: 'oklch(96% 0.02 255 / 0.5)' }}>
-            <MapPin className="h-3.5 w-3.5 flex-shrink-0" style={{ color: 'oklch(51% 0.16 255)' }} />
+          <div className="bg-surface-sunken/50 flex items-center gap-2 rounded-lg p-2.5 text-xs text-muted">
+            <MapPin className="text-accent h-3.5 w-3.5 flex-shrink-0" />
             <span className="truncate">หมู่ที่ 5 บ้านหัวงัว ต.หัวงัว อ.ยางตลาด จ.กาฬสินธุ์</span>
           </div>
 
@@ -308,17 +283,20 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
           <div className="space-y-2.5">
             <div className="flex items-center justify-between text-xs">
               <span className="font-medium">ความคืบหน้า</span>
-              <span className="font-bold" style={{ color: 'oklch(51% 0.16 255)' }}>
-                65%
-              </span>
+              <span className="text-accent font-bold">65%</span>
             </div>
-            <div className="h-2 overflow-hidden rounded-full" style={{ backgroundColor: 'oklch(96% 0.02 255)' }}>
+            {/* § accent-sunken ไม่ใช่ surface-sunken — สองตัวนี้ค่าเท่ากันเป๊ะในธีม light
+                แต่ต่างกันในธีมมืด (27% 0.03 vs 27% 0.02) แถบนี้เป็นรางของ progress
+                ซึ่งความหมายผูกกับ accent จึงต้องเลือกตัวที่ถูกไม่ใช่ตัวที่ดูเหมือน */}
+            <div className="bg-accent-sunken h-2 overflow-hidden rounded-full">
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: '65%' }}
                 transition={{ duration: reduce ? 0 : 1.2, delay: reduce ? 0 : 0.8, ease: 'easeOut' }}
                 className="bg-accent-gradient relative h-full rounded-full"
               >
+                {/* § ประกายวิ่งบนแถบ — พื้นขาวโปร่งคงเป็น literal ด้วยเหตุผลเดียวกับ
+                    ป้ายสถานะด้านบน (ดู .glass ใน tokens.css) */}
                 <motion.div
                   animate={reduce ? undefined : { x: ['-100%', '200%'] }}
                   transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
@@ -344,16 +322,11 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
                       delay: reduce ? 0 : 0.5 + i * 0.15,
                       type: 'spring',
                     }}
-                    className={`flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold ${
-                      step.active ? 'ring-4' : ''
-                    }`}
-                    style={{
-                      backgroundColor: step.done
-                        ? 'oklch(51% 0.16 255)'
-                        : 'oklch(96% 0.02 255)',
-                      color: step.done ? 'oklch(99% 0.005 255)' : 'oklch(50% 0.02 255)',
-                      ...(step.active && { outline: '3px solid oklch(94% 0.04 255)' }),
-                    }}
+                    className={cn(
+                      'flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold',
+                      step.done ? 'bg-accent text-on-accent' : 'bg-accent-sunken text-muted',
+                      step.active && 'ring-4 outline-accent-100 outline-3',
+                    )}
                   >
                     {step.done ? '✓' : i + 1}
                   </motion.div>
@@ -364,7 +337,7 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
           </div>
 
           {/* Assignee */}
-          <div className="flex items-center justify-between border-t pt-2" style={{ borderColor: 'oklch(90% 0.01 255)' }}>
+          <div className="border-border flex items-center justify-between border-t pt-2">
             <div className="flex items-center gap-2">
               <div
                 className="bg-accent-gradient-br flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold text-on-accent"
@@ -376,9 +349,7 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
                 <p className="text-[10px] text-muted">ช่างไฟฟ้า • เจ้าหน้าที่</p>
               </div>
             </div>
-            <span className="text-[10px] font-medium" style={{ color: 'oklch(51% 0.16 255)' }}>
-              อัปเดต 2 นาทีที่แล้ว
-            </span>
+            <span className="text-accent text-[10px] font-medium">อัปเดต 2 นาทีที่แล้ว</span>
           </div>
         </div>
       </motion.div>

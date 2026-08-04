@@ -467,6 +467,15 @@
   box-shadow: var(--shadow-glow-accent);
 }
 
+/* § เงาทอดลึกของการ์ดใหญ่ — คนละตัวกับ shadow-accent-glow โดยตั้งใจ
+ * glow = เรืองแสงใต้ปุ่ม (offset 10px, blur 40px, alpha 0.3)
+ * drop = เงาทอดของการ์ดลอย (offset 25px, blur 50px, alpha 0.1)
+ * เคยเป็นค่า inline ใน Hero tracking card จุดเดียว ยกขึ้นมาเป็น utility เพื่อไม่ให้
+ * ต้องเลือกระหว่าง "กลืนเข้า glow แล้วเงาเปลี่ยน" กับ "คงเป็น inline ต่อไป" */
+@utility shadow-accent-drop {
+  box-shadow: 0 25px 50px -12px color-mix(in oklab, var(--color-accent) 10%, transparent);
+}
+
 /* ซ่อน scrollbar สำหรับแถบแท็บที่เลื่อนแนวนอนบนมือถือ (ยังเลื่อนได้ปกติ) */
 @utility scrollbar-none {
   scrollbar-width: none;
