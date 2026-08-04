@@ -2,59 +2,65 @@
 
 import { motion } from 'framer-motion';
 import { Zap, Droplets, MapPin, Activity, Wrench, TreePine } from 'lucide-react';
+import { cn } from '@/lib/cn';
 
+/**
+ * § field เป็น "ชื่อ class" ไม่ใช่ค่าสี — ตั้งใจเปลี่ยนชื่อจาก color/bgColor
+ * เพื่อให้ typecheck ชี้ทุก call site ตอนย้าย ถ้าคงชื่อเดิมไว้แล้วใส่ชื่อ class ลงไป
+ * มันจะ compile ผ่านแล้วไป render เป็น style={{ color: 'text-accent' }} ซึ่ง browser
+ * ทิ้งเงียบ ๆ — สีหายโดยไม่มีอะไรเตือน
+ *
+ * § ไอคอนบนพื้น *-soft ต้องใช้ *-ink เท่านั้น (กฎใน tokens.css §status ink)
+ * สีเต็มบนพื้น soft ให้ ~1.5–3.6:1 ซึ่งอ่านไม่ออก
+ */
 const services = [
   {
     title: 'ไฟฟ้าสาธารณะ',
     description: 'หลอดไฟถนนชำรุด ไฟฟ้าสาธารณะขัดข้อง',
     icon: Zap,
-    // § ค่าเดียวกับ --color-warning-ink — ทองสว่าง (82% 0.14 80) บนพื้น gold-soft
-    // ให้แค่ 1.52:1 ไอคอนจะจางจนแทบมองไม่เห็น โดยเฉพาะกับผู้สูงอายุซึ่งเป็นกลุ่มเป้าหมาย
-    color: 'oklch(45% 0.12 70)',
-    bgColor: 'oklch(95% 0.05 80)',
+    iconClass: 'text-warning-ink',
+    bgClass: 'bg-warning-soft',
   },
   {
     title: 'ประปาหมู่บ้าน',
     description: 'ท่อประปารั่ว น้ำไม่ไหล คุณภาพน้ำ',
     icon: Droplets,
-    color: 'oklch(51% 0.16 255)',
-    bgColor: 'oklch(94% 0.04 255)',
+    iconClass: 'text-accent',
+    bgClass: 'bg-accent-100',
   },
   {
     title: 'ถนน',
     description: 'ถนนชำรุด หลุมบ่อ ต้องการซ่อมแซม',
     icon: MapPin,
-    // § ใช้ danger-ink ไม่ใช่ danger เต็ม — สีเต็มบนพื้น danger-soft ให้ 3.61:1
-    // ตกเกณฑ์ข้อความ 4.5:1 (กฎเดียวกับที่ tokens.css §status ink กำหนดไว้)
-    color: 'oklch(45% 0.19 25)',
-    bgColor: 'oklch(95% 0.05 25)',
+    iconClass: 'text-danger-ink',
+    bgClass: 'bg-danger-soft',
   },
   {
     title: 'การระบายน้ำ',
     description: 'ท่อระบายน้ำอุดตัน น้ำท่วมขัง',
     icon: Activity,
-    color: 'oklch(51% 0.16 255)',
-    bgColor: 'oklch(94% 0.04 255)',
+    iconClass: 'text-accent',
+    bgClass: 'bg-accent-100',
   },
   {
     title: 'ซ่อมบำรุง',
     description: 'สิ่งก่อสร้างสาธารณะ อาคาร สะพาน',
     icon: Wrench,
-    color: 'oklch(45% 0.12 70)',
-    bgColor: 'oklch(95% 0.05 80)',
+    iconClass: 'text-warning-ink',
+    bgClass: 'bg-warning-soft',
   },
   {
     title: 'สิ่งแวดล้อม',
     description: 'ขยะสาธารณะ ต้นไม้หักโค่น',
     icon: TreePine,
-    color: 'oklch(51% 0.16 255)',
-    bgColor: 'oklch(94% 0.04 255)',
+    iconClass: 'text-accent',
+    bgClass: 'bg-accent-100',
   },
 ];
 
 export function Services() {
   return (
-    <section id="services" className="relative py-16 lg:py-24" style={{ backgroundColor: 'oklch(96% 0.02 255)' }}>
+    <section id="services" className="bg-surface-sunken relative py-16 lg:py-24">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -81,11 +87,8 @@ export function Services() {
               whileHover={{ y: -5 }}
               className="glass rounded-lg p-6 shadow-lg transition-shadow hover:shadow-xl"
             >
-              <div
-                className="flex h-14 w-14 items-center justify-center rounded-xl"
-                style={{ backgroundColor: service.bgColor }}
-              >
-                <service.icon className="h-7 w-7" style={{ color: service.color }} />
+              <div className={cn('flex h-14 w-14 items-center justify-center rounded-xl', service.bgClass)}>
+                <service.icon className={cn('h-7 w-7', service.iconClass)} />
               </div>
               <h3 className="mt-4 text-lg font-semibold">{service.title}</h3>
               <p className="mt-2 text-sm text-muted">{service.description}</p>

@@ -42,36 +42,34 @@ export async function Stats() {
       // change% ไม่แสดงเพราะต้องเทียบกับวันก่อนหน้า (เก็บไว้ทำใน PR #3 reports)
       change: null,
       icon: 'TrendingUp',
-      color: 'oklch(51% 0.16 255)',
-      bgColor: 'oklch(94% 0.04 255)',
+      colorClass: 'text-accent',
+      bgClass: 'bg-accent-100',
     },
     {
       label: 'เวลาตอบสนองเฉลี่ย',
       value: hasData && latest!.avgResolutionDays != null ? `${latest!.avgResolutionDays} วัน` : '—',
       change: null,
       icon: 'Clock',
-      // § ใช้ค่าเดียวกับ --color-warning-ink ไม่ใช่ --color-warning (82% 0.14 80)
-      // เพราะ color ตัวนี้ถูกใช้เป็นสี "ตัวเลข KPI" ใน stats-client.tsx ด้วย ไม่ใช่แค่ไอคอน
-      // ทองสว่างบนพื้น gold-soft ให้ 1.52:1 ซึ่งอ่านไม่ออก (บั๊กเดียวกับที่ tokens.css
-      // แก้ไปแล้วด้วยการสร้าง token *-ink แต่ค่า hardcode ตรงนี้ไม่ได้ตามไปด้วย)
-      color: 'oklch(45% 0.12 70)',
-      bgColor: 'oklch(95% 0.05 80)',
+      // § warning-ink ไม่ใช่ warning เต็ม — class นี้ถูกใช้เป็นสี "ตัวเลข KPI" ด้วย
+      // ไม่ใช่แค่ไอคอน ทองสว่างบนพื้น warning-soft ให้ 1.52:1 ซึ่งอ่านไม่ออก
+      colorClass: 'text-warning-ink',
+      bgClass: 'bg-warning-soft',
     },
     {
       label: 'เรื่องรับทั้งหมด',
       value: hasData ? formatNumber(latest!.totalReceived) : '—',
       change: null,
       icon: 'Users',
-      color: 'oklch(51% 0.16 255)',
-      bgColor: 'oklch(94% 0.04 255)',
+      colorClass: 'text-accent',
+      bgClass: 'bg-accent-100',
     },
     {
       label: 'เรื่องปิดสำเร็จ',
       value: hasData ? formatNumber(latest!.totalClosed) : '—',
       change: null,
       icon: 'CheckCircle2',
-      color: 'oklch(51% 0.16 255)',
-      bgColor: 'oklch(94% 0.04 255)',
+      colorClass: 'text-accent',
+      bgClass: 'bg-accent-100',
     },
   ];
 

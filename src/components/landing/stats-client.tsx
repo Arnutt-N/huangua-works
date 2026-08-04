@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { TrendingUp, Clock, Users, CheckCircle2, type LucideIcon } from 'lucide-react';
+import { cn } from '@/lib/cn';
 
 export interface StatItem {
   label: string;
@@ -9,8 +10,13 @@ export interface StatItem {
   /** เปอร์เซ็นต์เปลี่ยนแปลง (เช่น "+12%") หรือ null ถ้าไม่แสดง */
   change: string | null;
   icon: 'TrendingUp' | 'Clock' | 'Users' | 'CheckCircle2';
-  color: string;
-  bgColor: string;
+  /**
+   * § ชื่อ Tailwind class ไม่ใช่ค่าสี — เปลี่ยนชื่อจาก color/bgColor ตั้งใจให้
+   * typecheck ชี้ทุก call site ตอนย้ายจาก inline style ถ้าคงชื่อเดิมไว้ ค่าที่เป็น
+   * ชื่อ class จะไหลเข้า style={{ color: 'text-accent' }} แล้ว browser ทิ้งเงียบ ๆ
+   */
+  colorClass: string;
+  bgClass: string;
 }
 
 const ICONS: Record<StatItem['icon'], LucideIcon> = {
@@ -41,28 +47,23 @@ export function StatsClient({ stats, hasData }: { stats: StatItem[]; hasData: bo
                 className="glass rounded-lg p-6 shadow-lg"
               >
                 <div className="flex items-start justify-between">
-                  <div
-                    className="flex h-12 w-12 items-center justify-center rounded-xl"
-                    style={{ backgroundColor: stat.bgColor }}
-                  >
-                    <Icon className="h-6 w-6" style={{ color: stat.color }} />
+                  <div className={cn('flex h-12 w-12 items-center justify-center rounded-xl', stat.bgClass)}>
+                    <Icon className={cn('h-6 w-6', stat.colorClass)} />
                   </div>
                   {stat.change && (
                     <span
-                      className="rounded-full px-2 py-0.5 text-xs font-semibold"
-                      style={{
-                        backgroundColor: stat.bgColor,
-                        color: stat.color,
-                      }}
+                      className={cn(
+                        'rounded-full px-2 py-0.5 text-xs font-semibold',
+                        stat.bgClass,
+                        stat.colorClass,
+                      )}
                     >
                       {stat.change}
                     </span>
                   )}
                 </div>
                 <div className="mt-4">
-                  <p className="text-3xl font-bold" style={{ color: stat.color }}>
-                    {stat.value}
-                  </p>
+                  <p className={cn('text-3xl font-bold', stat.colorClass)}>{stat.value}</p>
                   <p className="mt-1 text-sm text-muted">{stat.label}</p>
                 </div>
               </motion.div>

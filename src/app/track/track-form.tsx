@@ -100,11 +100,8 @@ export function TrackForm({ initialId }: { initialId?: string }) {
         className="glass mt-8 rounded-xl p-6 shadow-sm sm:p-8"
       >
         <div className="flex items-center gap-3">
-          <span
-            className="flex h-10 w-10 items-center justify-center rounded-xl"
-            style={{ backgroundColor: 'oklch(94% 0.04 255)' }}
-          >
-            <Search className="h-5 w-5" style={{ color: 'oklch(42% 0.16 255)' }} aria-hidden="true" />
+          <span className="bg-accent-100 flex h-10 w-10 items-center justify-center rounded-xl">
+            <Search className="text-accent-strong h-5 w-5" aria-hidden="true" />
           </span>
           <h2 className="text-xl font-semibold">ค้นหาเรื่อง</h2>
         </div>

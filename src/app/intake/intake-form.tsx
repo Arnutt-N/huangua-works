@@ -100,11 +100,8 @@ function SectionCard({ children }: { children: React.ReactNode }) {
 function SectionHeading({ icon: Icon, children }: { icon: typeof User; children: React.ReactNode }) {
   return (
     <h2 className="flex items-center gap-3 text-xl font-semibold">
-      <span
-        className="flex h-10 w-10 items-center justify-center rounded-xl"
-        style={{ backgroundColor: 'oklch(94% 0.04 255)' }}
-      >
-        <Icon className="h-5 w-5" style={{ color: 'oklch(42% 0.16 255)' }} aria-hidden="true" />
+      <span className="bg-accent-100 flex h-10 w-10 items-center justify-center rounded-xl">
+        <Icon className="text-accent-strong h-5 w-5" aria-hidden="true" />
       </span>
       {children}
     </h2>
@@ -244,11 +241,8 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
   if (result) {
     return (
       <div className="glass mt-8 rounded-xl px-6 py-10 text-center shadow-lg">
-        <span
-          className="mx-auto flex h-16 w-16 items-center justify-center rounded-full"
-          style={{ backgroundColor: 'oklch(94% 0.04 255)' }}
-        >
-          <CheckCircle2 className="h-8 w-8" style={{ color: 'oklch(42% 0.16 255)' }} aria-hidden="true" />
+        <span className="bg-accent-100 mx-auto flex h-16 w-16 items-center justify-center rounded-full">
+          <CheckCircle2 className="text-accent-strong h-8 w-8" aria-hidden="true" />
         </span>
         <h2 className="mt-5 text-2xl font-bold text-ink">รับเรื่องเรียบร้อย</h2>
         <p className="mt-2 text-muted">{result.message}</p>
@@ -256,8 +250,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
         <p
           data-testid="tracking-code"
           data-case-id={result.caseId}
-          className="mx-auto mt-2 inline-block rounded-xl border px-6 py-3 font-mono text-2xl font-bold tracking-widest text-ink"
-          style={{ borderColor: 'oklch(90% 0.01 255)', backgroundColor: 'oklch(96% 0.02 255 / 0.5)' }}
+          className="border-border bg-surface-sunken/50 mx-auto mt-2 inline-block rounded-xl border px-6 py-3 font-mono text-2xl font-bold tracking-widest text-ink"
         >
           {result.trackingCode}
         </p>
@@ -511,7 +504,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
 
       {/* PDPA consent */}
       <div className="glass rounded-xl p-6 shadow-sm sm:p-8">
-        <label className="flex items-start gap-3 rounded-xl border p-4" style={{ borderColor: 'oklch(90% 0.01 255)', backgroundColor: 'oklch(96% 0.02 255 / 0.3)' }}>
+        <label className="border-border bg-surface-sunken/30 flex items-start gap-3 rounded-xl border p-4">
           <input
             type="checkbox"
             aria-label="ยินยอมให้เก็บข้อมูลตามกฎหมายว่าด้วยการคุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562"
