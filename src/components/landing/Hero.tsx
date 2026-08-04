@@ -22,7 +22,7 @@ const serviceChips = [
   { label: 'ประปาหมู่บ้าน', icon: Droplets },
   { label: 'ถนน', icon: MapPin },
   { label: 'การระบายน้ำ', icon: Activity },
-  { label: 'ซ่อมบำรุง', icon: Wrench },
+  { label: 'เรื่องอื่นๆ', icon: Wrench },
 ];
 
 export function Hero() {
@@ -192,6 +192,18 @@ export function Hero() {
   );
 }
 
+/**
+ * การ์ดตัวอย่างบนหน้าแรก — ห้ามใส่ข้อมูลจริงหรือข้อมูลที่ดูเหมือนจริง
+ *
+ * § หน้านี้เป็นหน้าสาธารณะ ไม่ต้องล็อกอิน ทุกอย่างที่แสดงตรงนี้คนทั้งอินเทอร์เน็ตเห็น
+ * เดิมการ์ดนี้โชว์เลขใบแจ้งที่ดูเหมือนของจริง บ้านเลขที่เจาะจง และชื่อ-นามสกุลเต็ม
+ * ของเจ้าหน้าที่ ซึ่งแม้เป็นข้อมูลสมมติก็สอนผู้ใช้ผิดว่าระบบเปิดเผยข้อมูลระดับนั้นได้
+ * และถ้าวันหนึ่งมีคนเปลี่ยนมาดึงข้อมูลจริงจาก DB จะกลายเป็นการเปิดเผยข้อมูลส่วนบุคคล
+ * ตาม พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 ทันทีโดยไม่มีใครทันสังเกต
+ *
+ * หลักที่ใช้: แสดงได้เฉพาะ "ประเภทงาน + พื้นที่ระดับหมู่บ้าน + สถานะ" เท่านั้น
+ * ห้ามมีเลขใบแจ้งที่ใช้ค้นหาได้จริง บ้านเลขที่ ชื่อบุคคล หรือเบอร์โทร
+ */
 function HeroTrackingCard({ reduce }: { reduce: boolean }) {
   return (
     <div className="relative">
@@ -239,7 +251,7 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-accent-100 text-xs">เลขใบแจ้ง</p>
-              <p className="text-sm font-bold">SSC-2026-0847</p>
+              <p className="text-sm font-bold">HN-XXX-XXX-XXX</p>
             </div>
             {/* § พื้นขาวโปร่งคงเป็น literal — surface-raised ไม่ใช่สีขาวในธีมมืด
                 การแทนด้วย token จะทำให้ป้ายนี้กลืนหายบน gradient (tokens.css ใช้
@@ -267,16 +279,14 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold">ไฟฟ้าสาธารณะ</p>
-              <p className="line-clamp-2 text-xs text-muted">
-                หลอดไฟถนนหน้าบ้านเลขที่ 88 หมู่ 5 ขาด 3 ดวง
-              </p>
+              <p className="line-clamp-2 text-xs text-muted">หลอดไฟถนนสาธารณะชำรุด 3 ดวง</p>
             </div>
           </div>
 
           {/* Location */}
           <div className="bg-surface-sunken/50 flex items-center gap-2 rounded-lg p-2.5 text-xs text-muted">
             <MapPin className="text-accent h-3.5 w-3.5 flex-shrink-0" />
-            <span className="truncate">หมู่ที่ 5 บ้านหัวงัว ต.หัวงัว อ.ยางตลาด จ.กาฬสินธุ์</span>
+            <span className="truncate">หมู่ที่ 5 ต.หัวงัว อ.ยางตลาด จ.กาฬสินธุ์</span>
           </div>
 
           {/* Progress timeline */}
@@ -339,14 +349,12 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
           {/* Assignee */}
           <div className="border-border flex items-center justify-between border-t pt-2">
             <div className="flex items-center gap-2">
-              <div
-                className="bg-accent-gradient-br flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold text-on-accent"
-              >
-                สช
+              <div className="bg-accent-gradient-br flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold text-on-accent">
+                <Wrench className="h-3.5 w-3.5" />
               </div>
               <div>
-                <p className="text-[11px] font-medium">นายสมชาย ใจดี</p>
-                <p className="text-[10px] text-muted">ช่างไฟฟ้า • เจ้าหน้าที่</p>
+                <p className="text-[11px] font-medium">เจ้าหน้าที่ผู้รับผิดชอบ</p>
+                <p className="text-[10px] text-muted">งานไฟฟ้า • กองช่าง</p>
               </div>
             </div>
             <span className="text-accent text-[10px] font-medium">อัปเดต 2 นาทีที่แล้ว</span>

@@ -326,7 +326,15 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
                       {entry.comment && (
                         <p className="mt-1 whitespace-pre-wrap">{entry.comment}</p>
                       )}
-                      {!entry.isPublic && (
+                      {/* § ติดป้ายทั้งสองฝั่ง ไม่ใช่เฉพาะ "ภายใน"
+                          เดิมมีแต่ป้าย "ภายใน" ทำให้รายการที่เผยแพร่แล้วดูเหมือนรายการ
+                          ธรรมดาที่ไม่มีป้ายอะไร เจ้าหน้าที่จึงไล่ดูย้อนหลังไม่ออกว่า
+                          มีอันไหนที่เผยแพร่ไปโดยไม่ตั้งใจ ซึ่งเป็นความผิดพลาดที่แก้คืนไม่ได้ */}
+                      {entry.isPublic ? (
+                        <span className="mt-2 inline-block rounded-pill bg-accent-sunken px-2 py-0.5 text-xs font-semibold text-accent-strong ring-1 ring-accent-strong/20 ring-inset">
+                          เผยแพร่แล้ว
+                        </span>
+                      ) : (
                         <span className="mt-2 inline-block rounded-pill bg-warning-soft px-2 py-0.5 text-xs font-semibold text-warning-ink ring-1 ring-warning-ink/20 ring-inset">
                           ภายใน
                         </span>

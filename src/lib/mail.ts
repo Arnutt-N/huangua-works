@@ -33,7 +33,10 @@ export async function sendMail(to: string, subject: string, html: string): Promi
   if (!transport) {
     // ไม่มี SMTP — ไม่ throw (กัน enumeration: caller ต้องคืน message เดียวกันเสมอ)
     // แต่ log ให้ operator รู้ว่าอีเมลไม่ถูกส่งจริง
-    console.warn('[mail] SMTP not configured — email NOT sent', { to, subject });
+    // § ไม่ log อีเมลผู้รับ — Vercel เก็บ log ไว้และใครเข้า dashboard ได้ก็อ่านได้
+    // การรู้ว่า "ใครขอรีเซ็ตรหัสผ่านเมื่อไร" เป็นข้อมูลส่วนบุคคลในตัวมันเอง
+    // operator ต้องการรู้แค่ว่ามีอีเมลที่ส่งไม่ออก ไม่ใช่ว่าส่งถึงใคร
+    console.warn('[mail] SMTP not configured — email NOT sent', { subject });
     return;
   }
 

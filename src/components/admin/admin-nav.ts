@@ -55,11 +55,12 @@ export interface AdminNavGroup {
  * นิยาม nav ของแอดมินไว้ที่เดียว — sidebar (desktop + mobile drawer) อ่านจากตัวนี้ทั้งคู่
  *
  * § หลักการตั้งชื่อกลุ่ม: ตั้งตาม "หน้าที่ของงาน" ไม่ใช่ "ใครเข้าได้"
- * เดิมเคยคิดจะใช้ชื่อกลุ่มว่า "Admin" แต่ในระบบนี้มีแค่ /admin/users กับ
- * /admin/master-data ที่จำกัด head/superadmin ส่วน /admin/audit เจ้าหน้าที่ทุกคน
- * เข้าได้ — ถ้าใช้ชื่อ "Admin" เจ้าหน้าที่ทั่วไปจะเห็นกลุ่มที่สื่อว่าตัวเองไม่มีสิทธิ์
- * ทั้งที่กดเข้าได้ จึงใช้ "ระบบและเครื่องมือ" ซึ่งบอกว่าเป็นเรื่องของระบบ
- * ไม่ได้บอกระดับสิทธิ์
+ * ใช้ "ระบบและเครื่องมือ" ซึ่งบอกว่าเป็นเรื่องของระบบ ไม่ได้บอกระดับสิทธิ์ —
+ * ถ้าใช้ชื่อแบบ "Admin" แล้ววันหนึ่งมีเมนูที่เจ้าหน้าที่ทั่วไปเข้าได้เพิ่มเข้ามา
+ * ชื่อกลุ่มจะสื่อผิดทันที
+ *
+ * (ปัจจุบันทุกเมนูในกลุ่มนี้เป็น supervisorOnly — /admin/audit ถูกจำกัดเพิ่มเพราะ
+ * มี email/ชื่อเจ้าหน้าที่ IP address และเลขติดตามของประชาชนอยู่ในตาราง)
  *
  * § ทำไม ไฟล์สื่อ/ย่อรูป/สุขภาพระบบ/ตั้งค่า ไม่อยู่ในกลุ่ม "แชทบอท"
  * ทั้งสี่ตัวไม่ได้ผูกกับบอทโดยเฉพาะ — ไฟล์สื่อใช้กับ Rich Menu ก็จริงแต่ใช้กับ
@@ -120,7 +121,9 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       { key: 'settings', label: 'ตั้งค่า', href: '/admin/settings', icon: Settings, supervisorOnly: true },
       { key: 'design', label: 'ระบบดีไซน์', href: '/admin/design', icon: Palette, supervisorOnly: true },
       { key: 'health', label: 'สุขภาพระบบ', href: '/admin/health', icon: HeartPulse, supervisorOnly: true },
-      { key: 'audit', label: 'ประวัติการกระทำ', href: '/admin/audit', icon: ScrollText },
+      // § supervisorOnly ต้องตรงกับ requireStaff(ADMIN_ROLES) ในหน้า /admin/audit
+      // ถ้าเมนูเปิดให้ officer เห็นแต่หน้าเด้งกลับ จะกลายเป็นทางตันที่ไม่มีคำอธิบาย
+      { key: 'audit', label: 'ประวัติการกระทำ', href: '/admin/audit', icon: ScrollText, supervisorOnly: true },
     ],
   },
 ];
@@ -135,7 +138,9 @@ export function visibleNavItems(role: UserRole, items: AdminNavItem[]): AdminNav
 
 /**
  * กรองทั้งกลุ่มตามสิทธิ์ แล้วตัดกลุ่มที่ไม่เหลือรายการทิ้ง
- * (ไม่งั้น officer จะเห็นหัวข้อ "ระบบ" ลอยอยู่โดยไม่มีเมนูข้างใต้)
+ * (ไม่งั้น officer จะเห็นหัวข้อ "ระบบและเครื่องมือ" ลอยอยู่โดยไม่มีเมนูข้างใต้ —
+ * ซึ่งเกิดขึ้นจริงตั้งแต่ /admin/audit ถูกจำกัดเป็น supervisorOnly ทำให้ทั้งกลุ่ม
+ * ไม่เหลือเมนูสำหรับ officer เลย)
  */
 export function visibleNavGroups(role: UserRole): AdminNavGroup[] {
   return ADMIN_NAV_GROUPS.map((group) => ({
