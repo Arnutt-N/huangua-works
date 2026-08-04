@@ -1,9 +1,10 @@
 /**
- * แคตตาล็อกของ token และคู่สีที่ต้องแสดง — แยกจาก UI เพื่อให้เพิ่ม token ใหม่แล้ว
+ * แคตตาล็อกของ token ที่ต้องแสดง — แยกจาก UI เพื่อให้เพิ่ม token ใหม่แล้ว
  * หน้านี้ตามทันทีโดยไม่ต้องแตะ JSX
  *
- * § รายการคู่สีตรงกับ PAIRS ใน scripts/check-contrast.ts โดยตั้งใจ เพื่อให้เทียบได้ว่า
- * ตัวเลขที่ browser render จริงต่างจากที่สคริปต์คำนวณแค่ไหน (ดู _lib/contrast.ts)
+ * § รายการ "คู่สี" ไม่ได้อยู่ในไฟล์นี้ — อยู่ที่ src/lib/design/contrast-pairs.ts
+ * ซึ่ง scripts/check-contrast.ts ใช้ร่วมกัน เดิมเคยเขียนซ้ำสองที่แล้ว drift จริง
+ * (สคริปต์ 16 คู่ หน้าเว็บ 18) ทำให้สองคู่ที่โชว์บนหน้าไม่ถูก gate ตรวจ
  */
 
 export interface TokenGroup {
@@ -85,32 +86,3 @@ export const TOKEN_GROUPS: TokenGroup[] = [
   },
 ];
 
-export interface PairCheck {
-  label: string;
-  fg: string;
-  bg: string;
-  min: number;
-  where: string;
-}
-
-/** คู่สีที่ใช้จริงในโค้ด — ตรงกับ PAIRS ใน scripts/check-contrast.ts */
-export const PAIR_CHECKS: PairCheck[] = [
-  { label: 'ink / surface', fg: '--color-ink', bg: '--color-surface', min: 4.5, where: 'ข้อความทั่วไป' },
-  { label: 'ink / surface-raised', fg: '--color-ink', bg: '--color-surface-raised', min: 4.5, where: 'ข้อความในการ์ด' },
-  { label: 'muted / surface', fg: '--color-muted', bg: '--color-surface', min: 4.5, where: 'คำอธิบาย' },
-  { label: 'muted / surface-raised', fg: '--color-muted', bg: '--color-surface-raised', min: 4.5, where: 'ข้อความรองในการ์ด' },
-  { label: 'muted / surface-sunken', fg: '--color-muted', bg: '--color-surface-sunken', min: 4.5, where: 'หัวตาราง' },
-  { label: 'accent-strong / surface-raised', fg: '--color-accent-strong', bg: '--color-surface-raised', min: 4.5, where: 'ลิงก์, ไอคอนเน้น' },
-  { label: 'accent-strong / accent-sunken', fg: '--color-accent-strong', bg: '--color-accent-sunken', min: 4.5, where: 'badge รับเรื่อง, RoleBadge' },
-  { label: 'on-accent / accent-strong', fg: '--color-on-accent', bg: '--color-accent-strong', min: 4.5, where: 'ปุ่ม primary' },
-  { label: 'warning-ink / warning-soft', fg: '--color-warning-ink', bg: '--color-warning-soft', min: 4.5, where: 'badge กำลังดำเนินการ' },
-  { label: 'success-ink / success-soft', fg: '--color-success-ink', bg: '--color-success-soft', min: 4.5, where: 'badge เสร็จสิ้น' },
-  { label: 'danger-ink / danger-soft', fg: '--color-danger-ink', bg: '--color-danger-soft', min: 4.5, where: 'badge ฉุกเฉิน' },
-  { label: 'warning-ink / surface-raised', fg: '--color-warning-ink', bg: '--color-surface-raised', min: 3, where: 'ไอคอน KpiCard gold' },
-  { label: 'danger-ink / surface-raised', fg: '--color-danger-ink', bg: '--color-surface-raised', min: 4.5, where: 'ตัวเลข KpiCard danger' },
-  { label: 'border-strong / surface', fg: '--color-border-strong', bg: '--color-surface', min: 3, where: 'ขอบปุ่ม secondary' },
-  { label: 'accent-strong / surface-sunken', fg: '--color-accent-strong', bg: '--color-surface-sunken', min: 3, where: 'แถบกราฟ' },
-  { label: 'accent / surface-raised', fg: '--color-accent', bg: '--color-surface-raised', min: 3, where: 'ไอคอน accent ขนาดใหญ่' },
-  { label: 'accent-100 / surface-raised', fg: '--color-accent-100', bg: '--color-surface-raised', min: 1, where: 'พื้นไอคอน (ไม่ใช่ข้อความ)' },
-  { label: 'accent-strong / accent-100', fg: '--color-accent-strong', bg: '--color-accent-100', min: 4.5, where: 'ไอคอนบนพื้น accent-100' },
-];

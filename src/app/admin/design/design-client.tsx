@@ -10,6 +10,8 @@ import {
   ClipboardList,
   Clock,
   CheckCircle2,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import { KpiCard } from '@/components/admin/kpi-card';
@@ -20,13 +22,14 @@ import { FieldHint, Input, Label, Textarea } from '@/components/ui/field';
 import { ALL_STATUSES } from '@/lib/cases/state-machine';
 import { ALL_ROLES } from '@/lib/auth/roles';
 import { cn } from '@/lib/cn';
-import { TOKEN_GROUPS, PAIR_CHECKS } from './_lib/catalog';
-import { contrast, levelOf, toHex, tokenToRgb, type Level, type Rgb } from './_lib/contrast';
+import { CONTRAST_PAIRS, pairLabel } from '@/lib/design/contrast-pairs';
+import { TOKEN_GROUPS } from './_lib/catalog';
+import { contrast, levelOf, toHex, tokenToRgb, type Level } from './_lib/contrast';
 
 interface ResolvedToken {
   name: string;
   use: string;
-  hex: string;
+  hex: string | null;
   onSurface: number | null;
 }
 
@@ -34,16 +37,21 @@ interface ResolvedPair {
   label: string;
   where: string;
   min: number;
-  ratio: number;
-  level: Level;
+  /** null = วัดไม่ได้ (token หาย/ค่าพัง) ต่างจาก 0 ซึ่งเคยปนกับ "วัดได้แล้วแย่มาก" */
+  ratio: number | null;
+  level: Level | null;
   pass: boolean;
 }
 
 const LEVEL_STYLE: Record<Level, string> = {
+  // AAA กับ AA ใช้สีเดียวกันโดยตั้งใจ — badge สื่อ 3 ระดับ (ผ่าน/ผ่านแบบมีเงื่อนไข/ไม่ผ่าน)
+  // ส่วนความต่าง AAA vs AA อ่านได้จากตัวอักษรบน badge เอง
   AAA: 'bg-success-soft text-success-ink ring-success-ink/20',
   AA: 'bg-success-soft text-success-ink ring-success-ink/20',
+  ผ่าน: 'bg-success-soft text-success-ink ring-success-ink/20',
   'AA-large': 'bg-warning-soft text-warning-ink ring-warning-ink/20',
-  fail: 'bg-danger-soft text-danger-ink ring-danger-ink/20',
+  อ้างอิง: 'bg-surface-sunken text-muted ring-border-strong/30',
+  ไม่ผ่าน: 'bg-danger-soft text-danger-ink ring-danger-ink/20',
 };
 
 export function DesignClient() {
@@ -69,7 +77,7 @@ export function DesignClient() {
           return {
             name: t.name,
             use: t.use,
-            hex: rgb ? toHex(rgb) : '—',
+            hex: rgb ? toHex(rgb) : null,
             onSurface: rgb && surface ? contrast(rgb, surface) : null,
           };
         }),
@@ -77,21 +85,33 @@ export function DesignClient() {
     );
 
     setPairs(
-      PAIR_CHECKS.map((p) => {
-        const fg = tokenToRgb(p.fg);
-        const bg = tokenToRgb(p.bg);
-        const ratio = fg && bg ? contrast(fg, bg) : 0;
+      CONTRAST_PAIRS.map((p) => {
+        // contrast-pairs.ts เก็บชื่อสั้น (ตรงกับ key ของ parseTokens ในสคริปต์)
+        // ฝั่งนี้เป็นคนเติม prefix เองตอนอ่าน CSS custom property
+        const fg = tokenToRgb(`--color-${p.fg}`);
+        const bg = tokenToRgb(`--color-${p.bg}`);
+        if (!fg || !bg) {
+          // แยก "วัดไม่ได้" ออกจาก "วัดได้แล้วไม่ผ่าน" — เดิมทั้งสองกรณีได้ ratio 0
+          // เหมือนกันจนดูไม่ออกว่าชื่อ token พิมพ์ผิดหรือสีตกเกณฑ์จริง
+          return { label: pairLabel(p), where: p.where, min: p.min, ratio: null, level: null, pass: false };
+        }
+        const ratio = contrast(fg, bg);
         return {
-          label: p.label,
+          label: pairLabel(p),
           where: p.where,
           min: p.min,
           ratio,
-          level: levelOf(ratio),
+          level: levelOf(ratio, p.kind, p.min),
           pass: ratio >= p.min,
         };
       }),
     );
   }, []);
+
+  function toggleTheme() {
+    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+  }
 
   useEffect(() => {
     /* § วัดใน requestAnimationFrame ไม่ใช่ทันทีใน effect
@@ -120,16 +140,27 @@ export function DesignClient() {
           <AdminCardTitle icon={<AlertTriangle className="h-4 w-4" />}>
             ผลตรวจ contrast — ธีม{theme === 'dark' ? 'มืด' : 'สว่าง'}
           </AdminCardTitle>
-          <Button variant="ghost" onClick={measure} className="gap-2">
-            <RefreshCw className="h-4 w-4" />
-            วัดใหม่
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={toggleTheme} className="gap-2">
+              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              ดูธีม{theme === 'dark' ? 'สว่าง' : 'มืด'}
+            </Button>
+            <Button variant="ghost" onClick={measure} className="gap-2">
+              <RefreshCw className="h-4 w-4" />
+              วัดใหม่
+            </Button>
+          </div>
         </div>
         <p className="mt-2 text-sm text-muted">
           ตัวเลขทั้งหมดคำนวณจากสีที่เบราว์เซอร์แสดงจริง (ผ่าน canvas) ไม่ใช่จากตัวเลขใน{' '}
           <code className="rounded bg-surface-sunken px-1 py-0.5 text-xs">tokens.css</code> —
-          จึงเห็นผลของ gamut mapping ที่สคริปต์ <code className="rounded bg-surface-sunken px-1 py-0.5 text-xs">check-contrast</code>{' '}
-          คำนวณต่างออกไปเล็กน้อย สลับธีมด้วยปุ่มมุมขวาบนแล้วตัวเลขจะอัปเดตเอง
+          จึงเห็นผลของ gamut mapping ที่สคริปต์{' '}
+          <code className="rounded bg-surface-sunken px-1 py-0.5 text-xs">check-contrast</code>{' '}
+          คำนวณต่างออกไปเล็กน้อย
+        </p>
+        <p className="mt-1 text-xs text-muted">
+          ปุ่มสลับธีมด้านบนมีผลเฉพาะหน้านี้และรีเซ็ตเมื่อโหลดใหม่ — ระบบยังไม่มีตัวสลับธีมถาวร
+          หน้านี้จึงเป็นที่เดียวที่ตรวจธีมมืดได้
         </p>
         <p className="mt-3 text-sm font-semibold">
           {failed.length === 0 ? (
@@ -164,10 +195,10 @@ export function DesignClient() {
                   <td
                     className={cn(
                       'py-2 pr-4 text-right font-mono tabular-nums',
-                      p.pass ? 'text-ink' : 'text-danger-ink font-bold',
+                      p.ratio === null || !p.pass ? 'text-danger-ink font-bold' : 'text-ink',
                     )}
                   >
-                    {p.ratio.toFixed(2)}:1
+                    {p.ratio === null ? 'วัดไม่ได้' : `${p.ratio.toFixed(2)}:1`}
                   </td>
                   <td className="py-2 pr-4 text-right font-mono text-xs tabular-nums text-muted">
                     {p.min}
@@ -176,10 +207,10 @@ export function DesignClient() {
                     <span
                       className={cn(
                         'inline-flex rounded-pill px-2 py-0.5 text-xs font-semibold ring-1 ring-inset',
-                        LEVEL_STYLE[p.level],
+                        p.level ? LEVEL_STYLE[p.level] : 'bg-danger-soft text-danger-ink ring-danger-ink/20',
                       )}
                     >
-                      {p.level}
+                      {p.level ?? 'ไม่พบ token'}
                     </span>
                   </td>
                 </tr>
@@ -217,8 +248,13 @@ export function DesignClient() {
                         {t.name.replace('--color-', '')}
                       </p>
                       <p className="truncate text-xs text-muted">{t.use}</p>
-                      <p className="mt-0.5 font-mono text-[11px] tabular-nums text-muted">
-                        {t.hex}
+                      <p
+                        className={cn(
+                          'mt-0.5 font-mono text-[11px] tabular-nums',
+                          t.hex === null ? 'text-danger-ink font-semibold' : 'text-muted',
+                        )}
+                      >
+                        {t.hex ?? 'ไม่พบ token'}
                         {t.onSurface !== null && ` · ${t.onSurface.toFixed(2)}:1`}
                       </p>
                     </div>

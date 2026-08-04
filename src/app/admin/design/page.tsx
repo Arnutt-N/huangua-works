@@ -15,7 +15,7 @@ export default async function DesignPage() {
       <div className="space-y-6">
         <p className="text-sm text-muted">
           สี ส่วนประกอบ และผลตรวจ contrast ของระบบ — ค่าทั้งหมดอ่านจากที่เบราว์เซอร์แสดงจริง
-          สลับธีมสว่าง/มืดได้จากเมนูมุมขวาบนแล้วตัวเลขจะอัปเดตตาม
+          ใช้ปุ่มสลับธีมในการ์ดด้านล่างเพื่อดูค่าของธีมมืด
         </p>
         <DesignClient />
       </div>
