@@ -4,6 +4,7 @@ import { ScrollText, Globe, Fingerprint, Clock, FileJson } from 'lucide-react';
 import { getDb } from '@/lib/db';
 import { auditLogs, users } from '@/lib/db/schema';
 import { requireStaff } from '@/lib/auth/require-staff';
+import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { AdminCard } from '@/components/admin/admin-card';
 import { EmptyState } from '@/components/admin/empty-state';
@@ -38,7 +39,17 @@ export default async function AuditPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const { user: staffUser } = await requireStaff();
+  /**
+   * § จำกัดที่ ADMIN_ROLES — หน้านี้เป็น audit trail สำหรับ PDPA
+   *
+   * เดิมใช้ requireStaff() เปล่า ทำให้ officer ทุกคนไล่ดู log ของทั้งองค์กรได้
+   * ทั้งที่ตารางนี้มี email + ชื่อเต็มของเจ้าหน้าที่ทุกคน, IP address, user agent
+   * และ metadata ที่รวมเลขติดตามของประชาชน (เช่นตอนถอนความยินยอม)
+   *
+   * หน้าที่ sensitive น้อยกว่านี้อย่าง /admin/users และ /admin/settings ยังจำกัด
+   * ที่ head/superadmin อยู่แล้ว — audit trail ไม่ควรหลวมกว่าสิ่งที่มันเฝ้าดู
+   */
+  const { user: staffUser } = await requireStaff(ADMIN_ROLES);
   const params = await searchParams;
   const db = await getDb();
 

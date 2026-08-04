@@ -135,6 +135,10 @@ export function CaseDetailClient({
               placeholder="เช่น ตรวจสอบแล้วอยู่ในขอบเขต ส่งต่อให้กองช่าง"
             />
           </div>
+          {/* § การเปลี่ยนสถานะยังคง defaultChecked ไว้โดยตั้งใจ — ต่างจากช่องความคืบหน้า
+              ด้านล่างที่กลับทิศเป็น opt-in เพราะการรู้ว่าเรื่องถึงขั้นไหนแล้วคือสิ่งที่
+              ผู้แจ้งควรได้รับ ส่วนความเสี่ยงอยู่ที่ "หมายเหตุ" ซึ่งเป็นข้อความอิสระ
+              จึงเตือนไว้ใต้ช่องแทนการปิดค่าเริ่มต้นทั้งหมด */}
           <label htmlFor="status-is-public" className="flex items-center gap-2 text-sm">
             <input
               id="status-is-public"
@@ -143,10 +147,14 @@ export function CaseDetailClient({
               value="true"
               defaultChecked
               aria-label="ให้ประชาชนเห็นการอัปเดตนี้"
+              aria-describedby="status-public-hint"
               className="h-4 w-4 rounded border-border-strong accent-accent-strong"
             />
             <span>ให้ประชาชนเห็นการอัปเดตนี้</span>
           </label>
+          <p id="status-public-hint" className="-mt-1 text-xs text-muted">
+            หมายเหตุจะแสดงบนหน้าติดตามเรื่อง — ห้ามระบุชื่อ เบอร์โทร หรือที่อยู่ของบุคคลอื่น
+          </p>
           {statusState.error && <ErrorText>{statusState.error}</ErrorText>}
           <Button type="submit" size="sm" disabled={statusPending || !transitionCheck.ok}>
             {statusPending ? 'กำลังบันทึก...' : 'บันทึกสถานะ'}
@@ -251,17 +259,25 @@ export function CaseDetailClient({
               required
             />
           </div>
-          <label htmlFor="comment-is-internal" className="flex items-center gap-2 text-sm">
+          {/* § กลับทิศเป็น opt-in — เดิม checkbox นี้คือ "หมายเหตุภายใน" ที่ต้องติ๊กเอง
+              แปลว่าค่าเริ่มต้นคือเผยแพร่สู่สาธารณะ ลืมติ๊กครั้งเดียวข้อความก็ไปโผล่
+              บนหน้า /track ที่ใครมีเลขติดตามก็เปิดดูได้ และเรียกคืนไม่ได้ */}
+          <label htmlFor="comment-is-public" className="flex items-center gap-2 text-sm">
             <input
-              id="comment-is-internal"
+              id="comment-is-public"
               type="checkbox"
               name="isPublic"
-              value="false"
-              aria-label="ตั้งเป็นหมายเหตุภายใน (ไม่แสดงให้ประชาชนเห็น)"
+              value="true"
+              aria-label="เผยแพร่ให้ประชาชนเห็นบนหน้าติดตามเรื่อง"
+              aria-describedby="comment-public-hint"
               className="h-4 w-4 rounded border-border-strong accent-accent-strong"
             />
-            <span>หมายเหตุภายใน (ไม่แสดงให้ประชาชนเห็น)</span>
+            <span>เผยแพร่ให้ประชาชนเห็น</span>
           </label>
+          <p id="comment-public-hint" className="-mt-1 text-xs text-muted">
+            ค่าเริ่มต้นคือหมายเหตุภายใน ติ๊กเฉพาะเมื่อต้องการให้ผู้แจ้งเห็นข้อความนี้ —
+            ห้ามระบุชื่อ เบอร์โทร หรือที่อยู่ของบุคคลอื่นในข้อความที่เผยแพร่
+          </p>
           {commentState.error && <ErrorText>{commentState.error}</ErrorText>}
           <Button type="submit" size="sm" disabled={commentPending}>
             {commentPending ? 'กำลังบันทึก...' : 'เพิ่มความคืบหน้า'}

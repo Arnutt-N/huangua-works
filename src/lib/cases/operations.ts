@@ -161,7 +161,19 @@ function buildTimeline(
           updateType: 'assignment',
           oldValue,
           newValue,
-          isPublic: true,
+          /**
+           * § ต้องเป็น internal — oldValue/newValue คือ users.id (UUID) ของเจ้าหน้าที่
+           *
+           * เดิมตั้ง isPublic: true ทำให้ UUID ของเจ้าหน้าที่ถูกส่งออกทาง
+           * GET /api/cases/[id] ซึ่งเป็น endpoint สาธารณะ ใครมีเลขติดตามก็เรียกได้
+           * โดยไม่ต้องล็อกอิน — ขัดกับ comment ที่หัวไฟล์ route นั้นเองที่ระบุว่า
+           * ต้องไม่ส่ง assignedOfficer ออกไป
+           *
+           * ประชาชนควรเห็นแค่ "สถานะเปลี่ยนแล้ว" ไม่ใช่ว่าใครเป็นคนรับผิดชอบ
+           * ถ้าวันหน้าต้องการแสดงชื่อเจ้าหน้าที่จริง ให้สร้าง entry แยกที่เก็บ
+           * ข้อความอ่านง่ายแทน raw ID และผ่านการตัดสินใจเชิงนโยบายก่อน
+           */
+          isPublic: false,
         },
         auditMeta: { from: oldValue, to: newValue },
         updateSet: { assignedTo: patch.officerId },
@@ -177,7 +189,9 @@ function buildTimeline(
           oldValue,
           newValue,
           comment: 'เปลี่ยนหน่วยงานที่รับผิดชอบ',
-          isPublic: true,
+          // § เหตุผลเดียวกับ assignment — oldValue/newValue เป็น departments.id (UUID)
+          // ประชาชนได้ประโยชน์จาก comment ที่อ่านออก ไม่ใช่ ID ดิบของตารางภายใน
+          isPublic: false,
         },
         auditMeta: { from: current.departmentId, to: patch.departmentId },
         updateSet: { departmentId: patch.departmentId },
