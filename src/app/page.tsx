@@ -26,11 +26,7 @@ function StatsFallback() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {[0, 1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="glass h-36 animate-pulse rounded-lg"
-              style={{ backgroundColor: 'oklch(96% 0.01 255 / 0.5)' }}
-            />
+            <div key={i} className="glass bg-surface-sunken/50 h-36 animate-pulse rounded-lg" />
           ))}
         </div>
       </div>

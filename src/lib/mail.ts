@@ -57,7 +57,7 @@ export function buildResetEmailHtml(userName: string, resetUrl: string): string 
     </p>
     <p style="text-align:center;margin:28px 0;">
       <a href="${resetUrl}"
-         style="display:inline-block;background:#0d9488;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 28px;border-radius:8px;">
+         style="display:inline-block;background:#0049a1;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 28px;border-radius:8px;">
         ตั้งรหัสผ่านใหม่
       </a>
     </p>

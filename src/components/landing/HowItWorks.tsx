@@ -2,35 +2,48 @@
 
 import { motion } from 'framer-motion';
 import { Bell, Search, Users, CheckCircle2 } from 'lucide-react';
+import { cn } from '@/lib/cn';
 
+/**
+ * § แยกเป็นสอง field แทนค่าสีตัวเดียว — ค่าเดิม `color` ถูกใช้ 3 บทบาทพร้อมกัน
+ * (ขอบวงกลม, สีไอคอน, พื้นของตัวเลข) ซึ่งเขียนเป็น class เดียวไม่ได้
+ *
+ * เคยพิจารณาใช้ currentColor + border-current/bg-current เพื่อเหลือ field เดียว
+ * แต่ตัวเลขต้องมี text-on-accent อยู่บนพื้นนั้นด้วย ซึ่งจะเปลี่ยน currentColor
+ * ของ element เดียวกันไปเป็นสีขาว ทำให้ bg-current กลายเป็นขาวตามไปด้วย
+ */
 const steps = [
   {
     number: '01',
     title: 'แจ้งเหตุ',
     description: 'กรอกรายละเอียดปัญหา แนบรูปภาพ และระบุตำแหน่ง',
     icon: Bell,
-    color: 'oklch(51% 0.16 255)',
+    toneClass: 'text-accent',
+    numberBgClass: 'bg-accent',
   },
   {
     number: '02',
     title: 'ตรวจสอบ',
     description: 'เจ้าหน้าที่รับเรื่อง ตรวจสอบความถูกต้อง และจัดลำดับความสำคัญ',
     icon: Search,
-    color: 'oklch(42% 0.16 255)',
+    toneClass: 'text-accent-strong',
+    numberBgClass: 'bg-accent-strong',
   },
   {
     number: '03',
     title: 'มอบหมาย',
     description: 'มอบหมายงานให้หน่วยงานที่รับผิดชอบ พร้อมแผนการดำเนินงาน',
     icon: Users,
-    color: 'oklch(51% 0.16 255)',
+    toneClass: 'text-accent',
+    numberBgClass: 'bg-accent',
   },
   {
     number: '04',
     title: 'เสร็จสิ้น',
     description: 'ดำเนินการแก้ไข ถ่ายภาพหลักฐาน และปิดงานพร้อมรายงาน',
     icon: CheckCircle2,
-    color: 'oklch(51% 0.16 255)',
+    toneClass: 'text-accent',
+    numberBgClass: 'bg-accent',
   },
 ];
 
@@ -64,33 +77,25 @@ export function HowItWorks() {
             >
               {/* Connector line — เชื่อมระหว่างวงกลม (lg+ เท่านั้น) */}
               {i < steps.length - 1 && (
-                <div
-                  className="absolute left-1/2 top-16 hidden h-px w-full lg:block"
-                  style={{
-                    background:
-                      'linear-gradient(to right, oklch(51% 0.16 255 / 0.3), oklch(42% 0.16 255 / 0.3))',
-                  }}
-                />
+                <div className="bg-accent-gradient absolute left-1/2 top-16 hidden h-px w-full opacity-30 lg:block" />
               )}
 
               <div className="relative flex flex-col items-center text-center">
                 <div
-                  className="flex h-32 w-32 items-center justify-center rounded-full border-4"
-                  style={{
-                    backgroundColor: 'oklch(99% 0.005 255)',
-                    borderColor: step.color,
-                  }}
+                  className={cn(
+                    'bg-surface flex h-32 w-32 items-center justify-center rounded-full border-4 border-current',
+                    step.toneClass,
+                  )}
                 >
-                  <step.icon className="h-12 w-12" style={{ color: step.color }} />
+                  <step.icon className="h-12 w-12" />
                 </div>
 
                 {/* ตัวเลขขั้น — วางบนขอบวงกลม (overlap ตั้งใจ) แต่ใช้ padding-top ดัน h3 ลงมาไม่ให้ทับ */}
                 <div
-                  className="absolute top-28 flex h-12 w-12 items-center justify-center rounded-full font-bold shadow-lg ring-4 ring-white"
-                  style={{
-                    backgroundColor: step.color,
-                    color: 'oklch(99% 0.005 255)',
-                  }}
+                  className={cn(
+                    'text-on-accent absolute top-28 flex h-12 w-12 items-center justify-center rounded-full font-bold shadow-lg ring-4 ring-white',
+                    step.numberBgClass,
+                  )}
                 >
                   {step.number}
                 </div>

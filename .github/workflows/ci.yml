@@ -42,5 +42,12 @@ jobs:
         run: pnpm typecheck
 
       # Unit tests เท่านั้น — integration tests ต้องการ Postgres+Redis จริง (run แยกใน dedicated job ถ้าต้องการ)
+      # หมายเหตุ: contrast gate อยู่ใน src/styles/tokens.contrast.test.ts จึงรันไปกับ
+      # step นี้อยู่แล้ว ไม่ต้องพึ่ง pretest hook ซึ่งไม่ทำงานเพราะเราเรียก vitest ตรง
       - name: Unit tests
         run: pnpm vitest run --exclude '**/*.integration.test.ts'
+
+      # รันซ้ำเป็น step แยกเพื่อให้เห็นผลชัดใน log ตอน gate ไม่ผ่าน
+      # (ตัว gate จริงอยู่ใน unit tests ด้านบนแล้ว)
+      - name: Contrast gate
+        run: pnpm check-contrast

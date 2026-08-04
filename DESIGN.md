@@ -148,9 +148,33 @@ motion:
 > chroma ไว้ที่ 0.16 (สูงกว่า indigo เดิมที่ 0.12) เพื่อคงความสด
 
 **Primary: Blue 255° (ราชการที่น่าเชื่อถือ)**
-- `oklch(51% 0.16 255)` — หลัก (ไอคอน, ตัวคั่น, mesh gradient)
-- `oklch(42% 0.16 255)` — hover/strong (ปุ่ม primary, ลิงก์ — 8.51:1 บนการ์ดขาว)
-- `oklch(70% 0.14 255)` — dark mode
+
+| token | ค่า | ใช้ที่ | บนการ์ดขาว |
+|---|---|---|---|
+| `--color-accent-sunken` | `oklch(96% 0.02 255)` | พื้น badge, hover | — |
+| `--color-accent-100` | `oklch(94% 0.029 255)` | พื้นไอคอน | — |
+| `--color-accent-200` | `oklch(90% 0.049 255)` | ขอบ badge | — |
+| `--color-accent` | `oklch(51% 0.16 255)` | ไอคอน, ตัวคั่น, mesh | 5.82:1 |
+| `--color-accent-700` | `oklch(46% 0.152 255)` | hover ของปุ่ม | 7.0:1 |
+| `--color-accent-strong` | `oklch(42% 0.16 255)` | ปุ่ม primary, ลิงก์ | 8.51:1 |
+
+dark mode กลับทิศ: `accent` = `oklch(70% 0.14 255)`, `accent-strong` = `oklch(75% 0.15 255)`
+
+**เพิ่มขั้นใหม่ต้องดูเพดาน sRGB ก่อน** — chroma ไม่ใช่ตัวเลือกอิสระ ที่ hue 255 gamut จำกัดไว้ตาม lightness:
+
+| L | chroma สูงสุด | | L | chroma สูงสุด |
+|---|---|---|---|---|
+| 97% | 0.014 | | 60% | 0.198 |
+| 94% | 0.029 | | 51% | 0.168 |
+| 90% | 0.049 | | 46% | 0.152 |
+| 83% | 0.086 | | 42% | **0.139** |
+| 72% | 0.148 | | 35% | 0.116 |
+
+ค่าที่เกินเพดานจะถูก browser gamut-map ให้เอง (ลด chroma) แปลว่า**ตัวเลขใน token ไม่ใช่สีที่ผู้ใช้เห็น** และ `check-contrast.ts` ใช้ naive clipping ต่อ channel จึงรายงานคลาดจากที่ browser ทำเล็กน้อย
+
+> `--color-accent-strong` (42% 0.16) เกินเพดาน 0.139 อยู่ก่อนแล้ว ไม่แก้เพราะเป็นค่าที่ใช้ใน production การแก้จะทำให้สีที่เห็นขยับจริง
+
+หลังเพิ่มขั้นใหม่: map เข้า `@theme inline` (ไม่งั้นไม่มี utility) และเพิ่มคู่ใน `PAIRS` ของ `check-contrast.ts`
 
 **Accent: Amber 80° (Thai royal gold)**
 - `oklch(82% 0.14 80)` — amber-400 gold highlight
@@ -168,7 +192,9 @@ motion:
 - Success = emerald `oklch(55% 0.13 160)` — คงเขียวไว้ ตอนนี้แยกจาก accent ได้แล้ว
 - Warning = amber gold
 - Danger = `oklch(60% 0.22 25)` red-orange
-- Info = blue (เท่ากับ accent)
+- **ไม่มี Info** — เคยมีค่าเท่ากับ accent เป๊ะในธีม light (บั๊กแบบเดียวกับที่ accent เคยชนกับ success) และไม่มีที่ไหนใช้ ถ้าต้องการ info alert แยกจากปุ่ม primary ให้ออกแบบค่าใหม่โดยตั้งใจ
+
+**สีเต็ม vs สีข้อความ:** `--color-*` เป็น "สีเต็ม" สำหรับพื้น/ไอคอนบนพื้นเข้ม ส่วนบนพื้น `*-soft` **ต้องใช้ `*-ink` เท่านั้น** — สีเต็มบนพื้น soft ให้ 1.5–3.6:1 ซึ่งอ่านไม่ออก (เป็นบั๊กที่เกิดซ้ำมาแล้ว 3 รอบ)
 
 **The One Blue Rule:** blue ใช้เป็น primary ทุกที่ — CTA button, badge, progress bar, status active, link hover ห้ามใช้สีอื่นแทน (ยกเว้น amber gold accent เฉพาะ highlight/badge secondary)
 
