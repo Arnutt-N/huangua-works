@@ -11,6 +11,7 @@ import {
   LayoutGrid,
   HeartPulse,
   Settings,
+  Palette,
   type LucideIcon,
 } from 'lucide-react';
 import { ADMIN_ROLES, type UserRole } from '@/lib/auth/roles';
@@ -33,6 +34,7 @@ export type AdminTab =
   | 'files'
   | 'image-resize'
   | 'health'
+  | 'design'
   | 'settings';
 
 export interface AdminNavItem {
@@ -116,6 +118,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       { key: 'files', label: 'ไฟล์สื่อ', href: '/admin/files', icon: Image, supervisorOnly: true },
       { key: 'image-resize', label: 'ย่อรูป', href: '/admin/image-resize', icon: Image, supervisorOnly: true },
       { key: 'settings', label: 'ตั้งค่า', href: '/admin/settings', icon: Settings, supervisorOnly: true },
+      { key: 'design', label: 'ระบบดีไซน์', href: '/admin/design', icon: Palette, supervisorOnly: true },
       { key: 'health', label: 'สุขภาพระบบ', href: '/admin/health', icon: HeartPulse, supervisorOnly: true },
       { key: 'audit', label: 'ประวัติการกระทำ', href: '/admin/audit', icon: ScrollText },
     ],
