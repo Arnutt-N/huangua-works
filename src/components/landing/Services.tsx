@@ -24,7 +24,9 @@ const services = [
     title: 'ถนน',
     description: 'ถนนชำรุด หลุมบ่อ ต้องการซ่อมแซม',
     icon: MapPin,
-    color: 'oklch(60% 0.22 25)',
+    // § ใช้ danger-ink ไม่ใช่ danger เต็ม — สีเต็มบนพื้น danger-soft ให้ 3.61:1
+    // ตกเกณฑ์ข้อความ 4.5:1 (กฎเดียวกับที่ tokens.css §status ink กำหนดไว้)
+    color: 'oklch(45% 0.19 25)',
     bgColor: 'oklch(95% 0.05 25)',
   },
   {

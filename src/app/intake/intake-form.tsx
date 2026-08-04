@@ -273,8 +273,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
           </Link>
           <Link
             href="/"
-            className="inline-flex min-h-touch items-center justify-center gap-2 rounded-xl border-2 px-7 font-semibold text-accent-strong hover:bg-accent-sunken"
-            style={{ borderColor: 'oklch(80% 0.015 255)' }}
+            className="inline-flex min-h-touch items-center justify-center gap-2 rounded-xl border-2 border-border-strong px-7 font-semibold text-accent-strong hover:bg-accent-sunken"
           >
             กลับหน้าหลัก
           </Link>
@@ -504,7 +503,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
       {/* ไฟล์แนบ */}
       <SectionCard>
         <SectionHeading icon={Paperclip}>รูปภาพประกอบ (ไม่จำเป็น)</SectionHeading>
-        <div className="mt-5 rounded-xl border border-dashed px-4 py-8 text-center" style={{ borderColor: 'oklch(80% 0.015 255)', backgroundColor: 'oklch(96% 0.02 255 / 0.3)' }}>
+        <div className="mt-5 rounded-xl border border-dashed border-border-strong bg-surface-sunken/30 px-4 py-8 text-center">
           <p className="text-sm text-muted">ลากไฟล์มาวาง หรือเลือกจากเครื่อง (สูงสุด 5 รูป)</p>
           <p className="mt-1 text-xs text-muted">ยังไม่เปิดใช้งานในเฟสนี้</p>
         </div>

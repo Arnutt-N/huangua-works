@@ -17,8 +17,10 @@ const preview: Preview = {
     },
     backgrounds: {
       options: {
-        light: { name: 'light (default)', value: 'oklch(98% 0.003 245)' },
-        dark: { name: 'dark (intentional)', value: 'oklch(15% 0.006 245)' },
+        // § อ้าง token ตรง ๆ (ไฟล์นี้ import tokens.css แล้วด้านบน) — เดิมเป็นค่าดิบ
+        // hue 245 ซึ่งตกค้างจาก palette ก่อน #55 ทำให้ทุก story ตรวจบนพื้นผิดสี
+        light: { name: 'light (default)', value: 'var(--color-surface)' },
+        dark: { name: 'dark (intentional)', value: 'oklch(15% 0.015 255)' },
       },
     },
     controls: { matchers: { color: /(background|color)$/i, date: /Date$/i } },
