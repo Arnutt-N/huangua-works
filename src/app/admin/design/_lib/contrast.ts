@@ -11,6 +11,8 @@
  * ของ browser แล้วจริง ไม่ต้องพึ่งสูตรที่เราเขียนเอง
  */
 
+import type { PairKind } from '@/lib/design/contrast-pairs';
+
 export interface Rgb {
   r: number;
   g: number;
@@ -25,17 +27,35 @@ function getCtx(): CanvasRenderingContext2D | null {
   canvas.width = 1;
   canvas.height = 1;
   ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) {
+    // ความล้มเหลวระดับ "วัดอะไรไม่ได้ทั้งหน้า" ต้องไม่เงียบ
+    console.error('[design] canvas 2d context ใช้ไม่ได้ — วัดสีไม่ได้ทั้งหน้า');
+  }
   return ctx;
 }
 
-/** แปลงค่าสี CSS อะไรก็ได้ (oklch, var(), hex) → sRGB ที่ browser จะแสดงจริง */
+/**
+ * แปลงค่าสี CSS อะไรก็ได้ (oklch, var(), hex) → sRGB ที่ browser จะแสดงจริง
+ *
+ * § ตรวจว่า fillStyle รับค่าไปจริงก่อนวาด
+ * ตาม spec ของ canvas การ set fillStyle ด้วยสีที่ parse ไม่ได้จะถูก "เพิกเฉยเงียบ ๆ"
+ * ค่าก่อนหน้าจะคงอยู่ ถ้าไม่ตรวจตรงนี้ ค่าที่ผิดจะกลายเป็นสีดำที่ดูเหมือนผลวัดจริง
+ * แล้วให้ contrast สูง ๆ กับพื้นสว่าง (~19:1) → รายงานว่า "AAA ผ่านสวยงาม" ทั้งที่
+ * token นั้นพัง ซึ่งอันตรายกว่าไม่แสดงผลเลย
+ */
 export function resolveToRgb(cssColor: string): Rgb | null {
   const c = getCtx();
   if (!c) return null;
-  // เคลียร์ก่อนเพื่อไม่ให้สีเดิมค้างเมื่อ fillStyle ที่ส่งมาไม่ถูกต้อง
-  c.clearRect(0, 0, 1, 1);
-  c.fillStyle = '#000';
+
+  // ใช้ sentinel ที่ไม่มีทางเป็นค่าจริง แล้วดูว่า fillStyle เปลี่ยนไปหรือไม่หลัง assign
+  const sentinel = '#010203';
+  c.fillStyle = sentinel;
   c.fillStyle = cssColor;
+  if (c.fillStyle === sentinel && cssColor.trim().toLowerCase() !== sentinel) {
+    return null; // parse ไม่ผ่าน — ให้ผู้เรียกแสดงว่า "วัดไม่ได้" แทนสีดำปลอม ๆ
+  }
+
+  c.clearRect(0, 0, 1, 1);
   c.fillRect(0, 0, 1, 1);
   const [r, g, b] = c.getImageData(0, 0, 1, 1).data;
   return { r: r ?? 0, g: g ?? 0, b: b ?? 0 };
@@ -80,12 +100,26 @@ export function flatten(fg: Rgb, bg: Rgb, alpha: number): Rgb {
   };
 }
 
-export type Level = 'AAA' | 'AA' | 'AA-large' | 'fail';
+export type Level = 'AAA' | 'AA' | 'AA-large' | 'ผ่าน' | 'อ้างอิง' | 'ไม่ผ่าน';
 
-/** เกณฑ์ WCAG 2.2: ข้อความปกติ 4.5 / ข้อความใหญ่+องค์ประกอบที่ไม่ใช่ข้อความ 3 / AAA 7 */
-export function levelOf(ratio: number): Level {
+/**
+ * ตัดสินระดับตามเกณฑ์ "ของคู่นั้น" ไม่ใช่เกณฑ์ตายตัว
+ *
+ * § เดิมฟังก์ชันนี้รับแค่ ratio แล้วเทียบกับ 7/4.5/3 ตายตัว ทำให้เกิดสองปัญหา
+ * 1) คู่ที่ตั้ง min ต่ำโดยตั้งใจ (เช่นพื้นไอคอนที่ไม่มีข้อกำหนด contrast) ได้ป้าย
+ *    "fail" สีแดง ทั้งที่แถวเดียวกันนับเป็น "ผ่าน" เพราะ ratio >= min — ขัดกันเอง
+ * 2) คู่ non-text ที่ได้ 3.x:1 ถูกป้ายว่า "AA-large" ซึ่งเป็นศัพท์ของ SC 1.4.3
+ *    (ผ่อนผันให้ข้อความขนาดใหญ่) ทั้งที่จริงคือผ่าน SC 1.4.11 เต็มเกณฑ์ของมัน
+ *
+ * ตอนนี้จึงตัดสินจาก kind + min ของคู่นั้นก่อน แล้วค่อยไล่ระดับ AA/AAA เฉพาะคู่
+ * ที่เป็นข้อความจริง ซึ่งเป็นที่เดียวที่คำว่า AA/AAA มีความหมาย
+ */
+export function levelOf(ratio: number, kind: PairKind, min: number): Level {
+  if (kind === 'reference') return 'อ้างอิง';
+  if (ratio < min) return 'ไม่ผ่าน';
+  if (kind === 'non-text') return 'ผ่าน';
+  // kind === 'text' — ไล่ระดับตาม SC 1.4.3 / 1.4.6
   if (ratio >= 7) return 'AAA';
   if (ratio >= 4.5) return 'AA';
-  if (ratio >= 3) return 'AA-large';
-  return 'fail';
+  return 'AA-large';
 }

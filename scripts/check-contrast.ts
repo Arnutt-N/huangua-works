@@ -14,57 +14,18 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { CONTRAST_PAIRS, pairLabel } from '../src/lib/design/contrast-pairs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const TOKENS_PATH = resolve(here, '../src/styles/tokens.css');
 
 type Oklch = { l: number; c: number; h: number; alpha: number };
 
-/** เกณฑ์ตาม WCAG 2.2 */
-const AA_TEXT = 4.5; // 1.4.3 ข้อความปกติ
-const AA_LARGE = 3; // 1.4.3 ข้อความใหญ่ (≥18.66px bold / 24px)
-const NON_TEXT = 3; // 1.4.11 ขอบ/ไอคอนที่สื่อความหมาย
-
-interface Pair {
-  /** ชื่อคู่สีสำหรับรายงาน */
-  name: string;
-  fg: string;
-  bg: string;
-  min: number;
-  /** อธิบายว่าคู่นี้ปรากฏที่ไหนจริง — ให้คนอ่าน output รู้ว่าพังตรงไหน */
-  where: string;
-}
-
 /**
- * คู่สีที่ต้องผ่าน — ครอบเฉพาะคู่ที่ "ใช้จริงในโค้ด" ไม่ใช่ทุก permutation
- * เพิ่มคู่ใหม่ทุกครั้งที่สร้าง combination ใหม่ใน component
+ * § รายการคู่สีมาจาก src/lib/design/contrast-pairs.ts — แหล่งเดียวที่ใช้ร่วมกับ
+ * หน้า /admin/design เดิมเขียนซ้ำสองที่แล้ว drift จริง (สคริปต์ 16 คู่ หน้าเว็บ 18)
+ * ทำให้สองคู่ที่โชว์บนหน้าไม่เคยถูก gate นี้ตรวจเลย
  */
-const PAIRS: Pair[] = [
-  { name: 'ink / surface', fg: 'ink', bg: 'surface', min: AA_TEXT, where: 'ข้อความทั่วไปทั้งระบบ' },
-  { name: 'ink / surface-raised', fg: 'ink', bg: 'surface-raised', min: AA_TEXT, where: 'ข้อความในการ์ด' },
-  { name: 'muted / surface', fg: 'muted', bg: 'surface', min: AA_TEXT, where: 'subtitle, label รอง' },
-  { name: 'muted / surface-raised', fg: 'muted', bg: 'surface-raised', min: AA_TEXT, where: 'ข้อความรองในการ์ด' },
-  { name: 'muted / surface-sunken', fg: 'muted', bg: 'surface-sunken', min: AA_TEXT, where: 'หัวตาราง' },
-
-  { name: 'accent-strong / surface-raised', fg: 'accent-strong', bg: 'surface-raised', min: AA_TEXT, where: 'ลิงก์, ไอคอนเน้น' },
-  { name: 'accent-strong / accent-sunken', fg: 'accent-strong', bg: 'accent-sunken', min: AA_TEXT, where: 'badge "รับเรื่อง", RoleBadge ผู้ดูแล/หัวหน้ากอง, แท็บ hover' },
-  { name: 'on-accent / accent-strong', fg: 'on-accent', bg: 'accent-strong', min: AA_TEXT, where: 'ปุ่ม primary, แท็บที่เลือก, ตัวเลขแจ้งเตือน' },
-
-  // § คู่ที่เคยพังจริง — text-* (สีเต็ม) บนพื้น *-soft ให้ ~1.5:1
-  //   ปัจจุบันบังคับให้ใช้ token *-ink เท่านั้น
-  { name: 'warning-ink / warning-soft', fg: 'warning-ink', bg: 'warning-soft', min: AA_TEXT, where: 'badge ตรวจสอบ/มอบหมาย/กำลังดำเนินการ, RoleBadge หัวหน้างาน/เจ้าหน้าที่' },
-  { name: 'success-ink / success-soft', fg: 'success-ink', bg: 'success-soft', min: AA_TEXT, where: 'badge เสร็จสิ้น/ปิดเรื่อง, toast สำเร็จ' },
-  { name: 'danger-ink / danger-soft', fg: 'danger-ink', bg: 'danger-soft', min: AA_TEXT, where: 'badge ฉุกเฉิน/ไม่ดำเนินการ, ข้อความ error' },
-  { name: 'warning-ink / surface-raised', fg: 'warning-ink', bg: 'surface-raised', min: NON_TEXT, where: 'ไอคอน KpiCard variant gold' },
-  { name: 'danger-ink / surface-raised', fg: 'danger-ink', bg: 'surface-raised', min: AA_TEXT, where: 'ตัวเลข KpiCard variant danger, "เลย SLA"' },
-
-  // ขอบ UI component ที่สื่อความหมาย (1.4.11)
-  { name: 'border-strong / surface', fg: 'border-strong', bg: 'surface', min: NON_TEXT, where: 'ขอบปุ่ม secondary/outline' },
-
-  // แถบกราฟ/ตัวบ่งชี้ที่ไม่ใช่ข้อความ
-  { name: 'accent-strong / surface-sunken', fg: 'accent-strong', bg: 'surface-sunken', min: NON_TEXT, where: 'แถบกราฟในรายงาน' },
-  { name: 'accent / surface-raised', fg: 'accent', bg: 'surface-raised', min: AA_LARGE, where: 'ไอคอน accent ขนาดใหญ่' },
-];
 
 /** อ่านบล็อก :root และ [data-theme='dark'] แยกกัน แล้วดึง --color-* ออกมา */
 function parseTokens(css: string): { light: Map<string, string>; dark: Map<string, string> } {
@@ -148,12 +109,12 @@ function runTheme(
   console.log(`\n── ธีม ${theme} ${'─'.repeat(58)}`);
   let failures = 0;
 
-  for (const pair of PAIRS) {
+  for (const pair of CONTRAST_PAIRS) {
     const rawFg = tokens.get(pair.fg) ?? fallback?.get(pair.fg);
     const rawBg = tokens.get(pair.bg) ?? fallback?.get(pair.bg);
 
     if (!rawFg || !rawBg) {
-      console.error(`  ✗ ${pair.name} — ไม่พบ token: ${!rawFg ? pair.fg : pair.bg}`);
+      console.error(`  ✗ ${pairLabel(pair)} — ไม่พบ token: ${!rawFg ? pair.fg : pair.bg}`);
       failures++;
       continue;
     }
@@ -162,7 +123,7 @@ function runTheme(
     const fg = parseOklch(rawFg);
     const bg = parseOklch(rawBg);
     if (fg.alpha < 1 || bg.alpha < 1) {
-      console.log(`  – ${pair.name} — ข้าม (token มี alpha ต้องรู้พื้นหลังจริงก่อน)`);
+      console.log(`  – ${pairLabel(pair)} — ข้าม (token มี alpha ต้องรู้พื้นหลังจริงก่อน)`);
       continue;
     }
 
@@ -170,7 +131,7 @@ function runTheme(
     const ok = ratio >= pair.min;
     if (!ok) failures++;
     const mark = ok ? '✓' : '✗';
-    const line = `  ${mark} ${ratio.toFixed(2).padStart(5)}:1 (ต้อง ≥${pair.min})  ${pair.name}`;
+    const line = `  ${mark} ${ratio.toFixed(2).padStart(5)}:1 (ต้อง ≥${pair.min})  ${pairLabel(pair)}`;
     if (ok) {
       console.log(line);
     } else {
@@ -196,9 +157,11 @@ export function countFailures(quiet = false): number {
 
   const log = console.log;
   const err = console.error;
+  // § mute เฉพาะ console.log — ไม่แตะ console.error
+  // รายละเอียดว่าคู่ไหนพัง ค่าเท่าไร ใช้ที่ไหน ถูกพิมพ์ผ่าน console.error ถ้า mute ด้วย
+  // เวลา test ล้มจะเหลือแค่ "expected 2 to be 0" ซึ่งบอกอะไรไม่ได้เลย
   if (quiet) {
     console.log = () => {};
-    console.error = () => {};
   }
   try {
     const lightFails = runTheme('light', light);
@@ -213,7 +176,7 @@ export function countFailures(quiet = false): number {
 
 function main(): void {
   console.log(`ตรวจ contrast จาก ${TOKENS_PATH.replace(process.cwd() + '/', '')}`);
-  console.log(`คู่สีที่ตรวจ: ${PAIRS.length} คู่ × 2 ธีม`);
+  console.log(`คู่สีที่ตรวจ: ${CONTRAST_PAIRS.length} คู่ × 2 ธีม`);
 
   const total = countFailures();
   console.log(`\n${'═'.repeat(70)}`);

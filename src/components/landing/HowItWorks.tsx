@@ -93,7 +93,9 @@ export function HowItWorks() {
                 {/* ตัวเลขขั้น — วางบนขอบวงกลม (overlap ตั้งใจ) แต่ใช้ padding-top ดัน h3 ลงมาไม่ให้ทับ */}
                 <div
                   className={cn(
-                    'text-on-accent absolute top-28 flex h-12 w-12 items-center justify-center rounded-full font-bold shadow-lg ring-4 ring-white',
+                    // ring-surface ไม่ใช่ ring-white — literal ขาวให้ 1.03:1 บนพื้น surface
+                    // ในธีมสว่าง (แทบมองไม่เห็น) และไม่ตอบสนองธีมมืด
+                    'text-on-accent ring-surface absolute top-28 flex h-12 w-12 items-center justify-center rounded-full font-bold shadow-lg ring-4',
                     step.numberBgClass,
                   )}
                 >
