@@ -1,6 +1,6 @@
 # PRD — Chatbot Management Suite (port จาก jsk-app)
 
-> **เอกสารวางแผน (planning artifact)** — ไม่ใช่ code/scaffold · ทำตาม workflow ใน `AGENT.md` (§2 PRD → §3 PRP-Plan → §4 Review Gate)
+> **เอกสารวางแผน (planning artifact)** — ไม่ใช่ code/scaffold · ทำตาม workflow ใน `AGENTS.md` (§2 PRD → §3 PRP-Plan → §4 Review Gate)
 > แหล่งอ้างอิง: บทวิเคราะห์ jsk-app ที่ `D:\topbliz\public\huangua-works\research\jsk-reviews\` (00-overview / 01-frontend-admin / 02-backend / 03-remediation-plan)
 > Stack ปัจจุบันของ huangua-works: **Next.js 16 (App Router) + Drizzle ORM (postgres-js) + Auth.js v5 + Upstash Redis (REST) + SSE + Tailwind v4 + Radix UI** — ดู `docs/PRD.md` (หมายเหตุสถานะ: stack จริงเปลี่ยนจาก Supabase เป็น self-host Postgres แล้ว)
 
@@ -287,5 +287,5 @@
 - บทวิเคราะห์ jsk-app: `research/jsk-reviews/` (00-03)
 - PRD หลัก huangua: `docs/PRD.md`, `docs/implementation-plan.md`
 - Design system: `DESIGN.md`
-- Workflow: `AGENT.md` (§2-§4)
+- Workflow: `AGENTS.md` (§2-§4)
 - PRP-Plan คู่กัน: `docs/prp-chatbot-management.md`
