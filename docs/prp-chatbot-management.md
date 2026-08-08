@@ -1,6 +1,6 @@
 # PRP-Plan — Chatbot Management Suite (port จาก jsk-app)
 
-> **Implementation plan** คู่กับ `docs/prd-chatbot-management.md` · ทำตาม `AGENT.md` §3 (PRP-Plan) + §4 (Review Gate)
+> **Implementation plan** คู่กับ `docs/prd-chatbot-management.md` · ทำตาม `AGENTS.md` §3 (PRP-Plan) + §4 (Review Gate)
 > ⚠️ **Review Gate ก่อนเขียนโค้ด:** ตรวจ PRP นี้กับ codebase จริง (path/pattern ถูกต้อง), flag สมมติฐาน, รอ user confirm
 > Convention huangua: หน้า admin = `page.tsx` (server, `requireStaff`) + `*-client.tsx` (client) · API = `route.ts` (`requireStaffApi`) · branch ต่อ tranche (`feat/<tranche>`)
 
@@ -246,7 +246,7 @@ intent-matcher → response-parser → reply-objects API/UI → engine refactor 
 
 ---
 
-## Review Gate Checklist (ก่อน implement — AGENT.md §4)
+## Review Gate Checklist (ก่อน implement — AGENTS.md §4)
 
 - [ ] PRD ครอบ original request ครบ (port 9 เมนู, skip 5 เมนูที่已有) — no scope creep
 - [ ] PRP path ถูกต้องตาม codebase จริง (ตรวจ `src/app/admin/`, `src/lib/line/`, `src/lib/db/schema.ts`)
@@ -256,7 +256,7 @@ intent-matcher → response-parser → reply-objects API/UI → engine refactor 
 
 ---
 
-## คำสั่ง verification (ต่อ tranche — AGENT.md CI section)
+## คำสั่ง verification (ต่อ tranche — AGENTS.md "Verification gates")
 ```bash
 npx tsc --noEmit       # typecheck
 npx eslint .           # lint
