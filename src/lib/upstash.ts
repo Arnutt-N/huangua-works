@@ -48,10 +48,29 @@ export async function checkRateLimit(
     // Remove old entries
     await redis.zremrangebyscore(key, 0, windowStart);
 
-    // Count current entries
-    const count = await redis.zcard(key);
+    // § เพิ่มตัวเองก่อน แล้วตัดสินจาก "ตำแหน่งของตัวเอง" ไม่ใช่จำนวนรวม
+    // ห้ามสลับกลับไปเป็น "นับก่อน แล้วค่อยเพิ่ม" — ลำดับนั้นไม่ atomic: request ที่ยิง
+    // พร้อมกัน N ตัวอ่าน count ตัวเดียวกันก่อนที่ใครจะ zadd ทัน จึงผ่าน gate ได้ทั้งหมด
+    // = brute-force ทะลุ limit ที่ login/password-reset พึ่งอยู่
+    //
+    // และห้ามใช้ zcard หลัง zadd ด้วย — ปิด race ได้ก็จริงแต่เหวี่ยงเกินไป: ถ้า N ตัว
+    // zadd เสร็จก่อนที่ใครจะนับ ทุกตัวจะเห็น count = N แล้วถูกปฏิเสธ "ทั้งหมด" แม้ตัวแรกๆ
+    // ควรผ่าน — สำคัญกับที่นี่เพราะประชาชนหลายคนอาจออกเน็ตผ่าน IP เดียวกันหลัง NAT
+    //
+    // zrank คืนลำดับของ member ตัวเองในเซ็ต (0-based) จึงตัดสินได้แม่นยำว่า "ฉันเป็น
+    // คนที่เท่าไหร่ในหน้าต่างนี้" ไม่ว่า request อื่นจะแทรกตอนไหน → ผ่านพอดี limit ตัวแรก
+    // เสมอ ไม่มากไม่น้อย โดยไม่ต้องพึ่ง Lua/MULTI (ซึ่งเสี่ยงกับ up-redis proxy ใน local)
+    //
+    // (ตั้งใจให้ request ที่ถูกปฏิเสธยังคงอยู่ในหน้าต่าง — ความพยายามที่ล้มเหลวควรนับรวม
+    //  สำหรับ path กัน brute-force)
+    const member = `${now}-${Math.random()}`;
+    await redis.zadd(key, { score: now, member });
+    await redis.expire(key, windowSeconds);
 
-    if (count >= limit) {
+    const rank = await redis.zrank(key, member);
+
+    // rank เป็น null ไม่ควรเกิด (เพิ่งเพิ่มเอง) — ถ้าเกิดให้ถือว่าเกิน ปลอดภัยกว่าปล่อยผ่าน
+    if (rank === null || rank >= limit) {
       // ZRANGE WITHSCORES คืน flat array [member, score, ...] — SDK ไม่แปลงเป็น object
       const oldestEntry = await redis.zrange<(string | number)[]>(key, 0, 0, {
         withScores: true,
@@ -64,13 +83,9 @@ export async function checkRateLimit(
       return { allowed: false, remaining: 0, reset };
     }
 
-    // Add current request
-    await redis.zadd(key, { score: now, member: `${now}-${Math.random()}` });
-    await redis.expire(key, windowSeconds);
-
     return {
       allowed: true,
-      remaining: limit - count - 1,
+      remaining: limit - rank - 1,
       reset: windowSeconds,
     };
   } catch {

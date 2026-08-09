@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { generateCidHash, generateDedupHash, verifyDedupHash } from './cid-hmac';
 
 describe('generateCidHash', () => {
@@ -74,5 +74,43 @@ describe('verifyDedupHash', () => {
 
   test('returns false for a malformed/unrelated hash', () => {
     expect(verifyDedupHash('1101200563040', 'title', 'description', 'not-a-real-hash')).toBe(false);
+  });
+});
+
+describe('assertKeyUsable — ด่านกัน key ว่างตอน runtime', () => {
+  // § HMAC_KEY ถูกอ่านตอน module load ครั้งเดียว การทดสอบจึงต้อง reset module registry
+  // แล้ว import ใหม่ทุกครั้ง ไม่ใช่แค่ stubEnv เฉยๆ
+  async function loadWith(env: { NODE_ENV?: string; CID_HMAC_KEY?: string }) {
+    vi.resetModules();
+    vi.stubEnv('NODE_ENV', env.NODE_ENV ?? 'test');
+    vi.stubEnv('CID_HMAC_KEY', env.CID_HMAC_KEY ?? '');
+    return import('./cid-hmac');
+  }
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  test('throw ใน production เมื่อไม่มี CID_HMAC_KEY', async () => {
+    const mod = await loadWith({ NODE_ENV: 'production', CID_HMAC_KEY: '' });
+
+    expect(() => mod.generateCidHash('1101200563040')).toThrow(/CID_HMAC_KEY/);
+    expect(() => mod.generateDedupHash('1101200563040', 'a', 'b')).toThrow(/CID_HMAC_KEY/);
+  });
+
+  test('throw ใน production เมื่อ key สั้นกว่า 32 ตัว', async () => {
+    const mod = await loadWith({ NODE_ENV: 'production', CID_HMAC_KEY: 'x'.repeat(31) });
+    expect(() => mod.generateCidHash('1101200563040')).toThrow(/32/);
+  });
+
+  test('ผ่านใน production เมื่อ key ยาวพอ', async () => {
+    const mod = await loadWith({ NODE_ENV: 'production', CID_HMAC_KEY: 'x'.repeat(32) });
+    expect(mod.generateCidHash('1101200563040')).toMatch(/^[0-9a-f]{16}$/);
+  });
+
+  test('ไม่ throw นอก production แม้ key ว่าง — dev/test ยังรันได้โดยไม่ต้องตั้ง secret', async () => {
+    const mod = await loadWith({ NODE_ENV: 'development', CID_HMAC_KEY: '' });
+    expect(mod.generateCidHash('1101200563040')).toMatch(/^[0-9a-f]{16}$/);
   });
 });

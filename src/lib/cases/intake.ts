@@ -73,13 +73,21 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
   const estimatedDays = category.estimatedDays || 7;
   const dueDate = new Date(Date.now() + estimatedDays * 24 * 60 * 60 * 1000);
 
-  let trackingCode = generateTrackingCode();
+  // § ตรวจทุกรหัสที่สุ่มได้ก่อนใช้ — เดิมวนสุ่มใหม่ตอนชนแล้วออกจากลูปโดยไม่ได้ตรวจ
+  // ตัวสุดท้าย ทำให้รหัสที่ไม่เคยผ่านการตรวจหลุดไปถึง insert แล้วพังที่ unique index
+  let trackingCode: string | null = null;
   for (let attempt = 0; attempt < 5; attempt++) {
+    const candidate = generateTrackingCode();
     const collision = await firstOrUndefined(
-      db.select({ id: cases.id }).from(cases).where(eq(cases.trackingCode, trackingCode)).limit(1)
+      db.select({ id: cases.id }).from(cases).where(eq(cases.trackingCode, candidate)).limit(1)
     );
-    if (!collision) break;
-    trackingCode = generateTrackingCode();
+    if (!collision) {
+      trackingCode = candidate;
+      break;
+    }
+  }
+  if (!trackingCode) {
+    return { ok: false, error: 'ไม่สามารถออกเลขติดตามได้ กรุณาลองใหม่', errorCode: 'internal' };
   }
 
   await db.insert(cases).values({
@@ -152,7 +160,15 @@ async function resolveSubmitter(db: Db, input: CaseIntakeInput): Promise<string 
     return userId;
   }
 
-  const cidEmail = input.email || `cid-${generateCidHash(input.cid!)}@placeholder.local`;
+  // § ตัวตนของผู้แจ้งทางเว็บผูกกับ CID เท่านั้น — ห้ามใช้ input.email เป็น lookup key
+  // เดิมใช้ `input.email || cid-hash` ซึ่งเปิดให้ใครก็ได้ยิง /api/cases/submit พร้อม email
+  // ของเจ้าหน้าที่ แล้วเคส + consent record ไปผูกกับบัญชีคนนั้นทั้งที่เขาไม่เคยยินยอม
+  // (endpoint นี้ไม่ต้อง login — email ที่ส่งมาไม่เคยถูกยืนยัน จึงเป็น identity ไม่ได้)
+  //
+  // ผลพลอยได้: เดิมคนที่กรอก email จริงจะถอนความยินยอมไม่ได้เลย เพราะ
+  // /api/consent/withdraw เทียบกับ `cid-<hash>@placeholder.local` เท่านั้น
+  // ผูกทุกคนด้วย CID hash เหมือนกันหมดแล้ว withdraw จึงทำงานครบทุกเคส
+  const cidEmail = `cid-${generateCidHash(input.cid!)}@placeholder.local`;
   const existing = await firstOrUndefined(
     db.select().from(users).where(eq(users.email, cidEmail)).limit(1)
   );
@@ -166,7 +182,11 @@ async function resolveSubmitter(db: Db, input: CaseIntakeInput): Promise<string 
     isActive: true,
     fullName: input.fullName || 'ประชาชน',
     phoneNumber: input.phoneNumber || null,
-    metadata: JSON.stringify({ source: 'web_intake' }),
+    // § email ที่ประชาชนกรอกเก็บเป็น "ช่องทางติดต่อ" ใน metadata ไม่ใช่ identity key
+    metadata: JSON.stringify({
+      source: 'web_intake',
+      ...(input.email ? { contactEmail: input.email } : {}),
+    }),
   });
   return userId;
 }

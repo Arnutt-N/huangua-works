@@ -7,21 +7,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { cases } from '@/lib/db/schema';
 import { applyCaseUpdate, SYSTEM_ACTOR } from '@/lib/cases/operations';
+import { requireCron } from '@/lib/cron-auth';
 import { eq, and, lt } from 'drizzle-orm';
 
 const STALE_DAYS = 7;
 
 export async function GET(req: NextRequest) {
-  const authHeader = req.headers.get('authorization');
-  const cronSecret = process.env.CRON_SECRET;
-
-  if (!cronSecret || cronSecret.length < 16) {
-    return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 });
-  }
-
-  if (authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const auth = requireCron(req);
+  if (!auth.ok) return auth.response;
 
   const db = await getDb();
   const staleThreshold = new Date(Date.now() - STALE_DAYS * 24 * 60 * 60 * 1000);

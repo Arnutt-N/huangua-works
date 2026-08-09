@@ -8,15 +8,35 @@ import { createHmac } from 'node:crypto';
  */
 
 const HMAC_KEY = process.env.CID_HMAC_KEY || '';
+const MIN_KEY_LENGTH = 32;
 
 // Build time: ข้าม validation (ไม่มี secret จริง)
 // Runtime: scripts/verify-env.ts จะ fail fast ถ้าไม่มี
 if (
   process.env.NODE_ENV === 'production' &&
   typeof window === 'undefined' &&
-  (!HMAC_KEY || HMAC_KEY.length < 32)
+  (!HMAC_KEY || HMAC_KEY.length < MIN_KEY_LENGTH)
 ) {
   console.warn('[cid-hmac] CID_HMAC_KEY not configured — dedup will use empty key');
+}
+
+/**
+ * § ถ้า key หายไปตอน runtime ต้อง throw ไม่ใช่แค่ warn แล้วเดินต่อด้วย key ว่าง
+ *
+ * HMAC ที่ key ว่างมีค่าเท่ากับ hash ธรรมดา — CID เป็นเลข 13 หลักที่มี checksum
+ * บังคับรูปแบบอยู่แล้ว พื้นที่ค้นหาจึงเล็กพอจะไล่ทั้งหมดได้ ใครได้ hash ไปก็ย้อนกลับ
+ * เป็น CID ตัวจริงได้ ซึ่งพังทั้งเหตุผลที่เลือกใช้ HMAC แต่แรก
+ *
+ * verify-env.ts กันตอน build แล้ว แต่ build-time env กับ runtime env เป็นคนละชุดได้
+ * (เช่นตั้งค่าใน Vercel คนละ environment) — ด่านนี้จึงจำเป็น
+ * ยอมให้ request พังดังๆ ดีกว่าเขียน identifier ที่ถอดกลับได้ลง DB เงียบๆ
+ */
+function assertKeyUsable(): void {
+  if (process.env.NODE_ENV !== 'production') return;
+  if (HMAC_KEY.length >= MIN_KEY_LENGTH) return;
+  throw new Error(
+    `[cid-hmac] CID_HMAC_KEY missing or shorter than ${MIN_KEY_LENGTH} chars — refusing to hash CID with a guessable key`,
+  );
 }
 
 /**
@@ -32,6 +52,7 @@ if (
  * @returns HMAC hex 16 ตัวแรก
  */
 export function generateCidHash(cid: string): string {
+  assertKeyUsable();
   return createHmac('sha256', HMAC_KEY).update(cid, 'utf8').digest('hex').slice(0, 16);
 }
 
@@ -43,6 +64,7 @@ export function generateDedupHash(
   title: string,
   description: string
 ): string {
+  assertKeyUsable();
   const payload = `${cid}|${title}|${description}`.toLowerCase().trim();
   return createHmac('sha256', HMAC_KEY).update(payload, 'utf8').digest('hex');
 }
