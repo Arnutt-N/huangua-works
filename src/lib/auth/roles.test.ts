@@ -5,6 +5,8 @@ import {
   CASE_SUPERVISOR_ROLES,
   STAFF_ROLES,
   SUPERADMIN_ONLY,
+  canGrantRole,
+  type UserRole,
 } from './roles';
 
 describe('auth · ALL_ROLES', () => {
@@ -40,5 +42,39 @@ describe('auth · role tiers', () => {
     for (const tier of [CASE_SUPERVISOR_ROLES, ADMIN_ROLES, SUPERADMIN_ONLY]) {
       expect(tier).not.toContain('citizen');
     }
+  });
+});
+
+describe('auth · canGrantRole', () => {
+  // ADMIN_ROLES = head|superadmin คือคนที่เรียก createUser/updateUserRole ได้
+  // แต่ STAFF_ROLES ที่ zod ยอมรับเป็นค่า role รวม 'superadmin' ด้วย
+  // ช่องว่างตรงนี้เคยเปิดให้ head สร้าง/เลื่อนใครก็ได้เป็น superadmin
+  const nonSuperadminStaff = STAFF_ROLES.filter((r) => r !== 'superadmin');
+
+  it('lets superadmin grant every role', () => {
+    for (const role of ALL_ROLES) {
+      expect(canGrantRole('superadmin', role)).toBe(true);
+    }
+  });
+
+  it.each(nonSuperadminStaff)('stops %s from granting superadmin', (actorRole) => {
+    expect(canGrantRole(actorRole, 'superadmin')).toBe(false);
+  });
+
+  it('lets head still grant every non-superadmin role', () => {
+    for (const role of nonSuperadminStaff) {
+      expect(canGrantRole('head', role)).toBe(true);
+    }
+  });
+
+  it('covers every admin-tier actor — no role that reaches the action bypasses the check', () => {
+    // ถ้ามีใครเพิ่ม role ลง ADMIN_ROLES ในอนาคต test นี้จะบังคับให้ตัดสินใจเรื่องนี้ด้วย
+    const allowedToGrantSuperadmin = ADMIN_ROLES.filter((r) => canGrantRole(r, 'superadmin'));
+    expect(allowedToGrantSuperadmin).toEqual([...SUPERADMIN_ONLY]);
+  });
+
+  it('is not fooled by a role string outside the union', () => {
+    expect(canGrantRole('officer' as UserRole, 'superadmin')).toBe(false);
+    expect(canGrantRole('citizen' as UserRole, 'superadmin')).toBe(false);
   });
 });

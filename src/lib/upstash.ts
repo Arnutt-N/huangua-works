@@ -48,10 +48,21 @@ export async function checkRateLimit(
     // Remove old entries
     await redis.zremrangebyscore(key, 0, windowStart);
 
-    // Count current entries
+    // § เพิ่มตัวเองก่อนแล้วค่อยนับ — ห้ามสลับกลับไปเป็น "นับก่อน แล้วค่อยเพิ่ม"
+    // ลำดับเดิม (zcard → zadd) ไม่ atomic: request ที่ยิงพร้อมกัน N ตัวอ่าน count
+    // ตัวเดียวกันก่อนที่ใครจะ zadd ทัน จึงผ่าน gate ได้ทั้งหมด = brute-force ทะลุ limit
+    // ที่ login/password-reset พึ่งอยู่
+    //
+    // zadd atomic ในตัว และ zcard ที่นับ "หลัง" zadd ของตัวเองจะเห็นอย่างน้อยลำดับที่ k
+    // ของตัวเองเสมอ → request ตัวที่เกิน limit ถูกปฏิเสธแน่นอน ไม่ต้องพึ่ง Lua/MULTI
+    // (ตั้งใจให้ request ที่ถูกปฏิเสธยังคงนับอยู่ในหน้าต่าง — ความพยายามที่ล้มเหลว
+    //  ควรนับรวมสำหรับ path กัน brute-force)
+    await redis.zadd(key, { score: now, member: `${now}-${Math.random()}` });
+    await redis.expire(key, windowSeconds);
+
     const count = await redis.zcard(key);
 
-    if (count >= limit) {
+    if (count > limit) {
       // ZRANGE WITHSCORES คืน flat array [member, score, ...] — SDK ไม่แปลงเป็น object
       const oldestEntry = await redis.zrange<(string | number)[]>(key, 0, 0, {
         withScores: true,
@@ -64,13 +75,9 @@ export async function checkRateLimit(
       return { allowed: false, remaining: 0, reset };
     }
 
-    // Add current request
-    await redis.zadd(key, { score: now, member: `${now}-${Math.random()}` });
-    await redis.expire(key, windowSeconds);
-
     return {
       allowed: true,
-      remaining: limit - count - 1,
+      remaining: limit - count,
       reset: windowSeconds,
     };
   } catch {

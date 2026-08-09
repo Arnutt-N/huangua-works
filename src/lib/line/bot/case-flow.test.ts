@@ -3,23 +3,41 @@ import type { CaseFlowState } from './case-flow';
 
 // --- Mock @/lib/db so startCaseFlow / createCase don't hit real Postgres ---
 const { mockDb } = vi.hoisted(() => {
-  function makeThenable(value: unknown) {
+  const mockCategories = [
+    { id: 'cat-road', name: 'ถนน-ทางเท้า', isActive: true, estimatedDays: 7 },
+    { id: 'cat-elec', name: 'ไฟฟ้า-แสงสว่าง', isActive: true, estimatedDays: 7 },
+  ];
+
+  // § mock เดิมคืน mockCategories ให้ทุก select ไม่ว่าถามตารางไหน ซึ่งทำให้ query
+  // ตรวจการชนของ trackingCode ใน createCase "เจอแถว" เสมอ = ชนทุกครั้ง
+  // (โค้ดเดิมกลบไว้ได้เพราะออกจากลูปแล้วใช้รหัสที่ยังไม่ผ่านการตรวจ)
+  //
+  // แยกผลลัพธ์ตามตารางที่ .from() ถาม แทนที่จะเดาจาก argument ของ select()
+  // (case-flow เรียก categories ทั้งแบบมีและไม่มี projection) — ตารางอื่นใน intake
+  // (cases, lineUsers, users) คืน [] = "ไม่พบแถว" ซึ่งตรงกับที่ flow นี้ต้องการ
+  function isCategoriesTable(table: unknown): boolean {
+    return !!table && typeof table === 'object' && 'estimatedDays' in table;
+  }
+
+  function makeThenable() {
+    let value: unknown = [];
     const obj: Record<string, unknown> = {
       then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
         Promise.resolve(value).then(resolve, reject),
+      from: vi.fn((table: unknown) => {
+        value = isCategoriesTable(table) ? mockCategories : [];
+        return obj;
+      }),
     };
-    for (const m of ['from', 'where', 'limit', 'values']) {
+    for (const m of ['where', 'limit', 'values']) {
       obj[m] = vi.fn(() => obj);
     }
     return obj;
   }
-  const mockCategories = [
-    { id: 'cat-road', name: 'ถนน-ทางเท้า', isActive: true },
-    { id: 'cat-elec', name: 'ไฟฟ้า-แสงสว่าง', isActive: true },
-  ];
+
   const mockDb = {
-    select: vi.fn(() => makeThenable(mockCategories)),
-    insert: vi.fn(() => makeThenable(undefined)),
+    select: vi.fn(() => makeThenable()),
+    insert: vi.fn(() => makeThenable()),
   };
   return { mockDb };
 });

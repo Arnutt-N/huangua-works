@@ -16,7 +16,7 @@ import {
   resetPasswordFormSchema,
   validateFormData,
 } from '@/lib/validation';
-import { ADMIN_ROLES, SUPERADMIN_ONLY, type UserRole } from '@/lib/auth/roles';
+import { ADMIN_ROLES, SUPERADMIN_ONLY, canGrantRole, type UserRole } from '@/lib/auth/roles';
 
 /**
  * Server actions สำหรับจัดการ users (admin panel)
@@ -33,6 +33,8 @@ export interface UserActionState {
   success?: string;
 }
 
+const GRANT_DENIED = 'เฉพาะผู้ดูแลระบบสูงสุดเท่านั้นที่กำหนดบทบาทผู้ดูแลระบบสูงสุดได้';
+
 // ────────────────────────────────────────────────────────────────────────────
 // 1. สร้าง user ใหม่
 // ────────────────────────────────────────────────────────────────────────────
@@ -47,6 +49,10 @@ export async function createUser(
   const v = validateFormData(createUserFormSchema, formData);
   if (!v.success) return { error: v.error };
   const { email, fullName, role, departmentId, password } = v.data;
+
+  if (!canGrantRole(actor.role, role)) {
+    return { error: GRANT_DENIED };
+  }
 
   const db = await getDb();
 
@@ -169,6 +175,11 @@ export async function updateUserRole(
   // § ห้ามเปลี่ยน role ตัวเอง (กัน self-escalation/de-escalation)
   if (userId === actor.id) {
     return { error: 'ไม่สามารถเปลี่ยนบทบาทตัวเองได้' };
+  }
+
+  // § head เลื่อนใครขึ้น superadmin ไม่ได้ (คู่กับด่าน target.role ด้านล่าง)
+  if (!canGrantRole(actor.role, role)) {
+    return { error: GRANT_DENIED };
   }
 
   const db = await getDb();

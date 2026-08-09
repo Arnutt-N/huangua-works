@@ -11,21 +11,13 @@
 
 import { NextResponse } from 'next/server';
 import { getDueScheduled, sendBroadcast } from '@/lib/line/broadcast-service';
+import { requireCron } from '@/lib/cron-auth';
 
 export const runtime = 'nodejs';
 
 export async function GET(request: Request) {
-  const cronSecret = process.env.CRON_SECRET;
-
-  // กัน `Bearer undefined` ผ่านตอน env หาย — endpoint นี้เปิดรับ caller ภายนอก
-  if (!cronSecret || cronSecret.length < 16) {
-    return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 });
-  }
-
-  const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const auth = requireCron(request);
+  if (!auth.ok) return auth.response;
 
   const due = await getDueScheduled();
   let sent = 0;

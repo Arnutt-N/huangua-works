@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   chatReplySchema,
+  submitCaseSchema,
   updateConversationSchema,
   validateOrError,
 } from './validation';
@@ -52,6 +53,39 @@ describe('chatReplySchema', () => {
   it("rejects text over LINE's 5000-char cap", () => {
     expect(validateOrError(chatReplySchema, { text: 'ก'.repeat(5000) }).success).toBe(true);
     expect(validateOrError(chatReplySchema, { text: 'ก'.repeat(5001) }).success).toBe(false);
+  });
+});
+
+describe('submitCaseSchema — attachments[].url', () => {
+  // /api/cases/submit ไม่ต้อง login — url ที่ผ่าน schema นี้ถูกเก็บลง cases.attachments
+  // และจะกลายเป็น stored XSS ทันทีที่มีหน้าไหน render มันเป็นลิงก์
+  const buildAttachment = (url: string) => ({
+    url,
+    type: 'image/png',
+    size: 1024,
+  });
+
+  const parseUrl = (url: string) =>
+    validateOrError(submitCaseSchema.shape.attachments, [buildAttachment(url)]).success;
+
+  it('accepts http and https', () => {
+    expect(parseUrl('https://storage.example/a.png')).toBe(true);
+    expect(parseUrl('http://storage.example/a.png')).toBe(true);
+  });
+
+  it.each([
+    'javascript:alert(1)',
+    'JaVaScRiPt:alert(1)',
+    'data:text/html,<script>alert(1)</script>',
+    'vbscript:msgbox(1)',
+    'file:///etc/passwd',
+  ])('rejects the %s scheme', (url) => {
+    // zod 4 ข้ามการตรวจ protocol ถ้าไม่ส่ง option — scheme เหล่านี้เคยผ่านมาก่อน
+    expect(parseUrl(url)).toBe(false);
+  });
+
+  it('still enforces the 2048-char cap', () => {
+    expect(parseUrl(`https://storage.example/${'a'.repeat(2048)}`)).toBe(false);
   });
 });
 

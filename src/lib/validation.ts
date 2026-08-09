@@ -132,7 +132,15 @@ export const submitCaseSchema = z.object({
   attachments: z
     .array(
       z.object({
-        url: z.string().url().max(2048),
+        // § ต้องบังคับ protocol เอง — zod 4 ข้ามการตรวจ protocol ถ้าไม่ส่ง option มา
+        // (ดู $ZodURL ใน zod/v4/core: `if (def.protocol)` — ไม่ระบุ = ผ่านทุก scheme
+        //  ที่ `new URL()` แปลงได้ รวม javascript: / data: / file:)
+        // field นี้รับจาก /api/cases/submit ซึ่งไม่ต้อง login — ปล่อยไว้คือฝัง
+        // `javascript:...` ลง DB รอวันที่มีหน้า admin เอามา render เป็นลิงก์
+        url: z
+          .string()
+          .url({ protocol: /^https?$/ })
+          .max(2048),
         type: z.string().max(100),
         size: z.number().int().min(0).max(10_000_000), // 10MB max
       }),
