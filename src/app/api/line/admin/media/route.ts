@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { desc } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
-import { mediaFiles } from '@/lib/db/schema';
+import { mediaCategoryEnum, mediaFiles } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import { requireStaffApi } from '@/lib/auth/require-staff';
 import { ADMIN_ROLES } from '@/lib/auth/roles';
@@ -15,8 +15,20 @@ const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 // § category ไหลเข้า S3 key และเป็น pgEnum ใน media_files — ต้องตรวจกับ list ก่อน
 // ไม่งั้นค่าอย่าง `../../x` เขียน object นอก prefix ที่ตั้งใจ แล้วค่อยพัง 500 ตอน insert
 // (ไฟล์ขึ้น S3 ไปแล้วแต่ไม่มีแถวใน DB = ไฟล์ค้างที่ไม่มีใครตามลบ)
-const MEDIA_CATEGORIES = ['rich_menu', 'image_message', 'general'] as const;
+//
+// § derive จาก pgEnum ไม่ประกาศ literal ซ้ำ — ถ้าเขียนมือแล้วสองชุด drift กันจะได้
+// ผลลัพธ์เดียวกับที่ย่อหน้าบนเตือนไว้พอดี (เพิ่ม category ใน enum แล้วลืมแก้ที่นี่ = โดน
+// 400 เสมอ, แก้ที่นี่โดยไม่แก้ enum = ผ่าน guard แต่ล้ม 500 ตอน insert หลังไฟล์ขึ้น S3)
+// pattern เดียวกับ UpdateType ใน lib/cases/operations.ts
+const MEDIA_CATEGORIES = mediaCategoryEnum.enumValues;
 type MediaCategory = (typeof MEDIA_CATEGORIES)[number];
+
+// § type predicate ไม่ใช่ cast — .includes() ไม่ narrow ให้เอง และ `as` จะปิดการตรวจ
+// ของ compiler ตรงจุดที่ควรพิสูจน์ invariant พอดี (แบบเดียวกับ isCaseStatus ใน
+// lib/cases/state-machine.ts)
+function isMediaCategory(value: string): value is MediaCategory {
+  return (MEDIA_CATEGORIES as readonly string[]).includes(value);
+}
 
 // § allow-list ของชนิดไฟล์ — LINE rich menu/image message รับแค่ภาพ
 // กัน SVG และ HTML ที่ถูกเสิร์ฟกลับมาจาก S3 origin พร้อม Content-Type ที่ client เป็นคนบอก
@@ -45,12 +57,13 @@ export async function POST(request: Request) {
 
   const formData = await request.formData();
   const file = formData.get('file') as File | null;
-  const rawCategory = (formData.get('category') as string) || 'general';
+  // § FormData.get คืน string | File | null — บังคับให้เป็น string ก่อนเข้า type guard
+  const rawCategory = formData.get('category');
+  const category = typeof rawCategory === 'string' && rawCategory ? rawCategory : 'general';
 
-  if (!MEDIA_CATEGORIES.includes(rawCategory as MediaCategory)) {
+  if (!isMediaCategory(category)) {
     return NextResponse.json({ error: 'หมวดหมู่ไฟล์ไม่ถูกต้อง' }, { status: 400 });
   }
-  const category = rawCategory as MediaCategory;
 
   if (!file) return NextResponse.json({ error: 'ไม่มีไฟล์' }, { status: 400 });
   if (file.size > MAX_SIZE) return NextResponse.json({ error: 'ไฟล์ใหญ่เกิน 10MB' }, { status: 413 });

@@ -1,3 +1,4 @@
+import { getTableName } from 'drizzle-orm';
 import { describe, expect, it, vi } from 'vitest';
 import type { CaseFlowState } from './case-flow';
 
@@ -15,8 +16,12 @@ const { mockDb } = vi.hoisted(() => {
   // แยกผลลัพธ์ตามตารางที่ .from() ถาม แทนที่จะเดาจาก argument ของ select()
   // (case-flow เรียก categories ทั้งแบบมีและไม่มี projection) — ตารางอื่นใน intake
   // (cases, lineUsers, users) คืน [] = "ไม่พบแถว" ซึ่งตรงกับที่ flow นี้ต้องการ
+  //
+  // เทียบด้วยชื่อตาราง ไม่ใช่ชื่อคอลัมน์ — ถ้าผูกกับคอลัมน์ (เช่น 'estimatedDays' in table)
+  // วันที่มีคน rename คอลัมน์นั้นใน schema.ts mock จะเงียบๆ คืน [] แทน mockCategories
+  // แล้วเทสต์พังโดยไม่มีอะไรชี้ว่าสาเหตุอยู่ที่ mock
   function isCategoriesTable(table: unknown): boolean {
-    return !!table && typeof table === 'object' && 'estimatedDays' in table;
+    return getTableName(table as Parameters<typeof getTableName>[0]) === 'categories';
   }
 
   function makeThenable() {

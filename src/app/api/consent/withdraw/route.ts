@@ -27,12 +27,7 @@ import { consentWithdrawSchema, validateOrError } from '@/lib/validation';
 // เดิมแยก 404 กับ 403 ทำให้บอกได้ว่า tracking code ไหนมีอยู่จริงโดยไม่ต้องรู้ CID
 // (เป็น enumeration oracle) — GET /api/cases/[id] ตั้งใจคืน 404 เหมือนกันหมดอยู่แล้ว
 // ที่นี่จึงต้องเดินตามแบบเดียวกัน
-// (เป็น factory ไม่ใช่ค่าคงที่ — body ของ Response อ่านได้ครั้งเดียว ใช้ instance ซ้ำข้าม request ไม่ได้)
-const withdrawDenied = () =>
-  NextResponse.json(
-    { error: 'ไม่พบเรื่องที่ระบุ หรือข้อมูลไม่ตรงกับเจ้าของเรื่อง' },
-    { status: 404 },
-  );
+const WITHDRAW_DENIED = { error: 'ไม่พบเรื่องที่ระบุ หรือข้อมูลไม่ตรงกับเจ้าของเรื่อง' };
 
 export async function POST(req: NextRequest) {
   const ip =
@@ -70,7 +65,7 @@ export async function POST(req: NextRequest) {
   const trackingCode = normalizeTrackingCode(rawTrackingCode);
   if (!trackingCode) {
     // ไม่เปิดเผยว่า format ผิด — คืนคำตอบเดียวกับเคสไม่พบ
-    return withdrawDenied();
+    return NextResponse.json(WITHDRAW_DENIED, { status: 404 });
   }
 
   const db = await getDb();
@@ -81,7 +76,7 @@ export async function POST(req: NextRequest) {
   );
 
   if (!caseRow) {
-    return withdrawDenied();
+    return NextResponse.json(WITHDRAW_DENIED, { status: 404 });
   }
 
   // § Verify CID matches — ตัวตนของผู้แจ้งทางเว็บผูกกับ HMAC ของ CID เสมอ
@@ -104,7 +99,7 @@ export async function POST(req: NextRequest) {
       userAgent: req.headers.get('user-agent') || undefined,
       metadata: { reason: userRow ? 'cid_mismatch' : 'submitter_missing' },
     });
-    return withdrawDenied();
+    return NextResponse.json(WITHDRAW_DENIED, { status: 404 });
   }
 
   // § Revoke consent
