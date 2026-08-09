@@ -48,21 +48,29 @@ export async function checkRateLimit(
     // Remove old entries
     await redis.zremrangebyscore(key, 0, windowStart);
 
-    // § เพิ่มตัวเองก่อนแล้วค่อยนับ — ห้ามสลับกลับไปเป็น "นับก่อน แล้วค่อยเพิ่ม"
-    // ลำดับเดิม (zcard → zadd) ไม่ atomic: request ที่ยิงพร้อมกัน N ตัวอ่าน count
-    // ตัวเดียวกันก่อนที่ใครจะ zadd ทัน จึงผ่าน gate ได้ทั้งหมด = brute-force ทะลุ limit
-    // ที่ login/password-reset พึ่งอยู่
+    // § เพิ่มตัวเองก่อน แล้วตัดสินจาก "ตำแหน่งของตัวเอง" ไม่ใช่จำนวนรวม
+    // ห้ามสลับกลับไปเป็น "นับก่อน แล้วค่อยเพิ่ม" — ลำดับนั้นไม่ atomic: request ที่ยิง
+    // พร้อมกัน N ตัวอ่าน count ตัวเดียวกันก่อนที่ใครจะ zadd ทัน จึงผ่าน gate ได้ทั้งหมด
+    // = brute-force ทะลุ limit ที่ login/password-reset พึ่งอยู่
     //
-    // zadd atomic ในตัว และ zcard ที่นับ "หลัง" zadd ของตัวเองจะเห็นอย่างน้อยลำดับที่ k
-    // ของตัวเองเสมอ → request ตัวที่เกิน limit ถูกปฏิเสธแน่นอน ไม่ต้องพึ่ง Lua/MULTI
-    // (ตั้งใจให้ request ที่ถูกปฏิเสธยังคงนับอยู่ในหน้าต่าง — ความพยายามที่ล้มเหลว
-    //  ควรนับรวมสำหรับ path กัน brute-force)
-    await redis.zadd(key, { score: now, member: `${now}-${Math.random()}` });
+    // และห้ามใช้ zcard หลัง zadd ด้วย — ปิด race ได้ก็จริงแต่เหวี่ยงเกินไป: ถ้า N ตัว
+    // zadd เสร็จก่อนที่ใครจะนับ ทุกตัวจะเห็น count = N แล้วถูกปฏิเสธ "ทั้งหมด" แม้ตัวแรกๆ
+    // ควรผ่าน — สำคัญกับที่นี่เพราะประชาชนหลายคนอาจออกเน็ตผ่าน IP เดียวกันหลัง NAT
+    //
+    // zrank คืนลำดับของ member ตัวเองในเซ็ต (0-based) จึงตัดสินได้แม่นยำว่า "ฉันเป็น
+    // คนที่เท่าไหร่ในหน้าต่างนี้" ไม่ว่า request อื่นจะแทรกตอนไหน → ผ่านพอดี limit ตัวแรก
+    // เสมอ ไม่มากไม่น้อย โดยไม่ต้องพึ่ง Lua/MULTI (ซึ่งเสี่ยงกับ up-redis proxy ใน local)
+    //
+    // (ตั้งใจให้ request ที่ถูกปฏิเสธยังคงอยู่ในหน้าต่าง — ความพยายามที่ล้มเหลวควรนับรวม
+    //  สำหรับ path กัน brute-force)
+    const member = `${now}-${Math.random()}`;
+    await redis.zadd(key, { score: now, member });
     await redis.expire(key, windowSeconds);
 
-    const count = await redis.zcard(key);
+    const rank = await redis.zrank(key, member);
 
-    if (count > limit) {
+    // rank เป็น null ไม่ควรเกิด (เพิ่งเพิ่มเอง) — ถ้าเกิดให้ถือว่าเกิน ปลอดภัยกว่าปล่อยผ่าน
+    if (rank === null || rank >= limit) {
       // ZRANGE WITHSCORES คืน flat array [member, score, ...] — SDK ไม่แปลงเป็น object
       const oldestEntry = await redis.zrange<(string | number)[]>(key, 0, 0, {
         withScores: true,
@@ -77,7 +85,7 @@ export async function checkRateLimit(
 
     return {
       allowed: true,
-      remaining: limit - count,
+      remaining: limit - rank - 1,
       reset: windowSeconds,
     };
   } catch {
