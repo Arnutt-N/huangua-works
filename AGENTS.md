@@ -284,3 +284,22 @@ That third file exists specifically because a gate you have to remember to run i
 - IDs come from `generateId()` (`src/lib/id.ts`), not from the database.
 - Fiscal year and Thai date formatting go through `src/lib/thai-date.ts` — Thai fiscal years start in October.
 - E2E runs `fullyParallel: false, workers: 1` on purpose: specs share one real Postgres and Redis, so parallel runs collide on rate-limit and dedup state.
+
+---
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues on `Arnutt-N/huangua-works` via the `gh` CLI. External PRs are **not**
+a triage surface — `/triage` handles issues only. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Canonical vocabulary, unchanged — `needs-triage`, `needs-info`, `ready-for-agent`,
+`ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context — `CONTEXT.md` + `docs/adr/` at the repo root (neither exists yet;
+that's expected). See `docs/agents/domain.md`.
