@@ -16,8 +16,8 @@ export const metadata: Metadata = {
  * และกฎหมายที่เกี่ยวข้องอย่างสมบูรณ์
  */
 
-const POLICY_VERSION = '1.0';
-const POLICY_DATE = '20 กรกฎาคม 2569';
+const POLICY_VERSION = '1.1';
+const POLICY_DATE = '23 สิงหาคม 2569';
 
 export default function PrivacyPage() {
   return (
@@ -56,6 +56,7 @@ export default function PrivacyPage() {
                 <li>• <strong>เบอร์โทรศัพท์และอีเมล</strong> — สำหรับติดต่อกลับ (ใส่หรือไม่ใส่ก็ได้)</li>
                 <li>• <strong>ที่อยู่/สถานที่เกิดเหตุ</strong> — สำหรับดำเนินการเกี่ยวกับเรื่องที่แจ้ง</li>
                 <li>• <strong>รายละเอียดเรื่องร้องเรียก</strong> — สำหรับดำเนินการ</li>
+                <li>• <strong>ข้อมูลโปรไฟล์ LINE</strong> — ชื่อที่แสดง รูปโปรไฟล์ และรหัสผู้ใช้ LINE ในกรณีที่ท่านใช้ฟอร์มแจ้งเรื่อง/ติดตามผ่าน LINE (LIFF) เพื่อยืนยันตัวตนและแสดงรายการ &quot;เรื่องของฉัน&quot; ของท่าน</li>
                 <li>• <strong>ที่อยู่ IP และ User-Agent</strong> — สำหรับความปลอดภัยและป้องกันการละเมิด</li>
               </ul>
             </Section>
@@ -106,6 +107,7 @@ export default function PrivacyPage() {
               </p>
               <ul className="mt-3 space-y-2">
                 <li>• ใช้ระบบถอนความยินยอมออนไลน์ (ใช้รหัสติดตามงานและเลขบัตรประชาชน)</li>
+                <li>• กรณีแจ้งเรื่องผ่าน LINE (LIFF): ถอนได้จากบัญชี LINE ของท่านโดยไม่ต้องใช้เลขบัตรประชาชน</li>
                 <li>• ติดต่อเจ้าหน้าที่โดยตรงที่อบต.หัวงัว</li>
               </ul>
               <p className="mt-3">

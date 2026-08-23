@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description: 'เงื่อนไขและข้อตกลงในการใช้ระบบรับแจ้งเหตุออนไลน์ อบต.หัวงัว',
 };
 
-const TERMS_DATE = '20 กรกฎาคม 2569';
+const TERMS_DATE = '23 สิงหาคม 2569';
 
 /**
  * /terms — เงื่อนไขการใช้งาน
@@ -57,6 +57,7 @@ export default function TermsPage() {
               <ul className="mt-3 space-y-2">
                 <li>• แจ้งเหตุ/ร้องเรียกเกี่ยวกับบริการสาธารณูปโภค</li>
                 <li>• ติดตามสถานะเรื่องที่แจ้งผ่านรหัสติดตามงาน</li>
+                <li>• ใช้บริการผ่านแอป LINE (LIFF) ด้วยบัญชี LINE ของท่าน — การใช้ผ่าน LINE อยู่ภายใต้ข้อกำหนดของ LINE Corporation ประกอบด้วย</li>
                 <li>• ถอนความยินยอมในการเก็บข้อมูลได้</li>
               </ul>
               <p className="mt-3">ผู้ใช้ตกลงที่จะ:</p>

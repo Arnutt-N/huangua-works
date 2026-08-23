@@ -53,6 +53,23 @@ for (const spec of required) {
   }
 }
 
+// § LIFF (optional group) — เปิดใช้เมื่อมีค่าจริงอย่างน้อยหนึ่งตัวในชุด แล้วบังคับให้ครบทั้งชุด
+// กัน deploy ที่ config ครึ่งเดียว (เช่น มี LIFF ID แต่ไม่มี channel id → session route
+// verify ไม่ได้) — ไม่ตั้งค่าเลยทั้งชุด = ข้ามอย่างเงียบ (ระบบเดิมทำงานได้ปกติ)
+const liffVars = ['NEXT_PUBLIC_LIFF_ID', 'LINE_LOGIN_CHANNEL_ID'] as const;
+const liffSet = liffVars.filter((k) => {
+  const v = process.env[k];
+  return !!v && !v.startsWith('YOUR_') && !v.startsWith('CHANGE_ME');
+});
+if (liffSet.length > 0 && liffSet.length < liffVars.length) {
+  const missing = liffVars.filter((k) => !liffSet.includes(k));
+  for (const key of missing) {
+    errors.push(
+      `✗ ${key} — config LIFF ครึ่งเดียว (มี ${liffSet.join(', ')}) — ต้องครบทั้ง ${liffVars.join(' + ')} หรือไม่ตั้งค่าเลย`,
+    );
+  }
+}
+
 if (errors.length > 0) {
   console.error('\n[verify-env] BLOCKED — env ขาดหรือไม่ถูกต้อง:');
   for (const e of errors) console.error('  ' + e);

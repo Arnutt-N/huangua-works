@@ -150,11 +150,37 @@ export const submitCaseSchema = z.object({
 });
 
 /**
+ * POST /api/cases/submit แบบ LIFF — ใช้เมื่อ request มี liff session cookie
+ * (server เป็นคนเลือก schema จาก cookie ไม่ใช่ client)
+ *
+ * § cid ไม่บังคับ (D1) — ตัวตนผูกกับ LINE ที่ผ่านการ verify ID token แล้ว
+ * fullName optional เพราะบางบัญชี LINE ไม่มี displayName
+ */
+export const submitCaseLineSchema = submitCaseSchema
+  .omit({ cid: true })
+  .extend({ fullName: fullNameSchema.optional() });
+
+/**
  * POST /api/consent/withdraw — citizen withdraws PDPA consent
  */
 export const consentWithdrawSchema = z.object({
   trackingCode: trackingCodeSchema,
   cid: cidSchema,
+});
+
+/**
+ * POST /api/consent/withdraw แบบ LIFF — ยืนยันตัวด้วย liff session cookie แทน CID
+ * (ผู้ใช้ที่แจ้งผ่าน LIFF ไม่มี CID ในระบบ จึงถอนผ่านบัญชี LINE ที่ผูกกับเคส)
+ */
+export const consentWithdrawLineSchema = z.object({
+  trackingCode: trackingCodeSchema,
+});
+
+/**
+ * POST /api/liff/session — แลก LINE ID token (LIFF) เป็น session cookie
+ */
+export const liffSessionSchema = z.object({
+  idToken: z.string().min(6, 'idToken ไม่ถูกต้อง').max(4096, 'idToken ยาวเกินไป'),
 });
 
 /**

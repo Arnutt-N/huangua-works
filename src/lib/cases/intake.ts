@@ -12,6 +12,8 @@ import { getFiscalYear } from '../thai-date';
 
 export interface CaseIntakeInput {
   channel: 'web' | 'line';
+  /** 'liff' = มาจากฟอร์มใน LIFF (channel เป็น line แต่เป็นฟอร์มเว็บ ไม่ใช่บอท) */
+  origin?: 'liff';
   title: string;
   description: string;
   location?: string;
@@ -45,8 +47,17 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
     return { ok: false, error: 'หมวดหมู่ไม่ถูกต้อง', errorCode: 'invalid_category' };
   }
 
-  if (input.channel === 'web' && input.cid) {
-    const dupCheck = await checkDuplicate(input.cid, input.title, input.description);
+  // § dedup key: เว็บใช้ CID, ช่องทาง LINE ใช้ lineUserId (prefix 'line:' กันชนกับ
+  // เลข CID จริงใน HMAC payload) — ก่อนหน้านี้ช่องทาง LINE ไม่มี dedup เลย
+  // LIFF ทำให้แจ้งง่ายขึ้นจึงต้องกันซ้ำด้วย key เดียวกันทั้งบอทและ LIFF
+  const dedupKey =
+    input.channel === 'web' && input.cid
+      ? input.cid
+      : input.channel === 'line' && input.lineUserId
+        ? `line:${input.lineUserId}`
+        : null;
+  if (dedupKey) {
+    const dupCheck = await checkDuplicate(dedupKey, input.title, input.description);
     if (dupCheck.isDuplicate) {
       return { ok: false, error: 'คุณเคยแจ้งเรื่องนี้ไปแล้วภายใน 7 วัน', errorCode: 'duplicate', existingCaseId: dupCheck.caseId };
     }
@@ -57,14 +68,16 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
     return { ok: false, error: 'ไม่สามารถสร้างผู้ใช้งานได้', errorCode: 'internal' };
   }
 
-  if (input.channel === 'web') {
+  // § LIFF เป็นฟอร์มเว็บในหน้าต่าง LINE — consent เก็บเท่ากับทางเว็บ (ต่างจากบอท
+  // ซึ่งเก็บข้อมูลน้อยกว่าและไม่มี checkbox ความยินยอมในแชท)
+  if (input.channel === 'web' || input.origin === 'liff') {
     await grantConsent({
       userId: submitterId,
       consentType: 'data_collection',
       version: CONSENT_VERSION,
       ipAddress: input.ipAddress,
       userAgent: input.userAgent,
-      metadata: { via: 'intake_submit' },
+      metadata: { via: input.origin === 'liff' ? 'liff_submit' : 'intake_submit' },
     });
   }
 
@@ -110,14 +123,15 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
     metadata: JSON.stringify({
       fiscalYear,
       source: input.channel,
+      ...(input.origin === 'liff' ? { origin: 'liff' } : {}),
       ipAddress: input.ipAddress,
       userAgent: input.userAgent,
     }),
     trackingCode,
   });
 
-  if (input.channel === 'web' && input.cid) {
-    await recordDedupHash(input.cid, input.title, input.description, caseId);
+  if (dedupKey) {
+    await recordDedupHash(dedupKey, input.title, input.description, caseId);
   }
 
   await logAudit({
@@ -137,21 +151,49 @@ type Db = Awaited<ReturnType<typeof getDb>>;
 
 async function resolveSubmitter(db: Db, input: CaseIntakeInput): Promise<string | null> {
   if (input.channel === 'line') {
-    const linkedUser = input.lineUserId
-      ? await firstOrUndefined(
-          db.select({ linkedUserId: lineUsers.linkedUserId })
-            .from(lineUsers)
-            .where(eq(lineUsers.lineUserId, input.lineUserId))
-            .limit(1)
-        )
-      : undefined;
+    // § เดิม create user ใหม่ทุกครั้งแต่ไม่เขียน lineUsers.linkedUserId กลับ → แจ้งผ่านบอท
+    // ครั้งที่ 2 ของ LINE user เดิมชน unique(users.email) กับ placeholder เดิมแล้วกลายเป็น 500
+    // ตอนนี้ reuse row เดิมเสมอและเขียน link กลับ เพื่อให้ "เรื่องของฉัน" (LIFF) เห็น
+    // เคสที่แจ้งผ่านบอทด้วย
+    if (input.lineUserId) {
+      const lineRow = await firstOrUndefined(
+        db
+          .select({ id: lineUsers.id, linkedUserId: lineUsers.linkedUserId })
+          .from(lineUsers)
+          .where(eq(lineUsers.lineUserId, input.lineUserId))
+          .limit(1)
+      );
+      if (lineRow?.linkedUserId) return lineRow.linkedUserId;
 
-    if (linkedUser?.linkedUserId) return linkedUser.linkedUserId;
+      const email = `line-${input.lineUserId}@placeholder.local`;
+      const existingUser = await firstOrUndefined(
+        db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1)
+      );
+      const userId = existingUser?.id ?? generateId();
+      if (!existingUser) {
+        await db.insert(users).values({
+          id: userId,
+          email,
+          role: 'citizen',
+          isActive: true,
+          fullName: input.fullName || 'ผู้ใช้ LINE',
+          metadata: JSON.stringify({ source: 'line_intake' }),
+        });
+      }
+      if (lineRow) {
+        await db
+          .update(lineUsers)
+          .set({ linkedUserId: userId, updatedAt: new Date() })
+          .where(eq(lineUsers.id, lineRow.id));
+      }
+      return userId;
+    }
 
+    // ไม่มี lineUserId (ไม่ควรเกิดจาก flow จริง) — สร้างแบบไม่ผูก link เหมือนเดิม
     const userId = generateId();
     await db.insert(users).values({
       id: userId,
-      email: `line-${input.lineUserId || generateId()}@placeholder.local`,
+      email: `line-${generateId()}@placeholder.local`,
       role: 'citizen',
       isActive: true,
       fullName: input.fullName || 'ผู้ใช้ LINE',

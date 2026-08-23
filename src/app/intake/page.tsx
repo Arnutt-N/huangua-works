@@ -5,6 +5,7 @@ import { getDb } from '@/lib/db';
 import { getActiveCategories } from '@/lib/queries/lookups';
 import { Navbar } from '@/components/landing/Navbar';
 import { SiteFooter } from '../../components/site/site-footer';
+import { LiffProvider } from '@/components/liff/liff-provider';
 import { IntakeForm } from './intake-form';
 
 export const metadata: Metadata = { title: 'แจ้งเรื่องใหม่' };
@@ -42,7 +43,11 @@ export default async function IntakePage() {
             กรอกข้อมูลให้ครบ เจ้าหน้าที่จะรับเรื่องและติดตามให้ท่านทุกขั้นตอน
           </p>
 
-          <IntakeForm categories={categories} />
+          {/* LiffProvider — ครอบแค่หน้าที่เป็น LIFF endpoint ไม่ครอบ root layout
+              เพื่อไม่ให้หน้าอื่นแบก SDK script โดยไม่จำเป็น (ไม่มี LIFF ID = disabled) */}
+          <LiffProvider>
+            <IntakeForm categories={categories} />
+          </LiffProvider>
         </div>
       </main>
       <SiteFooter />
