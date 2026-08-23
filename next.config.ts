@@ -6,6 +6,8 @@ import type { NextConfig } from 'next';
  * Security headers (เพิ่มใน PR #4 — PDPA hardening):
  *  - CSP: default-src 'self' + img 'self' data: + style 'self' 'unsafe-inline'
  *    (Next.js ต้องการ 'unsafe-inline' สำหรับ inline styles ใน dev + styled runtime)
+ *    + ยกเว้นให้ LINE: script-src เพิ่ม static.line-scdn.net (LIFF SDK),
+ *    connect-src เพิ่ม api.line.me (การเรียกภายใน liff.init) — ดู § ใน headers()
  *  - HSTS: 2 ปี + includeSubDomains + preload (production เท่านั้น)
  *  - X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy
  *
@@ -26,16 +28,19 @@ const nextConfig: NextConfig = {
   // Headers ความปลอดภัย — PDPA + OWASP baseline
   async headers() {
     const scriptSrc = isProduction
-      ? "script-src 'self' 'unsafe-inline'"
-      : "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
+      ? "script-src 'self' 'unsafe-inline' https://static.line-scdn.net"
+      : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.line-scdn.net";
 
+    // § LIFF SDK โหลดจาก static.line-scdn.net และเรียก api.line.me ระหว่าง init —
+    // ถ้าไม่อนุญาตใน CSP ตัว provider จะติดสถานะ 'error' เงียบ ๆ แล้ว fallback เป็น
+    // ฟอร์มเว็บธรรมดา (พบตอนทดสอบ T0 — e2e mock ข้าม SDK จึงตรวจไม่จับกรณีนี้)
     const cspDirectives = [
       "default-src 'self'",
       scriptSrc,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self' data:",
-      "connect-src 'self'",
+      "connect-src 'self' https://api.line.me",
       "frame-ancestors 'none'",
       "form-action 'self'",
       "base-uri 'self'",

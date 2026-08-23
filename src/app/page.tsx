@@ -6,6 +6,7 @@ import { Services } from '@/components/landing/Services';
 import { HowItWorks } from '@/components/landing/HowItWorks';
 import { CTA } from '@/components/landing/CTA';
 import { Footer } from '@/components/landing/Footer';
+import { LiffStateRedirect } from '@/components/liff/liff-state-redirect';
 
 /**
  * หน้า landing (/) — cache ทุก 1 ชั่วโมง (ISR)
@@ -36,7 +37,10 @@ function StatsFallback() {
 
 export default function Home() {
   return (
+    // § LiffStateRedirect: จุดเข้า LIFF แบบมี path จะลงหน้าแรกพร้อม ?liff.state=…
+    // ต้องมีตัวรับแล้วพาไปหน้าจริง — ลบทิ้งไม่ได้ ไม่งั้นปุ่ม rich menu "ติดตาม" ติดค้างที่นี่
     <div className="flex min-h-screen flex-col bg-surface">
+      <LiffStateRedirect />
       <Navbar />
       <main className="flex-1">
         <Hero />
