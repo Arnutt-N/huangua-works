@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '../../components/ui/select';
 import { isValidCid, sanitizeCid } from '../../lib/cid-checksum';
+import { useLiff } from '../../components/liff/liff-provider';
 
 export interface IntakeCategory {
   id: string;
@@ -73,11 +74,15 @@ interface SubmitResult {
   message: string;
 }
 
-function validate(form: FormState): FieldErrors {
+function validate(form: FormState, skipIdentity: boolean): FieldErrors {
   const errors: FieldErrors = {};
 
-  if (!form.fullName.trim()) errors.fullName = 'กรุณากรอกชื่อ-นามสกุล';
-  if (!isValidCid(form.cid)) errors.cid = 'เลขบัตรประชาชนไม่ถูกต้อง (13 หลัก)';
+  // § LIFF mode (ยืนยันตัวผ่าน LINE แล้ว) — ไม่ต้องกรอก CID และชื่อตาม D1
+  // ชื่อจะ autofill จากโปรไฟล์ แต่บางบัญชีไม่มี displayName จึงไม่บังคับฝั่ง client
+  if (!skipIdentity) {
+    if (!form.fullName.trim()) errors.fullName = 'กรุณากรอกชื่อ-นามสกุล';
+    if (!isValidCid(form.cid)) errors.cid = 'เลขบัตรประชาชนไม่ถูกต้อง (13 หลัก)';
+  }
   if (!form.categoryId) errors.categoryId = 'กรุณาเลือกหมวดเรื่อง';
   if (!form.title.trim()) errors.title = 'กรุณากรอกหัวเรื่อง';
   if (!form.detail.trim()) errors.detail = 'กรุณากรอกรายละเอียด';
@@ -114,6 +119,21 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<SubmitResult | null>(null);
+
+  const liff = useLiff();
+  const liffMode = liff.authenticated;
+
+  // ชื่อจากโปรไฟล์ LINE — เติมครั้งเดียวเมื่อฟอร์มยังว่าง ไม่เขียนทับที่ผู้ใช้พิมพ์/ลบเอง
+  // (render-adjust pattern: setState ระหว่าง render ตอนค่าภายนอกเปลี่ยน ตาม
+  // https://react.dev/learn/you-might-not-need-an-effect — ไม่ใช้ effect เพราะ
+  // กฎ react-hooks/set-state-in-effect และไม่ต้อง render ซ้ำสอบ)
+  const [prevDisplayName, setPrevDisplayName] = useState<string | null>(null);
+  if (liff.displayName !== prevDisplayName) {
+    setPrevDisplayName(liff.displayName);
+    if (liffMode && liff.displayName && !form.fullName) {
+      setForm((prev) => ({ ...prev, fullName: liff.displayName! }));
+    }
+  }
 
   const [provinces, setProvinces] = useState<GeoOption[]>([]);
   const [districts, setDistricts] = useState<GeoOption[]>([]);
@@ -193,7 +213,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
     e.preventDefault();
     setSubmitError(null);
 
-    const errors = validate(form);
+    const errors = validate(form, liffMode);
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
@@ -203,8 +223,8 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          cid: sanitizeCid(form.cid),
-          fullName: form.fullName.trim(),
+          ...(liffMode ? {} : { cid: sanitizeCid(form.cid) }),
+          fullName: form.fullName.trim() || undefined,
           phoneNumber: form.phone.trim() || undefined,
           categoryId: form.categoryId,
           title: form.title.trim(),
@@ -290,6 +310,15 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
       {/* ข้อมูลผู้แจ้ง */}
       <SectionCard>
         <SectionHeading icon={User}>ข้อมูลผู้แจ้ง</SectionHeading>
+        {liffMode && (
+          <p
+            role="status"
+            data-testid="liff-auth-banner"
+            className="mt-4 rounded-xl border border-success/30 bg-success-soft px-4 py-3 text-sm font-semibold text-ink"
+          >
+            ยืนยันตัวตนผ่าน LINE เรียบร้อยแล้ว — ไม่ต้องกรอกเลขบัตรประชาชน
+          </p>
+        )}
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <div>
             <Label htmlFor="name">ชื่อ - นามสกุล</Label>
@@ -303,19 +332,21 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
             />
             <FieldError>{fieldErrors.fullName}</FieldError>
           </div>
-          <div>
-            <Label htmlFor="cid">เลขบัตรประชาชน 13 หลัก</Label>
-            <Input
-              id="cid"
-              name="cid"
-              inputMode="numeric"
-              placeholder="x-xxxx-xxxxx-xx-x"
-              invalid={!!fieldErrors.cid}
-              value={form.cid}
-              onChange={(e) => updateField('cid', e.target.value)}
-            />
-            {fieldErrors.cid && <FieldError>{fieldErrors.cid}</FieldError>}
-          </div>
+          {!liffMode && (
+            <div>
+              <Label htmlFor="cid">เลขบัตรประชาชน 13 หลัก</Label>
+              <Input
+                id="cid"
+                name="cid"
+                inputMode="numeric"
+                placeholder="x-xxxx-xxxxx-xx-x"
+                invalid={!!fieldErrors.cid}
+                value={form.cid}
+                onChange={(e) => updateField('cid', e.target.value)}
+              />
+              {fieldErrors.cid && <FieldError>{fieldErrors.cid}</FieldError>}
+            </div>
+          )}
         </div>
         <div className="mt-4">
           <Label htmlFor="phone">เบอร์โทรติดต่อ</Label>

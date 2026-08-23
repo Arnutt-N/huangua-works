@@ -15,13 +15,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { and, eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
-import { cases, users } from '@/lib/db/schema';
+import { cases, lineUsers, users } from '@/lib/db/schema';
 import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
 import { checkRateLimit } from '@/lib/upstash';
 import { normalizeTrackingCode } from '@/lib/case-tracking';
 import { generateCidHash } from '@/lib/cid-hmac';
 import { revokeConsent } from '@/lib/consent';
-import { consentWithdrawSchema, validateOrError } from '@/lib/validation';
+import { consentWithdrawSchema, consentWithdrawLineSchema, validateOrError } from '@/lib/validation';
+import { LIFF_SESSION_COOKIE, readLiffSessionValue } from '@/lib/liff/session';
 
 // § คำตอบเดียวสำหรับ "ไม่พบเคส" / "มีเคสแต่ CID ไม่ตรง" / "ไม่มี user row"
 // เดิมแยก 404 กับ 403 ทำให้บอกได้ว่า tracking code ไหนมีอยู่จริงโดยไม่ต้องรู้ CID
@@ -54,6 +55,70 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
+  const db = await getDb();
+
+  // § ทางถอนแบบ LIFF — ผู้ใช้ที่แจ้งผ่าน LIFF ไม่มี CID ในระบบ (D1) จึงยืนยันความ
+  // เป็นเจ้าของเคสด้วย liff session cookie แทน: เคสต้องถูกส่งโดย linkedUserId ของ
+  // LINE user คนนี้เท่านั้น
+  const liffSession = readLiffSessionValue(req.cookies.get(LIFF_SESSION_COOKIE)?.value);
+  if (liffSession) {
+    const validation = validateOrError(consentWithdrawLineSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+    const lineTrackingCode = normalizeTrackingCode(validation.data.trackingCode);
+    if (!lineTrackingCode) {
+      return NextResponse.json(WITHDRAW_DENIED, { status: 404 });
+    }
+
+    const lineCaseRow = await firstOrUndefined(
+      db.select({ id: cases.id, submittedBy: cases.submittedBy }).from(cases).where(eq(cases.trackingCode, lineTrackingCode)).limit(1),
+    );
+    if (!lineCaseRow) {
+      return NextResponse.json(WITHDRAW_DENIED, { status: 404 });
+    }
+
+    const owned = await firstOrUndefined(
+      db
+        .select({ id: lineUsers.id })
+        .from(lineUsers)
+        .where(and(eq(lineUsers.lineUserId, liffSession.lineUserId), eq(lineUsers.linkedUserId, lineCaseRow.submittedBy)))
+        .limit(1),
+    );
+    if (!owned) {
+      await logAudit({
+        action: AUDIT_ACTIONS.CONSENT_WITHDRAW_DENIED,
+        resource: 'consent',
+        resourceId: lineCaseRow.id,
+        ipAddress: ip,
+        userAgent: req.headers.get('user-agent') || undefined,
+        metadata: { reason: 'not_case_owner_line' },
+      });
+      return NextResponse.json(WITHDRAW_DENIED, { status: 404 });
+    }
+
+    await revokeConsent(lineCaseRow.submittedBy, 'data_collection', {
+      via: 'liff_withdraw',
+      caseId: lineCaseRow.id,
+      trackingCode: lineTrackingCode,
+    });
+
+    await logAudit({
+      userId: lineCaseRow.submittedBy,
+      action: AUDIT_ACTIONS.CONSENT_WITHDRAWN,
+      resource: 'consent',
+      resourceId: lineCaseRow.id,
+      ipAddress: ip,
+      userAgent: req.headers.get('user-agent') || undefined,
+      metadata: { trackingCode: lineTrackingCode, via: 'liff' },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: 'ถอนความยินยอมเรียบร้อย — ข้อมูลของคุณจะไม่สามารถเข้าถึงได้ผ่านระบบติดตามงาน',
+    });
+  }
+
   const validation = validateOrError(consentWithdrawSchema, body);
   if (!validation.success) {
     return NextResponse.json({ error: validation.error }, { status: 400 });
@@ -67,8 +132,6 @@ export async function POST(req: NextRequest) {
     // ไม่เปิดเผยว่า format ผิด — คืนคำตอบเดียวกับเคสไม่พบ
     return NextResponse.json(WITHDRAW_DENIED, { status: 404 });
   }
-
-  const db = await getDb();
 
   // § Lookup case by trackingCode
   const caseRow = await firstOrUndefined(

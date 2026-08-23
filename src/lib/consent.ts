@@ -13,8 +13,11 @@ export type ConsentType = 'data_collection' | 'data_sharing' | 'marketing';
 /**
  * เวอร์ชันนโยบาย PDPA ปัจจุบัน — ใช้ทุกที่ที่บันทึกความยินยอม
  * bump เมื่อมีการเปลี่ยนแปลงนโยบายที่ส่งผลต่อขอบเขตการเก็บ/ใช้ข้อมูล
+ *
+ * § 1.1 (2569-08-23): เพิ่มขอบเขตการเก็บข้อมูลโปรไฟล์ LINE ผ่าน LIFF
+ * (ชื่อที่แสดง, รูปโปรไฟล์, รหัสผู้ใช้ LINE) ดูรายละเอียดใน /privacy
  */
-export const CONSENT_VERSION = '1.0';
+export const CONSENT_VERSION = '1.1';
 
 export interface ConsentGrant {
   userId: string;
