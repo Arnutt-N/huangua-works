@@ -9,7 +9,8 @@ import { useEffect } from 'react';
  * ไม่ได้ mount LiffProvider ผู้ใช้เลยติดค้างที่ landing (พบตอนทดสอบ T0)
  *
  * องค์ประกอบนี้อ่าน liff.state แล้ว replace ไปหน้านั้นเอง โดยไม่โหลด LIFF SDK —
- * ผู้เยี่ยมปกติ (ไม่มี liff.state) จึงไม่มีค่าใช้จ่าย JS เพิ่มเติม
+ * ผู้เยี่ยมปกติ (ไม่มี liff.state) effect เป็น no-op ส่วนที่เพิ่มมีแค่ chunk เล็ก ๆ
+ * ขององค์ประกอบนี้ใน bundle หน้าแรก
  *
  * § รับเฉพาะ path ที่ขึ้นต้นด้วย `/` เดี่ยว และห้ามมี `\` — กัน //evil.com
  * (protocol-relative) และ /\evil.com (เบราว์เซอร์ตี backslash เป็น slash)

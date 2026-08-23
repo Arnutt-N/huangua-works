@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { render } from '@testing-library/react';
-import { beforeAll, beforeEach, expect, test, vi } from 'vitest';
+import { cleanup, render } from '@testing-library/react';
+import { afterEach, beforeAll, beforeEach, expect, test, vi } from 'vitest';
 import { LiffStateRedirect } from './liff-state-redirect';
 
 /**
@@ -28,6 +28,9 @@ beforeEach(() => {
   currentUrl = 'http://localhost/';
 });
 
+// § vitest.config ไม่ได้เปิด globals — auto-cleanup ของ RTL ไม่ทำงาน ต้องเรียกเอง
+afterEach(cleanup);
+
 test('ไม่มี liff.state → อยู่หน้าแรกตามปกติ ไม่ redirect', () => {
   render(<LiffStateRedirect />);
 
@@ -53,5 +56,18 @@ test('liff.state อันตราย (//, สัมบูรณ์, backslash)
     render(<LiffStateRedirect />);
   }
 
+  expect(replaceMock).not.toHaveBeenCalled();
+});
+
+test('liff.state รูปแบบขอบ: / เดี่ยว → origin เดิมได้, ค่าว่าง/%2F%2F/space นำหน้า → ไม่ redirect', () => {
+  currentUrl = 'http://localhost/?liff.state=' + encodeURIComponent('/');
+  render(<LiffStateRedirect />);
+  expect(replaceMock).toHaveBeenCalledWith('/');
+
+  replaceMock.mockClear();
+  for (const edge of ['', '%2F%2Fevil.com', encodeURIComponent(' /track')]) {
+    currentUrl = 'http://localhost/?liff.state=' + edge;
+    render(<LiffStateRedirect />);
+  }
   expect(replaceMock).not.toHaveBeenCalled();
 });
