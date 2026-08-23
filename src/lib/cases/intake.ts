@@ -137,21 +137,49 @@ type Db = Awaited<ReturnType<typeof getDb>>;
 
 async function resolveSubmitter(db: Db, input: CaseIntakeInput): Promise<string | null> {
   if (input.channel === 'line') {
-    const linkedUser = input.lineUserId
-      ? await firstOrUndefined(
-          db.select({ linkedUserId: lineUsers.linkedUserId })
-            .from(lineUsers)
-            .where(eq(lineUsers.lineUserId, input.lineUserId))
-            .limit(1)
-        )
-      : undefined;
+    // § เดิม create user ใหม่ทุกครั้งแต่ไม่เขียน lineUsers.linkedUserId กลับ → แจ้งผ่านบอท
+    // ครั้งที่ 2 ของ LINE user เดิมชน unique(users.email) กับ placeholder เดิมแล้วกลายเป็น 500
+    // ตอนนี้ reuse row เดิมเสมอและเขียน link กลับ เพื่อให้ "เรื่องของฉัน" (LIFF) เห็น
+    // เคสที่แจ้งผ่านบอทด้วย
+    if (input.lineUserId) {
+      const lineRow = await firstOrUndefined(
+        db
+          .select({ id: lineUsers.id, linkedUserId: lineUsers.linkedUserId })
+          .from(lineUsers)
+          .where(eq(lineUsers.lineUserId, input.lineUserId))
+          .limit(1)
+      );
+      if (lineRow?.linkedUserId) return lineRow.linkedUserId;
 
-    if (linkedUser?.linkedUserId) return linkedUser.linkedUserId;
+      const email = `line-${input.lineUserId}@placeholder.local`;
+      const existingUser = await firstOrUndefined(
+        db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1)
+      );
+      const userId = existingUser?.id ?? generateId();
+      if (!existingUser) {
+        await db.insert(users).values({
+          id: userId,
+          email,
+          role: 'citizen',
+          isActive: true,
+          fullName: input.fullName || 'ผู้ใช้ LINE',
+          metadata: JSON.stringify({ source: 'line_intake' }),
+        });
+      }
+      if (lineRow) {
+        await db
+          .update(lineUsers)
+          .set({ linkedUserId: userId, updatedAt: new Date() })
+          .where(eq(lineUsers.id, lineRow.id));
+      }
+      return userId;
+    }
 
+    // ไม่มี lineUserId (ไม่ควรเกิดจาก flow จริง) — สร้างแบบไม่ผูก link เหมือนเดิม
     const userId = generateId();
     await db.insert(users).values({
       id: userId,
-      email: `line-${input.lineUserId || generateId()}@placeholder.local`,
+      email: `line-${generateId()}@placeholder.local`,
       role: 'citizen',
       isActive: true,
       fullName: input.fullName || 'ผู้ใช้ LINE',

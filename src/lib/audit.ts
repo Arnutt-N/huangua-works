@@ -13,6 +13,7 @@ export const AUDIT_ACTIONS = {
   LOGIN_SUCCESS: 'login_success',
   LOGIN_FAILURE: 'login_failure',
   LOGOUT: 'logout',
+  LIFF_LOGIN: 'liff_login',
   SUBMIT_CASE: 'submit_case',
   VIEW_CASE: 'view_case',
   UPDATE_CASE_STATUS: 'update_case_status',

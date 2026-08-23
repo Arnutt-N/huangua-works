@@ -158,6 +158,13 @@ export const consentWithdrawSchema = z.object({
 });
 
 /**
+ * POST /api/liff/session — แลก LINE ID token (LIFF) เป็น session cookie
+ */
+export const liffSessionSchema = z.object({
+  idToken: z.string().min(6, 'idToken ไม่ถูกต้อง').max(4096, 'idToken ยาวเกินไป'),
+});
+
+/**
  * PATCH /api/line/admin/conversations/[id] — เจ้าหน้าที่เปลี่ยนโหมด/ผูกเรื่องแจ้ง/
  * โอนแชท (assignedAdminId) / บันทึกโน้ตภายใน (adminNote)
  * linkedCaseId = null คือถอดการผูกออก, adminNote = null คือลบโน้ต
