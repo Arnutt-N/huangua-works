@@ -4,8 +4,9 @@ import { liffUrl } from '@/lib/liff/config';
 
 /**
  * § เมื่อตั้ง NEXT_PUBLIC_LIFF_ID แล้ว ปุ่ม "แจ้งเรื่อง"/"ติดตาม" เปลี่ยนจากส่งข้อความ
- * หาบอทเป็นเปิดฟอร์ม LIFF โดยตรง (path ที่ต่อท้าย liff.line.me/<id> จะไปต่อที่
- * Endpoint URL ของ LIFF app) — ยังไม่ตั้ง = ใช้พฤติกรรมเดิม (ส่งข้อความหาบอท)
+ * หาบอทเป็นเปิดฟอร์ม LIFF โดยตรง (path ที่ต่อท้าย liff.line.me/<id> จะถูกนำไปต่อท้าย
+ * path ของ Endpoint URL ไม่ใช่แทนที่ — Endpoint ต้องตั้งเป็น root โดเมน ดู § ใน
+ * lib/liff/config.ts) — ยังไม่ตั้ง = ใช้พฤติกรรมเดิม (ส่งข้อความหาบอท)
  *
  * ⚠️ เมนูที่อัปโหลดไป LINE แล้วไม่เปลี่ยนเอง — หลังใส่ env ต้องรัน
  * `npx tsx scripts/upload-rich-menu.ts` (หรือ sync ผ่าน /admin/chatbot/rich-menus) ใหม่
