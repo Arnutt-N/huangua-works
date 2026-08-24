@@ -14,8 +14,13 @@ export function getLiffId(): string | null {
 }
 
 /**
- * URL เปิด LIFF — path segment ที่ต่อท้ายจะถูกนำไปต่อท้าย Endpoint URL ของ LIFF app
- * (เช่น liffUrl('/track') → เปิด /track ใน LIFF เดียวกัน ไม่ต้องสร้าง LIFF app แยก)
+ * URL เปิด LIFF — path segment ที่ต่อท้ายจะถูกนำไป "ต่อท้าย" path ของ Endpoint URL
+ * (ไม่ใช่แทนที่) — เช่น liffUrl('/track') → เปิด /track ใน LIFF เดียวกัน ไม่ต้องสร้าง
+ * LIFF app แยก
+ *
+ * § ผลที่ตามมา: Endpoint URL ใน LINE Developers Console ต้องตั้งเป็น root
+ * `https://huangua-works.vercel.app` เท่านั้น — ถ้าตั้งเป็น /intake ปุ่ม "ติดตาม"
+ * (liff.line.me/<id>/track) จะเปิด /intake/track ซึ่ง 404
  *
  * คืน null เมื่อยังไม่ได้ตั้ง LIFF ID — caller ต้องมี fallback เสมอ
  */

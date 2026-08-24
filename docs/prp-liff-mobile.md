@@ -27,7 +27,7 @@
 
 LINE Developers Console → provider **เดียวกับ** Messaging API channel ปัจจุบัน:
 1. สร้าง **LINE Login channel** → จด Channel ID
-2. สร้าง LIFF app: Size **Full** (D3), Scope `openid` + `profile`, Endpoint URL `https://huangua-works.vercel.app/intake`
+2. สร้าง LIFF app: Size **Full** (D3), Scope `openid` + `profile`, Endpoint URL `https://huangua-works.vercel.app` (**root ของโดเมน** — path ที่ต่อท้าย `liff.line.me/<id>` จะถูกนำไปต่อท้าย path ของ Endpoint URL ตาม spec ของ LINE; ถ้าตั้งเป็น `/intake` ปุ่ม "ติดตาม" (`<id>/track`) จะเปิด `/intake/track` = 404)
 3. (D4) LIFF app ที่สอง: Endpoint `https://huangua-works-staging...` หรือ preview URL ถาวรของ staging
 4. ผลลัพธ์ที่ต้องได้: ค่า `LIFF_ID` (prod) + `LIFF_ID_STAGING` + `LINE_LOGIN_CHANNEL_ID`
 
