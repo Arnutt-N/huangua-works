@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { ShieldCheck, FileText, Mail, Phone, UserCog, Database, Eye, Ban, RefreshCw } from 'lucide-react';
 import { Navbar } from '@/components/landing/Navbar';
 import { Footer } from '@/components/landing/Footer';
+import { COPY } from '@/lib/copy';
 
 export const metadata: Metadata = {
   title: 'นโยบายความเป็นส่วนตัว',
@@ -34,7 +35,7 @@ export default function PrivacyPage() {
               นโยบายความเป็นส่วนตัว
             </h1>
             <p className="mt-3 text-muted">
-              องค์การบริหารส่วนตำบลหัวงัว ให้ความสำคัญกับการคุ้มครองข้อมูลส่วนบุคคล
+              {COPY.ORG_FULL} ให้ความสำคัญกับการคุ้มครองข้อมูลส่วนบุคคล
               ตามกฎหมายว่าด้วยการคุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562
             </p>
           </header>
@@ -56,7 +57,7 @@ export default function PrivacyPage() {
                 <li>• <strong>เบอร์โทรศัพท์และอีเมล</strong> — สำหรับติดต่อกลับ (ใส่หรือไม่ใส่ก็ได้)</li>
                 <li>• <strong>ที่อยู่/สถานที่เกิดเหตุ</strong> — สำหรับดำเนินการเกี่ยวกับเรื่องที่แจ้ง</li>
                 <li>• <strong>รายละเอียดเรื่องร้องเรียก</strong> — สำหรับดำเนินการ</li>
-                <li>• <strong>ข้อมูลโปรไฟล์ LINE</strong> — ชื่อที่แสดง รูปโปรไฟล์ และรหัสผู้ใช้ LINE ในกรณีที่ท่านใช้ฟอร์มแจ้งเรื่อง/ติดตามผ่าน LINE (LIFF) เพื่อยืนยันตัวตนและแสดงรายการ &quot;เรื่องของฉัน&quot; ของท่าน</li>
+                <li>• <strong>ข้อมูลโปรไฟล์ LINE</strong> — ชื่อที่แสดง รูปโปรไฟล์ และรหัสผู้ใช้ LINE ในกรณีที่ท่านใช้ฟอร์มแจ้งเรื่อง/ติดตามผ่าน LINE (LIFF) เพื่อยืนยันตัวตนและแสดงรายการ &quot;{COPY.MY_CASES}&quot; ของท่าน</li>
                 <li>• <strong>ที่อยู่ IP และ User-Agent</strong> — สำหรับความปลอดภัยและป้องกันการละเมิด</li>
               </ul>
             </Section>
@@ -64,7 +65,7 @@ export default function PrivacyPage() {
             <Section icon={<Eye className="h-5 w-5" />} title="2. วัตถุประสงค์การเก็บข้อมูล">
               <p>ข้อมูลส่วนบุคคลที่เก็บรวบรวมใช้เพื่อ:</p>
               <ul className="mt-3 space-y-2">
-                <li>• รับและดำเนินการเรื่องแจ้งเรื่องใหม่/ร้องเรียก</li>
+                <li>• รับและดำเนินการเรื่อง{COPY.INTAKE_LABEL}/ร้องเรียก</li>
                 <li>• ติดตามสถานะและแจ้งผลการดำเนินการให้ประชาชน</li>
                 <li>• ป้องกันการแจ้งเรื่องซ้ำซ้อนในช่วง 7 วัน</li>
                 <li>• รวบรวมสถิติเพื่อประเมินประสิทธิภาพการให้บริการ</li>
@@ -85,7 +86,7 @@ export default function PrivacyPage() {
                 <li>• การเข้าถึงส่วนเจ้าหน้าที่ต้องผ่านการยืนยันตัวตน</li>
               </ul>
               <p className="mt-3">
-                ระยะเวลาเก็บรักษา: ข้อมูลเรื่องแจ้งเรื่องใหม่เก็บไว้ตามระยะเวลาที่กฎหมายกำหนด
+                ระยะเวลาเก็บรักษา: ข้อมูลเรื่อง{COPY.INTAKE_LABEL}เก็บไว้ตามระยะเวลาที่กฎหมายกำหนด
                 หรือตามความจำเป็นในการดำเนินการ
               </p>
             </Section>
@@ -106,7 +107,7 @@ export default function PrivacyPage() {
                 ประชาชนสามารถถอนความยินยอมในการเก็บข้อมูลได้โดย:
               </p>
               <ul className="mt-3 space-y-2">
-                <li>• ใช้ระบบถอนความยินยอมออนไลน์ (ใช้เลขติดตามและเลขบัตรประชาชน)</li>
+                <li>• ใช้ระบบถอนความยินยอมออนไลน์ (ใช้{COPY.TRACKING_CODE}และเลขบัตรประชาชน)</li>
                 <li>• กรณีแจ้งเรื่องผ่าน LINE (LIFF): ถอนได้จากบัญชี LINE ของท่านโดยไม่ต้องใช้เลขบัตรประชาชน</li>
                 <li>• ติดต่อเจ้าหน้าที่โดยตรงที่อบต.หัวงัว</li>
               </ul>
@@ -134,13 +135,13 @@ export default function PrivacyPage() {
               <div className="mt-4 rounded-md border border-border bg-surface-raised p-5">
                 <p className="font-semibold text-ink">เจ้าหน้าที่คุ้มครองข้อมูลส่วนบุคคล (DPO)</p>
                 <p className="mt-2 text-sm text-muted">
-                  องค์การบริหารส่วนตำบลหัวงัว<br />
+                  {COPY.ORG_FULL}<br />
                   อำเภอยางตลาด จังหวัดกาฬสินธุ์ 46120
                 </p>
                 <div className="mt-3 space-y-1 text-sm">
                   <p className="flex items-center gap-2">
                     <Phone className="h-4 w-4 text-accent" aria-hidden="true" />
-                    <span>043-601-494</span>
+                    <span>{COPY.ORG_PHONE}</span>
                   </p>
                   <p className="flex items-center gap-2">
                     <Mail className="h-4 w-4 text-accent" aria-hidden="true" />

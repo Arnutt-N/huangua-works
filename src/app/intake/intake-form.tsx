@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '../../components/ui/select';
 import { isValidCid, sanitizeCid, formatCid } from '../../lib/cid-checksum';
+import { COPY } from '../../lib/copy';
 import { useLiff } from '../../components/liff/liff-provider';
 
 export interface IntakeCategory {
@@ -266,7 +267,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
         </span>
         <h2 className="mt-5 text-2xl font-bold text-ink">รับเรื่องเรียบร้อย</h2>
         <p className="mt-2 text-muted">{result.message}</p>
-        <p className="mt-5 text-sm font-semibold text-ink">เลขติดตามเรื่องของท่าน</p>
+        <p className="mt-5 text-sm font-semibold text-ink">{COPY.TRACKING_CODE}เรื่องของท่าน</p>
         <p
           data-testid="tracking-code"
           data-case-id={result.caseId}
@@ -288,7 +289,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
             href="/"
             className="inline-flex min-h-touch items-center justify-center gap-2 rounded-xl border-2 border-border-strong px-7 font-semibold text-accent-strong hover:bg-accent-sunken"
           >
-            กลับหน้าหลัก
+            {COPY.BACK_HOME}
           </Link>
         </div>
       </div>

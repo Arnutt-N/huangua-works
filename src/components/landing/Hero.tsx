@@ -16,6 +16,7 @@ import {
 import Link from 'next/link';
 import { Button } from '../ui/button';
 import { cn } from '@/lib/cn';
+import { COPY } from '@/lib/copy';
 
 const serviceChips = [
   { label: 'ไฟฟ้าสาธารณะ', icon: Zap },
@@ -83,7 +84,7 @@ export function Hero() {
               transition={{ delay: reduce ? 0 : 0.4, duration: reduce ? 0 : 0.6 }}
               className="text-accent mt-3 text-base font-semibold lg:text-lg"
             >
-              กองช่าง องค์การบริหารส่วนตำบลหัวงัว
+              กองช่าง {COPY.ORG_FULL}
             </motion.p>
 
             <motion.p
@@ -92,7 +93,7 @@ export function Hero() {
               transition={{ delay: reduce ? 0 : 0.5, duration: reduce ? 0 : 0.6 }}
               className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted lg:mx-0 lg:text-lg"
             >
-              ระบบรับแจ้งเรื่องและติดตามเรื่องบริการสาธารณูปโภคออนไลน์
+              {COPY.ORG_SYSTEM_DESC}
               ประชาชนสามารถติดตามสถานะการดำเนินงานได้แบบเรียลไทม์
               เพื่อการบริการที่รวดเร็ว โปร่งใส และมีประสิทธิภาพ
             </motion.p>
@@ -135,7 +136,7 @@ export function Hero() {
               >
                 <Link href="/intake">
                   <Bell className="mr-2 h-5 w-5" />
-                  แจ้งเรื่องใหม่
+                  {COPY.INTAKE_LABEL}
                 </Link>
               </Button>
               <Button
@@ -146,7 +147,7 @@ export function Hero() {
               >
                 <Link href="/track">
                   <Search className="mr-2 h-5 w-5" />
-                  ติดตามเรื่อง
+                  {COPY.TRACK_LABEL}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>

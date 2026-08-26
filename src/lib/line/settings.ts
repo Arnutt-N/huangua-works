@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { getDb } from '../db';
 import { chatSettings } from '../db/schema';
 import { generateId } from '../id';
+import { COPY } from '@/lib/copy';
 
 export interface ChatSettingsDefaults {
   welcome_message: string;
@@ -15,7 +16,7 @@ const DEFAULTS: ChatSettingsDefaults = {
   // § ข้อความนี้เป็นเพียง fallback — ถ้า prod เคยบันทึก welcome_message ไว้ใน
   // chatSettings แล้ว ค่าใน DB จะ override ตลอด ต้องอัปเดตผ่านหน้า admin ด้วย
   welcome_message:
-    'สวัสดีครับ/ค่ะ ยินดีต้อนรับสู่ อบต.หัวงัว 🏛️\n\nเลือกเมนูด้านล่างหรือพิมพ์:\n• แจ้งเรื่องใหม่ — แจ้งเรื่อง (เปิดฟอร์มกรอกใน LINE ได้เลย)\n• ติดตามเรื่อง — ติดตามสถานะเรื่อง\n• ติดต่อเจ้าหน้าที่ — พูดคุยกับเจ้าหน้าที่',
+    `สวัสดีครับ/ค่ะ ยินดีต้อนรับสู่ ${COPY.ORG_SHORT} 🏛️\n\nเลือกเมนูด้านล่างหรือพิมพ์:\n• ${COPY.INTAKE_LABEL} — แจ้งเรื่อง (เปิดฟอร์มกรอกใน LINE ได้เลย)\n• ${COPY.TRACK_LABEL} — ติดตามสถานะเรื่อง\n• ติดต่อเจ้าหน้าที่ — พูดคุยกับเจ้าหน้าที่`,
   handoff_keywords: [
     'ติดต่อเจ้าหน้าที่',
     'เจ้าหน้าที่',
