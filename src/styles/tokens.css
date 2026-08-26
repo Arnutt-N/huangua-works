@@ -495,3 +495,21 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------- LIFF bootstrap pre-paint (§ ดู liff-state-redirect.tsx) ----------
+ * inline script ที่หน้าแรกตั้ง html[data-liff-boot] ทันทีที่เจอ ?liff.state=
+ * ก่อนเบราว์เซอร์ paint — กฎนี้ซ่อน landing ไม่ให้ "กระพริบ" ระหว่างรอ
+ * liff.init() แล้ว React overlay ของ LiffStateRedirect (visibility:visible)
+ * จะโชว์ตัวต่อบนพื้นเดียวกัน
+ *
+ * visibility ไม่ใช่ display เพราะลูกที่ประกาศ visible กลับมาได้ (inherit) —
+ * overlay ที่อยู่ใน body จึงมองเห็นได้แม้ body ถูกซ่อน
+ * ผู้เยี่ยมปกติไม่มี attribute นี้ = กติกาไม่ทำงานเลย
+ */
+html[data-liff-boot] {
+  background: var(--color-surface);
+}
+html[data-liff-boot] body {
+  visibility: hidden;
+}
+
