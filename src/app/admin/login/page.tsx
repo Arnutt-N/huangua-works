@@ -43,7 +43,7 @@ export default async function AdminLoginPage({
           <div className="glass-panel mt-6 rounded-xl p-6 shadow-lg sm:p-8">
             <h1 className="text-2xl font-bold text-ink">เข้าระบบเจ้าหน้าที่</h1>
             <p className="mt-2 text-sm text-muted">
-              สำหรับเจ้าหน้าที่ อบต.หัวงัว เข้าดูคิวและดำเนินเรื่องแจ้งเหตุ
+              สำหรับเจ้าหน้าที่ อบต.หัวงัว เข้าดูคิวและดำเนินเรื่องแจ้งเรื่องใหม่
             </p>
 
             {reset === 'ok' && (

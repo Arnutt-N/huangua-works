@@ -64,7 +64,7 @@ describe('getFaqReply', () => {
 
   it('mentions contact phone placeholder', () => {
     const text = (getFaqReply() as { text: string }).text;
-    expect(text).toContain('043-xxx-xxx');
+    expect(text).toContain('043-601-494');
   });
 
   it('lists the main service keywords', () => {

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('../settings', () => ({
   getChatSetting: vi.fn(async (key: string) => {
     if (key === 'welcome_message') {
-      return 'สวัสดีครับ ยินดีต้อนรับสู่ อบต.หัวงัว 🏛️\n\nเลือกบริการที่ต้องการ:\n\n📢 แจ้งเรื่อง — พิมพ์ "แจ้งเรื่อง"\n🔍 ติดตามสถานะ — พิมพ์ "ติดตาม HNxxxxxxxxx"\n❓ คำถามที่พบบ่อย — พิมพ์คำถามได้เลย\n🙋 ติดต่อเจ้าหน้าที่ — พิมพ์ "ติดต่อเจ้าหน้าที่"';
+      return 'สวัสดีครับ ยินดีต้อนรับสู่ อบต.หัวงัว 🏛️\n\nเลือกบริการที่ต้องการ:\n\n📢 แจ้งเรื่อง — พิมพ์ "แจ้งเรื่อง"\n🔍 ติดตามสถานะ — พิมพ์ "ติดตาม HGxxxxxxxxx"\n❓ คำถามที่พบบ่อย — พิมพ์คำถามได้เลย\n🙋 ติดต่อเจ้าหน้าที่ — พิมพ์ "ติดต่อเจ้าหน้าที่"';
     }
     return null;
   }),
@@ -36,9 +36,9 @@ describe('getWelcomeMessages', () => {
     expect(text).toContain('ติดต่อเจ้าหน้าที่');
   });
 
-  it('mentions tracking code format (HN prefix)', async () => {
+  it('mentions tracking code format (HG prefix)', async () => {
     const first = (await getWelcomeMessages())[0];
     const text = (first as { text: string }).text;
-    expect(text).toMatch(/HNx+/);
+    expect(text).toMatch(/HGx+/);
   });
 });

@@ -73,7 +73,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     label: 'งานหลัก',
     items: [
       { key: 'dashboard', label: 'แดชบอร์ด', href: '/admin', icon: BarChart3 },
-      { key: 'reports', label: 'จัดการคำร้อง / แจ้งเหตุ', href: '/admin/reports', icon: ClipboardList },
+      { key: 'reports', label: 'จัดการเรื่อง', href: '/admin/reports', icon: ClipboardList },
     ],
   },
   {

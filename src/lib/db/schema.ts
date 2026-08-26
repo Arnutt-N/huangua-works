@@ -243,7 +243,7 @@ export const villages = pgTable(
 );
 
 // ────────────────────────────────────────────────────────────────────────────
-// § Cases (เรื่องแจ้งเหตุ — state machine: pending→received→reviewing→assigned→in_progress→done→closed/rejected)
+// § Cases (เรื่องที่แจ้ง — state machine: pending→received→reviewing→assigned→in_progress→done→closed/rejected)
 // ────────────────────────────────────────────────────────────────────────────
 
 export const cases = pgTable(

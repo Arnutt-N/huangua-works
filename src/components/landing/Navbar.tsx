@@ -10,8 +10,8 @@ import { BrandMark } from '../site/brand-mark';
  * Navbar หลักของหน้า landing (/)
  *
  * ลิงก์ทั้งหมดชี้ไป route จริง (ไม่ใช่ anchor #tracking ที่ไม่มีอยู่):
- *  - ปุ่ม "แจ้งเหตุ" / "แจ้งเหตุออนไลน์"  → /intake
- *  - ปุ่ม "ติดตามงาน"                    → /track
+ *  - ปุ่ม "แจ้งเรื่องใหม่"  → /intake
+ *  - ปุ่ม "ติดตามเรื่อง"     → /track
  *
  * Anchor (#home/#services/#how-it-works) ยังใช้ต่อเพราะมี section id จริงในหน้า landing
  * (ดู page.tsx — Hero มี id="home", Services มี id="services", HowItWorks มี id="how-it-works")
@@ -62,7 +62,7 @@ export function Navbar() {
               href="/track"
               className="text-sm font-medium transition-colors hover:text-accent"
             >
-              ติดตามงาน
+              ติดตามเรื่อง
             </Link>
           </div>
 
@@ -81,7 +81,7 @@ export function Navbar() {
               {/* Button base มี gap-2 อยู่แล้ว — mr-2 เดิมทำให้ไอคอนเยื้องตอนซ่อนข้อความบนมือถือ */}
               <Link href="/intake">
                 <Bell className="h-4 w-4" />
-                <span className="hidden whitespace-nowrap sm:inline">แจ้งเหตุ</span>
+                <span className="hidden whitespace-nowrap sm:inline">แจ้งเรื่องใหม่</span>
               </Link>
             </Button>
 
@@ -113,10 +113,10 @@ export function Navbar() {
               เข้าสู่ระบบ
             </MobileLink>
             <MobileLink href="/intake" onClick={() => setMobileOpen(false)} icon={<Bell className="h-4 w-4" />}>
-              แจ้งเหตุออนไลน์
+              แจ้งเรื่องใหม่
             </MobileLink>
             <MobileLink href="/track" onClick={() => setMobileOpen(false)} icon={<Search className="h-4 w-4" />}>
-              ติดตามงาน
+              ติดตามเรื่อง
             </MobileLink>
             <MobileLink href="/#services" onClick={() => setMobileOpen(false)}>
               บริการของเรา

@@ -110,7 +110,7 @@ export function TrackForm({ initialId }: { initialId?: string }) {
           <Label htmlFor="trackId">เลขติดตามเรื่อง</Label>
           <Input
             id="trackId"
-            placeholder="เช่น HN483729156"
+            placeholder="เช่น HG483729156"
             invalid={!!error}
             value={trackId}
             onChange={(e) => setTrackId(e.target.value)}

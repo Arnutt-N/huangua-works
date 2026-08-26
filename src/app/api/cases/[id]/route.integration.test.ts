@@ -129,7 +129,7 @@ describe('GET /api/cases/[id] (lookup via trackingCode)', () => {
     expect(res.status).toBe(404);
   });
 
-  test('returns 404 for malformed input (not HN + 9 digits)', async () => {
+  test('returns 404 for malformed input (not HN|HG + 9 digits)', async () => {
     // UUID รูปแบบเก่า — ต้อง 404 ไม่ใช่ lookup ด้วย PK
     const res = await GET(buildRequest('019f5c00-932f-776b-9203-ac13c48c2937'), {
       params: Promise.resolve({ id: '019f5c00-932f-776b-9203-ac13c48c2937' }),

@@ -72,7 +72,7 @@ export function Services() {
             <span className="gradient-text">บริการของเรา</span>
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-base text-muted lg:text-lg">
-            แจ้งเหตุได้ทุกประเภท ทีมงานพร้อมดำเนินการตรวจสอบและแก้ไขอย่างรวดเร็ว
+            แจ้งเรื่องใหม่ได้ทุกประเภท ทีมงานพร้อมดำเนินการตรวจสอบและแก้ไขอย่างรวดเร็ว
           </p>
         </motion.div>
 

@@ -1,5 +1,5 @@
 /**
- * GET /api/cases/[id] — ดูสถานะเรื่องแจ้งเหตุ (สำหรับ citizen track)
+ * GET /api/cases/[id] — ดูสถานะเรื่องที่แจ้ง (สำหรับ citizen track)
  *
  * [id] ตอนนี้คือ **trackingCode** (HN + 9 หลัก) ไม่ใช่ UUID PK
  * เพื่อไม่เปิดเผย UUID v7 ที่ timestamp-ordered และเดาได้

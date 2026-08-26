@@ -14,7 +14,7 @@ import { TrackForm } from './track-form';
 export const metadata: Metadata = { title: 'ติดตามเรื่อง' };
 
 /**
- * /track — ค้นหาและดูสถานะเรื่องด้วยเลขติดตาม (HN + 9 หลัก)
+ * /track — ค้นหาและดูสถานะเรื่องด้วยเลขติดตาม (HG + 9 หลัก)
  * [id] ของ GET /api/cases/[id] ตอนนี้คือ trackingCode (คล้าย EMS ไปรษณีย์ไทย)
  * ไม่ใช้ UUID PK เพราะ timestamp-ordered และเดาได้
  *

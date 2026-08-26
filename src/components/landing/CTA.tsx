@@ -21,7 +21,7 @@ export function CTA() {
             <span className="gradient-text">พร้อมเริ่มใช้งานแล้วหรือยัง?</span>
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-base text-muted lg:text-lg">
-            แจ้งเหตุได้ทันที ติดตามสถานะแบบเรียลไทม์
+            แจ้งเรื่องใหม่ได้ทันที ติดตามสถานะแบบเรียลไทม์
             ทีมงานพร้อมให้บริการตลอด 24 ชั่วโมง
           </p>
 
@@ -33,7 +33,7 @@ export function CTA() {
             >
               <Link href="/intake">
                 <Bell className="mr-2 h-5 w-5" />
-                เริ่มแจ้งเหตุเลย
+                เริ่มแจ้งเรื่องใหม่เลย
               </Link>
             </Button>
             <Button

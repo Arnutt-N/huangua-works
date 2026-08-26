@@ -56,7 +56,7 @@ export default async function MasterDataPage() {
     <AdminShell user={staffUser} active="master-data" title="หน่วยงาน / หมวดหมู่">
       <div className="space-y-6">
         <p className="text-sm text-muted">
-          ข้อมูลหลักที่ใช้ทั้งระบบ — หมวดหมู่แสดงในฟอร์มแจ้งเหตุของประชาชน
+          ข้อมูลหลักที่ใช้ทั้งระบบ — หมวดหมู่แสดงในฟอร์มแจ้งเรื่องใหม่ของประชาชน
           ส่วนหน่วยงานใช้มอบหมายผู้รับผิดชอบ ปิดใช้งานแทนการลบเพื่อให้เรื่องเก่ายังอ่านได้
         </p>
 

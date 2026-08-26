@@ -147,12 +147,12 @@ describe('routeBotMessage — existing behavior (TDD safety net)', () => {
       const event = makeEvent('ติดตาม');
       const replies = await routeBotMessage(mockDb, event, 'ติดตาม', 'user-pk', 'conv-1');
       expect(replies).toHaveLength(1);
-      expect((replies[0] as { text: string }).text).toContain('HN');
+      expect((replies[0] as { text: string }).text).toContain('HG');
     });
 
     it('returns not-found for unknown tracking code', async () => {
-      const event = makeEvent('ติดตาม HN000000000');
-      const replies = await routeBotMessage(mockDb, event, 'ติดตาม HN000000000', 'user-pk', 'conv-1');
+      const event = makeEvent('ติดตาม HG000000000');
+      const replies = await routeBotMessage(mockDb, event, 'ติดตาม HG000000000', 'user-pk', 'conv-1');
       expect(replies).toHaveLength(1);
       expect((replies[0] as { text: string }).text).toContain('ไม่พบ');
     });

@@ -81,7 +81,7 @@ export function DepartmentsCard({ rows }: { rows: DepartmentRow[] }) {
               <DialogHeader>
                 <DialogTitle>เพิ่มหน่วยงาน</DialogTitle>
                 <DialogDescription>
-                  หน่วยงานใช้สำหรับมอบหมายเรื่องแจ้งเหตุให้ผู้รับผิดชอบ
+                  หน่วยงานใช้สำหรับมอบหมายเรื่องแจ้งเรื่องใหม่ให้ผู้รับผิดชอบ
                 </DialogDescription>
               </DialogHeader>
               <DepartmentForm onDone={() => setOpenId(null)} />
@@ -96,7 +96,7 @@ export function DepartmentsCard({ rows }: { rows: DepartmentRow[] }) {
         <EmptyState
           icon={Building2}
           title="ยังไม่มีหน่วยงาน"
-          description="เพิ่มหน่วยงานเพื่อใช้มอบหมายเรื่องแจ้งเหตุ"
+          description="เพิ่มหน่วยงานเพื่อใช้มอบหมายเรื่องแจ้งเรื่องใหม่"
         />
       ) : (
         <ul className="divide-y divide-border">
@@ -230,7 +230,7 @@ export function CategoriesCard({
               <DialogHeader>
                 <DialogTitle>เพิ่มหมวดหมู่</DialogTitle>
                 <DialogDescription>
-                  หมวดหมู่ที่ประชาชนเลือกตอนแจ้งเหตุ พร้อมกำหนดหน่วยงานและ SLA เริ่มต้น
+                  หมวดหมู่ที่ประชาชนเลือกตอนแจ้งเรื่องใหม่ พร้อมกำหนดหน่วยงานและ SLA เริ่มต้น
                 </DialogDescription>
               </DialogHeader>
               <CategoryForm departments={deptOptions} onDone={() => setOpenId(null)} />
@@ -245,7 +245,7 @@ export function CategoriesCard({
         <EmptyState
           icon={FolderTree}
           title="ยังไม่มีหมวดหมู่"
-          description="เพิ่มหมวดหมู่เพื่อให้ประชาชนเลือกตอนแจ้งเหตุ"
+          description="เพิ่มหมวดหมู่เพื่อให้ประชาชนเลือกตอนแจ้งเรื่องใหม่"
         />
       ) : (
         <ul className="divide-y divide-border">

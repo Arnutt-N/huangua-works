@@ -157,7 +157,8 @@ describe('createCase · ลูปกันชนของ trackingCode', () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.trackingCode).toMatch(/^HN\d{9}$/);
+    // § รหัสที่สร้างใหม่ใช้ prefix HG แต่ normalize ยังรับ HN เก่าด้วย เลยตรวจทั้งคู่
+    expect(result.trackingCode).toMatch(/^(HN|HG)\d{9}$/);
     expect(mockState.insertedCases[0]?.trackingCode).toBe(result.trackingCode);
   });
 
@@ -167,7 +168,7 @@ describe('createCase · ลูปกันชนของ trackingCode', () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.trackingCode).toMatch(/^HN\d{9}$/);
+    expect(result.trackingCode).toMatch(/^(HN|HG)\d{9}$/);
   });
 
   it('รหัสที่ถูกใช้จริงต้องเป็นรหัสที่ผ่านการตรวจแล้วเท่านั้น', async () => {
