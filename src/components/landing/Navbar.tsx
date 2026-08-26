@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Bell, Menu, X, Search, LogIn } from 'lucide-react';
 import { Button } from '../ui/button';
 import { BrandMark } from '../site/brand-mark';
+import { COPY } from '@/lib/copy';
 
 /**
  * Navbar หลักของหน้า landing (/)
@@ -62,7 +63,7 @@ export function Navbar() {
               href="/track"
               className="text-sm font-medium transition-colors hover:text-accent"
             >
-              ติดตามเรื่อง
+              {COPY.TRACK_LABEL}
             </Link>
           </div>
 
@@ -81,7 +82,7 @@ export function Navbar() {
               {/* Button base มี gap-2 อยู่แล้ว — mr-2 เดิมทำให้ไอคอนเยื้องตอนซ่อนข้อความบนมือถือ */}
               <Link href="/intake">
                 <Bell className="h-4 w-4" />
-                <span className="hidden whitespace-nowrap sm:inline">แจ้งเรื่องใหม่</span>
+                <span className="hidden whitespace-nowrap sm:inline">{COPY.INTAKE_LABEL}</span>
               </Link>
             </Button>
 
@@ -113,10 +114,10 @@ export function Navbar() {
               เข้าสู่ระบบ
             </MobileLink>
             <MobileLink href="/intake" onClick={() => setMobileOpen(false)} icon={<Bell className="h-4 w-4" />}>
-              แจ้งเรื่องใหม่
+              {COPY.INTAKE_LABEL}
             </MobileLink>
             <MobileLink href="/track" onClick={() => setMobileOpen(false)} icon={<Search className="h-4 w-4" />}>
-              ติดตามเรื่อง
+              {COPY.TRACK_LABEL}
             </MobileLink>
             <MobileLink href="/#services" onClick={() => setMobileOpen(false)}>
               บริการของเรา

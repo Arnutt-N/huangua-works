@@ -10,9 +10,10 @@ import { getMyCases } from '@/lib/cases/my-cases';
 import { STATUS_LABELS_TH_CITIZEN } from '@/lib/cases/state-machine';
 import { formatThaiDateLong } from '@/lib/thai-date';
 import { LIFF_SESSION_COOKIE, readLiffSessionValue } from '@/lib/liff/session';
+import { COPY } from '@/lib/copy';
 import { TrackForm } from './track-form';
 
-export const metadata: Metadata = { title: 'ติดตามเรื่อง' };
+export const metadata: Metadata = { title: COPY.TRACK_LABEL };
 
 /**
  * /track — ค้นหาและดูสถานะเรื่องด้วยเลขติดตาม (HG + 9 หลัก)
@@ -48,16 +49,16 @@ export default async function TrackPage({
             className="inline-flex min-h-touch items-center gap-1.5 text-sm text-muted hover:text-ink"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            กลับหน้าหลัก
+            {COPY.BACK_HOME}
           </Link>
 
-          <h1 className="mt-4 text-3xl font-bold sm:text-4xl">ติดตามเรื่อง</h1>
+          <h1 className="mt-4 text-3xl font-bold sm:text-4xl">{COPY.TRACK_LABEL}</h1>
           <p className="mt-3 text-lg text-muted">กรอกเลขติดตามเรื่อง เพื่อดูสถานะเรื่องที่ท่านแจ้ง</p>
 
           {myCases.length > 0 && (
             <section className="glass mt-8 rounded-xl p-6 shadow-sm" aria-labelledby="my-cases-heading">
               <h2 id="my-cases-heading" className="text-xl font-semibold">
-                เรื่องของฉัน{' '}
+                {COPY.MY_CASES}{' '}
                 <span className="text-sm font-normal text-muted">(จากบัญชี LINE ของท่าน)</span>
               </h2>
               <ul className="mt-4 space-y-3" data-testid="my-cases-list">

@@ -104,7 +104,7 @@ test('§ หัวใจของบั๊กลูป: มี LIFF ID → init 
 
   // overlay โผล่ตั้งแต่ยังไม่ navigate (ผู้ใช้เห็น splash แทนหน้าแรก)
   expect(container.querySelector('[role="status"]')).not.toBeNull();
-  expect(container.textContent).toContain('กำลังเปิดหน้าแจ้งเรื่อง…');
+  expect(container.textContent).toContain('กำลังเปิดหน้าแจ้งเรื่องใหม่…');
 
   await waitFor(() => expect(replaceMock).toHaveBeenCalledWith('/intake'));
 
@@ -193,7 +193,7 @@ test('มี liff.state แต่ยังไม่ตั้ง LIFF ID → repl
 
 test('§ ข้อความ splash บอกปลายทางจริง — ตาม prefix ของ target', async () => {
   const cases: Array<[string, string]> = [
-    ['/intake', 'กำลังเปิดหน้าแจ้งเรื่อง…'],
+    ['/intake', 'กำลังเปิดหน้าแจ้งเรื่องใหม่…'],
     ['/track?id=HN123', 'กำลังเปิดหน้าติดตามเรื่อง…'],
     ['/other/page', 'กำลังเชื่อมต่อบัญชี LINE…'],
   ];

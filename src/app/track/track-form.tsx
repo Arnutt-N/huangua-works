@@ -6,6 +6,7 @@ import { CaseStatusBadge } from '../../components/ui/case-status-badge';
 import { Button } from '../../components/ui/button';
 import { FieldHint, Input, Label } from '../../components/ui/field';
 import { cn } from '../../lib/cn';
+import { COPY } from '../../lib/copy';
 import type { CaseStatus } from '../../lib/cases/state-machine';
 import { formatThaiDateTimeShort } from '../../lib/thai-date';
 
@@ -107,7 +108,7 @@ export function TrackForm({ initialId }: { initialId?: string }) {
         </div>
 
         <div className="mt-5">
-          <Label htmlFor="trackId">เลขติดตามเรื่อง</Label>
+          <Label htmlFor="trackId">{COPY.TRACKING_CODE}เรื่อง</Label>
           <Input
             id="trackId"
             placeholder="เช่น HG483729156"
@@ -146,7 +147,7 @@ export function TrackForm({ initialId }: { initialId?: string }) {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm text-muted">
-                  เลขติดตามเรื่อง{' '}
+                  {COPY.TRACKING_CODE}เรื่อง{' '}
                   <span className="font-mono font-semibold text-ink">{trackId}</span>
                 </p>
                 <h3 className="mt-1 text-lg font-semibold">{result.case.title}</h3>

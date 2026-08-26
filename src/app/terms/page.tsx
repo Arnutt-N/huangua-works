@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { FileText, AlertCircle, CheckSquare, Ban, Scale } from 'lucide-react';
 import { Navbar } from '@/components/landing/Navbar';
 import { Footer } from '@/components/landing/Footer';
+import { COPY } from '@/lib/copy';
 
 export const metadata: Metadata = {
   title: 'เงื่อนไขการใช้งาน',
@@ -32,7 +33,7 @@ export default function TermsPage() {
             </h1>
             <p className="mt-3 text-muted">
               เงื่อนไขและข้อตกลงสำหรับการใช้ระบบรับแจ้งเรื่องใหม่ออนไลน์
-              องค์การบริหารส่วนตำบลหัวงัว
+              {COPY.ORG_FULL}
             </p>
           </header>
 
@@ -55,8 +56,8 @@ export default function TermsPage() {
             <Section icon={<FileText className="h-5 w-5" />} title="2. การใช้บริการ">
               <p>ผู้ใช้สามารถ:</p>
               <ul className="mt-3 space-y-2">
-                <li>• แจ้งเรื่องใหม่/ร้องเรียกเกี่ยวกับบริการสาธารณูปโภค</li>
-                <li>• ติดตามสถานะเรื่องที่แจ้งผ่านเลขติดตาม</li>
+                <li>• {COPY.INTAKE_LABEL}/ร้องเรียกเกี่ยวกับบริการสาธารณูปโภค</li>
+                <li>• ติดตามสถานะเรื่องที่แจ้งผ่าน{COPY.TRACKING_CODE}</li>
                 <li>• ใช้บริการผ่านแอป LINE (LIFF) ด้วยบัญชี LINE ของท่าน — การใช้ผ่าน LINE อยู่ภายใต้ข้อกำหนดของ LINE Corporation ประกอบด้วย</li>
                 <li>• ถอนความยินยอมในการเก็บข้อมูลได้</li>
               </ul>
@@ -71,7 +72,7 @@ export default function TermsPage() {
 
             <Section icon={<Ban className="h-5 w-5" />} title="3. ข้อจำกัดความรับผิดชอบ">
               <p>
-                อบต.หัวงัวจะดำเนินการเรื่องที่ได้รับแจ้งตามลำดับความสำคัญ
+                {COPY.ORG_SHORT}จะดำเนินการเรื่องที่ได้รับแจ้งตามลำดับความสำคัญ
                 และความเป็นไปได้ทางงบประมาณ โดยไม่รับประกัน:
               </p>
               <ul className="mt-3 space-y-2">
@@ -84,7 +85,7 @@ export default function TermsPage() {
             <Section icon={<AlertCircle className="h-5 w-5" />} title="4. การแจ้งเรื่องเท็จ">
               <p>
                 การแจ้งเรื่องอันเป็นเท็จหรือใส่ความผู้อื่นอาจมีความผิดตามกฎหมาย
-                อบต.หัวงัวอาจดำเนินคดีตามกฎหมายที่เกี่ยวข้อง
+                {COPY.ORG_SHORT}อาจดำเนินคดีตามกฎหมายที่เกี่ยวข้อง
                 และ/หรือระงับการให้บริการแก่ผู้กระทำความผิด
               </p>
             </Section>
@@ -99,7 +100,7 @@ export default function TermsPage() {
 
             <Section icon={<FileText className="h-5 w-5" />} title="6. การแก้ไขเงื่อนไข">
               <p>
-                อบต.หัวงัวสงวนสิทธิในการแก้ไขเงื่อนไขการใช้งานได้ตลอดเวลา
+                {COPY.ORG_SHORT}สงวนสิทธิในการแก้ไขเงื่อนไขการใช้งานได้ตลอดเวลา
                 การแก้ไขจะมีผลเมื่อเผยแพร่บนเว็บไซต์นี้
                 ผู้ใช้ควรตรวจสอบเงื่อนไขเป็นระยะ
               </p>

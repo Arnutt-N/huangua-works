@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Noto_Sans_Thai } from 'next/font/google';
 import { Analytics } from '@vercel/analytics/react';
+import { COPY } from '@/lib/copy';
 import '../styles/tokens.css';
 
 /**
@@ -21,24 +22,24 @@ const baseUrl = process.env.AUTH_URL || 'http://localhost:3000';
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
   title: {
-    default: 'อบต.หัวงัว — แจ้งเรื่องใหม่/ติดตามเรื่องบริการสาธารณูปโภค',
+    default: `อบต.หัวงัว — ${COPY.INTAKE_LABEL}/${COPY.TRACK_LABEL}บริการสาธารณูปโภค`,
     template: '%s · อบต.หัวงัว',
   },
   description:
-    'ระบบแจ้งเรื่องใหม่/ติดตามเรื่องบริการสาธารณูปโภค องค์การบริหารส่วนตำบลหัวงัว (อ.ยางตลาด จ.กาฬสินธุ์) — แจ้งเรื่องได้ ติดตามได้ ตรวจสอบได้',
+    `ระบบ${COPY.INTAKE_LABEL}/${COPY.TRACK_LABEL}บริการสาธารณูปโภค ${COPY.ORG_FULL} (อ.ยางตลาด จ.กาฬสินธุ์) — แจ้งเรื่องได้ ติดตามได้ ตรวจสอบได้`,
   applicationName: 'อบต.หัวงัว Citizen Help',
   keywords: [
     'อบต.หัวงัว',
-    'แจ้งเรื่องใหม่',
-    'ติดตามเรื่อง',
+    COPY.INTAKE_LABEL,
+    COPY.TRACK_LABEL,
     'บริการสาธารณูปโภค',
     'ยางตลาด',
     'กาฬสินธุ์',
     'ร้องเรียก',
     'ร้องทุกข์',
   ],
-  authors: [{ name: 'องค์การบริหารส่วนตำบลหัวงัว' }],
-  creator: 'องค์การบริหารส่วนตำบลหัวงัว',
+  authors: [{ name: COPY.ORG_FULL }],
+  creator: COPY.ORG_FULL,
   icons: {
     icon: [
       { url: '/icon.svg', type: 'image/svg+xml' },
@@ -51,9 +52,9 @@ export const metadata: Metadata = {
     locale: 'th_TH',
     url: baseUrl,
     siteName: 'อบต.หัวงัว Citizen Help',
-    title: 'อบต.หัวงัว — แจ้งเรื่องใหม่/ติดตามเรื่องบริการสาธารณูปโภค',
+    title: `อบต.หัวงัว — ${COPY.INTAKE_LABEL}/${COPY.TRACK_LABEL}บริการสาธารณูปโภค`,
     description:
-      'ระบบแจ้งเรื่องใหม่/ติดตามเรื่องบริการสาธารณูปโภค องค์การบริหารส่วนตำบลหัวงัว (อ.ยางตลาด จ.กาฬสินธุ์)',
+      `ระบบ${COPY.INTAKE_LABEL}/${COPY.TRACK_LABEL}บริการสาธารณูปโภค ${COPY.ORG_FULL} (อ.ยางตลาด จ.กาฬสินธุ์)`,
   },
   robots: {
     index: true,

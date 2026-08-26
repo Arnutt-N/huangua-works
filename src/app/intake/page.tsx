@@ -6,9 +6,10 @@ import { getActiveCategories } from '@/lib/queries/lookups';
 import { Navbar } from '@/components/landing/Navbar';
 import { SiteFooter } from '../../components/site/site-footer';
 import { LiffProvider } from '@/components/liff/liff-provider';
+import { COPY } from '@/lib/copy';
 import { IntakeForm } from './intake-form';
 
-export const metadata: Metadata = { title: 'แจ้งเรื่องใหม่' };
+export const metadata: Metadata = { title: COPY.INTAKE_LABEL };
 
 // § force-dynamic: หน้านี้ query categories จาก DB ระดับ Server Component รันทุก request
 // ห้ามให้ Next.js prerender เป็น static HTML ตอน build เพราะ build machine จะต้องต่อ DB
@@ -35,10 +36,10 @@ export default async function IntakePage() {
             className="inline-flex min-h-touch items-center gap-1.5 text-sm text-muted hover:text-ink"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            กลับหน้าหลัก
+            {COPY.BACK_HOME}
           </Link>
 
-          <h1 className="mt-4 text-3xl font-bold sm:text-4xl">แจ้งเรื่องใหม่</h1>
+          <h1 className="mt-4 text-3xl font-bold sm:text-4xl">{COPY.INTAKE_LABEL}</h1>
           <p className="mt-3 text-lg text-muted">
             กรอกข้อมูลให้ครบ เจ้าหน้าที่จะรับเรื่องและติดตามให้ท่านทุกขั้นตอน
           </p>

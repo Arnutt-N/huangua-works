@@ -2,6 +2,7 @@ import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Navbar } from '@/components/landing/Navbar';
+import { COPY } from '@/lib/copy';
 import { SiteFooter } from '../../../components/site/site-footer';
 import { LoginForm } from './login-form';
 
@@ -29,7 +30,7 @@ export default async function AdminLoginPage({
             className="inline-flex min-h-touch items-center gap-1.5 text-sm text-muted hover:text-ink"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            กลับหน้าหลัก
+            {COPY.BACK_HOME}
           </Link>
 
           {/* § หัวการ์ดเป็นตัวอักษรสีทึบ ไม่ใช้ .gradient-text

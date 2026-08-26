@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import { Bell, Search, Users, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { COPY } from '@/lib/copy';
 
 /**
  * § แยกเป็นสอง field แทนค่าสีตัวเดียว — ค่าเดิม `color` ถูกใช้ 3 บทบาทพร้อมกัน
@@ -15,7 +16,7 @@ import { cn } from '@/lib/cn';
 const steps = [
   {
     number: '01',
-    title: 'แจ้งเรื่องใหม่',
+    title: COPY.INTAKE_LABEL,
     description: 'กรอกรายละเอียดปัญหา แนบรูปภาพ และระบุตำแหน่ง',
     icon: Bell,
     toneClass: 'text-accent',

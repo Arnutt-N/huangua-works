@@ -5,6 +5,7 @@ import { Loader2 } from 'lucide-react';
 import { BrandMark } from '../site/brand-mark';
 import { getLiffId } from '@/lib/liff/config';
 import { loadLiffSdk } from './liff-sdk';
+import { COPY } from '@/lib/copy';
 
 /**
  * § จุดเข้า LIFF ที่มี path (เช่น liff.line.me/<id>/track) จะโดน LINE redirect
@@ -67,8 +68,10 @@ export function readLiffStateTarget(): string | null {
 
 /** ข้อความบอกปลายทางจริง — ไม่ใช้ศัพท์กลาง ๆ อย่าง "กำลังเปิดบริการ..." */
 export function splashMessage(target: string): string {
-  if (target.startsWith('/intake')) return 'กำลังเปิดหน้าแจ้งเรื่อง…';
-  if (target.startsWith('/track')) return 'กำลังเปิดหน้าติดตามเรื่อง…';
+  // § ใช้ COPY.INTAKE_LABEL/TRACK_LABEL ให้ splash เรียกชื่อเดียวกับปุ่ม rich menu
+  // และ heading หน้าปลายทาง (แจ้งเรื่องใหม่/ติดตามเรื่อง)
+  if (target.startsWith('/intake')) return `กำลังเปิดหน้า${COPY.INTAKE_LABEL}…`;
+  if (target.startsWith('/track')) return `กำลังเปิดหน้า${COPY.TRACK_LABEL}…`;
   return 'กำลังเชื่อมต่อบัญชี LINE…';
 }
 
