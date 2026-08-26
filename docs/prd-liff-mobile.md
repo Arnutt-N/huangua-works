@@ -49,6 +49,7 @@
 6. `POST /api/liff/session` ที่ได้รับ ID token ปลอม/หมดอายุ/aud ไม่ตรง → ปฏิเสธ; ไม่มี path ไหนที่ client ส่ง `lineUserId` ตรงมาโดยไม่ผ่านการ verify
 7. ทุก mutation/ข้อความใหม่ผ่าน gates: `tsc` + `eslint` + `vitest run` + Vercel preview ผ่าน
 8. ผู้ใช้ LINE ถอนความยินยอมได้โดยไม่ต้องมี CID
+9. § (เพิ่มหลังรายงาน UX 15/8/2569): ระหว่าง LIFF bootstrap ที่ landing ผู้ใช้**ไม่เห็นหน้าแรกเต็ม ๆ ก่อนเด้งไปหน้าปลายทาง** — เห็น splash (ตรา + ข้อความบอกปลายทางจริง + spinner หน่วง 250 ms) แทน หาก init ค้างเกิน 5 วินาทีให้เดินทางต่อตาม `liff.state` เพื่อให้หน้าปลายทาง fallback เอง; ผู้เยี่ยมปกติ (ไม่มี `liff.state`) ไม่เห็น splash และไม่มีพฤติกรรมใดเปลี่ยน
 
 ## 5. ข้อจำกัด & Dependencies
 

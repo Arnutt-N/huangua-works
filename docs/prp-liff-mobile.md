@@ -99,6 +99,7 @@ T4 กับ T5 ทำขนานกันได้ (คนละไฟล์�
 | แจ้งซ้ำผ่านช่องทาง bot (ไม่ผ่าน LIFF) | dedup สาย LINE ใน T4 ครอบทั้ง bot และ LIFF (key เดียวกันคือ lineUserId) |
 | e2e จำลองไม่ครบพฤติกรรม LINE จริง | กำหนด manual test checklist มือถือ 1 รอบก่อน announce |
 | § บั๊กที่พบหลังทดสอบมือถือจริง (post-T0): `LiffStateRedirect` เดิม replace ออกจาก landing ก่อน `liff.init()` → token ของ SDK หลุด → หน้าปลายทาง auto-login กลับ landing ซ้ำ = ลูปหน้าโฮม ↔ `/intake`,`/track` ไม่รู้จบ | แก้แล้ว: init SDK ที่ landing ก่อนแล้วค่อย replace (ตาม spec "process URL changes after `liff.init()` completes") — e2e mock ข้าม SDK จึงตรวจไม่จับ (เหมือนบั๊ก CSP ก่อนหน้า) ต้องพิสูจน์ด้วยมือถือจริงอีกครั้ง |
+| § (จากรายงาน UX 15/8/2569) splash กัน "หน้าแรกกระพริบ" ต้อง**ไม่**ทำแบบ server branch ตาม `searchParams` ของหน้าแรก | การอ่าน `searchParams` ใน `page.tsx` จะเปลี่ยน ISR (`revalidate = 3600`) เป็น dynamic render ทุก request เสีย caching ของผู้เยี่ยมปกติทั้งหมด — ใช้ pre-paint inline script + overlay ฝั่ง client แทน (ซ่อน body ก่อน paint ด้วย `html[data-liff-boot]` ที่ script ตั้ง + React overlay `visibility:visible` รับต่อ) และกัน init ค้างด้วย timeout 5 วิ |
 
 ## 5. ประมาณการขนาดงาน
 
