@@ -57,6 +57,7 @@
 | LIFF ต้องใช้ **LINE Login channel** แยกจาก Messaging API channel ที่มีอยู่ และต้องอยู่ใน **provider เดียวกัน** | ไม่งั้น `userId` ของประชาชนไม่ตรงกันระหว่างบอทกับ LIFF → ผูกเคสให้คนผิดทันที (ทั้งระบบ key บน `lineUserId`) |
 | หนึ่ง LIFF app = หนึ่ง Endpoint URL | Vercel preview ใช้กับ LIFF ตรง ๆ ไม่ได้ ต้องมี LIFF app ที่สองชี้ staging (D4) |
 | path ใน LIFF URL (`liff.line.me/<id>/track`) ถูกนำไป **ต่อท้าย** path ของ Endpoint URL ไม่ใช่แทนที่ (ตาม spec LINE) | Endpoint URL ต้องตั้งเป็น root `https://huangua-works.vercel.app` — ถ้าตั้ง `/intake` ปุ่ม "ติดตาม" จะเปิด `/intake/track` (404) |
+| การเปลี่ยน URL ของ LIFF app ต้องเกิด**หลัง** `liff.init()` เสร็จเท่านั้น และต้อง init ที่ primary redirect URL (หน้า landing) อย่างน้อยหนึ่งครั้ง (spec LINE) | ถ้า replace ออกจาก landing ก่อน init จะเกิดลูป หน้าโฮม ↔ หน้าเป้าหมายไม่รู้จบ (บั๊กหลัง T0 — แก้โดยทำให้ `LiffStateRedirect` init ก่อน replace) |
 | `NEXT_PUBLIC_*` เป็น build-time env | เพิ่มใน Vercel แล้วต้อง redeploy ถึงมีผล |
 | Vercel Hobby + GitHub Actions หยุดอยู่ | gates คือ local + Vercel preview checks |
 | ID token ของ LIFF อาจถูกเซ็นด้วยอัลกอริทึม HS256 **หรือ** ES256 | ห้าม verify เองด้วย channel secret อย่างเดียว — ต้องใช้ verify endpoint ของ LINE (ดู PRP §2 ข้อ 1) |

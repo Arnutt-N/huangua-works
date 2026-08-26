@@ -98,6 +98,7 @@ T4 กับ T5 ทำขนานกันได้ (คนละไฟล์�
 | `NEXT_PUBLIC_LIFF_ID` ลืม redeploy | เพิ่ม health check แสดงสถานะ LIFF config ใน `/admin/health` |
 | แจ้งซ้ำผ่านช่องทาง bot (ไม่ผ่าน LIFF) | dedup สาย LINE ใน T4 ครอบทั้ง bot และ LIFF (key เดียวกันคือ lineUserId) |
 | e2e จำลองไม่ครบพฤติกรรม LINE จริง | กำหนด manual test checklist มือถือ 1 รอบก่อน announce |
+| § บั๊กที่พบหลังทดสอบมือถือจริง (post-T0): `LiffStateRedirect` เดิม replace ออกจาก landing ก่อน `liff.init()` → token ของ SDK หลุด → หน้าปลายทาง auto-login กลับ landing ซ้ำ = ลูปหน้าโฮม ↔ `/intake`,`/track` ไม่รู้จบ | แก้แล้ว: init SDK ที่ landing ก่อนแล้วค่อย replace (ตาม spec "process URL changes after `liff.init()` completes") — e2e mock ข้าม SDK จึงตรวจไม่จับ (เหมือนบั๊ก CSP ก่อนหน้า) ต้องพิสูจน์ด้วยมือถือจริงอีกครั้ง |
 
 ## 5. ประมาณการขนาดงาน
 
