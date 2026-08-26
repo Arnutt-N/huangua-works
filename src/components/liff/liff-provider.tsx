@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { getLiffId } from '@/lib/liff/config';
+import { loadLiffSdk } from './liff-sdk';
 
 /**
  * LiffProvider — โหลด LIFF SDK ผ่าน CDN (ไม่เพิ่ม npm dep ตามแผนเดิมใน
@@ -19,10 +20,7 @@ import { getLiffId } from '@/lib/liff/config';
  * ไป LINE login กลางคันจะทำให้ลิงก์ที่แชร์ออกไปใช้ไม่ได้ทันที
  */
 
-const LIFF_SDK_URL = 'https://static.line-scdn.net/liff/edge/2/sdk.js';
-
 type LiffStatus = 'disabled' | 'loading' | 'ready' | 'error';
-
 export interface LiffContextValue {
   status: LiffStatus;
   /** อยู่ในหน้าต่าง LINE (LIFF browser) หรือเบราว์เซอร์ปกติ */
@@ -75,39 +73,6 @@ async function ensureMockSession(userId: string): Promise<{ authenticated: boole
   } catch {
     return { authenticated: false, displayName: null };
   }
-}
-
-interface LiffSdk {
-  init(config: { liffId: string }): Promise<void>;
-  isInClient(): boolean;
-  isLoggedIn(): boolean;
-  login(): void;
-  getIDToken(): string | null;
-  getProfile(): Promise<{ displayName?: string; pictureUrl?: string }>;
-}
-
-declare global {
-  interface Window {
-    liff?: LiffSdk;
-  }
-}
-
-function loadLiffSdk(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (window.liff) return resolve();
-    const existing = document.querySelector<HTMLScriptElement>(`script[src="${LIFF_SDK_URL}"]`);
-    if (existing) {
-      existing.addEventListener('load', () => resolve());
-      existing.addEventListener('error', () => reject(new Error('LIFF SDK load failed')));
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = LIFF_SDK_URL;
-    script.async = true;
-    script.addEventListener('load', () => resolve());
-    script.addEventListener('error', () => reject(new Error('LIFF SDK load failed')));
-    document.head.appendChild(script);
-  });
 }
 
 async function ensureSession(): Promise<{ authenticated: boolean; displayName: string | null }> {
