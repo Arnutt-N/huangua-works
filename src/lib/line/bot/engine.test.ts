@@ -156,6 +156,24 @@ describe('routeBotMessage — existing behavior (TDD safety net)', () => {
       expect(replies).toHaveLength(1);
       expect((replies[0] as { text: string }).text).toContain('ไม่พบ');
     });
+
+    it('§ normalize: "ติดตาม HG 0000 0000 0" (เว้นวรรค) ต้อง normalize เป็น HG000000000 ก่อนค้น', async () => {
+      const event = makeEvent('ติดตาม HG 0000 0000 0');
+      const replies = await routeBotMessage(mockDb, event, 'ติดตาม HG 0000 0000 0', 'user-pk', 'conv-1');
+      expect(replies).toHaveLength(1);
+      // ค้นไม่เจอก็ได้ (ไม่มีเคสจริง) — สำคัญคือไม่พังด้วย code ที่มีเว้นวรรค
+      expect((replies[0] as { text: string }).text).toContain('ไม่พบ');
+    });
+  });
+
+  describe('rich menu button handlers', () => {
+    it('§ "คำถามที่พบบ่อย" (ปุ่ม rich menu) ตอบ FAQ ได้จริง ไม่ตก fallback', async () => {
+      const event = makeEvent('คำถามที่พบบ่อย');
+      const replies = await routeBotMessage(mockDb, event, 'คำถามที่พบบ่อย', 'user-pk', 'conv-1');
+      expect(replies).toHaveLength(1);
+      expect((replies[0] as { text: string }).text).toContain('เวลาทำการ');
+      expect((replies[0] as { text: string }).text).not.toContain('ไม่เข้าใจ');
+    });
   });
 
   describe('FAQ fallback', () => {

@@ -169,7 +169,7 @@ describe('case-flow · processCaseFlow · location step', () => {
     expect(result.state?.step).toBe('confirm');
     expect(result.state?.location).toBe('หน้าวัดหัวงัว หมู่ 3');
     const text = firstReplyText(result);
-    expect(text).toContain('สรุปเรื่องร้องเรียน');
+    expect(text).toContain('สรุปเรื่องที่แจ้ง');
     expect(text).toContain('ถนน-ทางเท้า');
     expect(text).toContain('ถนนพัง');
     expect(text).toContain('หน้าวัดหัวงัว');

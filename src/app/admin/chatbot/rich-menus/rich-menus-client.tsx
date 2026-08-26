@@ -30,8 +30,8 @@ const DEFAULT_CONFIG = JSON.stringify({
   name: 'Main Menu',
   chatBarText: 'เมนูหลัก',
   areas: [
-    { bounds: { x: 0, y: 0, width: 1250, height: 843 }, action: { type: 'message', text: 'แจ้งเรื่อง' } },
-    { bounds: { x: 1250, y: 0, width: 1250, height: 843 }, action: { type: 'message', text: 'ติดตาม' } },
+    { bounds: { x: 0, y: 0, width: 1250, height: 843 }, action: { type: 'message', text: 'แจ้งเรื่องใหม่' } },
+    { bounds: { x: 1250, y: 0, width: 1250, height: 843 }, action: { type: 'message', text: 'ติดตามเรื่อง' } },
     { bounds: { x: 0, y: 843, width: 1250, height: 843 }, action: { type: 'message', text: 'ติดต่อเจ้าหน้าที่' } },
     { bounds: { x: 1250, y: 843, width: 1250, height: 843 }, action: { type: 'message', text: 'คำถามที่พบบ่อย' } },
   ],

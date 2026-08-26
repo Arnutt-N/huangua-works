@@ -125,7 +125,7 @@ describe('state-machine · STATUS_LABELS_TH_CITIZEN', () => {
     expect(STATUS_LABELS_TH_CITIZEN.received).toBe('รับเรื่องแล้ว');
     expect(STATUS_LABELS_TH_CITIZEN.reviewing).toBe('กำลังตรวจสอบ');
     expect(STATUS_LABELS_TH_CITIZEN.assigned).toBe('มอบหมายแล้ว');
-    expect(STATUS_LABELS_TH_CITIZEN.done).toBe('ดำเนินการเสร็จ');
+    expect(STATUS_LABELS_TH_CITIZEN.done).toBe('เสร็จสิ้น');
     expect(STATUS_LABELS_TH_CITIZEN.rejected).toBe('ไม่รับเรื่อง');
   });
 });
