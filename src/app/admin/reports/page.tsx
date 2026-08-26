@@ -14,7 +14,7 @@ import { CaseStatusBadge } from '@/components/ui/case-status-badge';
 import { OPEN_STATUSES, isCaseStatus, type CaseStatus } from '@/lib/cases/state-machine';
 import { cn } from '@/lib/cn';
 
-export const metadata: Metadata = { title: 'จัดการคำร้อง / แจ้งเหตุ' };
+export const metadata: Metadata = { title: 'จัดการเรื่อง' };
 
 export const dynamic = 'force-dynamic';
 
@@ -131,7 +131,7 @@ export default async function CaseManagementPage({
   const isFiltered = !!(statusFilter || priorityFilter || categoryFilter || q);
 
   return (
-    <AdminShell user={staffUser} active="reports" title="จัดการคำร้อง / แจ้งเหตุ">
+    <AdminShell user={staffUser} active="reports" title="จัดการเรื่อง">
       <div className="space-y-6">
         <p className="text-sm text-muted">
           คลิกที่เรื่องเพื่อดูรายละเอียด เปลี่ยนสถานะ หรือมอบหมาย
@@ -172,7 +172,7 @@ export default async function CaseManagementPage({
               description={
                 isFiltered
                   ? 'ลองปรับตัวกรองหรือล้างเพื่อดูเรื่องทั้งหมด'
-                  : 'เมื่อประชาชนแจ้งเหตุผ่านฟอร์ม เรื่องจะปรากฏที่นี่'
+                  : 'เมื่อประชาชนแจ้งเรื่องใหม่ผ่านฟอร์ม เรื่องจะปรากฏที่นี่'
               }
               action={
                 isFiltered ? (

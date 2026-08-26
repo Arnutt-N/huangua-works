@@ -107,7 +107,7 @@ export async function processCaseFlow(
         const trackingCode = await submitLineCase(state, lineUserId);
         return {
           state: null,
-          replies: [{ type: 'text', text: `✅ ส่งเรื่องเรียบร้อยแล้ว!\n\nรหัสติดตาม: ${trackingCode}\n\nพิมพ์ "ติดตาม ${trackingCode}" เพื่อตรวจสอบสถานะได้ตลอด 24 ชม.` }],
+          replies: [{ type: 'text', text: `✅ ส่งเรื่องเรียบร้อยแล้ว!\n\nเลขติดตาม: ${trackingCode}\n\nพิมพ์ "ติดตาม ${trackingCode}" เพื่อตรวจสอบสถานะได้ตลอด 24 ชม.` }],
         };
       }
       return { state, replies: [{ type: 'text', text: 'กรุณาพิมพ์ "ยืนยัน" เพื่อส่งเรื่อง หรือ "ยกเลิก" เพื่อเริ่มใหม่' }] };

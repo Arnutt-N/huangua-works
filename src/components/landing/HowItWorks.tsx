@@ -15,7 +15,7 @@ import { cn } from '@/lib/cn';
 const steps = [
   {
     number: '01',
-    title: 'แจ้งเหตุ',
+    title: 'แจ้งเรื่องใหม่',
     description: 'กรอกรายละเอียดปัญหา แนบรูปภาพ และระบุตำแหน่ง',
     icon: Bell,
     toneClass: 'text-accent',

@@ -71,7 +71,7 @@ test('LIFF golden path: ส่งเรื่องได้โดยไม่�
 
   const trackingCodeEl = page.getByTestId('tracking-code');
   const trackingCode = (await trackingCodeEl.textContent())?.trim();
-  expect(trackingCode).toMatch(/^HN\d{9}$/);
+  expect(trackingCode).toMatch(/^HG\d{9}$/);
   const caseId = await trackingCodeEl.getAttribute('data-case-id');
   if (caseId) createdCaseIds.push(caseId);
 });

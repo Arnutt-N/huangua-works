@@ -81,7 +81,7 @@ describe('POST /api/cases/submit', () => {
     const body = await res.json();
     expect(body.success).toBe(true);
     expect(typeof body.caseId).toBe('string');
-    expect(body.trackingCode).toMatch(/^HN\d{9}$/);
+    expect(body.trackingCode).toMatch(/^HG\d{9}$/);
     createdCaseIds.push(body.caseId);
   });
 

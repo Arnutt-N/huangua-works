@@ -206,8 +206,9 @@ describe('case-flow · processCaseFlow · confirm step', () => {
     const result = await flow('ยืนยัน', confirmState);
     expect(result.state).toBeNull();
     const text = firstReplyText(result);
-    expect(text).toContain('รหัสติดตาม');
-    expect(text).toMatch(/HN\d{9}/);
+    expect(text).toContain('เลขติดตาม');
+    // § รหัสที่สร้างใหม่ใช้ prefix HG แต่ normalize ยังรับ HN เก่าด้วย
+    expect(text).toMatch(/(HN|HG)\d{9}/);
     expect(mockDb.insert).toHaveBeenCalled();
   });
 

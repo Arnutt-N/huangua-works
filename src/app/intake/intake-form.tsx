@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../components/ui/select';
-import { isValidCid, sanitizeCid } from '../../lib/cid-checksum';
+import { isValidCid, sanitizeCid, formatCid } from '../../lib/cid-checksum';
 import { useLiff } from '../../components/liff/liff-provider';
 
 export interface IntakeCategory {
@@ -339,10 +339,14 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
                 id="cid"
                 name="cid"
                 inputMode="numeric"
-                placeholder="x-xxxx-xxxxx-xx-x"
+                placeholder="กรอกตัวเลข 13 หลัก"
                 invalid={!!fieldErrors.cid}
                 value={form.cid}
                 onChange={(e) => updateField('cid', e.target.value)}
+                onBlur={() => {
+                  const digits = sanitizeCid(form.cid);
+                  if (digits.length === 13) updateField('cid', formatCid(digits));
+                }}
               />
               {fieldErrors.cid && <FieldError>{fieldErrors.cid}</FieldError>}
             </div>
@@ -355,7 +359,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
             name="phone"
             type="tel"
             inputMode="tel"
-            placeholder="08x-xxx-xxxx"
+            placeholder="0812345678"
             value={form.phone}
             onChange={(e) => updateField('phone', e.target.value)}
           />
@@ -544,7 +548,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
             onChange={(e) => updateField('consent', e.target.checked)}
           />
           <span className="text-sm text-ink">
-            ฉันยินยอมให้ อบต.หัวงัว เก็บรวบรวมและใช้ข้อมูลข้างต้นเพื่อดำเนินการเรื่องแจ้งเหตุ
+            ฉันยินยอมให้ อบต.หัวงัว เก็บรวบรวมและใช้ข้อมูลข้างต้นเพื่อดำเนินการเรื่องที่แจ้ง
             ตามกฎหมายว่าด้วยการคุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562
           </span>
         </label>

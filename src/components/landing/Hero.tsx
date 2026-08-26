@@ -92,7 +92,7 @@ export function Hero() {
               transition={{ delay: reduce ? 0 : 0.5, duration: reduce ? 0 : 0.6 }}
               className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted lg:mx-0 lg:text-lg"
             >
-              ระบบรับแจ้งเหตุและติดตามงานบริการสาธารณูปโภคออนไลน์
+              ระบบรับแจ้งเรื่องและติดตามเรื่องบริการสาธารณูปโภคออนไลน์
               ประชาชนสามารถติดตามสถานะการดำเนินงานได้แบบเรียลไทม์
               เพื่อการบริการที่รวดเร็ว โปร่งใส และมีประสิทธิภาพ
             </motion.p>
@@ -135,7 +135,7 @@ export function Hero() {
               >
                 <Link href="/intake">
                   <Bell className="mr-2 h-5 w-5" />
-                  แจ้งเหตุออนไลน์
+                  แจ้งเรื่องใหม่
                 </Link>
               </Button>
               <Button
@@ -146,7 +146,7 @@ export function Hero() {
               >
                 <Link href="/track">
                   <Search className="mr-2 h-5 w-5" />
-                  ติดตามงาน
+                  ติดตามเรื่อง
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
@@ -251,7 +251,7 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-accent-100 text-xs">เลขใบแจ้ง</p>
-              <p className="text-sm font-bold">HN-XXX-XXX-XXX</p>
+              <p className="text-sm font-bold">HG-XXX-XXX-XXX</p>
             </div>
             {/* § พื้นขาวโปร่งคงเป็น literal — surface-raised ไม่ใช่สีขาวในธีมมืด
                 การแทนด้วย token จะทำให้ป้ายนี้กลืนหายบน gradient (tokens.css ใช้

@@ -84,10 +84,10 @@ test('golden path: filling and submitting creates a real case', async ({ page })
     timeout: 30_000,
   });
 
-  // § อ่าน tracking code (HN...) และ caseId (UUID — เก็บไว้ใน data attribute สำหรับ cleanup)
+  // § อ่าน tracking code (HG...) และ caseId (UUID — เก็บไว้ใน data attribute สำหรับ cleanup)
   const trackingCodeEl = page.getByTestId('tracking-code');
   const trackingCode = (await trackingCodeEl.textContent())?.trim();
-  expect(trackingCode).toMatch(/^HN\d{9}$/);
+  expect(trackingCode).toMatch(/^HG\d{9}$/);
   const caseId = await trackingCodeEl.getAttribute('data-case-id');
   expect(caseId).toBeTruthy();
   if (caseId) createdCaseIds.push(caseId);

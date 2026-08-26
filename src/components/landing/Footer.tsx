@@ -11,7 +11,7 @@ export function Footer() {
           <div>
             <h3 className="text-lg font-semibold leading-tight">กองช่าง องค์การบริหารส่วนตำบลหัวงัว</h3>
             <p className="mt-4 text-sm text-muted">
-              ระบบรับแจ้งเหตุและติดตามงานบริการสาธารณูปโภคออนไลน์
+              ระบบรับแจ้งเรื่องและติดตามเรื่องบริการสาธารณูปโภคออนไลน์
               เพื่อการบริการที่รวดเร็ว โปร่งใส และมีประสิทธิภาพ
             </p>
           </div>
@@ -27,12 +27,12 @@ export function Footer() {
               </li>
               <li>
                 <Link href="/intake" className="text-muted transition-colors hover:text-accent">
-                  แจ้งเหตุออนไลน์
+                  แจ้งเรื่องใหม่
                 </Link>
               </li>
               <li>
                 <Link href="/track" className="text-muted transition-colors hover:text-accent">
-                  ติดตามงาน
+                  ติดตามเรื่อง
                 </Link>
               </li>
               <li>
@@ -68,8 +68,8 @@ export function Footer() {
               </li>
               <li className="flex items-center gap-2">
                 <Phone className="h-4 w-4 flex-shrink-0 text-accent" />
-                <a href="tel:043-123456" className="text-muted transition-colors hover:text-accent">
-                  043-123456
+                <a href="tel:043601494" className="text-muted transition-colors hover:text-accent">
+                  043-601-494
                 </a>
               </li>
               <li className="flex items-center gap-2">
