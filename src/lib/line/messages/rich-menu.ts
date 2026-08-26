@@ -13,11 +13,11 @@ import { liffUrl } from '@/lib/liff/config';
  */
 const intakeAction = liffUrl('/intake')
   ? { type: 'uri' as const, uri: liffUrl('/intake')! }
-  : { type: 'message' as const, text: 'แจ้งเรื่อง' };
+  : { type: 'message' as const, text: 'แจ้งเรื่องใหม่' };
 
 const trackAction = liffUrl('/track')
   ? { type: 'uri' as const, uri: liffUrl('/track')! }
-  : { type: 'message' as const, text: 'ติดตาม' };
+  : { type: 'message' as const, text: 'ติดตามเรื่อง' };
 
 export const RICH_MENU_BODY = {
   size: { width: 2500, height: 1686 },
@@ -73,6 +73,6 @@ export async function uploadRichMenuImage(richMenuId: string, imageBuffer: Buffe
 export function getFaqReply(): LineOutgoingMessage {
   return {
     type: 'text',
-    text: 'คำถามที่พบบ่อย:\n\n🕐 เวลาทำการ: จ-ศ 08:30-16:30\n📞 ติดต่อ: 043-601-494\n📢 แจ้งเรื่อง: พิมพ์ "แจ้งเรื่อง"\n🔍 ติดตาม: พิมพ์ "ติดตาม HGxxxxxxxxx"\n🛣️ ถนน/ทางเท้า\n💡 ไฟฟ้า/แสงสว่าง\n💧 น้ำประปา\n🗑️ ขยะ\n\nพิมพ์คำถามได้เลย หรือพิมพ์ "ติดต่อเจ้าหน้าที่" เพื่อพูดคุยกับเจ้าหน้าที่',
+    text: 'คำถามที่พบบ่อย:\n\n🕐 เวลาทำการ: จ-ศ 08:30-16:30\n📞 ติดต่อ: 043-601-494\n📢 แจ้งเรื่องใหม่: พิมพ์ "แจ้งเรื่องใหม่"\n🔍 ติดตามเรื่อง: พิมพ์ "ติดตาม HGxxxxxxxxx"\n🛣️ ถนน/ทางเท้า\n💡 ไฟฟ้า/แสงสว่าง\n💧 น้ำประปา\n🗑️ ขยะ\n\nพิมพ์คำถามได้เลย หรือพิมพ์ "ติดต่อเจ้าหน้าที่" เพื่อพูดคุยกับเจ้าหน้าที่',
   };
 }

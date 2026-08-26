@@ -12,6 +12,8 @@ import { isHandoffRequest, triggerHandoff } from './handoff';
 import { getWelcomeMessages } from './welcome';
 import { getChatSetting } from '../settings';
 import { caseStatusFlex } from '../messages/flex';
+import { getFaqReply } from '../messages/rich-menu';
+import { normalizeTrackingCode } from '@/lib/case-tracking';
 import { broadcast } from '../sse/broadcaster';
 
 type Db = Awaited<ReturnType<typeof getDb>>;
@@ -185,12 +187,16 @@ export async function routeBotMessage(
         return result.replies;
       }
     }
-    return [{ type: 'text', text: 'ได้รับแล้วครับ (รองรับข้อความและ location) พิมพ์ "แจ้งเรื่อง" เพื่อเริ่มแจ้งเรื่องร้องเรียน' }];
+    return [{ type: 'text', text: 'ได้รับแล้วครับ (รองรับข้อความและ location) พิมพ์ "แจ้งเรื่องใหม่" เพื่อเริ่มแจ้งเรื่อง' }];
   }
 
   const normalized = text.trim().toLowerCase();
 
-  if (normalized.includes('แจ้งเรื่อง') || normalized.includes('ร้องเรียน') || normalized === 'แจ้ง') {
+  if (
+    normalized.includes('แจ้งเรื่อง') ||
+    normalized.includes('ร้องเรียน') ||
+    normalized === 'แจ้ง'
+  ) {
     const { state, reply } = await startCaseFlow();
     await updateBotState(db, lineUserPk, state);
     return [reply];
@@ -200,6 +206,12 @@ export async function routeBotMessage(
     const code = text.replace(/ติดตาม\s*/i, '').trim().toUpperCase();
     if (code) return trackCase(db, code);
     return [{ type: 'text', text: 'กรุณาระบุเลขติดตาม เช่น "ติดตาม HG123456789"' }];
+  }
+
+  // § ปุ่ม rich menu "คำถามที่พบบ่อย" ส่งข้อความนี้ — เดิมไม่มี handler ตก
+  // fallback "ไม่เข้าใจคำถาม" (audit พบ) จัดการตรงนี้เลยให้ตอบ FAQ ได้จริง
+  if (normalized.includes('คำถามที่พบบ่อย') || normalized.includes('faq')) {
+    return [getFaqReply()];
   }
 
   const [user] = await db.select().from(lineUsers).where(eq(lineUsers.id, lineUserPk)).limit(1);
@@ -230,15 +242,22 @@ export async function routeBotMessage(
 
   return [{
     type: 'text',
-    text: 'ขออภัยครับ ไม่เข้าใจคำถาม\n\nลองพิมพ์:\n• "แจ้งเรื่อง" — แจ้งเรื่องร้องเรียน\n• "ติดตาม HGxxxxxxxxx" — ตรวจสอบสถานะ\n• "ติดต่อเจ้าหน้าที่" — พูดคุยกับเจ้าหน้าที่',
+    text: 'ขออภัยครับ ไม่เข้าใจคำถาม\n\nลองพิมพ์:\n• "แจ้งเรื่องใหม่" — แจ้งเรื่อง\n• "ติดตาม HGxxxxxxxxx" — ตรวจสอบสถานะ\n• "ติดต่อเจ้าหน้าที่" — พูดคุยกับเจ้าหน้าที่',
   }];
 }
 
 async function trackCase(db: Db, trackingCode: string): Promise<LineOutgoingMessage[]> {
+  // § ต้อง normalize ก่อนค้น — เดิมค้นตรง ๆ ด้วย code ที่พิมพ์มา ถ้าผู้ใช้พิมพ์
+  // เลขแบบมีเว้นวรรค (HG 4837 2915 6 ที่ระบบ format ให้) จะค้นไม่เจอ
+  const normalized = normalizeTrackingCode(trackingCode);
+  if (!normalized) {
+    return [{ type: 'text', text: `ไม่พบเรื่องเลข ${trackingCode} กรุณาตรวจสอบเลขติดตามอีกครั้ง` }];
+  }
+
   const [caseRow] = await db
     .select()
     .from(cases)
-    .where(eq(cases.trackingCode, trackingCode))
+    .where(eq(cases.trackingCode, normalized))
     .limit(1);
 
   if (!caseRow) {

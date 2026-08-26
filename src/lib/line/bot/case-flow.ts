@@ -55,7 +55,7 @@ export async function processCaseFlow(
         if (missCount >= 3) {
           return {
             state: null,
-            replies: [{ type: 'text', text: 'ขออภัยครับ ไม่สามารถระบุหมวดหมู่ได้ กรุณาพิมพ์ "แจ้งเรื่อง" เพื่อเริ่มใหม่ หรือพิมพ์ "ติดต่อเจ้าหน้าที่" เพื่อพูดคุยกับเจ้าหน้าที่' }],
+            replies: [{ type: 'text', text: 'ขออภัยครับ ไม่สามารถระบุหมวดหมู่ได้ กรุณาพิมพ์ "แจ้งเรื่องใหม่" เพื่อเริ่มใหม่ หรือพิมพ์ "ติดต่อเจ้าหน้าที่" เพื่อพูดคุยกับเจ้าหน้าที่' }],
           };
         }
         return {
@@ -85,7 +85,7 @@ export async function processCaseFlow(
       }
       return {
         state: { ...state, step: 'location', description: text },
-        replies: [{ type: 'text', text: 'กรุณาระบุสถานที่เกิดเหตุ เช่น "หน้าวัดหัวงัว หมู่ 3" หรือส่ง location จาก LINE ได้ครับ' }],
+        replies: [{ type: 'text', text: 'กรุณาระบุสถานที่ของเรื่องที่แจ้ง เช่น "หน้าวัดหัวงัว หมู่ 3" หรือส่ง location จาก LINE ได้ครับ' }],
       };
     }
 
@@ -94,14 +94,14 @@ export async function processCaseFlow(
         state: { ...state, step: 'confirm', location: text },
         replies: [{
           type: 'text',
-          text: `📋 สรุปเรื่องร้องเรียน:\n\nหมวดหมู่: ${state.categoryName}\nหัวข้อ: ${state.title}\nรายละเอียด: ${state.description}\nสถานที่: ${text}\n\nพิมพ์ "ยืนยัน" เพื่อส่งเรื่อง หรือพิมพ์ "ยกเลิก" เพื่อเริ่มใหม่`,
+          text: `📋 สรุปเรื่องที่แจ้ง:\n\nหมวดหมู่: ${state.categoryName}\nหัวข้อ: ${state.title}\nรายละเอียด: ${state.description}\nสถานที่: ${text}\n\nพิมพ์ "ยืนยัน" เพื่อส่งเรื่อง หรือพิมพ์ "ยกเลิก" เพื่อเริ่มใหม่`,
         }],
       };
     }
 
     case 'confirm': {
       if (text.includes('ยกเลิก') || text.toLowerCase() === 'cancel') {
-        return { state: null, replies: [{ type: 'text', text: 'ยกเลิกแล้วครับ พิมพ์ "แจ้งเรื่อง" เพื่อเริ่มใหม่ได้ตลอด' }] };
+        return { state: null, replies: [{ type: 'text', text: 'ยกเลิกแล้วครับ พิมพ์ "แจ้งเรื่องใหม่" เพื่อเริ่มใหม่ได้ตลอด' }] };
       }
       if (text.includes('ยืนยัน') || text.toLowerCase() === 'confirm' || text === 'ใช่' || text === 'ok') {
         const trackingCode = await submitLineCase(state, lineUserId);

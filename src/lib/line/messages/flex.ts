@@ -29,7 +29,7 @@ export function caseStatusFlex(trackingCode: string, status: string, title: stri
         type: 'box',
         layout: 'vertical',
         contents: [
-          { type: 'text', text: 'สถานะเรื่องร้องเรียน', color: '#FFFFFF', size: 'sm' },
+          { type: 'text', text: 'สถานะเรื่อง', color: '#FFFFFF', size: 'sm' },
           { type: 'text', text: trackingCode, color: '#FFFFFF', size: 'lg', weight: 'bold' },
         ],
         backgroundColor: headerColor,
@@ -56,8 +56,11 @@ export function caseStatusFlex(trackingCode: string, status: string, title: stri
         layout: 'vertical',
         contents: [
           {
+            // § เดิม label "สอบถามเพิ่มเติม" ส่งข้อความที่ engine ไม่มี handler →
+            // ตก fallback "ไม่เข้าใจคำถาม" (audit พบ) เปลี่ยนเป็น "ติดต่อเจ้าหน้าที่"
+            // ซึ่งเป็น handoff keyword ที่ engine จัดการอยู่แล้ว
             type: 'button',
-            action: { type: 'message', label: 'สอบถามเพิ่มเติม', text: 'สอบถามเพิ่มเติม' },
+            action: { type: 'message', label: 'ติดต่อเจ้าหน้าที่', text: 'ติดต่อเจ้าหน้าที่' },
             style: 'secondary',
           },
         ],
@@ -69,14 +72,14 @@ export function caseStatusFlex(trackingCode: string, status: string, title: stri
 export function faqMenuFlex(categories: { label: string; value: string }[]): LineOutgoingMessage {
   return {
     type: 'flex',
-    altText: 'เลือกหมวดหมู่เรื่องร้องเรียน',
+    altText: 'เลือกหมวดหมู่เรื่องที่แจ้ง',
     contents: {
       type: 'bubble',
       header: {
         type: 'box',
         layout: 'vertical',
         contents: [
-          { type: 'text', text: 'แจ้งเรื่องร้องเรียน', color: '#FFFFFF', weight: 'bold' },
+          { type: 'text', text: 'แจ้งเรื่องใหม่', color: '#FFFFFF', weight: 'bold' },
         ],
         backgroundColor: '#4A90D9',
       },

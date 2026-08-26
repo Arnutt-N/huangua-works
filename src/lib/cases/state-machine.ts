@@ -124,7 +124,7 @@ export const STATUS_LABELS_TH_CITIZEN: Record<CaseStatus, string> = {
   reviewing: 'กำลังตรวจสอบ',
   assigned: 'มอบหมายแล้ว',
   in_progress: 'กำลังดำเนินการ',
-  done: 'ดำเนินการเสร็จ',
+  done: 'เสร็จสิ้น',
   closed: 'ปิดเรื่อง',
   rejected: 'ไม่รับเรื่อง',
 };

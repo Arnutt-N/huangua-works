@@ -51,8 +51,8 @@ interface Cell {
 }
 
 const CELLS: Cell[] = [
-  { x: 0, y: 0, w: HALF_W, h: HALF_H, bg: ACCENT, label: 'แจ้งเรื่อง', sublabel: 'ร้องเรียน / ร้องทุกข์' },
-  { x: HALF_W, y: 0, w: HALF_W, h: HALF_H, bg: ACCENT2, label: 'ติดตาม', sublabel: 'ตรวจสอบสถานะ' },
+  { x: 0, y: 0, w: HALF_W, h: HALF_H, bg: ACCENT, label: 'แจ้งเรื่องใหม่', sublabel: 'ร้องเรียน / ร้องทุกข์' },
+  { x: HALF_W, y: 0, w: HALF_W, h: HALF_H, bg: ACCENT2, label: 'ติดตามเรื่อง', sublabel: 'ตรวจสอบสถานะ' },
   { x: 0, y: HALF_H, w: HALF_W, h: HALF_H, bg: ACCENT3, label: 'ติดต่อเจ้าหน้าที่', sublabel: 'พูดคุยกับเจ้าหน้าที่' },
   { x: HALF_W, y: HALF_H, w: HALF_W, h: HALF_H, bg: ACCENT4, label: 'คำถามที่พบบ่อย', sublabel: 'FAQ' },
 ];

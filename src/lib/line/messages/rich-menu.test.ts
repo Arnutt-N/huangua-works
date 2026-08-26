@@ -26,8 +26,8 @@ describe('RICH_MENU_BODY', () => {
 
   it('areas map to the 4 main commands', () => {
     const texts = RICH_MENU_BODY.areas.map((a) => a.action.text);
-    expect(texts).toContain('แจ้งเรื่อง');
-    expect(texts).toContain('ติดตาม');
+    expect(texts).toContain('แจ้งเรื่องใหม่');
+    expect(texts).toContain('ติดตามเรื่อง');
     expect(texts).toContain('ติดต่อเจ้าหน้าที่');
     expect(texts).toContain('คำถามที่พบบ่อย');
   });
@@ -69,8 +69,8 @@ describe('getFaqReply', () => {
 
   it('lists the main service keywords', () => {
     const text = (getFaqReply() as { text: string }).text;
-    expect(text).toContain('แจ้งเรื่อง');
-    expect(text).toContain('ติดตาม');
+    expect(text).toContain('แจ้งเรื่องใหม่');
+    expect(text).toContain('ติดตามเรื่อง');
     expect(text).toContain('ติดต่อเจ้าหน้าที่');
   });
 });

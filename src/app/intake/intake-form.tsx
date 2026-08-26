@@ -244,7 +244,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
       if (!res.ok) {
         setSubmitError(
           res.status === 409 && data.existingCaseId
-            ? `${data.error} (เลขที่เรื่องเดิม: ${data.existingCaseId})`
+            ? `${data.error} (เลขติดตามของเรื่องเดิม: ${data.existingCaseId})`
             : data.error || 'ส่งเรื่องไม่สำเร็จ กรุณาลองใหม่',
         );
         return;
