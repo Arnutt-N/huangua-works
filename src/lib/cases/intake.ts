@@ -59,19 +59,24 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
   if (dedupKey) {
     const dupCheck = await checkDuplicate(dedupKey, input.title, input.description);
     if (dupCheck.isDuplicate) {
-      // § คืน trackingCode ไม่ใช่ UUID — คนที่เจอ 409 คือเจ้าของเรื่องเดิม
-      // (dedup key = cid/lineUserId + HMAC(title|description) ตรงกันใน 7 วัน)
-      // การบอกเลขติดตามของเรื่องตัวเองจึงปลอดภัยและมีประโยชน์ต่อผู้ใช้จริง
-      const existing = dupCheck.caseId
-        ? await firstOrUndefined(
-            db.select({ trackingCode: cases.trackingCode }).from(cases).where(eq(cases.id, dupCheck.caseId)).limit(1),
-          )
-        : undefined;
+      // § reveal policy: คืน trackingCode เฉพาะเมื่อพิสูจน์ว่าผู้ขอ = เจ้าของเรื่องเดิม
+      // channel 'line' = lineUserId ผ่านการ verify มาแล้วเสมอ (LIFF: HMAC session
+      // cookie ที่ server sign, บอท: LINE webhook จากเซิร์ฟเวอร์ LINE) — ปลอมไม่ได้
+      // ฝั่ง web(cid): attacker ที่รู้ cid ใครก็ได้+เดา title/desc ตรงเป๊ะ อาจถาม
+      // รู้ตัวแล้ว → bare 409 ไม่คืนอะไรเลย (review PR #73 suggestion #1)
+      const provenOwner = input.channel === 'line' && Boolean(input.lineUserId);
+      let existingTrackingCode: string | undefined;
+      if (provenOwner && dupCheck.caseId) {
+        const existing = await firstOrUndefined(
+          db.select({ trackingCode: cases.trackingCode }).from(cases).where(eq(cases.id, dupCheck.caseId)).limit(1),
+        );
+        existingTrackingCode = existing?.trackingCode ?? undefined;
+      }
       return {
         ok: false,
         error: 'คุณเคยแจ้งเรื่องนี้ไปแล้วภายใน 7 วัน',
         errorCode: 'duplicate',
-        existingTrackingCode: existing?.trackingCode ?? undefined,
+        ...(existingTrackingCode ? { existingTrackingCode } : {}),
       };
     }
   }

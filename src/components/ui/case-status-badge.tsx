@@ -1,5 +1,9 @@
 import { cn } from '../../lib/cn';
-import { STATUS_LABELS_TH, type CaseStatus } from '../../lib/cases/state-machine';
+import {
+  STATUS_LABELS_TH,
+  STATUS_LABELS_TH_CITIZEN,
+  type CaseStatus,
+} from '../../lib/cases/state-machine';
 
 /**
  * CaseStatusBadge — signature component (DESIGN.md §5 Chips/Status Badge)
@@ -26,11 +30,19 @@ const statusClasses: Record<CaseStatus, string> = {
 
 export interface CaseStatusBadgeProps {
   status: CaseStatus;
+  /**
+   * § register — ชุด label ที่จะใช้ ('admin' = กริยาสั้น 'รับเรื่อง',
+   * 'citizen' = ประโยคเต็มผู้ใช้มองเห็น 'รับเรื่องแล้ว') หน้าสาธารณะ
+   * ควรตั้ง citizen เสมอ เดิม call-site ต้อง manual label=… ทำให้ลืมได้
+   * (review PR #73 suggestion #5) — label override ยังใช้ได้แซง register
+   */
+  register?: 'admin' | 'citizen';
   label?: string;
   className?: string;
 }
 
-export function CaseStatusBadge({ status, label, className }: CaseStatusBadgeProps) {
+export function CaseStatusBadge({ status, register = 'admin', label, className }: CaseStatusBadgeProps) {
+  const fallback = register === 'citizen' ? STATUS_LABELS_TH_CITIZEN[status] : STATUS_LABELS_TH[status];
   return (
     <span
       className={cn(
@@ -39,7 +51,7 @@ export function CaseStatusBadge({ status, label, className }: CaseStatusBadgePro
         className,
       )}
     >
-      {label ?? STATUS_LABELS_TH[status]}
+      {label ?? fallback}
     </span>
   );
 }

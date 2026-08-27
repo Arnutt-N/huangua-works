@@ -7,7 +7,6 @@ import { SiteFooter } from '../../components/site/site-footer';
 import { LiffProvider } from '@/components/liff/liff-provider';
 import { CaseStatusBadge } from '@/components/ui/case-status-badge';
 import { getMyCases } from '@/lib/cases/my-cases';
-import { STATUS_LABELS_TH_CITIZEN } from '@/lib/cases/state-machine';
 import { formatThaiDateLong } from '@/lib/thai-date';
 import { LIFF_SESSION_COOKIE, readLiffSessionValue } from '@/lib/liff/session';
 import { COPY } from '@/lib/copy';
@@ -67,7 +66,7 @@ export default async function TrackPage({
                     key={item.trackingCode}
                     className="border-border bg-surface-raised flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3"
                   >
-                    <CaseStatusBadge status={item.status} label={STATUS_LABELS_TH_CITIZEN[item.status]} />
+                    <CaseStatusBadge status={item.status} register="citizen" />
                     <span className="text-ink min-w-0 flex-1 truncate text-sm font-medium" title={item.title}>
                       {item.title}
                     </span>

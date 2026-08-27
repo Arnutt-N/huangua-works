@@ -104,11 +104,22 @@ export async function processCaseFlow(
         return { state: null, replies: [{ type: 'text', text: 'ยกเลิกแล้วครับ พิมพ์ "แจ้งเรื่องใหม่" เพื่อเริ่มใหม่ได้ตลอด' }] };
       }
       if (text.includes('ยืนยัน') || text.toLowerCase() === 'confirm' || text === 'ใช่' || text === 'ok') {
-        const trackingCode = await submitLineCase(state, lineUserId);
-        return {
-          state: null,
-          replies: [{ type: 'text', text: `✅ ส่งเรื่องเรียบร้อยแล้ว!\n\nเลขติดตาม: ${trackingCode}\n\nพิมพ์ "ติดตาม ${trackingCode}" เพื่อตรวจสอบสถานะได้ตลอด 24 ชม.` }],
-        };
+        const submission = await submitLineCase(state, lineUserId);
+        if (submission.ok) {
+          return {
+            state: null,
+            replies: [{ type: 'text', text: `✅ ส่งเรื่องเรียบร้อยแล้ว!\n\nเลขติดตาม: ${submission.trackingCode}\n\nพิมพ์ "ติดตาม ${submission.trackingCode}" เพื่อตรวจสอบสถานะได้ตลอด 24 ชม.` }],
+          };
+        }
+        // § dedup duplicate — channel 'line' พิสูจน์เจ้าของได้ createCase จึงคืน
+        // trackingCode ของเรื่องเดิมให้ผู้ใช้กลับไปติดตามเองได้ (review PR #74)
+        if (submission.duplicateTrackingCode) {
+          return {
+            state: null,
+            replies: [{ type: 'text', text: `คุณเคยแจ้งเรื่องนี้ไปแล้วภายใน 7 วัน\n\nเลขติดตามของเรื่องเดิม: ${submission.duplicateTrackingCode}\n\nพิมพ์ "ติดตาม ${submission.duplicateTrackingCode}" เพื่อตรวจสอบสถานะ` }],
+          };
+        }
+        throw new Error(`LINE case creation failed: ${submission.message}`);
       }
       return { state, replies: [{ type: 'text', text: 'กรุณาพิมพ์ "ยืนยัน" เพื่อส่งเรื่อง หรือ "ยกเลิก" เพื่อเริ่มใหม่' }] };
     }
@@ -145,7 +156,16 @@ async function resolveCategory(input: string): Promise<{ id: string; name: strin
   return null;
 }
 
-async function submitLineCase(state: CaseFlowState, lineUserId: string): Promise<string> {
+/**
+ * ส่งเรื่องจาก flow — แยก duplicate ออกจาก error อื่น เพราะ channel 'line'
+ * พิสูจน์เจ้าของได้ (webhook uid / HMAC cookie) createCase จึงคืนเลขติดตาม
+ * เดิมให้แสดงกลับได้ปลอดภัย
+ */
+type LineSubmission =
+  | { ok: true; trackingCode: string }
+  | { ok: false; duplicateTrackingCode?: string; message: string };
+
+async function submitLineCase(state: CaseFlowState, lineUserId: string): Promise<LineSubmission> {
   if (!state.categoryId) {
     throw new Error('LINE case creation failed: missing categoryId');
   }
@@ -159,9 +179,13 @@ async function submitLineCase(state: CaseFlowState, lineUserId: string): Promise
     lineUserId,
   });
 
-  if (!result.ok) {
-    throw new Error(`LINE case creation failed: ${result.error}`);
+  if (result.ok) {
+    return { ok: true, trackingCode: result.trackingCode };
   }
 
-  return result.trackingCode;
+  if (result.errorCode === 'duplicate') {
+    return { ok: false, duplicateTrackingCode: result.existingTrackingCode, message: result.error };
+  }
+
+  return { ok: false, message: result.error };
 }
