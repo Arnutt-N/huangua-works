@@ -1,8 +1,8 @@
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, like } from 'drizzle-orm';
 import { NextRequest } from 'next/server';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { closeDb, getDb } from '@/lib/db';
-import { cases, categories, consentRecords, dedupHashes, users } from '@/lib/db/schema';
+import { cases, categories, consentRecords, dedupHashes, lineUsers, users } from '@/lib/db/schema';
 import { generateCidHash } from '@/lib/cid-hmac';
 import { POST } from './route';
 
@@ -28,6 +28,8 @@ const NO_CONSENT_CID = '1101400170025';
 
 const createdCaseIds: string[] = [];
 const createdUserEmails: string[] = [TEST_EMAIL, `cid-${generateCidHash(NO_CONSENT_CID)}@placeholder.local`];
+// § LINE-identity dedup test — เก็บ uid เพื่อล้าง lineUsers + users ตอน afterAll
+const createdLineUserIds: string[] = [];
 
 function buildRequest(body: unknown, ip: string): NextRequest {
   return new NextRequest('http://localhost:3000/api/cases/submit', {
@@ -51,6 +53,11 @@ afterAll(async () => {
   if (createdCaseIds.length > 0) {
     await db.delete(dedupHashes).where(inArray(dedupHashes.caseId, createdCaseIds));
     await db.delete(cases).where(inArray(cases.id, createdCaseIds));
+  }
+  // § ล้าง LINE identity rows จาก dedup test (lineUsers + placeholder users)
+  if (createdLineUserIds.length > 0) {
+    await db.delete(lineUsers).where(inArray(lineUsers.lineUserId, createdLineUserIds));
+    await db.delete(users).where(like(users.email, 'line-U-dedup-%@placeholder.local'));
   }
   // § ล้าง consent records ของ users ที่ทดสอบสร้างขึ้น (ใช้ email LIKE prefix)
   await db.delete(consentRecords).where(inArray(consentRecords.userId,
@@ -176,10 +183,39 @@ describe('POST /api/cases/submit', () => {
     const second = await POST(buildRequest(payload, testIp(6)));
     expect(second.status).toBe(409);
     const secondBody = await second.json();
-    // § ต้องคืน tracking code (HG...) ไม่ใช่ UUID — review follow-up: ผู้ใช้ใช้
-    // trackingCode ไปค้นหาที่ /track ได้จริง; UUID ภายในไม่มีความหมายกับประชาชน
-    expect(secondBody.existingTrackingCode).toMatch(/^(HN|HG)\d{9}$/);
-    expect(secondBody.existingTrackingCode).not.toBe(firstBody.caseId);
+    // § web dedup (cid key) ต้องเป็น bare 409 — attacker ที่รู้ cid + เดา
+    // title/desc ได้ต้องไม่ได้ trackingCode กลับไป (review PR #74 gating)
+    expect(secondBody.existingTrackingCode).toBeUndefined();
+    expect(secondBody.caseId).toBeUndefined();
+  });
+
+  test('duplicate via LINE identity (verified) returns the original tracking code', async () => {
+    // § positive path ของ reveal gating — channel 'line' ผ่าน createCase ตรง
+    // (lineUserId จาก webhook/cookie = verified) ครั้งแรก ok, ครั้งสอง duplicate
+    // พร้อม existingTrackingCode ของเรื่องแรก
+    const { createCase } = await import('@/lib/cases/intake');
+    const lineUserId = `U-dedup-${Date.now()}`;
+    createdLineUserIds.push(lineUserId);
+    const input = {
+      channel: 'line' as const,
+      lineUserId,
+      categoryId,
+      title: `LINE dedup ${Date.now()}`,
+      description: 'รายละเอียด LINE dedup',
+      location: 'ทดสอบ',
+    };
+
+    const first = await createCase(input);
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    createdCaseIds.push(first.caseId);
+
+    const second = await createCase(input);
+    expect(second.ok).toBe(false);
+    if (second.ok) return;
+    expect(second.errorCode).toBe('duplicate');
+    expect(second.existingTrackingCode).toMatch(/^HG\d{9}$/);
+    expect(second.existingTrackingCode).toBe(first.trackingCode);
   });
 
   test('rate-limits after 3 requests from the same IP within the window', async () => {

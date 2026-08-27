@@ -8,7 +8,6 @@ import { FieldHint, Input, Label } from '../../components/ui/field';
 import { cn } from '../../lib/cn';
 import { COPY } from '../../lib/copy';
 import type { CaseStatus } from '../../lib/cases/state-machine';
-import { STATUS_LABELS_TH_CITIZEN } from '../../lib/cases/state-machine';
 import { formatThaiDateTimeShort } from '../../lib/thai-date';
 
 interface CaseDetail {
@@ -159,7 +158,7 @@ export function TrackForm({ initialId }: { initialId?: string }) {
                   </span>
                 </p>
               </div>
-              <CaseStatusBadge status={result.case.status} label={STATUS_LABELS_TH_CITIZEN[result.case.status]} />
+              <CaseStatusBadge status={result.case.status} register="citizen" />
             </div>
 
             <ol className="relative mt-6">
@@ -187,7 +186,7 @@ export function TrackForm({ initialId }: { initialId?: string }) {
                         )}
                       </span>
                       <div className="pt-1.5">
-                        <CaseStatusBadge status={entry.status} label={STATUS_LABELS_TH_CITIZEN[entry.status]} />
+                        <CaseStatusBadge status={entry.status} register="citizen" />
                         <p className="mt-1 text-sm text-muted">{formatThaiDateTimeShort(new Date(entry.at))}</p>
                       </div>
                     </div>
