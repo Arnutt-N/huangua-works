@@ -79,6 +79,23 @@ test('ไม่มี liff.state → ไม่มี overlay ไม่โหล�
   expect(replaceMock).not.toHaveBeenCalled();
 });
 
+test('§ tripwire: PRE_PAINT_SCRIPT ต้องมี open-redirect guard ครบเหมือน readLiffStateTarget()', async () => {
+  // script ดิบ copy กติกาจาก readLiffStateTarget() (ต้องรันก่อน paint จึงแยกอยู่)
+  // audit เตือนว่าไม่มีอะไรบังคับ parity — test นี้ล้มเมื่อใดให้เทียบสองฝั่งทันที
+  const mod = await import('./liff-state-redirect');
+  const { container } = mountWithLiff('2000000001-abcdefgh');
+  const script = container.querySelector('script')?.textContent ?? '';
+
+  // guard ของ readLiffStateTarget: ขึ้นต้น '/' + ไม่ใช่ '//' + ไม่มี '\'
+  expect(script).toContain("charAt(0)==='/'");
+  expect(script).toContain("indexOf('//')!==0");
+  expect(script).toMatch(/indexOf\('\\\\'\)<0/);
+
+  // ทั้งคู่ trigger ด้วย liff.state เดียวกัน
+  expect(script).toContain("'liff.state'");
+  expect(mod.readLiffStateTarget()).toBeNull(); // currentUrl ยังไม่มี liff.state
+});
+
 test('§ pre-paint script ถูก render เฉพาะเมื่อตั้ง LIFF ID — ยังไม่ตั้งห้ามซ่อนอะไรของหน้าแรก', () => {
   const withId = mountWithLiff('2000000001-abcdefgh');
   const script = withId.container.querySelector('script');

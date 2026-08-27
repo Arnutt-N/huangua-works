@@ -176,7 +176,10 @@ describe('POST /api/cases/submit', () => {
     const second = await POST(buildRequest(payload, testIp(6)));
     expect(second.status).toBe(409);
     const secondBody = await second.json();
-    expect(secondBody.existingCaseId).toBe(firstBody.caseId);
+    // § ต้องคืน tracking code (HG...) ไม่ใช่ UUID — review follow-up: ผู้ใช้ใช้
+    // trackingCode ไปค้นหาที่ /track ได้จริง; UUID ภายในไม่มีความหมายกับประชาชน
+    expect(secondBody.existingTrackingCode).toMatch(/^(HN|HG)\d{9}$/);
+    expect(secondBody.existingTrackingCode).not.toBe(firstBody.caseId);
   });
 
   test('rate-limits after 3 requests from the same IP within the window', async () => {

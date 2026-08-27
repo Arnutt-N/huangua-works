@@ -14,6 +14,7 @@ import { getChatSetting } from '../settings';
 import { caseStatusFlex } from '../messages/flex';
 import { getFaqReply } from '../messages/rich-menu';
 import { normalizeTrackingCode } from '@/lib/case-tracking';
+import { COPY } from '@/lib/copy';
 import { broadcast } from '../sse/broadcaster';
 
 type Db = Awaited<ReturnType<typeof getDb>>;
@@ -210,7 +211,9 @@ export async function routeBotMessage(
 
   // § ปุ่ม rich menu "คำถามที่พบบ่อย" ส่งข้อความนี้ — เดิมไม่มี handler ตก
   // fallback "ไม่เข้าใจคำถาม" (audit พบ) จัดการตรงนี้เลยให้ตอบ FAQ ได้จริง
-  if (normalized.includes('คำถามที่พบบ่อย') || normalized.includes('faq')) {
+  // § match แบบ exact เท่านั้น — includes('faq') เดิมกว้างเกิน (audit: ข้อความ
+  // อื่นที่มี substring โดน short-circuit ข้าม handoff/case-flow recovery)
+  if (normalized === COPY.FAQ_LABEL || normalized === 'faq') {
     return [getFaqReply()];
   }
 
