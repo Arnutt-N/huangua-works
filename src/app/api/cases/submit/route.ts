@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
     if (!result.ok) {
       const status = result.errorCode === 'duplicate' ? 409 : result.errorCode === 'invalid_category' ? 400 : 500;
       return NextResponse.json(
-        { error: result.error, ...(result.existingCaseId ? { existingCaseId: result.existingCaseId } : {}) },
+        { error: result.error, ...(result.existingTrackingCode ? { existingTrackingCode: result.existingTrackingCode } : {}) },
         { status }
       );
     }
@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
   if (!result.ok) {
     const status = result.errorCode === 'duplicate' ? 409 : result.errorCode === 'invalid_category' ? 400 : 500;
     return NextResponse.json(
-      { error: result.error, ...(result.existingCaseId ? { existingCaseId: result.existingCaseId } : {}) },
+      { error: result.error, ...(result.existingTrackingCode ? { existingTrackingCode: result.existingTrackingCode } : {}) },
       { status }
     );
   }

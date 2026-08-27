@@ -35,7 +35,7 @@ export interface CaseIntakeInput {
 
 export type CaseIntakeResult =
   | { ok: true; caseId: string; trackingCode: string; estimatedDays: number }
-  | { ok: false; error: string; errorCode: 'duplicate' | 'invalid_category' | 'internal'; existingCaseId?: string };
+  | { ok: false; error: string; errorCode: 'duplicate' | 'invalid_category' | 'internal'; existingTrackingCode?: string };
 
 export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResult> {
   const db = await getDb();
@@ -59,7 +59,20 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
   if (dedupKey) {
     const dupCheck = await checkDuplicate(dedupKey, input.title, input.description);
     if (dupCheck.isDuplicate) {
-      return { ok: false, error: 'คุณเคยแจ้งเรื่องนี้ไปแล้วภายใน 7 วัน', errorCode: 'duplicate', existingCaseId: dupCheck.caseId };
+      // § คืน trackingCode ไม่ใช่ UUID — คนที่เจอ 409 คือเจ้าของเรื่องเดิม
+      // (dedup key = cid/lineUserId + HMAC(title|description) ตรงกันใน 7 วัน)
+      // การบอกเลขติดตามของเรื่องตัวเองจึงปลอดภัยและมีประโยชน์ต่อผู้ใช้จริง
+      const existing = dupCheck.caseId
+        ? await firstOrUndefined(
+            db.select({ trackingCode: cases.trackingCode }).from(cases).where(eq(cases.id, dupCheck.caseId)).limit(1),
+          )
+        : undefined;
+      return {
+        ok: false,
+        error: 'คุณเคยแจ้งเรื่องนี้ไปแล้วภายใน 7 วัน',
+        errorCode: 'duplicate',
+        existingTrackingCode: existing?.trackingCode ?? undefined,
+      };
     }
   }
 

@@ -40,7 +40,7 @@ export const RICH_MENU_BODY = {
     },
     {
       bounds: { x: 1250, y: 843, width: 1250, height: 843 },
-      action: { type: 'message', text: 'คำถามที่พบบ่อย' },
+      action: { type: 'message', text: COPY.FAQ_LABEL },
     },
   ],
 };

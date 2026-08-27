@@ -17,6 +17,9 @@ export const COPY = {
   /** อ้างอิงเลขติดตาม */
   TRACKING_CODE: 'เลขติดตาม',
 
+  /** ป้าย rich menu / bot (ส่งข้อความตรง ๆ) */
+  FAQ_LABEL: 'คำถามที่พบบ่อย',
+
   /** ข้อมูลหน่วยงาน */
   ORG_SHORT: 'อบต.หัวงัว',
   ORG_FULL: 'องค์การบริหารส่วนตำบลหัวงัว',
@@ -26,5 +29,3 @@ export const COPY = {
   /** tagline/description หลัก */
   ORG_SYSTEM_DESC: 'ระบบรับแจ้งเรื่องและติดตามเรื่องบริการสาธารณูปโภคออนไลน์',
 } as const;
-
-export type CopyKey = keyof typeof COPY;

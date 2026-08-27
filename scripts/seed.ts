@@ -259,7 +259,7 @@ if (existingSuperadmin?.passwordHash) {
       departmentId: clerkDept?.id,
       isActive: true,
       fullName: 'ผู้ดูแลระบบ',
-      phoneNumber: '043-601-494',
+      phoneNumber: '043-000-0000',
       metadata: JSON.stringify({ createdBy: 'seed' }),
       passwordHash,
     });
