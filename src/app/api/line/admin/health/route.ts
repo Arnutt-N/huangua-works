@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { requireStaffApi } from '@/lib/auth/require-staff';
 import { ADMIN_ROLES } from '@/lib/auth/roles';
+import { getLiffId } from '@/lib/liff/config';
 
 export const runtime = 'nodejs';
 
@@ -72,17 +73,39 @@ async function probeSseBroadcaster(): Promise<ProbeResult> {
   }
 }
 
+async function probeLiff(): Promise<ProbeResult> {
+  const id = getLiffId();
+  // § pattern เดียวกับ SSE Broadcaster — LIFF เป็นช่องทาง optional ตาม design
+  // (src/lib/liff/config.ts) จึงไม่ดึง overall เป็น degraded เมื่อไม่ได้ตั้ง
+  // แต่แสดง detail ให้เจอกรณี "ลืมตั้ง NEXT_PUBLIC_LIFF_ID / ลืม redeploy"
+  if (!id) {
+    return {
+      name: 'LIFF Config',
+      status: 'ok',
+      latencyMs: 0,
+      detail: 'ยังไม่ตั้ง NEXT_PUBLIC_LIFF_ID — ปิดช่องทาง LIFF (ทำงานแบบเว็บธรรมดา)',
+    };
+  }
+  return { name: 'LIFF Config', status: 'ok', latencyMs: 0, detail: id };
+}
+
 export async function GET() {
   const authz = await requireStaffApi(ADMIN_ROLES);
   if (!authz.ok) return authz.response;
 
-  const [db, redis, line, sse] = await Promise.all([probeDb(), probeRedis(), probeLine(), probeSseBroadcaster()]);
+  const [db, redis, line, sse, liff] = await Promise.all([
+    probeDb(),
+    probeRedis(),
+    probeLine(),
+    probeSseBroadcaster(),
+    probeLiff(),
+  ]);
 
-  const allOk = [db, redis, line, sse].every((p) => p.status === 'ok');
+  const allOk = [db, redis, line, sse, liff].every((p) => p.status === 'ok');
 
   return NextResponse.json({
     status: allOk ? 'healthy' : 'degraded',
-    probes: [db, redis, line, sse],
+    probes: [db, redis, line, sse, liff],
     timestamp: new Date().toISOString(),
   });
 }
