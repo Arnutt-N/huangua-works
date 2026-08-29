@@ -1,8 +1,12 @@
-import 'dotenv/config';
+// § ต้องชี้ .env.local ชัด ๆ — dotenv/config โหลดแค่ .env ซึ่งไม่มี DATABASE_URL
+// (postgres.js จะ fallback ไป localhost:5432 แล้ว ECONNREFUSED — จริงอยู่ :5433)
+import { config } from 'dotenv';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { chatFaq } from '../src/lib/db/schema';
 import { generateId } from '../src/lib/id';
+
+config({ path: '.env.local', override: false });
 
 const DATABASE_URL = process.env.DATABASE_URL!;
 const client = postgres(DATABASE_URL);

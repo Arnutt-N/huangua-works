@@ -28,7 +28,10 @@ test.beforeAll(async () => {
     .innerJoin(districts, eq(subDistricts.districtId, districts.id))
     .innerJoin(provinces, eq(districts.provinceId, provinces.id))
     .limit(1);
-  const row = chain[0]!;
+  const row = chain[0];
+  if (!row) {
+    throw new Error('ตาราง geography ว่าง — รัน npx tsx scripts/seed-villages.ts ก่อน (idempotent)');
+  }
   geoProvince = row.provinceName;
   geoDistrict = row.districtName;
   geoSubdistrict = row.subdistrictName;
