@@ -1,41 +1,21 @@
 import { expect, test } from '@playwright/test';
 import { eq } from 'drizzle-orm';
 import { closeDb, getDb } from '../src/lib/db';
-import { cases, dedupHashes, districts, provinces, subDistricts, users, villages } from '../src/lib/db/schema';
+import { cases, dedupHashes, users } from '../src/lib/db/schema';
+import { fillGeographyCascade, loadFirstGeography, type Geography } from './helpers/geography';
 import { resetRateLimits } from './helpers/reset-rate-limits';
 
 const TEST_CID = '1101200563040';
 const TEST_EMAIL = `cid-${TEST_CID}@placeholder.local`;
 const createdCaseIds: string[] = [];
 
-let geoProvince: string;
-let geoDistrict: string;
-let geoSubdistrict: string;
+let geo: Geography;
 
 test.beforeAll(async () => {
   // ::1 คือ IP ที่ request จาก Playwright (ผ่าน localhost) เห็นจริงบนเครื่องนี้
   await resetRateLimits('rate:submit:::1');
 
-  const db = await getDb();
-  const chain = await db
-    .select({
-      provinceName: provinces.nameTh,
-      districtName: districts.nameTh,
-      subdistrictName: subDistricts.nameTh,
-    })
-    .from(villages)
-    .innerJoin(subDistricts, eq(villages.subDistrictId, subDistricts.id))
-    .innerJoin(districts, eq(subDistricts.districtId, districts.id))
-    .innerJoin(provinces, eq(districts.provinceId, provinces.id))
-    .limit(1);
-  const row = chain[0];
-  if (!row) {
-    throw new Error('ตาราง geography ว่าง — รัน npx tsx scripts/seed-villages.ts ก่อน (idempotent)');
-  }
-  geoProvince = row.provinceName;
-  geoDistrict = row.districtName;
-  geoSubdistrict = row.subdistrictName;
-  await closeDb();
+  geo = await loadFirstGeography();
 });
 
 test.afterAll(async () => {
@@ -71,14 +51,7 @@ test('golden path: filling and submitting creates a real case', async ({ page })
   await page.getByLabel('รายละเอียด', { exact: true }).fill('ทดสอบฟอร์มแจ้งเรื่องผ่าน Playwright E2E ถาวร');
   await page.getByLabel('รายละเอียดเพิ่มเติม / จุดสังเกต').fill('ทดสอบ ตำบลหัวงัว');
 
-  await page.locator('#province').click();
-  await page.getByRole('option', { name: geoProvince }).click();
-  await expect(page.locator('#district')).toBeEnabled({ timeout: 10_000 });
-  await page.locator('#district').click();
-  await page.getByRole('option', { name: geoDistrict }).click();
-  await expect(page.locator('#subdistrict')).toBeEnabled({ timeout: 10_000 });
-  await page.locator('#subdistrict').click();
-  await page.getByRole('option', { name: geoSubdistrict }).click();
+  await fillGeographyCascade(page, geo);
 
   await page.getByRole('checkbox').check();
   await page.getByRole('button', { name: 'ส่งเรื่อง' }).click();
