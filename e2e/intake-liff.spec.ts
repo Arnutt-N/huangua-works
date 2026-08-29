@@ -1,7 +1,17 @@
 import { expect, test, type Page } from '@playwright/test';
 import { eq } from 'drizzle-orm';
 import { closeDb, getDb } from '../src/lib/db';
-import { cases, consentRecords, dedupHashes, lineUsers, users } from '../src/lib/db/schema';
+import {
+  cases,
+  consentRecords,
+  dedupHashes,
+  districts,
+  lineUsers,
+  provinces,
+  subDistricts,
+  users,
+  villages,
+} from '../src/lib/db/schema';
 import { resetRateLimits } from './helpers/reset-rate-limits';
 
 /**
@@ -17,8 +27,30 @@ const MOCK_LINE_USER = 'Ue2eliffmock01';
 const MOCK_LINE_EMAIL = `line-${MOCK_LINE_USER}@placeholder.local`;
 const createdCaseIds: string[] = [];
 
+// geography เป็น required บนฟอร์มปัจจุบัน — หยิบชื่อไทยจาก DB เหมือน intake.spec.ts
+let geoProvince: string;
+let geoDistrict: string;
+let geoSubdistrict: string;
+
 test.beforeAll(async () => {
   await resetRateLimits('rate:submit:::1', 'rate:liff-session:::1');
+
+  const db = await getDb();
+  const chain = await db
+    .select({
+      provinceName: provinces.nameTh,
+      districtName: districts.nameTh,
+      subdistrictName: subDistricts.nameTh,
+    })
+    .from(villages)
+    .innerJoin(subDistricts, eq(villages.subDistrictId, subDistricts.id))
+    .innerJoin(districts, eq(subDistricts.districtId, districts.id))
+    .innerJoin(provinces, eq(districts.provinceId, provinces.id))
+    .limit(1);
+  geoProvince = chain[0]!.provinceName;
+  geoDistrict = chain[0]!.districtName;
+  geoSubdistrict = chain[0]!.subdistrictName;
+  await closeDb();
 });
 
 test.afterAll(async () => {
@@ -45,6 +77,17 @@ async function fillAndSubmit(page: Page, title: string, description: string) {
   await page.getByRole('option').first().click();
   await page.getByLabel('หัวเรื่อง').fill(title);
   await page.getByLabel('รายละเอียด', { exact: true }).fill(description);
+
+  // cascade จังหวัด → อำเภอ → ตำบล (หมู่บ้านไม่บังคับ) — pattern เดียวกับ intake.spec.ts
+  await page.locator('#province').click();
+  await page.getByRole('option', { name: geoProvince }).click();
+  await expect(page.locator('#district')).toBeEnabled({ timeout: 10_000 });
+  await page.locator('#district').click();
+  await page.getByRole('option', { name: geoDistrict }).click();
+  await expect(page.locator('#subdistrict')).toBeEnabled({ timeout: 10_000 });
+  await page.locator('#subdistrict').click();
+  await page.getByRole('option', { name: geoSubdistrict }).click();
+
   await page.getByRole('checkbox').check();
   await page.getByRole('button', { name: 'ส่งเรื่อง' }).click();
 }
