@@ -27,7 +27,7 @@ const MOCK_LINE_USER = 'Ue2eliffmock01';
 const MOCK_LINE_EMAIL = `line-${MOCK_LINE_USER}@placeholder.local`;
 const createdCaseIds: string[] = [];
 
-// geography เป็น required บนฟอร์มปัจจุบัน — หยิบชื่อไทยจาก DB เหมือน intake.spec.ts
+// § geography เป็น required บนฟอร์มปัจจุบัน — หยิบชื่อไทยจาก DB เหมือน intake.spec.ts
 let geoProvince: string;
 let geoDistrict: string;
 let geoSubdistrict: string;
@@ -47,9 +47,13 @@ test.beforeAll(async () => {
     .innerJoin(districts, eq(subDistricts.districtId, districts.id))
     .innerJoin(provinces, eq(districts.provinceId, provinces.id))
     .limit(1);
-  geoProvince = chain[0]!.provinceName;
-  geoDistrict = chain[0]!.districtName;
-  geoSubdistrict = chain[0]!.subdistrictName;
+  const row = chain[0];
+  if (!row) {
+    throw new Error('ตาราง geography ว่าง — รัน npx tsx scripts/seed-villages.ts ก่อน (idempotent)');
+  }
+  geoProvince = row.provinceName;
+  geoDistrict = row.districtName;
+  geoSubdistrict = row.subdistrictName;
   await closeDb();
 });
 
