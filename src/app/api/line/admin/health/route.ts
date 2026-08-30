@@ -75,13 +75,14 @@ async function probeSseBroadcaster(): Promise<ProbeResult> {
 
 async function probeLiff(): Promise<ProbeResult> {
   const id = getLiffId();
-  // § pattern เดียวกับ SSE Broadcaster — LIFF เป็นช่องทาง optional ตาม design
-  // (src/lib/liff/config.ts) จึงไม่ดึง overall เป็น degraded เมื่อไม่ได้ตั้ง
-  // แต่แสดง detail ให้เจอกรณี "ลืมตั้ง NEXT_PUBLIC_LIFF_ID / ลืม redeploy"
+  // § ตาม risk row ของ docs/prp-liff-mobile.md — "ลืมตั้ง/ลืม redeploy NEXT_PUBLIC_LIFF_ID"
+  // ต้องเห็นเป็นสัญญาณเตือนจริง จึงรายงาน error (ไอคอนแดงบน /admin/health)
+  // แต่ LIFF เป็นช่องทาง optional ตาม design (src/lib/liff/config.ts) จึงถูก exclude
+  // จาก allOk ใน GET — badge รวมไม่ degraded จากการตั้งค่าที่ปิดโดยตั้งใจ
   if (!id) {
     return {
       name: 'LIFF Config',
-      status: 'ok',
+      status: 'error',
       latencyMs: 0,
       detail: 'ยังไม่ตั้ง NEXT_PUBLIC_LIFF_ID — ปิดช่องทาง LIFF (ทำงานแบบเว็บธรรมดา)',
     };
@@ -101,7 +102,8 @@ export async function GET() {
     probeLiff(),
   ]);
 
-  const allOk = [db, redis, line, sse, liff].every((p) => p.status === 'ok');
+  // § liff ไม่อยู่ใน allOk — เป็น probe สถานะการตั้งค่า ไม่ใช่สุขภาพบริการ (ดู § ใน probeLiff)
+  const allOk = [db, redis, line, sse].every((p) => p.status === 'ok');
 
   return NextResponse.json({
     status: allOk ? 'healthy' : 'degraded',
