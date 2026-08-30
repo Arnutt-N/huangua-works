@@ -20,6 +20,14 @@ describe('lineUserIdFromPlaceholderEmail', () => {
     expect(lineUserIdFromPlaceholderEmail('someone@example.com')).toBeNull();
   });
 
+  test('ปฏิเสธโดเมนอื่น แม้ prefix ถูก', () => {
+    expect(lineUserIdFromPlaceholderEmail('line-Uabc123@other.com')).toBeNull();
+  });
+
+  test('ปฏิเสธ prefix หลุด แม้โดเมนถูก', () => {
+    expect(lineUserIdFromPlaceholderEmail('xline-Uabc123@placeholder.local')).toBeNull();
+  });
+
   test('local part ว่าง คืนสตริงว่างไม่ใช่ null — caller ต้องเช็ค falsy ต่อ', () => {
     expect(lineUserIdFromPlaceholderEmail('line-@placeholder.local')).toBe('');
   });

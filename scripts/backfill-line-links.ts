@@ -39,7 +39,7 @@ const placeholderUsers = await db
 // § lookup เฉพาะ lineUserId ที่ parse ออกมา (inArray บน unique index) — ไม่ดึง line_users ทั้งตาราง
 const derivedIds = placeholderUsers
   .map((user) => lineUserIdFromPlaceholderEmail(user.email))
-  .filter((id): id is string => id !== null);
+  .filter((id): id is string => id !== null && id !== '');
 const lineRowsByLineId = new Map<string, { id: string; linkedUserId: string | null }>();
 if (derivedIds.length > 0) {
   const lineRows = await db
@@ -55,6 +55,7 @@ if (derivedIds.length > 0) {
 
 let alreadyLinked = 0;
 let noLineRow = 0;
+let writtenCount = 0;
 const toFill: { lineRowId: string; lineUserId: string; userId: string }[] = [];
 
 for (const user of placeholderUsers) {
@@ -79,18 +80,23 @@ for (const user of placeholderUsers) {
 
 if (apply && toFill.length > 0) {
   // § เงื่อนไข linked_user_id IS NULL ใน statement คุม invariant "ไม่ overwrite"
-  // แม้มีอีก process เขียน link ชนะระหว่างที่ script กำลังรัน
-  await db.execute(
+  // แม้มีอีก process เขียน link ชนะระหว่างที่ script กำลังรัน — RETURNING นับแถวที่เขียนจริง
+  // § postgres protocol จำกัด 65,535 params/statement (3 ต่อแถว ≈ 21k แถว) — ถ้าต้อง
+  // backfill ปริมาณมาก ให้ chunk toFill ก่อนยิง
+  const result = await db.execute(
     sql`UPDATE line_users AS l SET linked_user_id = v.uid, updated_at = now() FROM (VALUES ${sql.join(
       toFill.map((row) => sql`(${row.lineUserId}::text, ${row.userId}::text, ${row.lineRowId}::text)`),
       sql`, `
-    )}) AS v(line_user_id, uid, line_row_id) WHERE l.id = v.line_row_id AND l.line_user_id = v.line_user_id AND l.linked_user_id IS NULL`
+    )}) AS v(line_user_id, uid, line_row_id) WHERE l.id = v.line_row_id AND l.line_user_id = v.line_user_id AND l.linked_user_id IS NULL RETURNING l.id`
   );
+  // postgres-js คืน RowList เป็น Array ตรง ๆ (probe แล้ว) — length = จำนวนแถวที่เขียนจริง
+  writtenCount = (result as unknown[]).length;
 }
 
 console.log(
-  `\nสรุป: placeholder users ${placeholderUsers.length} ราย — ผูกใหม่ ${toFill.length}, ` +
-    `มี link อยู่แล้ว ${alreadyLinked}, ไม่มีแถว line_users ให้จับคู่ ${noLineRow}` +
+  `\nสรุป: placeholder users ${placeholderUsers.length} ราย — ผูกใหม่ ${toFill.length}` +
+    (apply ? ` (เขียนจริง ${writtenCount})` : '') +
+    `, มี link อยู่แล้ว ${alreadyLinked}, ไม่มีแถว line_users ให้จับคู่ ${noLineRow}` +
     (apply ? ' — เขียน DB แล้ว' : ' — dry-run ไม่ได้เขียน DB')
 );
 
