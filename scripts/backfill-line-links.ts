@@ -14,19 +14,12 @@
 import { config } from 'dotenv';
 import { eq, like } from 'drizzle-orm';
 import { closeDb, getDb } from '../src/lib/db';
+import { lineUserIdFromPlaceholderEmail } from '../src/lib/line/placeholder-email';
 import { lineUsers, users } from '../src/lib/db/schema';
 
 config({ path: '.env.local', override: false });
 
 const apply = process.argv.includes('--apply');
-
-const EMAIL_PREFIX = 'line-';
-const EMAIL_SUFFIX = '@placeholder.local';
-
-function lineUserIdFromEmail(email: string): string | null {
-  if (!email.startsWith(EMAIL_PREFIX) || !email.endsWith(EMAIL_SUFFIX)) return null;
-  return email.slice(EMAIL_PREFIX.length, email.length - EMAIL_SUFFIX.length);
-}
 
 const db = await getDb();
 
@@ -53,7 +46,7 @@ let alreadyLinked = 0;
 let noLineRow = 0;
 
 for (const user of placeholderUsers) {
-  const lineUserId = lineUserIdFromEmail(user.email);
+  const lineUserId = lineUserIdFromPlaceholderEmail(user.email);
   if (!lineUserId) {
     noLineRow += 1;
     continue;
