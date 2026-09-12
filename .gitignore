@@ -83,6 +83,7 @@ project-log-md/
 .claude/skill-collections-20260712.md
 research/
 scripts/tmp-shots/
+graphify-out/
 
 # ---- 🗄️ Database artifacts (เก่า — migrate เป็น Postgres แล้ว) ----
 data/
