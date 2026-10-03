@@ -1,11 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { resetRateLimits } from './helpers/reset-rate-limits';
+import { E2E_CLIENT_IP, resetRateLimits } from './helpers/reset-rate-limits';
+import { rateLimitKey } from '../src/lib/rate-limit/policies';
 
 const ADMIN_EMAIL = 'admin@huangua.go.th';
 const ADMIN_PASSWORD = 'ChangeMe123!'; // local dev seed password (scripts/seed.ts)
 
 test.beforeEach(async () => {
-  await resetRateLimits('rate:admin-login:ip:::1', `rate:admin-login:email:${ADMIN_EMAIL}`);
+  await resetRateLimits(rateLimitKey('adminLoginIp', E2E_CLIENT_IP), rateLimitKey('adminLoginEmail', ADMIN_EMAIL));
 });
 
 test.describe('admin chat page', () => {

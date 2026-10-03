@@ -9,7 +9,8 @@ import {
   users,
 } from '../src/lib/db/schema';
 import { fillGeographyCascade, loadFirstGeography, type Geography } from './helpers/geography';
-import { resetRateLimits } from './helpers/reset-rate-limits';
+import { E2E_CLIENT_IP, resetRateLimits } from './helpers/reset-rate-limits';
+import { rateLimitKey } from '../src/lib/rate-limit/policies';
 
 /**
  * E2E ของ LIFF intake — รันด้วย mock mode เท่านั้น
@@ -28,7 +29,7 @@ const createdCaseIds: string[] = [];
 let geo: Geography;
 
 test.beforeAll(async () => {
-  await resetRateLimits('rate:submit:::1', 'rate:liff-session:::1');
+  await resetRateLimits(rateLimitKey('submit', E2E_CLIENT_IP), rateLimitKey('liffSession', E2E_CLIENT_IP));
 
   geo = await loadFirstGeography();
 });
@@ -76,7 +77,7 @@ test('LIFF mode: banner แสดง และไม่มีช่องเล�
 
 test('LIFF golden path: ส่งเรื่องได้โดยไม่กรอก CID', async ({ page }) => {
   test.slow();
-  await resetRateLimits('rate:submit:::1');
+  await resetRateLimits(rateLimitKey('submit', E2E_CLIENT_IP));
 
   await fillAndSubmit(page, `ทดสอบ LIFF E2E ${Date.now()}`, 'ทดสอบฟอร์มแจ้งเรื่องผ่าน LIFF mock ถาวร');
 
@@ -97,7 +98,7 @@ test('LIFF dedup: ส่งเรื่องเดิมซ้ำ (title+descri
   const dupDesc = 'ทดสอบกันแจ้งซ้ำผ่านช่องทาง LINE ถาวร';
 
   // รอบ 1 — ส่งสำเร็จ
-  await resetRateLimits('rate:submit:::1');
+  await resetRateLimits(rateLimitKey('submit', E2E_CLIENT_IP));
   const page1 = await browser.newPage();
   await fillAndSubmit(page1, dupTitle, dupDesc);
   await expect(page1.getByRole('heading', { name: 'รับเรื่องเรียบร้อย' })).toBeVisible({ timeout: 30_000 });
@@ -107,7 +108,7 @@ test('LIFF dedup: ส่งเรื่องเดิมซ้ำ (title+descri
 
   // รอบ 2 — เรื่องเดิมจากบัญชี LINE เดิม → 409 duplicate (cookie อยู่ใน context เดิม
   // ของ page1 ที่ปิดไปแล้ว จึงต้อง mock session ใหม่ผ่าน URL param เหมือนเดิม)
-  await resetRateLimits('rate:submit:::1');
+  await resetRateLimits(rateLimitKey('submit', E2E_CLIENT_IP));
   const page2 = await browser.newPage();
   await fillAndSubmit(page2, dupTitle, dupDesc);
   await expect(page2.getByText('คุณเคยแจ้งเรื่องนี้ไปแล้วภายใน 7 วัน')).toBeVisible({ timeout: 30_000 });

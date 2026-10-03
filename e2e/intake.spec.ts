@@ -3,7 +3,8 @@ import { eq } from 'drizzle-orm';
 import { closeDb, getDb } from '../src/lib/db';
 import { cases, dedupHashes, users } from '../src/lib/db/schema';
 import { fillGeographyCascade, loadFirstGeography, type Geography } from './helpers/geography';
-import { resetRateLimits } from './helpers/reset-rate-limits';
+import { E2E_CLIENT_IP, resetRateLimits } from './helpers/reset-rate-limits';
+import { rateLimitKey } from '../src/lib/rate-limit/policies';
 
 const TEST_CID = '1101200563040';
 const TEST_EMAIL = `cid-${TEST_CID}@placeholder.local`;
@@ -13,7 +14,7 @@ let geo: Geography;
 
 test.beforeAll(async () => {
   // ::1 คือ IP ที่ request จาก Playwright (ผ่าน localhost) เห็นจริงบนเครื่องนี้
-  await resetRateLimits('rate:submit:::1');
+  await resetRateLimits(rateLimitKey('submit', E2E_CLIENT_IP));
 
   geo = await loadFirstGeography();
 });

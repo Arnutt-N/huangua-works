@@ -1,6 +1,12 @@
 import { Redis } from '@upstash/redis';
 
 /**
+ * IP ที่ next dev เห็นเมื่อ Playwright ยิงจากเครื่องเดียวกัน (IPv6 loopback)
+ * ใช้คู่กับ rateLimitKey() จาก src/lib/rate-limit/policies.ts — spec ไม่ต้องรู้รูปแบบ key เอง
+ */
+export const E2E_CLIENT_IP = '::1';
+
+/**
  * ล้าง rate-limit key ก่อนรัน E2E — กัน flaky test เวลารันซ้ำภายใน window เดิม
  * (เช่น dev รัน `pnpm test:e2e` ซ้ำหลายรอบระหว่างพัฒนา)
  *
