@@ -71,13 +71,24 @@ const config = [
             'ห้ามเขียนค่าสีดิบใน template literal — ใช้ token/utility แทน (ดู DESIGN.md §2)',
         },
       ],
-      // M-A5 — a11y (jsx-a11y plugin มาจาก core-web-vitals)
+      'no-console': ['warn', { allow: ['warn', 'error'] }],
+    },
+  },
+  {
+    /* M-A5 — a11y (jsx-a11y plugin มาจาก core-web-vitals)
+     *
+     * § กฎ jsx-a11y ต้อง scope ไว้ที่ไฟล์ JSX เท่านั้น — plugin ถูก register ใน scope
+     * ของ core-web-vitals ถ้าประกาศกฎใน object ลอย (ไม่มี files:) ESLint จะพยายาม
+     * apply กับทุกไฟล์ที่ linter เห็น แล้วลั่น "could not find plugin jsx-a11y"
+     * พังทั้ง run ตั้งแต่ระดับ config (lint ไฟล์เดียวที่เป็น .tsx ผ่านเพราะโดน scope พอดี)
+     */
+    files: ['**/*.{tsx,jsx}'],
+    rules: {
       'jsx-a11y/control-has-associated-label': 'error',
       'jsx-a11y/no-autofocus': 'error',
       'jsx-a11y/click-events-have-key-events': 'error',
       'jsx-a11y/no-static-element-interactions': 'error',
       'jsx-a11y/interactive-supports-focus': 'error',
-      'no-console': ['warn', { allow: ['warn', 'error'] }],
     },
   },
   {
