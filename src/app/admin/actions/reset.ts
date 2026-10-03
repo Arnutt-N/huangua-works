@@ -7,7 +7,7 @@ import { users } from '@/lib/db/schema';
 import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
 import { hashPassword } from '@/lib/password';
 import { getClientIp, getClientUserAgent } from '@/lib/auth/require-staff';
-import { checkRateLimit } from '@/lib/upstash';
+import { enforceRateLimit } from '@/lib/rate-limit/enforce';
 import {
   createResetToken,
   validateResetToken,
@@ -67,8 +67,8 @@ export async function requestPasswordReset(
   // § จำกัดทั้งต่อ IP และต่อ email — กัน email bombing (ส่งลิงก์รัวๆ ก่อกวนผู้ใช้)
   // และกัน brute-force ลอง email; fail-secure เหมือน login path
   const [ipLimit, emailLimit] = await Promise.all([
-    checkRateLimit(`rate:pw-reset:ip:${ip}`, 5, 900, { failOpen: false }),
-    checkRateLimit(`rate:pw-reset:email:${email}`, 3, 900, { failOpen: false }),
+    enforceRateLimit('pwResetIp', ip),
+    enforceRateLimit('pwResetEmail', email),
   ]);
   if (!ipLimit.allowed || !emailLimit.allowed) {
     const reset = Math.max(ipLimit.reset, emailLimit.reset);
@@ -152,9 +152,7 @@ export async function completePasswordReset(
   const userAgent = await getClientUserAgent();
 
   // § จำกัดการลอง token — แม้ token 256-bit จะเดาไม่ได้ แต่กันการยิง request รัวๆ
-  const limit = await checkRateLimit(`rate:pw-reset:complete:${ip}`, 5, 900, {
-    failOpen: false,
-  });
+  const limit = await enforceRateLimit('pwResetComplete', ip);
   if (!limit.allowed) {
     return { error: `ส่งคำขอถี่เกินไป กรุณารอ ${limit.reset} วินาที` };
   }

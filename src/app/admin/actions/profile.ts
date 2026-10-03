@@ -8,7 +8,7 @@ import { users } from '@/lib/db/schema';
 import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
 import { hashPassword, verifyPassword } from '@/lib/password';
 import { requireStaff } from '@/lib/auth/require-staff';
-import { checkRateLimit } from '@/lib/upstash';
+import { enforceRateLimit } from '@/lib/rate-limit/enforce';
 import {
   changeOwnPasswordFormSchema,
   updateProfileFormSchema,
@@ -88,9 +88,7 @@ export async function changeOwnPassword(
 
   // § จำกัดจำนวนครั้ง — ฟอร์มนี้ยืนยันรหัสผ่านเดิม จึงเป็น oracle ให้เดารหัสได้
   // ถ้าใครขโมย session ไปแล้ว ใช้ failOpen:false เหมือน path login ด้วยเหตุผลเดียวกัน
-  const limit = await checkRateLimit(`rate:change-password:${actor.id}`, 5, 900, {
-    failOpen: false,
-  });
+  const limit = await enforceRateLimit('changePassword', actor.id);
   if (!limit.allowed) {
     return { error: `เปลี่ยนรหัสผ่านถี่เกินไป กรุณารอ ${limit.reset} วินาที` };
   }
