@@ -1,6 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
+import type { RichMenuItem } from '@/app/admin/_lib/admin-api';
+import { adminApi } from '@/app/admin/_lib/admin-api';
+import { useResource } from '@/app/admin/_lib/use-resource';
 import { Plus, RefreshCw, Globe, LayoutGrid } from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import {
@@ -12,17 +15,6 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label, Input, Textarea } from '@/components/ui/field';
-
-interface RichMenuItem {
-  id: string;
-  name: string;
-  chatBarText: string;
-  lineRichMenuId: string | null;
-  status: string;
-  syncStatus: string;
-  lastSyncError: string | null;
-  createdAt: string;
-}
 
 const DEFAULT_CONFIG = JSON.stringify({
   size: { width: 2500, height: 1686 },
@@ -38,90 +30,50 @@ const DEFAULT_CONFIG = JSON.stringify({
 }, null, 2);
 
 export function RichMenusClient() {
-  const [items, setItems] = useState<RichMenuItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [name, setName] = useState('');
   const [chatBarText, setChatBarText] = useState('เมนูหลัก');
   const [configJson, setConfigJson] = useState(DEFAULT_CONFIG);
   const [saving, setSaving] = useState(false);
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
-  const notify = (type: 'success' | 'error', msg: string) => {
-    setFeedback({ type, msg });
-    setTimeout(() => setFeedback(null), 4000);
-  };
-
-  const fetchItems = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/line/admin/rich-menus');
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setItems(data.items);
-    } catch {
-      notify('error', 'โหลดข้อมูลไม่สำเร็จ');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchItems(); }, [fetchItems]);
+  const { data, loading, feedback, notify, mutate } = useResource({
+    load: adminApi.listRichMenus,
+  });
+  const items = data?.items ?? [];
 
   async function handleCreate() {
-    if (!name.trim()) { notify('error', 'กรุณากรอกชื่อ'); return; }
+    if (!name.trim()) {
+      notify('error', 'กรุณากรอกชื่อ');
+      return;
+    }
     let config: unknown;
-    try { config = JSON.parse(configJson); } catch { notify('error', 'Config JSON ไม่ถูกต้อง'); return; }
+    try {
+      config = JSON.parse(configJson);
+    } catch {
+      notify('error', 'Config JSON ไม่ถูกต้อง');
+      return;
+    }
 
     setSaving(true);
-    try {
-      const res = await fetch('/api/line/admin/rich-menus', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), chatBarText, config }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? 'สร้างไม่สำเร็จ');
-      }
-      notify('success', 'สร้าง Rich Menu สำเร็จ');
+    const ok = await mutate(
+      () => adminApi.createRichMenu({ name: name.trim(), chatBarText, config }),
+      'สร้าง Rich Menu สำเร็จ',
+    );
+    setSaving(false);
+    if (ok) {
       setDialogOpen(false);
       setName('');
-      fetchItems();
-    } catch (err) {
-      notify('error', err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
-    } finally {
-      setSaving(false);
     }
   }
 
   async function handleSync(item: RichMenuItem) {
-    try {
-      const res = await fetch(`/api/line/admin/rich-menus/${item.id}/sync`, { method: 'POST' });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? 'sync ไม่สำเร็จ');
-      }
-      notify('success', 'Sync สำเร็จ');
-      fetchItems();
-    } catch (err) {
-      notify('error', err instanceof Error ? err.message : 'sync ไม่สำเร็จ');
-    }
+    await mutate(() => adminApi.syncRichMenu(item.id), 'Sync สำเร็จ');
   }
 
   async function handlePublish(item: RichMenuItem) {
     if (!confirm(`Publish "${item.name}" ให้ผู้ใช้ LINE ทุกคน?`)) return;
-    try {
-      const res = await fetch(`/api/line/admin/rich-menus/${item.id}/publish`, { method: 'POST' });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? 'publish ไม่สำเร็จ');
-      }
-      notify('success', 'Publish สำเร็จ — ผู้ใช้ทุกคนจะเห็นเมนูใหม่');
-      fetchItems();
-    } catch (err) {
-      notify('error', err instanceof Error ? err.message : 'publish ไม่สำเร็จ');
-    }
+    // server คืน 422 { error } เมื่อ LINE ปฏิเสธ — mutate เอาข้อความนั้นมาแจ้ง
+    await mutate(() => adminApi.publishRichMenu(item.id), 'Publish สำเร็จ — ผู้ใช้ทุกคนจะเห็นเมนูใหม่');
   }
 
   return (
