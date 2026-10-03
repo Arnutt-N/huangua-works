@@ -28,6 +28,7 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
     visible,
     counts,
     loading,
+    feedback,
     filter,
     setFilter,
     sort,
@@ -136,6 +137,9 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
     <>
       <div className="flex h-[calc(100dvh-4rem)] w-full overflow-hidden bg-surface font-sans">
         {/* มือถือ: แสดงรายการเต็มจอ แล้วสลับไปหน้าต่างแชทเมื่อเลือกห้อง */}
+        {feedback?.type === 'error' && (
+          <p role="status" className="px-3 py-2 text-sm text-danger">{feedback.msg}</p>
+        )}
         <ConversationList
           visible={visible}
           counts={counts}
