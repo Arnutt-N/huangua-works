@@ -1,6 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
+import type { BroadcastItem } from '@/app/admin/_lib/admin-api';
+import { adminApi } from '@/app/admin/_lib/admin-api';
+import { useResource } from '@/app/admin/_lib/use-resource';
 import { Plus, Send, Clock, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import {
@@ -12,18 +15,6 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { FieldHint, Label, Textarea } from '@/components/ui/field';
-
-interface BroadcastItem {
-  id: string;
-  content: { type: string; text?: string }[];
-  status: string;
-  scheduledAt: string | null;
-  sentAt: string | null;
-  totalRecipients: number;
-  successCount: number;
-  failedCount: number;
-  createdAt: string;
-}
 
 /**
  * รอบการตรวจคิวส่งประกาศ (นาที) — ต้องตรงกับ schedule ที่ตั้งไว้ใน cron-job.org
@@ -40,76 +31,42 @@ const STATUS_MAP: Record<string, { label: string; icon: typeof Clock; cls: strin
 };
 
 export function BroadcastClient() {
-  const [items, setItems] = useState<BroadcastItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [message, setMessage] = useState('');
   const [scheduleAt, setScheduleAt] = useState('');
   const [saving, setSaving] = useState(false);
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
-  const notify = (type: 'success' | 'error', msg: string) => {
-    setFeedback({ type, msg });
-    setTimeout(() => setFeedback(null), 4000);
-  };
-
-  const fetchItems = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/line/admin/broadcasts');
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setItems(data.items);
-    } catch {
-      notify('error', 'โหลดข้อมูลไม่สำเร็จ');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchItems(); }, [fetchItems]);
+  const { data, loading, feedback, notify, mutate } = useResource({
+    load: adminApi.listBroadcasts,
+  });
+  const items = data?.items ?? [];
 
   async function handleCreate() {
-    if (!message.trim()) { notify('error', 'กรุณากรอกข้อความ'); return; }
+    if (!message.trim()) {
+      notify('error', 'กรุณากรอกข้อความ');
+      return;
+    }
     setSaving(true);
-    try {
-      const res = await fetch('/api/line/admin/broadcasts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+    const ok = await mutate(
+      () =>
+        adminApi.createBroadcast({
           content: [{ type: 'text', text: message.trim() }],
           scheduledAt: scheduleAt || null,
         }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? 'สร้างไม่สำเร็จ');
-      }
-      notify('success', scheduleAt ? 'ตั้งเวลาส่งแล้ว' : 'สร้างร่างสำเร็จ');
+      scheduleAt ? 'ตั้งเวลาส่งแล้ว' : 'สร้างร่างสำเร็จ',
+    );
+    setSaving(false);
+    if (ok) {
       setDialogOpen(false);
       setMessage('');
       setScheduleAt('');
-      fetchItems();
-    } catch (err) {
-      notify('error', err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
-    } finally {
-      setSaving(false);
     }
   }
 
   async function handleSend(item: BroadcastItem) {
     if (!confirm('ส่งประกาศหาผู้ติดตามทุกคนทันที?')) return;
-    try {
-      const res = await fetch(`/api/line/admin/broadcasts/${item.id}/send`, { method: 'POST' });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? 'ส่งไม่สำเร็จ');
-      }
-      notify('success', 'ส่งประกาศสำเร็จ');
-      fetchItems();
-    } catch (err) {
-      notify('error', err instanceof Error ? err.message : 'ส่งไม่สำเร็จ');
-    }
+    // server คืน 409 { error: 'ส่งแล้วหรือกำลังส่ง' } / 404 — mutate โชว์ข้อความนั้น
+    await mutate(() => adminApi.sendBroadcast(item.id), 'ส่งประกาศสำเร็จ');
   }
 
   return (
