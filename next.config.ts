@@ -20,6 +20,11 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   output: 'standalone',
+  // § Next 16.3 ขึ้นไป `next dev` เขียนบล็อก `nextjs-agent-rules` ต่อท้าย AGENTS.md ทุกครั้งที่รัน
+  // (เป็น tracked file ที่เราดูแลเอง และเป็นแหล่งกติกาเดียวของทุก agent) — ปิดไว้กันไฟล์
+  // เปลี่ยนเองแล้วถูก commit ติดไปกับงานอื่น ถ้าต้องการให้ agent อ่านคู่มือที่ bundle มากับ next
+  // (node_modules/next/dist/docs/) ให้ลบบรรทัดนี้แล้ว commit บล็อกที่ถูกสร้างขึ้นมาแทน
+  agentRules: false,
   // productionBrowserSourceMaps: false (default) — ไม่รั่ว source map สู่ client
   experimental: {
     // optimizePackageImports สำหรับ Radix ลด bundle — เปิดเมื่อ deps ลงเรียบร้อย
