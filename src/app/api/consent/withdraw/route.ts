@@ -17,7 +17,8 @@ import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { cases, lineUsers, users } from '@/lib/db/schema';
 import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
-import { checkRateLimit } from '@/lib/upstash';
+import { enforceRateLimit } from '@/lib/rate-limit/enforce';
+import { clientIpFromHeaders } from '@/lib/rate-limit/client-ip';
 import { normalizeTrackingCode } from '@/lib/case-tracking';
 import { generateCidHash } from '@/lib/cid-hmac';
 import { revokeConsent } from '@/lib/consent';
@@ -31,15 +32,13 @@ import { LIFF_SESSION_COOKIE, readLiffSessionValue } from '@/lib/liff/session';
 const WITHDRAW_DENIED = { error: 'ไม่พบเรื่องที่ระบุ หรือข้อมูลไม่ตรงกับเจ้าของเรื่อง' };
 
 export async function POST(req: NextRequest) {
-  const ip =
-    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'unknown';
+  const ip = clientIpFromHeaders(req.headers);
 
   // § Rate limit — 5 requests / 10 minutes (ถี่เกินไป = น่าสงสัย)
   // failOpen: false — endpoint นี้ยืนยันตัวตนด้วย trackingCode + CID และทำงานทำลายข้อมูล
   // (ถอนความยินยอม) ถ้า Redis ล่มแล้วปล่อยผ่าน = เดา CID ได้ไม่จำกัด นับเป็น auth path
-  const rateLimit = await checkRateLimit(`rate:consent-withdraw:${ip}`, 5, 600, {
-    failOpen: false,
-  });
+  // (บังคับที่ RATE_LIMIT_POLICIES.consentWithdraw — kind 'auth')
+  const rateLimit = await enforceRateLimit('consentWithdraw', ip);
   if (!rateLimit.allowed) {
     return NextResponse.json(
       { error: 'ส่งคำขอถี่เกินไป กรุณารอ ' + rateLimit.reset + ' วินาที' },

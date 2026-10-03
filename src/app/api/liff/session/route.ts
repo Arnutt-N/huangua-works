@@ -4,7 +4,8 @@ import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { lineUsers, users } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
-import { checkRateLimit } from '@/lib/upstash';
+import { enforceRateLimit } from '@/lib/rate-limit/enforce';
+import { clientIpFromHeaders } from '@/lib/rate-limit/client-ip';
 import { parseBody } from '@/lib/api-helpers';
 import { liffSessionSchema } from '@/lib/validation';
 import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
@@ -104,13 +105,11 @@ async function linkLineIdentity(identity: VerifiedLineIdentity): Promise<string>
 }
 
 export async function POST(req: NextRequest) {
-  const ip =
-    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    req.headers.get('x-real-ip') ||
-    'unknown';
+  const ip = clientIpFromHeaders(req.headers);
 
   // § failOpen: false — path นี้คือการยืนยันตัวตน Redis ล่มต้องปิด กัน brute ไม่จำกัด
-  const rateLimit = await checkRateLimit(`rate:liff-session:${ip}`, 5, 300, { failOpen: false });
+  // (บังคับที่ RATE_LIMIT_POLICIES.liffSession — kind 'auth')
+  const rateLimit = await enforceRateLimit('liffSession', ip);
   if (!rateLimit.allowed) {
     return NextResponse.json(
       { error: `พยายามบ่อยเกินไป กรุณารอ ${rateLimit.reset} วินาที` },

@@ -6,17 +6,17 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { isValidCid } from '@/lib/cid-checksum';
-import { checkRateLimit } from '@/lib/upstash';
+import { enforceRateLimit } from '@/lib/rate-limit/enforce';
+import { clientIpFromHeaders } from '@/lib/rate-limit/client-ip';
 import { submitCaseSchema, submitCaseLineSchema, validateOrError } from '@/lib/validation';
 import { createCase } from '@/lib/cases/intake';
 import { LIFF_SESSION_COOKIE, readLiffSessionValue } from '@/lib/liff/session';
 
 export async function POST(req: NextRequest) {
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'unknown';
+  const ip = clientIpFromHeaders(req.headers);
 
-  // § Rate limit — 3 requests / 5 minutes
-  const rateLimitKey = `rate:submit:${ip}`;
-  const rateLimit = await checkRateLimit(rateLimitKey, 3, 300);
+  // § Rate limit — 3 requests / 5 minutes (RATE_LIMIT_POLICIES.submit — public, fail-open)
+  const rateLimit = await enforceRateLimit('submit', ip);
 
   if (!rateLimit.allowed) {
     return NextResponse.json(
