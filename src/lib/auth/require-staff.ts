@@ -8,14 +8,14 @@ import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { users } from '@/lib/db/schema';
 import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
 import type { UserRole } from '@/lib/auth/roles';
+import { clientIpFromHeaders } from '@/lib/rate-limit/client-ip';
 
 /**
- * ดึง IP address จาก request headers
- * (เรียบง่าย — ใช้ X-Forwarded-For หรือ X-Real-IP ตามลำดับ, fallback 'unknown')
+ * ดึง IP address จาก request headers ของ server action / server component
+ * (สูตรจริงอยู่ที่ clientIpFromHeaders — route handler เรียกตัวนั้นกับ req.headers ตรง ๆ)
  */
 export async function getClientIp(): Promise<string> {
-  const h = await headers();
-  return h.get('x-forwarded-for')?.split(',')[0]?.trim() || h.get('x-real-ip') || 'unknown';
+  return clientIpFromHeaders(await headers());
 }
 
 export async function getClientUserAgent(): Promise<string | undefined> {
