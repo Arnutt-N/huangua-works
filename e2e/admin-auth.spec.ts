@@ -53,7 +53,9 @@ test('full session lifecycle: login -> dashboard -> bounce-back -> logout -> re-
   await page.getByLabel('รหัสผ่าน').fill(ADMIN_PASSWORD);
   await page.getByRole('button', { name: /เข้าระบบ/ }).click();
 
-  await expect(page).toHaveURL(/\/admin$/, { timeout: 10_000 });
+  // § /admin เจอครั้งแรกของ run = cold Turbopack compile (30-60s ตาม playwright.config)
+  // 10s เดิมแฟล็คเมื่อ spec นี้รันก่อน spec อื่นที่แตะ /admin
+  await expect(page).toHaveURL(/\/admin$/, { timeout: 60_000 });
   await expect(page.getByRole('heading', { name: 'แดชบอร์ดเจ้าหน้าที่' })).toBeVisible();
 
   // already authenticated -> visiting /admin/login bounces back to /admin
