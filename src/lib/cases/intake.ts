@@ -5,6 +5,7 @@ import { cases, categories, lineUsers, users } from '../db/schema';
 import { generateId } from '../id';
 import { generateTrackingCode } from '../case-tracking';
 import { generateCidHash } from '../cid-hmac';
+import { linePlaceholderEmail } from '../line/placeholder-email';
 import { checkDuplicate, recordDedupHash } from '../dedup';
 import { grantConsent, CONSENT_VERSION } from '../consent';
 import { AUDIT_ACTIONS, logAudit } from '../audit';
@@ -183,7 +184,7 @@ async function resolveSubmitter(db: Db, input: CaseIntakeInput): Promise<string 
       );
       if (lineRow?.linkedUserId) return lineRow.linkedUserId;
 
-      const email = `line-${input.lineUserId}@placeholder.local`;
+      const email = linePlaceholderEmail(input.lineUserId);
       const existingUser = await firstOrUndefined(
         db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1)
       );
@@ -211,7 +212,7 @@ async function resolveSubmitter(db: Db, input: CaseIntakeInput): Promise<string 
     const userId = generateId();
     await db.insert(users).values({
       id: userId,
-      email: `line-${generateId()}@placeholder.local`,
+      email: linePlaceholderEmail(generateId()),
       role: 'citizen',
       isActive: true,
       fullName: input.fullName || 'ผู้ใช้ LINE',
