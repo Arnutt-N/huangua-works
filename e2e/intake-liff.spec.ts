@@ -33,6 +33,14 @@ test.beforeAll(async () => {
   geo = await loadFirstGeography();
 });
 
+// § reset ต่อ test ไม่ใช่แค่ beforeAll — POST /api/liff/session จำกัด 5 ครั้ง/5 นาทีต่อ IP
+// (failOpen: false) และ `next dev` 16.3.8 ยิง GET+POST คู่ซ้ำสองชุดต่อหนึ่งการโหลดหน้า
+// (16.2.9 ยิงชุดเดียว — วัดจาก dev log; สาเหตุไม่ได้สืบ) ทั้งไฟล์ 4 โหลดหน้า = 8 ครั้งเกิน
+// budget ทำให้ test dedup รอบ 2 ได้ 429 แล้วไม่มี liff-auth-banner
+test.beforeEach(async () => {
+  await resetRateLimits('rate:liff-session:::1');
+});
+
 test.afterAll(async () => {
   const db = await getDb();
   for (const id of createdCaseIds) {
