@@ -1,6 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
+import type { FaqItem } from '@/app/admin/_lib/admin-api';
+import { adminApi } from '@/app/admin/_lib/admin-api';
+import { useResource } from '@/app/admin/_lib/use-resource';
 import { Plus, Search, Pencil, Trash2, MessageCircleQuestion } from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import {
@@ -13,17 +16,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label, Input, Textarea } from '@/components/ui/field';
 
-interface FaqItem {
-  id: string;
-  question: string;
-  answer: string;
-  keywords: string[];
-  priority: number;
-  isActive: boolean;
-  hitCount: number;
-  createdAt: string;
-}
-
 interface FaqForm {
   question: string;
   answer: string;
@@ -35,46 +27,19 @@ interface FaqForm {
 const EMPTY_FORM: FaqForm = { question: '', answer: '', keywords: '', priority: 0, isActive: true };
 
 export function AutoRepliesClient() {
-  const [items, setItems] = useState<FaqItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FaqForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
-  const notify = (type: 'success' | 'error', msg: string) => {
-    setFeedback({ type, msg });
-    setTimeout(() => setFeedback(null), 4000);
-  };
-
-  const fetchItems = useCallback(async (q?: string) => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({ limit: '50' });
-      if (q) params.set('q', q);
-      const res = await fetch(`/api/line/admin/faq?${params}`);
-      if (!res.ok) throw new Error('fetch failed');
-      const data = await res.json();
-      setItems(data.items);
-      setTotal(data.total);
-    } catch {
-      notify('error', 'โหลดข้อมูลไม่สำเร็จ');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
-
-  useEffect(() => {
-    const t = setTimeout(() => fetchItems(search || undefined), 300);
-    return () => clearTimeout(t);
-  }, [search, fetchItems]);
+  const { data, loading, feedback, notify, mutate } = useResource({
+    load: adminApi.listFaq,
+    query: search,
+    debounceMs: 300,
+  });
+  const items = data?.items ?? [];
+  const total = data?.total ?? 0;
 
   function openCreate() {
     setEditingId(null);
@@ -99,49 +64,26 @@ export function AutoRepliesClient() {
       notify('error', 'กรุณากรอกคำถามและคำตอบ');
       return;
     }
+    const payload = {
+      question: form.question.trim(),
+      answer: form.answer.trim(),
+      keywords: form.keywords.split(',').map((k) => k.trim()).filter(Boolean),
+      priority: form.priority,
+      isActive: form.isActive,
+    };
     setSaving(true);
-    try {
-      const payload = {
-        question: form.question.trim(),
-        answer: form.answer.trim(),
-        keywords: form.keywords.split(',').map((k) => k.trim()).filter(Boolean),
-        priority: form.priority,
-        isActive: form.isActive,
-      };
-
-      const url = editingId ? `/api/line/admin/faq/${editingId}` : '/api/line/admin/faq';
-      const method = editingId ? 'PATCH' : 'POST';
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? 'บันทึกไม่สำเร็จ');
-      }
-
-      notify('success', editingId ? 'แก้ไข FAQ สำเร็จ' : 'เพิ่ม FAQ สำเร็จ');
-      setDialogOpen(false);
-      fetchItems(search || undefined);
-    } catch (err) {
-      notify('error', err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
-    } finally {
-      setSaving(false);
-    }
+    const ok = await mutate(
+      () => (editingId ? adminApi.updateFaq(editingId, payload) : adminApi.createFaq(payload)),
+      editingId ? 'แก้ไข FAQ สำเร็จ' : 'เพิ่ม FAQ สำเร็จ',
+    );
+    setSaving(false);
+    if (ok) setDialogOpen(false);
   }
 
   async function handleDelete(item: FaqItem) {
     if (!confirm(`ปิดใช้งาน "${item.question}" ?`)) return;
-    try {
-      const res = await fetch(`/api/line/admin/faq/${item.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error();
-      notify('success', 'ปิดใช้งาน FAQ แล้ว');
-      fetchItems(search || undefined);
-    } catch {
-      notify('error', 'ลบไม่สำเร็จ');
-    }
+    // server คืน { error } ภาษาไทย (เช่น ไม่พบ FAQ) — mutate จะเอามาแจ้งให้เห็นตรง ๆ
+    await mutate(() => adminApi.deleteFaq(item.id), 'ปิดใช้งาน FAQ แล้ว');
   }
 
   return (
