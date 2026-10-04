@@ -11,7 +11,10 @@ const mockDb = {
   insert: vi.fn().mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) }),
   update: vi.fn().mockReturnValue({
     set: vi.fn().mockReturnValue({
-      where: vi.fn().mockResolvedValue(undefined),
+      // § changeMode เรียก .where().returning() — mock ชั่วคราวถึง Task 8 (เปลี่ยน mockDb ทั้งก้อน)
+      where: vi.fn().mockReturnValue(
+        Object.assign(Promise.resolve(undefined), { returning: vi.fn().mockResolvedValue([]) }),
+      ),
     }),
   }),
 } as never;
@@ -38,6 +41,7 @@ vi.mock('./intent-matcher', () => ({
 
 vi.mock('../client', () => ({
   getProfile: vi.fn(async () => null),
+  pushMessage: vi.fn(async () => {}),
   replyMessage: vi.fn(async () => {}),
   sendTypingIndicator: vi.fn(async () => {}),
 }));
