@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { eq, and } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { chatReplyObjects, chatIntentResponses, chatFaq } from '@/lib/db/schema';
+import { parseBody } from '@/lib/api-helpers';
 import { requireStaffApi } from '@/lib/auth/require-staff';
 import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit';
@@ -26,17 +27,8 @@ export async function PATCH(
 
   const { id } = await params;
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-
-  const parsed = updateSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'ข้อมูลไม่ถูกต้อง' }, { status: 400 });
-  }
+  const result = await parseBody(updateSchema, request);
+  if (!result.ok) return result.response;
 
   const db = await getDb();
   const [existing] = await db.select({ id: chatReplyObjects.id }).from(chatReplyObjects).where(eq(chatReplyObjects.id, id)).limit(1);
@@ -46,7 +38,7 @@ export async function PATCH(
 
   await db
     .update(chatReplyObjects)
-    .set({ ...parsed.data, updatedAt: new Date() })
+    .set({ ...result.data, updatedAt: new Date() })
     .where(eq(chatReplyObjects.id, id));
 
   await logAudit({

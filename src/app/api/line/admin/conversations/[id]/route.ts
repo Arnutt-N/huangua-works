@@ -9,6 +9,7 @@ import {
   updateConversationSchema,
   validateOrError,
 } from '@/lib/validation';
+import { parseBody } from '@/lib/api-helpers';
 import { broadcast } from '@/lib/line/sse/broadcaster';
 
 export const runtime = 'nodejs';
@@ -70,19 +71,10 @@ export async function PATCH(
   const authz = await requireStaffApi(STAFF_ROLES);
   if (!authz.ok) return authz.response;
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+  const result = await parseBody(updateConversationSchema, request);
+  if (!result.ok) return result.response;
 
-  const validation = validateOrError(updateConversationSchema, body);
-  if (!validation.success) {
-    return NextResponse.json({ error: validation.error }, { status: 400 });
-  }
-
-  const { mode, linkedCaseId, assignedAdminId, transferReason, adminNote } = validation.data;
+  const { mode, linkedCaseId, assignedAdminId, transferReason, adminNote } = result.data;
   const { id } = await params;
   const db = await getDb();
 

@@ -5,7 +5,8 @@ import { chatMessages, chatConversations } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import { requireStaffApi } from '@/lib/auth/require-staff';
 import { STAFF_ROLES } from '@/lib/auth/roles';
-import { chatReplySchema, validateOrError } from '@/lib/validation';
+import { chatReplySchema } from '@/lib/validation';
+import { parseBody } from '@/lib/api-helpers';
 import { pushMessage } from '@/lib/line/client';
 import { broadcast } from '@/lib/line/sse/broadcaster';
 
@@ -48,19 +49,9 @@ export async function POST(
   const authz = await requireStaffApi(STAFF_ROLES);
   if (!authz.ok) return authz.response;
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-
-  const validation = validateOrError(chatReplySchema, body);
-  if (!validation.success) {
-    return NextResponse.json({ error: validation.error }, { status: 400 });
-  }
-
-  const { text, clientTempId } = validation.data;
+  const result = await parseBody(chatReplySchema, request);
+  if (!result.ok) return result.response;
+  const { text, clientTempId } = result.data;
   const { id } = await params;
 
   const db = await getDb();

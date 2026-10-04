@@ -3,6 +3,7 @@ import { asc, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { chatFaq } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
+import { parseBody } from '@/lib/api-helpers';
 import { requireStaffApi } from '@/lib/auth/require-staff';
 import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit';
@@ -53,28 +54,19 @@ export async function POST(request: Request) {
   const authz = await requireStaffApi(ADMIN_ROLES);
   if (!authz.ok) return authz.response;
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-
-  const parsed = faqCreateSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'ข้อมูลไม่ถูกต้อง' }, { status: 400 });
-  }
+  const result = await parseBody(faqCreateSchema, request);
+  if (!result.ok) return result.response;
 
   const db = await getDb();
   const id = generateId();
 
   await db.insert(chatFaq).values({
     id,
-    question: parsed.data.question,
-    answer: parsed.data.answer,
-    keywords: parsed.data.keywords,
-    priority: parsed.data.priority,
-    isActive: parsed.data.isActive,
+    question: result.data.question,
+    answer: result.data.answer,
+    keywords: result.data.keywords,
+    priority: result.data.priority,
+    isActive: result.data.isActive,
   });
 
   await logAudit({

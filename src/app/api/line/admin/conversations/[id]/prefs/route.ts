@@ -4,7 +4,8 @@ import { chatAdminPrefs } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import { requireStaffApi } from '@/lib/auth/require-staff';
 import { STAFF_ROLES } from '@/lib/auth/roles';
-import { chatPrefsSchema, validateOrError } from '@/lib/validation';
+import { chatPrefsSchema } from '@/lib/validation';
+import { parseBody } from '@/lib/api-helpers';
 
 export const runtime = 'nodejs';
 
@@ -15,19 +16,10 @@ export async function PUT(
   const authz = await requireStaffApi(STAFF_ROLES);
   if (!authz.ok) return authz.response;
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+  const result = await parseBody(chatPrefsSchema, request);
+  if (!result.ok) return result.response;
 
-  const validation = validateOrError(chatPrefsSchema, body);
-  if (!validation.success) {
-    return NextResponse.json({ error: validation.error }, { status: 400 });
-  }
-
-  const { pinned, muted } = validation.data;
+  const { pinned, muted } = result.data;
   const { id } = await params;
   const db = await getDb();
 
