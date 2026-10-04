@@ -3,7 +3,7 @@
  * ใช้ HMAC-SHA256 hash ของ (CID + title + description)
  */
 
-import { getDb, type Db } from './db';
+import { getDb, type DbOrTx } from './db';
 import { firstOrUndefined } from './db/query-helpers';
 import { dedupHashes } from './db/schema';
 import { generateId } from './id';
@@ -19,7 +19,7 @@ export async function checkDuplicate(
   cid: string,
   title: string,
   description: string,
-  db?: Db,
+  db?: DbOrTx,
 ): Promise<{ isDuplicate: boolean; caseId?: string }> {
   const _db = db ?? await getDb();
   const hash = generateDedupHash(cid, title, description);
@@ -48,7 +48,7 @@ export async function recordDedupHash(
   title: string,
   description: string,
   caseId: string,
-  db?: Db,
+  db?: DbOrTx,
 ): Promise<void> {
   const _db = db ?? await getDb();
   const hash = generateDedupHash(cid, title, description);
@@ -65,7 +65,7 @@ export async function recordDedupHash(
 /**
  * ลบ hash ที่หมดอายุ (cleanup — เรียกจาก cron)
  */
-export async function cleanupExpiredHashes(db?: Db): Promise<number> {
+export async function cleanupExpiredHashes(db?: DbOrTx): Promise<number> {
   const _db = db ?? await getDb();
   const now = new Date();
 

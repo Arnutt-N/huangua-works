@@ -16,6 +16,7 @@ const { mockState, mockDb } = vi.hoisted(() => {
   const mockState = {
     /** จำนวนครั้งที่ query ตาราง cases จะตอบว่า "ชน" ก่อนจะเริ่มตอบว่าว่าง */
     collisionsRemaining: 0,
+    conflictWinner: null as { id: string; email: string } | null,
     /** แถวที่ query ตาราง users จะคืน (จำลอง user ที่มีอยู่แล้ว) */
     existingUsers: [] as Array<{ id: string; email: string }>,
     /** email ที่ resolveSubmitter ใช้ค้น users จริงๆ */
@@ -94,8 +95,13 @@ const { mockState, mockDb } = vi.hoisted(() => {
     const tableName = getTableName(table as Parameters<typeof getTableName>[0]);
     const obj: Record<string, unknown> = {
       then: (resolve: (v: unknown) => unknown) => Promise.resolve(undefined).then(resolve),
+      onConflictDoNothing: vi.fn(() => {
+        if (mockState.conflictWinner) mockState.existingUsers = [mockState.conflictWinner];
+        return obj;
+      }),
+      returning: vi.fn(() => Promise.resolve(mockState.conflictWinner ? [] : [{ id: mockState.insertedUsers.at(-1)?.id }])),
       values: vi.fn((row: Record<string, unknown>) => {
-        if (tableName === 'users') mockState.insertedUsers.push(row);
+        if (tableName === 'users' && !mockState.conflictWinner) mockState.insertedUsers.push(row);
         if (tableName === 'cases') mockState.insertedCases.push(row);
         return obj;
       }),
@@ -106,6 +112,8 @@ const { mockState, mockDb } = vi.hoisted(() => {
   const mockDb = {
     select: vi.fn(() => makeSelect()),
     insert: vi.fn((table: unknown) => makeInsert(table)),
+    // § mock ใช้ db ตัวเดียวเป็น tx เพื่อให้ unit tests ตรวจพฤติกรรม intake เดิม
+    transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(mockDb)),
   };
 
   return { mockState, mockDb };
@@ -145,6 +153,7 @@ function webInput(over: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   mockState.collisionsRemaining = 0;
+  mockState.conflictWinner = null;
   mockState.existingUsers = [];
   mockState.userLookupEmails = [];
   mockState.insertedUsers = [];
@@ -256,5 +265,20 @@ describe('createCase · ตัวตนผู้แจ้งทางเว็�
     expect(result.ok).toBe(true);
     expect(mockState.insertedUsers).toHaveLength(0);
     expect(mockState.insertedCases[0]?.submittedBy).toBe('user-existing');
+  });
+});
+
+// § จำลอง user ที่เกิดระหว่าง SELECT กับ INSERT เพื่อพิสูจน์ว่า unique conflict ไม่ทำ tx abort
+describe('createCase · ตัวตนที่ถูกสร้างพร้อมกัน', () => {
+  it.each(['web', 'line'] as const)('ใช้ผู้ชนะของ unique email ฝั่ง %s และสร้างเรื่องต่อได้', async (channel) => {
+    const email = channel === 'web'
+      ? `cid-${generateCidHash(VALID_CID)}@placeholder.local`
+      : 'line-U-conflict@placeholder.local';
+    mockState.conflictWinner = { id: 'winner-user', email };
+    const result = await createCase({ ...webInput(), channel, lineUserId: 'U-conflict' });
+    expect(result.ok).toBe(true);
+    expect(mockState.insertedUsers).toHaveLength(0);
+    expect(mockState.insertedCases[0]?.submittedBy).toBe('winner-user');
+    expect(mockState.userLookupEmails.filter((value) => value === email)).toHaveLength(2);
   });
 });

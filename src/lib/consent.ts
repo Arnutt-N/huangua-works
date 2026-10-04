@@ -3,7 +3,7 @@
  * จัดการความยินยอมในการเก็บ/ใช้/เปิดเผยข้อมูล
  */
 
-import { getDb, type Db } from './db';
+import { getDb, type DbOrTx } from './db';
 import { consentRecords } from './db/schema';
 import { generateId } from './id';
 import { eq, and, desc } from 'drizzle-orm';
@@ -31,7 +31,7 @@ export interface ConsentGrant {
 /**
  * บันทึกความยินยอม
  */
-export async function grantConsent(grant: ConsentGrant, db?: Db): Promise<void> {
+export async function grantConsent(grant: ConsentGrant, db?: DbOrTx): Promise<void> {
   const _db = db ?? await getDb();
 
   await _db.insert(consentRecords).values({
@@ -54,7 +54,7 @@ export async function revokeConsent(
   userId: string,
   consentType: ConsentType,
   metadata?: Record<string, unknown>,
-  db?: Db,
+  db?: DbOrTx,
 ): Promise<void> {
   const _db = db ?? await getDb();
 
@@ -75,7 +75,7 @@ export async function revokeConsent(
 export async function hasConsent(
   userId: string,
   consentType: ConsentType,
-  db?: Db,
+  db?: DbOrTx,
 ): Promise<boolean> {
   const _db = db ?? await getDb();
 
@@ -94,7 +94,7 @@ export async function hasConsent(
 /**
  * ดึงประวัติความยินยอมทั้งหมด
  */
-export async function getConsentHistory(userId: string, db?: Db) {
+export async function getConsentHistory(userId: string, db?: DbOrTx) {
   const _db = db ?? await getDb();
 
   return _db
