@@ -5,10 +5,14 @@ import { cases, categories } from '../db/schema';
 import { generateId } from '../id';
 import { generateTrackingCode } from '../case-tracking';
 import { checkDuplicate, recordDedupHash } from '../dedup';
-import { grantConsent, CONSENT_VERSION } from '../consent';
 import { AUDIT_ACTIONS, logAudit } from '../audit';
 import { getFiscalYear } from '../thai-date';
-import { resolveCitizen, type CitizenIdentity } from './citizen-access';
+import {
+  recordIntakeConsent,
+  resolveCitizen,
+  type CitizenIdentity,
+  type IntakeConsentVia,
+} from './citizen-access';
 
 export interface CaseIntakeInput {
   channel: 'web' | 'line';
@@ -115,18 +119,15 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
     }
     const submitterId = await resolveCitizen(identity, tx);
 
-    // § LIFF เป็นฟอร์มเว็บในหน้าต่าง LINE — consent เก็บเท่ากับทางเว็บ (ต่างจากบอท
-    // ซึ่งเก็บข้อมูลน้อยกว่าและไม่มี checkbox ความยินยอมในแชท)
-    if (input.channel === 'web' || input.origin === 'liff') {
-      await grantConsent({
-        userId: submitterId,
-        consentType: 'data_collection',
-        version: CONSENT_VERSION,
-        ipAddress: input.ipAddress,
-        userAgent: input.userAgent,
-        metadata: { via: input.origin === 'liff' ? 'liff_submit' : 'intake_submit' },
-      }, tx);
-    }
+    // § ทุกช่องทางบันทึกความยินยอมตอนแจ้ง — เดิมบอทไม่บันทึกเพราะไม่มี checkbox ในแชท
+    // ผลคือเรื่องจากบอท 404 บน /track ขณะที่บอทเองโชว์ได้ (กติกาไม่เท่ากัน)
+    // ตอนนี้บอทแจ้ง BOT_CONSENT_NOTICE ก่อน "ยืนยัน" แล้วบันทึกเป็น line_bot_submit
+    await recordIntakeConsent(
+      submitterId,
+      intakeConsentVia(input),
+      { ipAddress: input.ipAddress, userAgent: input.userAgent },
+      tx,
+    );
 
     await tx.insert(cases).values({
       id: caseId,
@@ -196,4 +197,9 @@ function citizenIdentityOf(input: CaseIntakeInput): CitizenIdentity | null {
         contactEmail: input.email,
       }
     : null;
+}
+
+function intakeConsentVia(input: CaseIntakeInput): IntakeConsentVia {
+  if (input.channel === 'web') return 'intake_submit';
+  return input.origin === 'liff' ? 'liff_submit' : 'line_bot_submit';
 }

@@ -56,6 +56,14 @@ afterAll(async () => {
   }
   // § ล้าง LINE identity rows จาก dedup test (lineUsers + placeholder users)
   if (createdLineUserIds.length > 0) {
+    // § createCase ช่องทาง line บันทึก consent แล้ว (citizen-access) — ล้างก่อนลบ users
+    const lineOwners = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(like(users.email, 'line-U-dedup-%@placeholder.local'));
+    if (lineOwners.length > 0) {
+      await db.delete(consentRecords).where(inArray(consentRecords.userId, lineOwners.map((u) => u.id)));
+    }
     await db.delete(lineUsers).where(inArray(lineUsers.lineUserId, createdLineUserIds));
     await db.delete(users).where(like(users.email, 'line-U-dedup-%@placeholder.local'));
   }

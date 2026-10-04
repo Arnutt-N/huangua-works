@@ -8,3 +8,4 @@
  * บอทแสดงหัวเรื่องของเรื่องที่เจ้าของถอนความยินยอมแล้วได้)
  */
 export { resolveCitizen, type CitizenIdentity } from './identity';
+export { recordIntakeConsent, type IntakeConsentVia } from './consent-policy';
