@@ -5,7 +5,8 @@ import { chatTags } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import { requireStaffApi } from '@/lib/auth/require-staff';
 import { STAFF_ROLES } from '@/lib/auth/roles';
-import { chatTagSchema, validateOrError } from '@/lib/validation';
+import { chatTagSchema } from '@/lib/validation';
+import { parseBody } from '@/lib/api-helpers';
 import { isUniqueViolation } from '@/lib/db/errors';
 
 export const runtime = 'nodejs';
@@ -27,23 +28,14 @@ export async function POST(request: Request) {
   const authz = await requireStaffApi(STAFF_ROLES);
   if (!authz.ok) return authz.response;
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-
-  const validation = validateOrError(chatTagSchema, body);
-  if (!validation.success) {
-    return NextResponse.json({ error: validation.error }, { status: 400 });
-  }
+  const result = await parseBody(chatTagSchema, request);
+  if (!result.ok) return result.response;
 
   const db = await getDb();
   const id = generateId();
 
   try {
-    await db.insert(chatTags).values({ id, ...validation.data });
+    await db.insert(chatTags).values({ id, ...result.data });
   } catch (error) {
     if (isUniqueViolation(error)) {
       return NextResponse.json({ error: 'มีป้ายชื่อนี้อยู่แล้ว' }, { status: 409 });
@@ -52,7 +44,7 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json(
-    { ok: true, id, name: validation.data.name, color: validation.data.color },
+    { ok: true, id, name: result.data.name, color: result.data.color },
     { status: 201 },
   );
 }

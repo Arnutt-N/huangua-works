@@ -3,9 +3,10 @@ import { asc, eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { chatCannedResponses } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
+import { parseBody } from '@/lib/api-helpers';
 import { requireStaffApi } from '@/lib/auth/require-staff';
 import { STAFF_ROLES } from '@/lib/auth/roles';
-import { cannedResponseSchema, validateOrError } from '@/lib/validation';
+import { cannedResponseSchema } from '@/lib/validation';
 import { isUniqueViolation } from '@/lib/db/errors';
 
 export const runtime = 'nodejs';
@@ -33,17 +34,8 @@ export async function POST(request: Request) {
   const authz = await requireStaffApi(STAFF_ROLES);
   if (!authz.ok) return authz.response;
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-
-  const validation = validateOrError(cannedResponseSchema, body);
-  if (!validation.success) {
-    return NextResponse.json({ error: validation.error }, { status: 400 });
-  }
+  const result = await parseBody(cannedResponseSchema, request);
+  if (!result.ok) return result.response;
 
   const db = await getDb();
   const id = generateId();
@@ -51,9 +43,9 @@ export async function POST(request: Request) {
   try {
     await db.insert(chatCannedResponses).values({
       id,
-      title: validation.data.title,
-      shortcut: validation.data.shortcut ?? null,
-      content: validation.data.content,
+      title: result.data.title,
+      shortcut: result.data.shortcut ?? null,
+      content: result.data.content,
       createdBy: authz.ctx.user.id,
     });
   } catch (error) {

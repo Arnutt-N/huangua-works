@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { chatCannedResponses } from '@/lib/db/schema';
+import { parseBody } from '@/lib/api-helpers';
 import { requireStaffApi } from '@/lib/auth/require-staff';
 import { STAFF_ROLES } from '@/lib/auth/roles';
-import { cannedResponseUpdateSchema, validateOrError } from '@/lib/validation';
+import { cannedResponseUpdateSchema } from '@/lib/validation';
 import { isUniqueViolation } from '@/lib/db/errors';
 
 export const runtime = 'nodejs';
@@ -16,17 +17,8 @@ export async function PATCH(
   const authz = await requireStaffApi(STAFF_ROLES);
   if (!authz.ok) return authz.response;
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-
-  const validation = validateOrError(cannedResponseUpdateSchema, body);
-  if (!validation.success) {
-    return NextResponse.json({ error: validation.error }, { status: 400 });
-  }
+  const result = await parseBody(cannedResponseUpdateSchema, request);
+  if (!result.ok) return result.response;
 
   const { id } = await params;
   const db = await getDb();
@@ -34,7 +26,7 @@ export async function PATCH(
   try {
     const [updated] = await db
       .update(chatCannedResponses)
-      .set({ ...validation.data, updatedAt: new Date() })
+      .set({ ...result.data, updatedAt: new Date() })
       .where(eq(chatCannedResponses.id, id))
       .returning({ id: chatCannedResponses.id });
 

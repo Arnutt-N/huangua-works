@@ -5,7 +5,8 @@ import { chatConversations, chatConversationTags } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import { requireStaffApi } from '@/lib/auth/require-staff';
 import { STAFF_ROLES } from '@/lib/auth/roles';
-import { conversationTagsSchema, validateOrError } from '@/lib/validation';
+import { conversationTagsSchema } from '@/lib/validation';
+import { parseBody } from '@/lib/api-helpers';
 import { broadcast } from '@/lib/line/sse/broadcaster';
 
 export const runtime = 'nodejs';
@@ -17,19 +18,10 @@ export async function PUT(
   const authz = await requireStaffApi(STAFF_ROLES);
   if (!authz.ok) return authz.response;
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+  const result = await parseBody(conversationTagsSchema, request);
+  if (!result.ok) return result.response;
 
-  const validation = validateOrError(conversationTagsSchema, body);
-  if (!validation.success) {
-    return NextResponse.json({ error: validation.error }, { status: 400 });
-  }
-
-  const { tagIds } = validation.data;
+  const { tagIds } = result.data;
   const { id } = await params;
   const db = await getDb();
 
