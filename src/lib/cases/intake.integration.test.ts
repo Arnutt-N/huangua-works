@@ -30,6 +30,7 @@ import { auditLogs, cases, categories, consentRecords, dedupHashes, lineUsers, u
 import { generateCidHash, generateDedupHash } from '@/lib/cid-hmac';
 import { generateId } from '@/lib/id';
 import { createCase } from './intake';
+import { findTrackableCase } from './citizen-access';
 
 // CID ต่อรอบรัน (13 หลัก) — createCase ไม่ตรวจ checksum จึงใช้เลขสุ่มได้
 const RUN = Date.now().toString().slice(-9);
@@ -54,6 +55,7 @@ async function cleanupFixture(): Promise<void> {
     // § c1 ต่อท้าย — fixture ความยินยอม/การมองเห็น (citizen-case-access)
     `บอท consent ${RUN}`,
     `LIFF consent ${RUN}`,
+    `บอท ติดตามได้ ${RUN}`,
   ];
   const leaked = await db.select({ id: cases.id }).from(cases).where(inArray(cases.title, titles));
   const caseIds = [...new Set([...createdCaseIds, ...leaked.map((r) => r.id)])];
@@ -279,5 +281,25 @@ describe('createCase · บันทึกความยินยอมทุ�
     if (!result.ok) return;
     consentCaseIds.push(result.caseId);
     expect(await grantedViasOf(await submitterOf(result.caseId))).toContain('liff_submit');
+  });
+
+  test('เรื่องที่แจ้งผ่านบอทติดตามได้ทันทีทั้งทางเว็บและทางบอท', async () => {
+    const title = `บอท ติดตามได้ ${RUN}`;
+    const result = await createCase({
+      channel: 'line',
+      lineUserId: LINE_BOT,
+      categoryId,
+      title,
+      description: 'รายละเอียดทดสอบติดตามเรื่องจากบอท',
+      location: 'ทดสอบ ตำบลหัวงัว',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    consentCaseIds.push(result.caseId);
+    await submitterOf(result.caseId);
+
+    expect((await findTrackableCase(result.trackingCode, { channel: 'web' }))?.case.title).toBe(title);
+    expect(await findTrackableCase(result.trackingCode, { channel: 'line_bot' })).not.toBeNull();
   });
 });
