@@ -1,22 +1,10 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { afterAll, describe, expect, it, vi, beforeEach } from 'vitest';
 
 const mockDb = {
-  select: vi.fn().mockReturnValue({
-    from: vi.fn().mockReturnValue({
-      where: vi.fn().mockReturnValue({
-        limit: vi.fn().mockResolvedValue([]),
-      }),
-    }),
-  }),
-  insert: vi.fn().mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) }),
-  update: vi.fn().mockReturnValue({
-    set: vi.fn().mockReturnValue({
-      // § changeMode เรียก .where().returning() — mock ชั่วคราวถึง Task 8 (เปลี่ยน mockDb ทั้งก้อน)
-      where: vi.fn().mockReturnValue(
-        Object.assign(Promise.resolve(undefined), { returning: vi.fn().mockResolvedValue([]) }),
-      ),
-    }),
-  }),
+  select: vi.fn(() => ({ from: () => ({ where: () => ({ limit: () => [] }) }) })),
+  insert: vi.fn(() => ({ values: vi.fn(() => ({})) })),
+  // § returning รองรับ changeMode (triggerHandoff ถูกเรียกผ่าน engine) — คืนแถวเดียว = เปลี่ยนสำเร็จ
+  update: vi.fn(() => ({ set: () => ({ where: () => ({ returning: vi.fn(() => [{ id: 'conv-1' }]) }) }) })),
 } as never;
 
 vi.mock('@/lib/db', () => ({
@@ -37,13 +25,6 @@ vi.mock('../settings', () => ({
 
 vi.mock('./intent-matcher', () => ({
   matchIntent: vi.fn(async () => null),
-}));
-
-vi.mock('../client', () => ({
-  getProfile: vi.fn(async () => null),
-  pushMessage: vi.fn(async () => {}),
-  replyMessage: vi.fn(async () => {}),
-  sendTypingIndicator: vi.fn(async () => {}),
 }));
 
 vi.mock('../sse/broadcaster', () => ({
@@ -82,10 +63,25 @@ vi.mock('@/lib/cases/citizen-access', () => ({
   findTrackableCase: vi.fn(async () => null),
 }));
 
-import { routeBotMessage } from './engine';
+// route import '../conversation' (index) ซึ่งดึง transport.ts → client.ts มาด้วย —
+// mock ../client ต้องถูกลบก่อน (ทำใน step นี้) และ stub fetch กัน default transport ยิงจริง
+vi.stubGlobal(
+  'fetch',
+  vi.fn(async () => {
+    throw new Error('ห้ามยิง LINE จริงจาก unit test — ส่ง transport เข้า handleEvent');
+  }),
+);
+
+import { handleEvent, routeBotMessage } from './engine';
 import { matchFaq } from './faq-matcher';
 import { startCaseFlow } from './case-flow';
 import { findTrackableCase } from '@/lib/cases/citizen-access';
+import { createRecordingTransport } from '../conversation/recording-transport';
+import { broadcast } from '../sse/broadcaster';
+
+afterAll(() => {
+  vi.unstubAllGlobals();
+});
 
 function makeEvent(text: string | null, type = 'text') {
   return {
@@ -236,5 +232,52 @@ describe('routeBotMessage — existing behavior (TDD safety net)', () => {
       expect(replies).toHaveLength(1);
       expect((replies[0] as { text: string }).text).toContain('ไม่เข้าใจ');
     });
+  });
+});
+
+describe('handleEvent (transport ถูก inject — ไม่ยิง LINE จริง)', () => {
+  it('ข้อความเข้า: profile → typing → reply ผ่าน transport ที่ส่งให้', async () => {
+    const transport = createRecordingTransport();
+    transport.setProfile({ userId: 'U123', displayName: 'สมชาย' } as never);
+
+    await handleEvent(makeEvent('สวัสดีครับ'), transport);
+
+    expect(transport.calls.filter((c) => c.kind === 'profile')).toHaveLength(1);
+    expect(transport.calls.filter((c) => c.kind === 'typing')).toHaveLength(1);
+    const replies = transport.calls.filter((c) => c.kind === 'reply');
+    expect(replies).toHaveLength(1);
+    expect(replies[0]).toMatchObject({ replyToken: 'reply-token' });
+  });
+
+  it('follow: ตอบ welcome ผ่าน transport', async () => {
+    const transport = createRecordingTransport();
+    const event = {
+      type: 'follow',
+      replyToken: 'reply-token',
+      timestamp: Date.now(),
+      mode: 'active',
+      webhookEventId: 'evt-follow',
+      source: { type: 'user', userId: 'U123' },
+    } as never;
+
+    await handleEvent(event, transport);
+
+    expect(transport.calls.filter((c) => c.kind === 'reply')).toHaveLength(1);
+  });
+
+  it('§ "ติดต่อเจ้าหน้าที่" ผ่าน handleEvent เต็มสาย: broadcast mode_change + ตอบ flex ผ่าน transport', async () => {
+    const transport = createRecordingTransport();
+
+    await handleEvent(makeEvent('ติดต่อเจ้าหน้าที่'), transport);
+
+    expect(broadcast).toHaveBeenCalledWith({
+      type: 'mode_change',
+      conversationId: expect.any(String),
+      payload: { mode: 'waiting_handoff' },
+    });
+    const replies = transport.calls.filter((c) => c.kind === 'reply');
+    expect(replies).toHaveLength(1);
+    expect(replies[0]).toMatchObject({ replyToken: 'reply-token', messages: expect.any(Array) });
+    expect((replies[0] as { messages: Array<{ type: string }> }).messages[0]!.type).toBe('flex');
   });
 });
