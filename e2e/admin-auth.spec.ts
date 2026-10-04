@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { decode } from 'next-auth/jwt';
-import { resetRateLimits } from './helpers/reset-rate-limits';
+import { E2E_CLIENT_IP, resetRateLimits } from './helpers/reset-rate-limits';
+import { rateLimitKey } from '../src/lib/rate-limit/policies';
 
 const ADMIN_EMAIL = 'admin@huangua.go.th';
 const ADMIN_PASSWORD = 'ChangeMe123!'; // local dev seed password (scripts/seed.ts)
@@ -20,7 +21,7 @@ test.beforeEach(async () => {
   // (Playwright ผ่าน localhost) + email เดียวกัน ถ้ารวมข้าม test เกิน 5 ครั้ง/15 นาที
   // จะโดนจำกัดทำให้ test ถัดไป fail — เปลี่ยนจาก beforeAll เป็น beforeEach หลัง migration
   // ไป Auth.js (signIn ทุกครั้งผ่าน rate-limit ของเรา ไม่เหมือน Supabase ที่มี gate ของตัวเอง)
-  await resetRateLimits('rate:admin-login:ip:::1', `rate:admin-login:email:${ADMIN_EMAIL}`);
+  await resetRateLimits(rateLimitKey('adminLoginIp', E2E_CLIENT_IP), rateLimitKey('adminLoginEmail', ADMIN_EMAIL));
 });
 
 test('unauthenticated visitors are redirected from /admin to /admin/login', async ({ page }) => {

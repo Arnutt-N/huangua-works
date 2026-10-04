@@ -3,7 +3,8 @@ import { eq } from 'drizzle-orm';
 import { closeDb, getDb } from '../src/lib/db';
 import { cases, categories, lineUsers, users } from '../src/lib/db/schema';
 import { generateId } from '../src/lib/id';
-import { resetRateLimits } from './helpers/reset-rate-limits';
+import { E2E_CLIENT_IP, resetRateLimits } from './helpers/reset-rate-limits';
+import { rateLimitKey } from '../src/lib/rate-limit/policies';
 
 /**
  * E2E ของ "เรื่องของฉัน" ใน /track ผ่าน LIFF mock — เงื่อนไขเดียวกับ intake-liff.spec
@@ -19,7 +20,7 @@ let testLineUserId: string;
 let testCaseId: string;
 
 test.beforeAll(async () => {
-  await resetRateLimits('rate:liff-session:::1');
+  await resetRateLimits(rateLimitKey('liffSession', E2E_CLIENT_IP));
 
   const db = await getDb();
   const [category] = await db.select().from(categories).limit(1);

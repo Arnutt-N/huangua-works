@@ -17,7 +17,8 @@ import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { cases, caseUpdates, categories } from '@/lib/db/schema';
 import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
-import { checkRateLimit } from '@/lib/upstash';
+import { enforceRateLimit } from '@/lib/rate-limit/enforce';
+import { clientIpFromHeaders } from '@/lib/rate-limit/client-ip';
 import { normalizeTrackingCode } from '@/lib/case-tracking';
 import { hasConsent } from '@/lib/consent';
 import { eq, and } from 'drizzle-orm';
@@ -29,10 +30,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: rawId } = await params;
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'unknown';
+  const ip = clientIpFromHeaders(req.headers);
 
   // § Rate limit — 10 requests / 5 minutes per IP (fail-open เหมือน submit)
-  const rateLimit = await checkRateLimit(`rate:track:${ip}`, 10, 300);
+  // (RATE_LIMIT_POLICIES.track)
+  const rateLimit = await enforceRateLimit('track', ip);
   if (!rateLimit.allowed) {
     return NextResponse.json(
       { error: 'ค้นหาถี่เกินไป กรุณารอ ' + rateLimit.reset + ' วินาที' },

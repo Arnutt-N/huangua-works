@@ -8,7 +8,7 @@ import { CredentialsSignin } from 'next-auth';
 import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { users } from '@/lib/db/schema';
-import { checkRateLimit } from '@/lib/upstash';
+import { enforceRateLimit } from '@/lib/rate-limit/enforce';
 import { getClientIp } from '@/lib/auth/require-staff';
 
 export interface LoginState {
@@ -39,10 +39,8 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
   // ง่าย (ไม่มี trusted reverse proxy คั่นใน local/self-host) แต่ per-email ยังจำกัดได้จริง
   // เพราะผูกกับบัญชีเป้าหมาย ไม่ใช่ header ที่ client กำหนดเอง
   const [ipRateLimit, emailRateLimit] = await Promise.all([
-    checkRateLimit(`rate:admin-login:ip:${ip}`, 5, 900, { failOpen: false }),
-    checkRateLimit(`rate:admin-login:email:${normalizedEmail}`, 5, 900, {
-      failOpen: false,
-    }),
+    enforceRateLimit('adminLoginIp', ip),
+    enforceRateLimit('adminLoginEmail', normalizedEmail),
   ]);
   if (!ipRateLimit.allowed || !emailRateLimit.allowed) {
     const reset = Math.max(ipRateLimit.reset, emailRateLimit.reset);
