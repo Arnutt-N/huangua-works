@@ -42,6 +42,10 @@ export async function checkDuplicate(
 
 /**
  * บันทึก hash เพื่อป้องกันซ้ำ
+ *
+ * § ห้าม catch-unique: createCase เรียกฟังก์ชันนี้ใน transaction ถ้าชน unique(hash)
+ * แบบ concurrent แล้ว statement error จะทำให้ทั้ง tx abort
+ * ใช้ ON CONFLICT DO NOTHING เพื่อไม่ throw และ RETURNING เพื่อคืน caseId ของแถวที่ชนะ
  */
 export async function recordDedupHash(
   cid: string,
@@ -49,17 +53,30 @@ export async function recordDedupHash(
   description: string,
   caseId: string,
   db?: DbOrTx,
-): Promise<void> {
+): Promise<string> {
   const _db = db ?? await getDb();
   const hash = generateDedupHash(cid, title, description);
   const expiresAt = new Date(Date.now() + DEDUP_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
-  await _db.insert(dedupHashes).values({
-    id: generateId(),
-    hash,
-    caseId,
-    expiresAt,
-  });
+  const inserted = await _db
+    .insert(dedupHashes)
+    .values({
+      id: generateId(),
+      hash,
+      caseId,
+      expiresAt,
+    })
+    .onConflictDoNothing({ target: dedupHashes.hash })
+    .returning({ caseId: dedupHashes.caseId });
+
+  if (inserted[0]?.caseId) {
+    return inserted[0].caseId;
+  }
+
+  const existing = await firstOrUndefined(
+    _db.select({ caseId: dedupHashes.caseId }).from(dedupHashes).where(eq(dedupHashes.hash, hash)).limit(1)
+  );
+  return existing?.caseId ?? caseId;
 }
 
 /**
