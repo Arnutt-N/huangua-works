@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getChatSetting, setChatSetting, invalidateSettingsCache, type ChatSettingsDefaults } from '@/lib/line/settings';
+import { parseBody } from '@/lib/api-helpers';
 import { requireStaffApi } from '@/lib/auth/require-staff';
 import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit';
@@ -48,19 +49,10 @@ export async function PUT(request: Request) {
   const authz = await requireStaffApi(ADMIN_ROLES);
   if (!authz.ok) return authz.response;
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+  const result = await parseBody(settingsSchema, request);
+  if (!result.ok) return result.response;
 
-  const parsed = settingsSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'ข้อมูลไม่ถูกต้อง' }, { status: 400 });
-  }
-
-  const entries = Object.entries(parsed.data) as [keyof ChatSettingsDefaults, unknown][];
+  const entries = Object.entries(result.data) as [keyof ChatSettingsDefaults, unknown][];
   for (const [key, value] of entries) {
     if (value !== undefined) {
       await setChatSetting(key, value as never);
@@ -75,7 +67,7 @@ export async function PUT(request: Request) {
     resource: 'chat_settings',
     ipAddress: authz.ctx.ipAddress,
     userAgent: authz.ctx.userAgent,
-    metadata: { keys: Object.keys(parsed.data) },
+    metadata: { keys: Object.keys(result.data) },
   });
 
   return NextResponse.json({ ok: true });

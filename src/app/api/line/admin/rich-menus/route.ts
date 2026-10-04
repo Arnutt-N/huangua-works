@@ -3,6 +3,7 @@ import { asc } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { richMenus } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
+import { parseBody } from '@/lib/api-helpers';
 import { requireStaffApi } from '@/lib/auth/require-staff';
 import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit';
@@ -38,26 +39,17 @@ export async function POST(request: Request) {
   const authz = await requireStaffApi(ADMIN_ROLES);
   if (!authz.ok) return authz.response;
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-
-  const parsed = createSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'ข้อมูลไม่ถูกต้อง' }, { status: 400 });
-  }
+  const result = await parseBody(createSchema, request);
+  if (!result.ok) return result.response;
 
   const db = await getDb();
   const id = generateId();
 
   await db.insert(richMenus).values({
     id,
-    name: parsed.data.name,
-    chatBarText: parsed.data.chatBarText,
-    config: parsed.data.config,
+    name: result.data.name,
+    chatBarText: result.data.chatBarText,
+    config: result.data.config,
     createdBy: authz.ctx.user.id,
   });
 
