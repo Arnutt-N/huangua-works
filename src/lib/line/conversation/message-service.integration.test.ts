@@ -8,7 +8,8 @@ import type { ConversationMode } from '../chat-modes';
 vi.mock('../sse/broadcaster', () => ({ broadcast: vi.fn() }));
 
 import { broadcast } from '../sse/broadcaster';
-import { recordBotReplies, recordInboundMessage } from './message-service';
+import { recordBotReplies, recordInboundMessage, sendAdminReply } from './message-service';
+import { createRecordingTransport } from './recording-transport';
 
 const created: string[] = [];
 
@@ -126,5 +127,71 @@ describe('recordBotReplies', () => {
     const id = await createConv('bot_active');
     await recordBotReplies(id, []);
     expect(await loadMessages(id)).toHaveLength(0);
+  });
+});
+
+describe('sendAdminReply', () => {
+  const ADMIN = generateId();
+
+  test('ส่งใหม่: push ผ่าน transport + pushStatus=sent + last message เป็น admin + broadcast new_message', async () => {
+    const id = await createConv('human_active', 4);
+    const transport = createRecordingTransport();
+
+    const result = await sendAdminReply({ conversationId: id, adminUserId: ADMIN, text: 'รับเรื่องแล้วครับ', clientTempId: `t-${id}` }, transport);
+
+    expect(result).toMatchObject({ kind: 'sent', pushStatus: 'sent' });
+    expect(transport.calls).toEqual([
+      { kind: 'push', to: `it-msg-${id}`, messages: [{ type: 'text', text: 'รับเรื่องแล้วครับ' }] },
+    ]);
+    const [row] = await loadMessages(id);
+    expect(row).toMatchObject({ sender: 'admin', adminUserId: ADMIN, textContent: 'รับเรื่องแล้วครับ', metadata: { pushStatus: 'sent' } });
+    const conv = await loadConv(id);
+    expect(conv.lastMessageSender).toBe('admin');
+    expect(conv.unreadAdmin).toBe(0);
+    expect(broadcast).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'new_message', conversationId: id, payload: expect.objectContaining({ sender: 'admin', clientTempId: `t-${id}` }) }),
+    );
+  });
+
+  test('retry ด้วย clientTempId เดิมหลังสำเร็จ → duplicate ไม่ push ซ้ำ ไม่สร้างแถวใหม่', async () => {
+    const id = await createConv('human_active');
+    const transport = createRecordingTransport();
+    const input = { conversationId: id, adminUserId: ADMIN, text: 'ซ้ำ', clientTempId: `t-${id}` };
+
+    const first = await sendAdminReply(input, transport);
+    const second = await sendAdminReply(input, transport);
+
+    expect(second).toEqual({ kind: 'duplicate', messageId: (first as { messageId: string }).messageId, pushStatus: 'sent' });
+    expect(transport.calls.filter((c) => c.kind === 'push')).toHaveLength(1);
+    expect(await loadMessages(id)).toHaveLength(1);
+  });
+
+  test('push ล้ม → push_failed ไม่ broadcast; retry ด้วย tempId เดิม push ใหม่สำเร็จ → duplicate pushStatus=sent', async () => {
+    const id = await createConv('human_active');
+    const transport = createRecordingTransport();
+    const input = { conversationId: id, adminUserId: ADMIN, text: 'ลองใหม่', clientTempId: `t-${id}` };
+
+    transport.failNextPush();
+    const failed = await sendAdminReply(input, transport);
+    expect(failed).toMatchObject({ kind: 'push_failed' });
+    expect(broadcast).not.toHaveBeenCalled();
+    expect((await loadMessages(id))[0]!.metadata).toEqual({ pushStatus: 'failed' });
+
+    const retried = await sendAdminReply(input, transport);
+    expect(retried).toEqual({ kind: 'duplicate', messageId: (failed as { messageId: string }).messageId, pushStatus: 'sent' });
+    expect(transport.calls.filter((c) => c.kind === 'push')).toHaveLength(2);
+    expect(await loadMessages(id)).toHaveLength(1);
+  });
+
+  test('ไม่มี clientTempId → ส่งได้ตามปกติ', async () => {
+    const id = await createConv('human_active');
+    const result = await sendAdminReply({ conversationId: id, adminUserId: ADMIN, text: 'ไม่มี tempId' }, createRecordingTransport());
+    expect(result).toMatchObject({ kind: 'sent' });
+  });
+
+  test('ห้องที่ไม่มีอยู่ → not_found และไม่แตะ LINE', async () => {
+    const transport = createRecordingTransport();
+    expect(await sendAdminReply({ conversationId: generateId(), adminUserId: ADMIN, text: 'x' }, transport)).toEqual({ kind: 'not_found' });
+    expect(transport.calls).toHaveLength(0);
   });
 });

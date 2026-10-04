@@ -7,8 +7,11 @@ export { httpLineTransport, type LineTransport } from './transport';
 export {
   recordBotReplies,
   recordInboundMessage,
+  sendAdminReply,
+  type AdminReplyInput,
   type InboundMessage,
   type InboundMessageType,
+  type SendAdminReplyResult,
 } from './message-service';
 export {
   changeMode,
