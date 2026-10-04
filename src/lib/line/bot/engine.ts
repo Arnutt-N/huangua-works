@@ -15,7 +15,9 @@ import { caseStatusFlex } from '../messages/flex';
 import { getFaqReply } from '../messages/rich-menu';
 import { findTrackableCase } from '@/lib/cases/citizen-access';
 import { COPY } from '@/lib/copy';
+import { isWithinBusinessHours, outsideBusinessHoursText } from '../business-hours';
 import {
+  changeMode,
   httpLineTransport,
   isHumanHandled,
   recordBotReplies,
@@ -119,6 +121,11 @@ async function handleMessageEvent(
     : msg.type === 'sticker' ? 'sticker'
     : 'text';
 
+  // § อ่าน bot_enabled ก่อนบันทึกข้อความ — ถ้าบอทปิด ข้อความนี้ไม่มีใครตอบอัตโนมัติ
+  // จึงต้องนับเป็น unread ของเจ้าหน้าที่ (เดิม reset เป็น 0 เพราะถือว่าบอทตอบแล้ว)
+  const botEnabled = await getChatSetting('bot_enabled');
+  const staffHandling = isHumanHandled(mode);
+
   await recordInboundMessage({
     conversationId,
     mode,
@@ -128,9 +135,15 @@ async function handleMessageEvent(
       ? { title: msg.title, address: msg.address, latitude: msg.latitude, longitude: msg.longitude }
       : null,
     lineMessageId: msg.id,
+    countUnread: staffHandling || !botEnabled,
   });
 
-  if (isHumanHandled(mode)) {
+  if (staffHandling) {
+    return;
+  }
+
+  if (!botEnabled) {
+    await routeToStaffWhileBotDisabled(event.replyToken, conversationId, transport);
     return;
   }
 
@@ -141,12 +154,27 @@ async function handleMessageEvent(
   await transport.reply(event.replyToken, replies.slice(0, 5));
 }
 
+export const BOT_DISABLED_TEXT =
+  'ขณะนี้ระบบตอบกลับอัตโนมัติปิดให้บริการชั่วคราว\nได้ส่งข้อความของท่านถึงเจ้าหน้าที่แล้ว เจ้าหน้าที่จะตอบกลับโดยเร็วที่สุดในเวลาทำการ';
+
+// § บอทปิด → ย้ายห้องเข้าคิวเจ้าหน้าที่ (waiting_handoff) ผ่าน changeMode ของ c4
+// ห้าม UPDATE mode ตรง — สอง event ที่อ่าน bot_active พร้อมกันจะส่ง notice สองครั้งและทับห้องที่ admin claim แทรก
+// ตอบ notice เฉพาะผู้ที่ changeMode สำเร็จ (changed: true) คนที่แพ้ race ไม่ตอบซ้ำ
+async function routeToStaffWhileBotDisabled(replyToken: string, conversationId: string, transport: LineTransport) {
+  const changed = await changeMode(conversationId, 'waiting_handoff');
+  if (!changed.ok || !changed.changed) return;
+
+  await recordBotReplies(conversationId, [{ type: 'text', text: BOT_DISABLED_TEXT }]);
+  await transport.reply(replyToken, [{ type: 'text', text: BOT_DISABLED_TEXT }]);
+}
+
 export async function routeBotMessage(
   db: Db,
   event: LineMessageEvent,
   text: string | null,
   lineUserPk: string,
   conversationId: string,
+  now: Date = new Date(),
 ): Promise<LineOutgoingMessage[]> {
   if (!text) {
     if (event.message.type === 'location') {
@@ -212,6 +240,12 @@ export async function routeBotMessage(
   }
 
   if (await isHandoffRequest(text)) {
+    // § นอกเวลาทำการไม่ย้ายเข้า waiting_handoff — ไม่งั้นบอทจะเงียบทั้งคืน (แม้ผู้ใช้พิมพ์
+    // "ติดตาม …") จนเจ้าหน้าที่เข้างาน บอกตรง ๆ ว่านอกเวลาแล้วให้ใช้บริการอัตโนมัติไปก่อน
+    const hours = await getChatSetting('business_hours');
+    if (!isWithinBusinessHours(hours, now)) {
+      return [{ type: 'text', text: outsideBusinessHoursText(hours) }];
+    }
     return triggerHandoff(conversationId);
   }
 

@@ -18,6 +18,8 @@ vi.mock('../settings', () => ({
       welcome_message: 'สวัสดี',
       bot_enabled: true,
       bot_engine_v2: true,
+      // ทุกวันทั้งวัน — test handoff เดิมไม่ส่ง now จึงต้องอยู่ในเวลาทำการเสมอ
+      business_hours: { start: '00:00', end: '24:00', days: [0, 1, 2, 3, 4, 5, 6] },
     };
     return defaults[key];
   }),

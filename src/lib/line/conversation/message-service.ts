@@ -18,6 +18,12 @@ export interface InboundMessage {
   textContent: string | null;
   locationData: Record<string, unknown> | null;
   lineMessageId: string;
+  /**
+   * บังคับนับ/ไม่นับ unread ให้แอดมิน — ถ้าไม่ส่ง ใช้ isHumanHandled(mode) ตามเดิม
+   * engine ส่ง true เมื่อ bot_enabled=false ทั้งที่ห้องยังเป็น bot_active (ข้อความนี้ไม่มีบอทตอบ
+   * จึงต้องเข้าคิวเจ้าหน้าที่) — engine ต้องอ่าน bot_enabled ก่อนเรียกฟังก์ชันนี้
+   */
+  countUnread?: boolean;
 }
 
 /** บันทึกข้อความจากผู้ใช้ LINE + อัปเดตข้อความล่าสุดของห้อง + แจ้ง inbox แอดมิน */
@@ -36,13 +42,14 @@ export async function recordInboundMessage(input: InboundMessage): Promise<{ mes
     lineMessageId: input.lineMessageId,
   });
 
+  const countUnread = input.countUnread ?? isHumanHandled(input.mode);
   await db
     .update(chatConversations)
     .set({
       lastMessageText: preview,
       lastMessageAt: new Date(),
       lastMessageSender: 'user',
-      unreadAdmin: isHumanHandled(input.mode) ? sql`${chatConversations.unreadAdmin} + 1` : 0,
+      unreadAdmin: countUnread ? sql`${chatConversations.unreadAdmin} + 1` : 0,
       updatedAt: new Date(),
     })
     .where(eq(chatConversations.id, input.conversationId));
