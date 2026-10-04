@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { and, desc, eq, inArray, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, lt } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { chatMessages, chatConversations, users } from '@/lib/db/schema';
 import { requireStaffApi } from '@/lib/auth/require-staff';
@@ -10,7 +10,7 @@ import {
   validateOrError,
 } from '@/lib/validation';
 import { parseBody } from '@/lib/api-helpers';
-import { broadcast } from '@/lib/line/sse/broadcaster';
+import { changeMode, linkCase, transferOwnership } from '@/lib/line/conversation';
 
 export const runtime = 'nodejs';
 
@@ -64,6 +64,29 @@ export async function GET(
   return NextResponse.json({ conversation, messages, hasMore });
 }
 
+async function isActiveStaff(userId: string): Promise<boolean> {
+  const db = await getDb();
+  const [target] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.id, userId), eq(users.isActive, true), inArray(users.role, [...STAFF_ROLES])))
+    .limit(1);
+  return Boolean(target);
+}
+
+// ── โน้ตภายใน — autosave, ไม่ broadcast (กัน refetch ไป clobber draft ของแอดมินอื่น) ──
+// ไม่ใช่การเปลี่ยนสถานะบทสนทนา จึงไม่อยู่ใน conversation module
+async function saveAdminNote(id: string, adminNote: string | null, adminId: string) {
+  const db = await getDb();
+  const [noted] = await db
+    .update(chatConversations)
+    .set({ adminNote, adminNoteUpdatedAt: new Date(), adminNoteUpdatedBy: adminId, updatedAt: new Date() })
+    .where(eq(chatConversations.id, id))
+    .returning({ id: chatConversations.id });
+  if (!noted) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  return NextResponse.json({ ok: true });
+}
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -71,149 +94,48 @@ export async function PATCH(
   const authz = await requireStaffApi(STAFF_ROLES);
   if (!authz.ok) return authz.response;
 
-  const result = await parseBody(updateConversationSchema, request);
-  if (!result.ok) return result.response;
+  // § parseBody ไม่ใช่ request.json()+validateOrError — ถ้า c8 merge ก่อน ห้าม revert กลับไป manual parse
+  const parsed = await parseBody(updateConversationSchema, request);
+  if (!parsed.ok) return parsed.response;
 
-  const { mode, linkedCaseId, assignedAdminId, transferReason, adminNote } = result.data;
+  const { mode, linkedCaseId, assignedAdminId, transferReason, adminNote } = parsed.data;
   const { id } = await params;
-  const db = await getDb();
+  const actorId = authz.ctx.user.id;
 
   // ── โอนแชท / รับช่วงต่อ — path แยกจาก claim (mode ต้องเป็น human_active อยู่แล้ว) ──
   if (assignedAdminId !== undefined && mode === undefined) {
     // กันโอนให้ id ผี — ปลายทางต้องเป็นเจ้าหน้าที่ที่ยัง active จริง
-    const [target] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(
-        and(
-          eq(users.id, assignedAdminId),
-          eq(users.isActive, true),
-          inArray(users.role, [...STAFF_ROLES]),
-        ),
-      )
-      .limit(1);
-    if (!target) {
-      return NextResponse.json(
-        { error: 'ปลายทางไม่ใช่เจ้าหน้าที่ที่ใช้งานอยู่' },
-        { status: 400 },
-      );
+    if (!(await isActiveStaff(assignedAdminId))) {
+      return NextResponse.json({ error: 'ปลายทางไม่ใช่เจ้าหน้าที่ที่ใช้งานอยู่' }, { status: 400 });
     }
-
-    const transferAudit = {
-      toAdminId: assignedAdminId,
-      byAdminId: authz.ctx.user.id,
-      at: new Date().toISOString(),
-      ...(transferReason ? { reason: transferReason } : {}),
-    };
-
-    const [transferred] = await db
-      .update(chatConversations)
-      .set({
-        assignedAdminId,
-        assignedAt: new Date(),
-        updatedAt: new Date(),
-        metadata: sql`jsonb_set(
-          coalesce(${chatConversations.metadata}, '{}'::jsonb),
-          '{transfers}',
-          coalesce(${chatConversations.metadata} -> 'transfers', '[]'::jsonb) || ${JSON.stringify(transferAudit)}::jsonb
-        )`,
-      })
-      // atomic guard: โอนได้เฉพาะห้องที่เจ้าหน้าที่กำลังดูแลอยู่จริง
-      .where(and(eq(chatConversations.id, id), eq(chatConversations.mode, 'human_active')))
-      .returning({ id: chatConversations.id });
-
-    if (!transferred) {
-      const [existing] = await db
-        .select({ id: chatConversations.id })
-        .from(chatConversations)
-        .where(eq(chatConversations.id, id))
-        .limit(1);
-      if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-      return NextResponse.json(
-        { error: 'โอนแชทได้เฉพาะห้องที่เจ้าหน้าที่กำลังดูแลอยู่' },
-        { status: 409 },
-      );
-    }
-
-    broadcast({
-      type: 'mode_change',
-      conversationId: id,
-      payload: { mode: 'human_active', assignedAdminId },
-    });
-    return NextResponse.json({ ok: true });
+    const result = await transferOwnership(id, { toAdminId: assignedAdminId, byAdminId: actorId, reason: transferReason });
+    if (result.ok) return NextResponse.json({ ok: true });
+    if (result.reason === 'not_found') return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return NextResponse.json({ error: 'โอนแชทได้เฉพาะห้องที่เจ้าหน้าที่กำลังดูแลอยู่' }, { status: 409 });
   }
 
-  // ── โน้ตภายใน — autosave, ไม่ broadcast (กัน refetch ไป clobber draft ของแอดมินอื่น) ──
   if (adminNote !== undefined && mode === undefined && linkedCaseId === undefined) {
-    const [noted] = await db
-      .update(chatConversations)
-      .set({
-        adminNote,
-        adminNoteUpdatedAt: new Date(),
-        adminNoteUpdatedBy: authz.ctx.user.id,
-        updatedAt: new Date(),
-      })
-      .where(eq(chatConversations.id, id))
-      .returning({ id: chatConversations.id });
+    return saveAdminNote(id, adminNote, actorId);
+  }
 
-    if (!noted) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (mode === undefined) {
+    // schema refine + สอง branch ข้างบนรับประกันว่าเหลือแค่ linkedCaseId
+    const linked = await linkCase(id, linkedCaseId ?? null);
+    if (!linked.ok) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     return NextResponse.json({ ok: true });
   }
 
-  const updates: Partial<typeof chatConversations.$inferInsert> = { updatedAt: new Date() };
-
-  if (mode) {
-    updates.mode = mode;
-    if (mode === 'human_active') {
-      updates.assignedAdminId = authz.ctx.user.id;
-      updates.assignedAt = new Date();
-    }
-    if (mode === 'resolved') {
-      updates.resolvedAt = new Date();
-    }
+  // § claim/คืนบอท/ปิดเรื่อง ผ่าน changeMode — guard อยู่ใน WHERE (atomic) ตามตาราง MODE_TRANSITIONS
+  // กันสองแอดมินกดรับพร้อมกันแล้วคนหลังทับเงียบ ๆ
+  const result = await changeMode(id, mode, { actorAdminId: actorId, linkedCaseId });
+  if (result.ok) return NextResponse.json({ ok: true });
+  if (result.reason === 'not_found') return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  // § claim ห้องที่มีเจ้าของแล้ว — คงข้อความเดิม (client แสดงข้อความนี้ + เทสต์เดิมล็อกไว้)
+  if (mode === 'human_active' && result.currentMode === 'human_active') {
+    return NextResponse.json({ error: 'มีเจ้าหน้าที่รับเรื่องนี้แล้ว' }, { status: 409 });
   }
-
-  if (linkedCaseId !== undefined) {
-    updates.linkedCaseId = linkedCaseId;
-  }
-
-  // claim ต้องเป็น atomic — guard mode ใน WHERE กันสองแอดมินกดรับพร้อมกันแล้วคนหลังทับเงียบๆ
-  const claimGuard =
-    mode === 'human_active'
-      ? inArray(chatConversations.mode, ['bot_active', 'waiting_handoff'])
-      : undefined;
-
-  const [updated] = await db
-    .update(chatConversations)
-    .set(updates)
-    .where(and(eq(chatConversations.id, id), claimGuard))
-    .returning({ id: chatConversations.id });
-
-  if (!updated) {
-    const [existing] = await db
-      .select({
-        mode: chatConversations.mode,
-        assignedAdminId: chatConversations.assignedAdminId,
-      })
-      .from(chatConversations)
-      .where(eq(chatConversations.id, id))
-      .limit(1);
-
-    if (!existing) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    }
-
-    if (existing.mode === 'human_active' && existing.assignedAdminId === authz.ctx.user.id) {
-      return NextResponse.json({ ok: true });
-    }
-
-    return NextResponse.json(
-      { error: 'มีเจ้าหน้าที่รับเรื่องนี้แล้ว' },
-      { status: 409 },
-    );
-  }
-
-  broadcast({ type: 'mode_change', conversationId: id, payload: updates });
-
-  return NextResponse.json({ ok: true });
+  return NextResponse.json(
+    { error: mode === 'human_active' ? 'เปลี่ยนสถานะไม่ได้จากสถานะปัจจุบัน' : 'สถานะบทสนทนาเปลี่ยนไปแล้ว กรุณารีเฟรช' },
+    { status: 409 },
+  );
 }
