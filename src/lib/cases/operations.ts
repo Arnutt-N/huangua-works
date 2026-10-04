@@ -62,30 +62,44 @@ export async function applyCaseUpdate(
 
   const db = await getDb();
 
-  const current = await firstOrUndefined(
-    db
-      .select({
-        id: cases.id,
-        status: cases.status,
-        priority: cases.priority,
-        assignedTo: cases.assignedTo,
-        departmentId: cases.departmentId,
-        title: cases.title,
-      })
-      .from(cases)
-      .where(eq(cases.id, caseId))
-      .limit(1)
-  );
-
-  if (!current) return { ok: false, error: 'ไม่พบเรื่องที่ระบุ' };
-
-  const timeline = buildTimeline(patch, current);
-  if ('error' in timeline) return { ok: false, error: timeline.error };
-
-  const updateSet = buildUpdateSet(patch, timeline);
-
   try {
-    await db.transaction(async (tx) => {
+    return await db.transaction(async (tx): Promise<CaseOperationResult> => {
+      /**
+       * § อ่าน + ตรวจ + เขียน ต้องอยู่ใน transaction เดียวและล็อกแถว (SELECT … FOR UPDATE)
+       *
+       * เดิมอ่าน current นอก transaction แล้ว UPDATE โดยกรองแค่ id — ผู้เขียนสองราย
+       * (เจ้าหน้าที่สองคน หรือเจ้าหน้าที่กับ cron close-stale) อ่านได้สถานะเดิมพร้อมกัน
+       * ผ่าน assertTransition ทั้งคู่ แล้วจบที่ transition ผิดกติกา เช่น rejected → assigned
+       *
+       * row lock ทำให้รายที่สองรอจนรายแรก commit แล้วอ่านสถานะล่าสุด (READ COMMITTED
+       * คืน row version ใหม่หลังรอ lock) จึงถูก assertTransition ปฏิเสธด้วยเหตุผลภาษาไทยตามปกติ
+       * ล็อกทุก patch kind ไม่ใช่แค่ status — priority ("เหมือนเดิม") และ oldValue ของ
+       * assignment/department ก็อ่านจาก current เหมือนกัน
+       */
+      const current = await firstOrUndefined(
+        tx
+          .select({
+            id: cases.id,
+            status: cases.status,
+            priority: cases.priority,
+            assignedTo: cases.assignedTo,
+            departmentId: cases.departmentId,
+            title: cases.title,
+          })
+          .from(cases)
+          .where(eq(cases.id, caseId))
+          .limit(1)
+          .for('update')
+      );
+
+      // คืน error จากใน callback (ไม่ throw) — tx commit แบบไม่มีการเขียน และปล่อย lock ทันที
+      if (!current) return { ok: false, error: 'ไม่พบเรื่องที่ระบุ' };
+
+      const timeline = buildTimeline(patch, current);
+      if ('error' in timeline) return { ok: false, error: timeline.error };
+
+      const updateSet = buildUpdateSet(patch, timeline);
+
       await tx.update(cases).set(updateSet).where(eq(cases.id, caseId));
 
       await tx.insert(caseUpdates).values({
@@ -104,13 +118,13 @@ export async function applyCaseUpdate(
         userAgent: actor.userAgent,
         metadata: { title: current.title, ...timeline.auditMeta },
       }, tx);
+
+      return { ok: true };
     });
   } catch (err) {
     console.error(`[applyCaseUpdate:${patch.kind}] failed`, err);
     return { ok: false, error: 'เกิดข้อผิดพลาดในการบันทึก กรุณาลองอีกครั้ง' };
   }
-
-  return { ok: true };
 }
 
 type TimelineEntry = {
