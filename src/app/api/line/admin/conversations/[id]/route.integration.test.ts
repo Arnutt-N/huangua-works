@@ -256,3 +256,47 @@ describe('PATCH — admin note', () => {
     expect(conv.adminNote).toBeNull();
   });
 });
+
+describe('PATCH — transition ผ่าน conversation module', () => {
+  test('ห้าม human_active → waiting_handoff (ไม่อยู่ในตาราง) → 409 และโหมดไม่เปลี่ยน', async () => {
+    mocks.currentUserId = adminBId;
+    const res = await PATCH(patchRequest(conversationId, { mode: 'waiting_handoff' }), params(conversationId));
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe('สถานะบทสนทนาเปลี่ยนไปแล้ว กรุณารีเฟรช');
+    expect((await loadConv()).mode).toBe('human_active');
+  });
+
+  test('ปิดเรื่อง human_active → resolved ตั้ง resolvedAt; ปิดซ้ำได้ 200 (idempotent)', async () => {
+    const res = await PATCH(patchRequest(conversationId, { mode: 'resolved' }), params(conversationId));
+    expect(res.status).toBe(200);
+    const conv = await loadConv();
+    expect(conv.mode).toBe('resolved');
+    expect(conv.resolvedAt).toBeInstanceOf(Date);
+
+    const again = await PATCH(patchRequest(conversationId, { mode: 'resolved' }), params(conversationId));
+    expect(again.status).toBe(200);
+  });
+
+  test('claim ห้อง resolved → 409 (คืนให้บอทก่อน) แล้ว resolved → bot_active ได้', async () => {
+    const claim = await PATCH(patchRequest(conversationId, { mode: 'human_active' }), params(conversationId));
+    expect(claim.status).toBe(409);
+    expect((await claim.json()).error).toBe('เปลี่ยนสถานะไม่ได้จากสถานะปัจจุบัน');
+
+    const toBot = await PATCH(patchRequest(conversationId, { mode: 'bot_active' }), params(conversationId));
+    expect(toBot.status).toBe(200);
+    expect((await loadConv()).mode).toBe('bot_active');
+  });
+
+  test('linkedCaseId อย่างเดียว: ผูกเคสโดยไม่เปลี่ยนโหมด; 404 ห้องที่ไม่มี', async () => {
+    const caseId = generateId();
+    const res = await PATCH(patchRequest(conversationId, { linkedCaseId: caseId }), params(conversationId));
+    expect(res.status).toBe(200);
+    const conv = await loadConv();
+    expect(conv.linkedCaseId).toBe(caseId);
+    expect(conv.mode).toBe('bot_active');
+
+    const missing = generateId();
+    const notFound = await PATCH(patchRequest(missing, { linkedCaseId: null }), params(missing));
+    expect(notFound.status).toBe(404);
+  });
+});

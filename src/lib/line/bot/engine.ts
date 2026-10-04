@@ -1,9 +1,9 @@
-import { eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { lineUsers, chatConversations, chatMessages } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
-import { getProfile, replyMessage, sendTypingIndicator } from '../client';
 import type { LineWebhookEvent, LineMessageEvent, LineFollowEvent, LinePostbackEvent, LineOutgoingMessage } from '../types';
+import type { ConversationMode } from '../chat-modes';
 import { matchFaq } from './faq-matcher';
 import { matchIntent } from './intent-matcher';
 import { parseResponseText } from './response-parser';
@@ -15,24 +15,31 @@ import { caseStatusFlex } from '../messages/flex';
 import { getFaqReply } from '../messages/rich-menu';
 import { findTrackableCase } from '@/lib/cases/citizen-access';
 import { COPY } from '@/lib/copy';
-import { broadcast } from '../sse/broadcaster';
+import {
+  httpLineTransport,
+  isHumanHandled,
+  recordBotReplies,
+  recordInboundMessage,
+  type InboundMessageType,
+  type LineTransport,
+} from '../conversation';
 
 type Db = Awaited<ReturnType<typeof getDb>>;
 
-export async function handleEvent(event: LineWebhookEvent) {
+export async function handleEvent(event: LineWebhookEvent, transport: LineTransport = httpLineTransport) {
   const userId = event.source.userId;
   if (!userId) return;
 
   const db = await getDb();
-  const lineUser = await getOrCreateLineUser(db, userId);
+  const lineUser = await getOrCreateLineUser(db, userId, transport);
   const conversation = await getOrCreateConversation(db, userId);
 
   switch (event.type) {
     case 'message':
-      await handleMessageEvent(db, event, lineUser.id, conversation.id, conversation.mode);
+      await handleMessageEvent(db, event, lineUser.id, conversation.id, conversation.mode, transport);
       break;
     case 'follow':
-      await handleFollowEvent(db, event, conversation.id);
+      await handleFollowEvent(db, event, conversation.id, transport);
       break;
     case 'postback':
       await handlePostbackEvent(db, event, conversation.id);
@@ -44,7 +51,7 @@ export async function handleEvent(event: LineWebhookEvent) {
 
 const PROFILE_RETRY_MS = 24 * 60 * 60 * 1000; // ลองดึงโปรไฟล์ที่พลาดซ้ำได้วันละครั้ง
 
-async function getOrCreateLineUser(db: Db, lineUserId: string) {
+async function getOrCreateLineUser(db: Db, lineUserId: string, transport: LineTransport) {
   const [existing] = await db
     .select()
     .from(lineUsers)
@@ -58,7 +65,7 @@ async function getOrCreateLineUser(db: Db, lineUserId: string) {
     const lastCheck = meta?.profileCheckedAt ? Date.parse(meta.profileCheckedAt) : 0;
     const due = Date.now() - lastCheck > PROFILE_RETRY_MS;
     if (!existing.displayName && due) {
-      const profile = await getProfile(lineUserId).catch(() => null);
+      const profile = await transport.getProfile(lineUserId).catch(() => null);
       await db
         .update(lineUsers)
         .set({
@@ -73,7 +80,7 @@ async function getOrCreateLineUser(db: Db, lineUserId: string) {
   }
 
   const id = generateId();
-  const profile = await getProfile(lineUserId).catch(() => null);
+  const profile = await transport.getProfile(lineUserId).catch(() => null);
   await db.insert(lineUsers).values({
     id,
     lineUserId,
@@ -103,70 +110,35 @@ async function handleMessageEvent(
   event: LineMessageEvent,
   lineUserPk: string,
   conversationId: string,
-  mode: string,
+  mode: ConversationMode,
+  transport: LineTransport,
 ) {
   const msg = event.message;
-  const textContent = msg.type === 'text' ? msg.text : null;
-  const messageType = msg.type === 'text' ? 'text'
-    : msg.type === 'image' ? 'image'
+  const messageType: InboundMessageType = msg.type === 'image' ? 'image'
     : msg.type === 'location' ? 'location'
     : msg.type === 'sticker' ? 'sticker'
     : 'text';
 
-  const messageId = generateId();
-  await db.insert(chatMessages).values({
-    id: messageId,
+  await recordInboundMessage({
     conversationId,
-    sender: 'user',
+    mode,
     messageType,
-    textContent,
+    textContent: msg.type === 'text' ? msg.text : null,
     locationData: msg.type === 'location'
       ? { title: msg.title, address: msg.address, latitude: msg.latitude, longitude: msg.longitude }
       : null,
     lineMessageId: msg.id,
   });
 
-  await db
-    .update(chatConversations)
-    .set({
-      lastMessageText: textContent ?? `[${messageType}]`,
-      lastMessageAt: new Date(),
-      lastMessageSender: 'user',
-      unreadAdmin:
-        mode === 'human_active' || mode === 'waiting_handoff'
-          ? sql`${chatConversations.unreadAdmin} + 1`
-          : 0,
-      updatedAt: new Date(),
-    })
-    .where(eq(chatConversations.id, conversationId));
-
-  broadcast({
-    type: 'new_message',
-    conversationId,
-    payload: { id: messageId, sender: 'user', messageType, textContent, createdAt: new Date().toISOString() },
-  });
-  broadcast({ type: 'conversation_update', conversationId, payload: { lastMessageText: textContent ?? `[${messageType}]` } });
-
-  if (mode === 'human_active' || mode === 'waiting_handoff') {
+  if (isHumanHandled(mode)) {
     return;
   }
 
-  await sendTypingIndicator(event.source.userId);
+  await transport.showTyping(event.source.userId);
 
-  const replies = await routeBotMessage(db, event, textContent, lineUserPk, conversationId);
-
-  for (const reply of replies) {
-    await db.insert(chatMessages).values({
-      id: generateId(),
-      conversationId,
-      sender: 'bot',
-      messageType: reply.type === 'text' ? 'text' : 'flex',
-      textContent: reply.type === 'text' ? reply.text : null,
-      flexPayload: reply.type === 'flex' ? reply.contents : null,
-    });
-  }
-
-  await replyMessage(event.replyToken, replies.slice(0, 5));
+  const replies = await routeBotMessage(db, event, msg.type === 'text' ? msg.text : null, lineUserPk, conversationId);
+  await recordBotReplies(conversationId, replies);
+  await transport.reply(event.replyToken, replies.slice(0, 5));
 }
 
 export async function routeBotMessage(
@@ -267,9 +239,10 @@ async function updateBotState(db: Db, lineUserPk: string, state: CaseFlowState |
     .where(eq(lineUsers.id, lineUserPk));
 }
 
-async function handleFollowEvent(db: Db, event: LineFollowEvent, conversationId: string) {
+async function handleFollowEvent(db: Db, event: LineFollowEvent, conversationId: string, transport: LineTransport) {
   const replies = await getWelcomeMessages();
 
+  // คงพฤติกรรมเดิม: บันทึกแค่ข้อความแรกเป็น text
   await db.insert(chatMessages).values({
     id: generateId(),
     conversationId,
@@ -278,7 +251,7 @@ async function handleFollowEvent(db: Db, event: LineFollowEvent, conversationId:
     textContent: (replies[0] as { type: 'text'; text: string }).text,
   });
 
-  await replyMessage(event.replyToken, replies);
+  await transport.reply(event.replyToken, replies);
 }
 
 async function handlePostbackEvent(db: Db, event: LinePostbackEvent, conversationId: string) {
