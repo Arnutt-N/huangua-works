@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { eq } from 'drizzle-orm';
 import { closeDb, getDb } from '../src/lib/db';
-import { cases, categories, lineUsers, users } from '../src/lib/db/schema';
+import { cases, categories, consentRecords, lineUsers, users } from '../src/lib/db/schema';
 import { generateId } from '../src/lib/id';
 import { E2E_CLIENT_IP, resetRateLimits } from './helpers/reset-rate-limits';
 import { rateLimitKey } from '../src/lib/rate-limit/policies';
@@ -43,6 +43,16 @@ test.beforeAll(async () => {
     linkedUserId: testUserId,
   });
 
+  // § "เรื่องของฉัน" ใช้กติกาเดียวกับ /track — เจ้าของต้องมีความยินยอม data_collection ล่าสุด
+  await db.insert(consentRecords).values({
+    id: generateId(),
+    userId: testUserId,
+    consentType: 'data_collection',
+    version: '1.1',
+    isGranted: true,
+    grantedAt: new Date(),
+  });
+
   testCaseId = generateId();
   await db.insert(cases).values({
     id: testCaseId,
@@ -63,6 +73,7 @@ test.afterAll(async () => {
   const db = await getDb();
   await db.delete(cases).where(eq(cases.id, testCaseId));
   await db.delete(lineUsers).where(eq(lineUsers.id, testLineUserId));
+  await db.delete(consentRecords).where(eq(consentRecords.userId, testUserId));
   await db.delete(users).where(eq(users.id, testUserId));
   await closeDb();
 });

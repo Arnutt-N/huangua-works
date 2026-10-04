@@ -6,7 +6,7 @@ import { Navbar } from '@/components/landing/Navbar';
 import { SiteFooter } from '../../components/site/site-footer';
 import { LiffProvider } from '@/components/liff/liff-provider';
 import { CaseStatusBadge } from '@/components/ui/case-status-badge';
-import { getMyCases } from '@/lib/cases/my-cases';
+import { listMyCases } from '@/lib/cases/citizen-access';
 import { formatThaiDateLong } from '@/lib/thai-date';
 import { LIFF_SESSION_COOKIE, readLiffSessionValue } from '@/lib/liff/session';
 import { COPY } from '@/lib/copy';
@@ -20,7 +20,8 @@ export const metadata: Metadata = { title: COPY.TRACK_LABEL };
  * ไม่ใช้ UUID PK เพราะ timestamp-ordered และเดาได้
  *
  * ถ้ามี liff session cookie (เข้าจาก LINE) จะแสดง "เรื่องของฉัน" — เคสทุกเรื่อง
- * ที่ผูกกับบัญชี LINE ของผู้ใช้ โดยไม่ต้องพิมพ์รหัส (D2)
+ * ที่ผูกกับบัญชี LINE ของผู้ใช้ โดยไม่ต้องพิมพ์รหัส (D2) เฉพาะเรื่องที่เจ้าของยังให้
+ * ความยินยอมอยู่ (กติกาเดียวกับ GET /api/cases/[id] — ดู citizen-access)
  */
 
 export default async function TrackPage({
@@ -35,7 +36,7 @@ export default async function TrackPage({
   // router.refresh() ให้ section นี้โผล่หลัง render รอบสอง)
   const cookieStore = await cookies();
   const liffSession = readLiffSessionValue(cookieStore.get(LIFF_SESSION_COOKIE)?.value);
-  const myCases = liffSession ? await getMyCases(liffSession.lineUserId) : [];
+  const myCases = liffSession ? await listMyCases(liffSession.lineUserId) : [];
 
   return (
     <div className="min-h-dvh bg-surface text-ink">
