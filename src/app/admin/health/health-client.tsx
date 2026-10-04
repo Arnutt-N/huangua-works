@@ -1,53 +1,29 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
 import { HeartPulse, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import { Button } from '@/components/ui/button';
-
-interface Probe {
-  name: string;
-  status: 'ok' | 'error';
-  latencyMs: number;
-  detail?: string;
-}
-
-interface HealthData {
-  status: string;
-  probes: Probe[];
-  timestamp: string;
-}
+import { adminApi } from '@/app/admin/_lib/admin-api';
+import { useResource } from '@/app/admin/_lib/use-resource';
 
 export function HealthClient() {
-  const [data, setData] = useState<HealthData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const fetchHealth = useCallback(async () => {
-    try {
-      const res = await fetch('/api/line/admin/health');
-      if (!res.ok) throw new Error();
-      setData(await res.json());
-    } catch {
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchHealth();
-    const interval = setInterval(fetchHealth, 30_000);
-    return () => clearInterval(interval);
-  }, [fetchHealth]);
+  const { data, loading, feedback, reload } = useResource({
+    load: adminApi.getHealth,
+    intervalMs: 30_000,
+    loadingOnReload: false, // คงพฤติกรรมเดิม: refresh ไม่ปิดข้อมูลระหว่างโหลด
+  });
 
   if (loading) return <div className="py-12 text-center text-muted">กำลังตรวจสอบ...</div>;
+  // § ห้าม return ก่อน banner — reload ล้มขณะมี data เดิมต้องเห็นข้อความจาก server ด้วย
+  // health route คืน 401/403 `{ error: 'Unauthorized'|'Forbidden' }` เท่านั้น ไม่มี envelope อื่น
+  const errorMsg = feedback?.type === 'error' ? feedback.msg : null;
 
   return (
     <AdminCard>
       <AdminCardTitle
         icon={<HeartPulse className="h-4 w-4" />}
         action={
-          <Button variant="outline" onClick={fetchHealth} className="min-h-touch gap-1.5 text-sm">
+          <Button variant="outline" onClick={() => void reload()} className="min-h-touch gap-1.5 text-sm">
             <RefreshCw className="h-3.5 w-3.5" /> Refresh
           </Button>
         }
@@ -58,6 +34,8 @@ export function HealthClient() {
           </span>
         )}
       </AdminCardTitle>
+
+      {errorMsg && <p className="text-sm text-danger">{errorMsg}</p>}
 
       {!data ? (
         <p className="text-sm text-danger">โหลดสถานะไม่สำเร็จ</p>

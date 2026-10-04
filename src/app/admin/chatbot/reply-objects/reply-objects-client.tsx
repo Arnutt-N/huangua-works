@@ -1,6 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
+import type { ReplyObject } from '@/app/admin/_lib/admin-api';
+import { adminApi } from '@/app/admin/_lib/admin-api';
+import { useResource } from '@/app/admin/_lib/use-resource';
 import { Plus, Pencil, Trash2, LayoutGrid } from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import {
@@ -13,16 +16,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label, Input, Textarea } from '@/components/ui/field';
 
-interface ReplyObject {
-  id: string;
-  objectId: string;
-  objectType: string;
-  payload: Record<string, unknown>;
-  altText: string | null;
-  isActive: boolean;
-  createdAt: string;
-}
-
 interface FormState {
   objectId: string;
   objectType: string;
@@ -34,34 +27,15 @@ interface FormState {
 const EMPTY_FORM: FormState = { objectId: '', objectType: 'text', payloadJson: '{}', altText: '', isActive: true };
 
 export function ReplyObjectsClient() {
-  const [items, setItems] = useState<ReplyObject[]>([]);
-  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
-  const notify = (type: 'success' | 'error', msg: string) => {
-    setFeedback({ type, msg });
-    setTimeout(() => setFeedback(null), 4000);
-  };
-
-  const fetchItems = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/line/admin/reply-objects');
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setItems(data.items);
-    } catch {
-      notify('error', 'โหลดข้อมูลไม่สำเร็จ');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchItems(); }, [fetchItems]);
+  const { data, loading, feedback, notify, mutate } = useResource({
+    load: adminApi.listReplyObjects,
+  });
+  const items = data?.items ?? [];
 
   function openCreate() {
     setEditingId(null);
@@ -82,7 +56,10 @@ export function ReplyObjectsClient() {
   }
 
   async function handleSave() {
-    if (!form.objectId.trim()) { notify('error', 'กรุณากรอก Object ID'); return; }
+    if (!form.objectId.trim()) {
+      notify('error', 'กรุณากรอก Object ID');
+      return;
+    }
     let payload: Record<string, unknown>;
     try {
       payload = JSON.parse(form.payloadJson);
@@ -91,42 +68,36 @@ export function ReplyObjectsClient() {
       return;
     }
 
+    // § POST createSchema รับ altText?: string เท่านั้น (null → 400); PATCH updateSchema รับ null ได้
+    const createBody = {
+      objectId: form.objectId.trim(),
+      objectType: form.objectType,
+      payload,
+      isActive: form.isActive,
+      ...(form.altText ? { altText: form.altText } : {}),
+    };
+    const updateBody = {
+      objectType: form.objectType,
+      payload,
+      altText: form.altText || null,
+      isActive: form.isActive,
+    };
     setSaving(true);
-    try {
-      const url = editingId ? `/api/line/admin/reply-objects/${editingId}` : '/api/line/admin/reply-objects';
-      const method = editingId ? 'PATCH' : 'POST';
-      const body = editingId
-        ? { objectType: form.objectType, payload, altText: form.altText || null, isActive: form.isActive }
-        : { objectId: form.objectId.trim(), objectType: form.objectType, payload, altText: form.altText || undefined, isActive: form.isActive };
-
-      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? 'บันทึกไม่สำเร็จ');
-      }
-      notify('success', editingId ? 'แก้ไขสำเร็จ' : 'สร้างสำเร็จ');
-      setDialogOpen(false);
-      fetchItems();
-    } catch (err) {
-      notify('error', err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
-    } finally {
-      setSaving(false);
-    }
+    const ok = await mutate(
+      () =>
+        editingId
+          ? adminApi.updateReplyObject(editingId, updateBody)
+          : adminApi.createReplyObject(createBody),
+      editingId ? 'แก้ไขสำเร็จ' : 'สร้างสำเร็จ',
+    );
+    setSaving(false);
+    if (ok) setDialogOpen(false);
   }
 
   async function handleDelete(item: ReplyObject) {
     if (!confirm(`ลบ "$${item.objectId}" ?`)) return;
-    try {
-      const res = await fetch(`/api/line/admin/reply-objects/${item.id}`, { method: 'DELETE' });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? 'ลบไม่สำเร็จ');
-      }
-      notify('success', 'ลบสำเร็จ');
-      fetchItems();
-    } catch (err) {
-      notify('error', err instanceof Error ? err.message : 'ลบไม่สำเร็จ');
-    }
+    // server คืน 409 { error: 'ไม่สามารถลบได้ — ถูกอ้างอยู่ใน N ที่ …' } — ต้องโชว์ให้เห็น
+    await mutate(() => adminApi.deleteReplyObject(item.id), 'ลบสำเร็จ');
   }
 
   return (

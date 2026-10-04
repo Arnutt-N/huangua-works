@@ -1,15 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { adminApi } from '@/app/admin/_lib/admin-api';
+import { useResource } from '@/app/admin/_lib/use-resource';
 import { Bot, MessageSquare, HelpCircle, UserPlus } from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
-
-interface Stats {
-  messages: { totalIn: number; totalOut: number };
-  faq: { total: number; active: number; hits: number; hitRate: number };
-  conversations: { total: number; active: number; handoff: number };
-  topFaq: { question: string; hitCount: number }[];
-}
 
 function KpiCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string | number; sub?: string }) {
   return (
@@ -25,19 +19,18 @@ function KpiCard({ icon, label, value, sub }: { icon: React.ReactNode; label: st
 }
 
 export function ChatbotDashboardClient() {
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch('/api/line/admin/chatbot-stats')
-      .then((res) => (res.ok ? res.json() : Promise.reject()))
-      .then(setStats)
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+  const { data: stats, loading, feedback } = useResource({
+    load: adminApi.getChatbotStats,
+  });
 
   if (loading) return <div className="py-12 text-center text-muted">กำลังโหลด...</div>;
-  if (!stats) return <div className="py-12 text-center text-muted">โหลดข้อมูลไม่สำเร็จ</div>;
+  if (!stats) {
+    return (
+      <div className="py-12 text-center text-danger">
+        {feedback?.type === 'error' ? feedback.msg : 'โหลดข้อมูลไม่สำเร็จ'}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

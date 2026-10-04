@@ -1,77 +1,62 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { adminApi } from '@/app/admin/_lib/admin-api';
+import { useResource } from '@/app/admin/_lib/use-resource';
 import { Settings, Save, Wifi, WifiOff } from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import { Button } from '@/components/ui/button';
 import { Label, Input, Textarea } from '@/components/ui/field';
 
-interface SettingsData {
-  welcome_message: string;
-  handoff_keywords: string[];
-  business_hours: { start: string; end: string; days: number[] };
-  bot_enabled: boolean;
-  line: { configured: boolean; maskedToken: string | null };
-}
-
 const DAY_LABELS = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 
 export function SettingsClient() {
-  const [data, setData] = useState<SettingsData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, loading, feedback, clearFeedback, mutate, setData } = useResource({
+    load: adminApi.getSettings,
+  });
   const [saving, setSaving] = useState(false);
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
-  const [keywordsText, setKeywordsText] = useState('');
-
-  useEffect(() => {
-    fetch('/api/line/admin/settings')
-      .then((res) => (res.ok ? res.json() : Promise.reject()))
-      .then((d: SettingsData) => {
-        setData(d);
-        setKeywordsText(d.handoff_keywords.join(', '));
-      })
-      .catch(() => setFeedback({ type: 'error', msg: 'โหลดตั้งค่าไม่สำเร็จ' }))
-      .finally(() => setLoading(false));
-  }, []);
+  // § keywordsText = null แปลว่ายังไม่เคยพิมพ์ → derive ค่าจาก server แทนที่จะ
+  //   useEffect setState (rule set-state-in-effect จับการ setState ใน effect)
+  const [keywordsText, setKeywordsText] = useState<string | null>(null);
+  const keywords = keywordsText ?? data?.handoff_keywords.join(', ') ?? '';
 
   async function handleSave() {
     if (!data) return;
     setSaving(true);
-    setFeedback(null);
-    try {
-      const res = await fetch('/api/line/admin/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+    clearFeedback();
+    await mutate(
+      () =>
+        adminApi.saveSettings({
           welcome_message: data.welcome_message,
-          handoff_keywords: keywordsText.split(',').map((k) => k.trim()).filter(Boolean),
+          handoff_keywords: keywords.split(',').map((k) => k.trim()).filter(Boolean),
           business_hours: data.business_hours,
           bot_enabled: data.bot_enabled,
         }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error ?? 'บันทึกไม่สำเร็จ');
-      }
-      setFeedback({ type: 'success', msg: 'บันทึกตั้งค่าสำเร็จ' });
-    } catch (err) {
-      setFeedback({ type: 'error', msg: err instanceof Error ? err.message : 'เกิดข้อผิดพลาด' });
-    } finally {
-      setSaving(false);
-      setTimeout(() => setFeedback(null), 4000);
-    }
+      'บันทึกตั้งค่าสำเร็จ',
+      { reload: false }, // คงค่าที่ผู้ใช้แก้ค้างไว้ในหน้า — ไม่ดึงทับจาก server
+    );
+    setSaving(false);
   }
 
   function toggleDay(day: number) {
-    if (!data) return;
-    const days = data.business_hours.days.includes(day)
-      ? data.business_hours.days.filter((d) => d !== day)
-      : [...data.business_hours.days, day].sort();
-    setData({ ...data, business_hours: { ...data.business_hours, days } });
+    setData((prev) => {
+      if (!prev) return prev;
+      const days = prev.business_hours.days.includes(day)
+        ? prev.business_hours.days.filter((d) => d !== day)
+        : [...prev.business_hours.days, day].sort();
+      return { ...prev, business_hours: { ...prev.business_hours, days } };
+    });
   }
 
   if (loading) return <div className="py-12 text-center text-muted">กำลังโหลด...</div>;
-  if (!data) return null;
+  // § ห้าม `if (!data) return null` ก่อน banner — โหลดครั้งแรกล้มต้องเห็น error ไม่ใช่หน้าว่าง
+  if (!data) {
+    return feedback?.type === 'error' ? (
+      <div role="status" className="rounded-lg bg-danger/10 px-4 py-3 text-sm font-medium text-danger">
+        {feedback.msg}
+      </div>
+    ) : null;
+  }
 
   return (
     <div className="space-y-6">
@@ -116,7 +101,7 @@ export function SettingsClient() {
             <input
               type="checkbox"
               checked={data.bot_enabled}
-              onChange={(e) => setData({ ...data, bot_enabled: e.target.checked })}
+              onChange={(e) => setData((prev) => (prev ? { ...prev, bot_enabled: e.target.checked } : prev))}
               className="h-5 w-5 rounded border-border accent-accent"
             />
             <span className="text-sm font-medium text-ink">เปิดใช้งานบอทตอบอัตโนมัติ</span>
@@ -128,7 +113,7 @@ export function SettingsClient() {
               id="welcome-msg"
               rows={5}
               value={data.welcome_message}
-              onChange={(e) => setData({ ...data, welcome_message: e.target.value })}
+              onChange={(e) => setData((prev) => (prev ? { ...prev, welcome_message: e.target.value } : prev))}
             />
           </div>
 
@@ -136,7 +121,7 @@ export function SettingsClient() {
             <Label htmlFor="handoff-kw">Handoff Keywords (คั่นด้วย comma)</Label>
             <Input
               id="handoff-kw"
-              value={keywordsText}
+              value={keywords}
               onChange={(e) => setKeywordsText(e.target.value)}
               placeholder="ติดต่อเจ้าหน้าที่, เจ้าหน้าที่, คุยกับคน"
             />
@@ -171,7 +156,13 @@ export function SettingsClient() {
                 id="hours-start"
                 type="time"
                 value={data.business_hours.start}
-                onChange={(e) => setData({ ...data, business_hours: { ...data.business_hours, start: e.target.value } })}
+                onChange={(e) =>
+                  setData((prev) =>
+                    prev
+                      ? { ...prev, business_hours: { ...prev.business_hours, start: e.target.value } }
+                      : prev,
+                  )
+                }
                 className="w-32"
               />
             </div>
@@ -181,7 +172,13 @@ export function SettingsClient() {
                 id="hours-end"
                 type="time"
                 value={data.business_hours.end}
-                onChange={(e) => setData({ ...data, business_hours: { ...data.business_hours, end: e.target.value } })}
+                onChange={(e) =>
+                  setData((prev) =>
+                    prev
+                      ? { ...prev, business_hours: { ...prev.business_hours, end: e.target.value } }
+                      : prev,
+                  )
+                }
                 className="w-32"
               />
             </div>

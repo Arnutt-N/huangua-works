@@ -1,19 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import type { MediaItem } from '@/app/admin/_lib/admin-api';
+import { adminApi } from '@/app/admin/_lib/admin-api';
+import { useResource } from '@/app/admin/_lib/use-resource';
 import { Upload, Trash2, Copy, Image as ImageIcon, FileIcon } from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import { Button } from '@/components/ui/button';
-
-interface MediaItem {
-  id: string;
-  url: string;
-  filename: string;
-  mimeType: string;
-  sizeBytes: number;
-  category: string;
-  createdAt: string;
-}
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -22,68 +15,28 @@ function formatSize(bytes: number): string {
 }
 
 export function FilesClient() {
-  const [items, setItems] = useState<MediaItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [storageOk, setStorageOk] = useState(true);
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const notify = (type: 'success' | 'error', msg: string) => {
-    setFeedback({ type, msg });
-    setTimeout(() => setFeedback(null), 4000);
-  };
-
-  const fetchItems = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/line/admin/media');
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setItems(data.items);
-      setStorageOk(data.storageConfigured);
-    } catch {
-      notify('error', 'โหลดข้อมูลไม่สำเร็จ');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchItems(); }, [fetchItems]);
+  const { data, loading, feedback, notify, mutate } = useResource({
+    load: adminApi.listMedia,
+  });
+  const items = data?.items ?? [];
+  const storageOk = data?.storageConfigured ?? true;
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
-    try {
-      const form = new FormData();
-      form.append('file', file);
-      form.append('category', 'general');
-      const res = await fetch('/api/line/admin/media', { method: 'POST', body: form });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? 'อัปโหลดไม่สำเร็จ');
-      }
-      notify('success', 'อัปโหลดสำเร็จ');
-      fetchItems();
-    } catch (err) {
-      notify('error', err instanceof Error ? err.message : 'อัปโหลดไม่สำเร็จ');
-    } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = '';
-    }
+    await mutate(() => adminApi.uploadMedia(file), 'อัปโหลดสำเร็จ');
+    setUploading(false);
+    if (fileRef.current) fileRef.current.value = '';
   }
 
   async function handleDelete(item: MediaItem) {
     if (!confirm(`ลบ "${item.filename}" ?`)) return;
-    try {
-      const res = await fetch(`/api/line/admin/media/${item.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error();
-      notify('success', 'ลบสำเร็จ');
-      fetchItems();
-    } catch {
-      notify('error', 'ลบไม่สำเร็จ');
-    }
+    // server คืน { error: 'ไม่พบไฟล์' } — mutate เอาข้อความนั้นมาแจ้ง ไม่โยนทิ้งเหมือนเดิม
+    await mutate(() => adminApi.deleteMedia(item.id), 'ลบสำเร็จ');
   }
 
   function copyUrl(url: string) {
