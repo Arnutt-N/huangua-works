@@ -44,19 +44,25 @@ export async function PATCH(
     return NextResponse.json({ error: 'ไม่พบ FAQ' }, { status: 404 });
   }
 
-  await db
-    .update(chatFaq)
-    .set({ ...parsed.data, updatedAt: new Date() })
-    .where(eq(chatFaq.id, id));
+  // § update + audit ใน transaction เดียว — audit ล้ม = FAQ ไม่เปลี่ยน (ตอบ 500 เหมือนเดิม)
+  await db.transaction(async (tx) => {
+    await tx
+      .update(chatFaq)
+      .set({ ...parsed.data, updatedAt: new Date() })
+      .where(eq(chatFaq.id, id));
 
-  await logAudit({
-    userId: authz.ctx.user.id,
-    action: AUDIT_ACTIONS.FAQ_UPDATE,
-    resource: 'chat_faq',
-    resourceId: id,
-    ipAddress: authz.ctx.ipAddress,
-    userAgent: authz.ctx.userAgent,
-    metadata: { changes: Object.keys(parsed.data) },
+    await logAudit(
+      {
+        userId: authz.ctx.user.id,
+        action: AUDIT_ACTIONS.FAQ_UPDATE,
+        resource: 'chat_faq',
+        resourceId: id,
+        ipAddress: authz.ctx.ipAddress,
+        userAgent: authz.ctx.userAgent,
+        metadata: { changes: Object.keys(parsed.data) },
+      },
+      tx,
+    );
   });
 
   return NextResponse.json({ ok: true });
@@ -77,15 +83,21 @@ export async function DELETE(
     return NextResponse.json({ error: 'ไม่พบ FAQ' }, { status: 404 });
   }
 
-  await db.update(chatFaq).set({ isActive: false, updatedAt: new Date() }).where(eq(chatFaq.id, id));
+  // § soft delete + audit ใน transaction เดียว
+  await db.transaction(async (tx) => {
+    await tx.update(chatFaq).set({ isActive: false, updatedAt: new Date() }).where(eq(chatFaq.id, id));
 
-  await logAudit({
-    userId: authz.ctx.user.id,
-    action: AUDIT_ACTIONS.FAQ_DELETE,
-    resource: 'chat_faq',
-    resourceId: id,
-    ipAddress: authz.ctx.ipAddress,
-    userAgent: authz.ctx.userAgent,
+    await logAudit(
+      {
+        userId: authz.ctx.user.id,
+        action: AUDIT_ACTIONS.FAQ_DELETE,
+        resource: 'chat_faq',
+        resourceId: id,
+        ipAddress: authz.ctx.ipAddress,
+        userAgent: authz.ctx.userAgent,
+      },
+      tx,
+    );
   });
 
   return NextResponse.json({ ok: true });

@@ -21,7 +21,7 @@ import { enforceRateLimit } from '@/lib/rate-limit/enforce';
 import { clientIpFromHeaders } from '@/lib/rate-limit/client-ip';
 import { normalizeTrackingCode } from '@/lib/case-tracking';
 import { generateCidHash } from '@/lib/cid-hmac';
-import { revokeConsent } from '@/lib/consent';
+import { revokeConsentWithAudit } from '@/lib/consent';
 import { consentWithdrawSchema, consentWithdrawLineSchema, validateOrError } from '@/lib/validation';
 import { LIFF_SESSION_COOKIE, readLiffSessionValue } from '@/lib/liff/session';
 
@@ -96,21 +96,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(WITHDRAW_DENIED, { status: 404 });
     }
 
-    await revokeConsent(lineCaseRow.submittedBy, 'data_collection', {
-      via: 'liff_withdraw',
-      caseId: lineCaseRow.id,
-      trackingCode: lineTrackingCode,
-    });
-
-    await logAudit({
-      userId: lineCaseRow.submittedBy,
-      action: AUDIT_ACTIONS.CONSENT_WITHDRAWN,
-      resource: 'consent',
-      resourceId: lineCaseRow.id,
-      ipAddress: ip,
-      userAgent: req.headers.get('user-agent') || undefined,
-      metadata: { trackingCode: lineTrackingCode, via: 'liff' },
-    });
+    // § route เป็นเจ้าของ tx ชั่วคราวก่อน c1; helper ใช้ tx นี้โดยไม่เปิดซ้อน
+    await db.transaction((tx) =>
+      revokeConsentWithAudit(
+        {
+          userId: lineCaseRow.submittedBy,
+          caseId: lineCaseRow.id,
+          trackingCode: lineTrackingCode,
+          via: 'liff',
+          ipAddress: ip,
+          userAgent: req.headers.get('user-agent') || undefined,
+        },
+        tx,
+      ),
+    );
 
     return NextResponse.json({
       success: true,
@@ -165,21 +164,20 @@ export async function POST(req: NextRequest) {
   }
 
   // § Revoke consent
-  await revokeConsent(userRow.id, 'data_collection', {
-    via: 'web_withdraw',
-    caseId: caseRow.id,
-    trackingCode,
-  });
-
-  await logAudit({
-    userId: userRow.id,
-    action: AUDIT_ACTIONS.CONSENT_WITHDRAWN,
-    resource: 'consent',
-    resourceId: caseRow.id,
-    ipAddress: ip,
-    userAgent: req.headers.get('user-agent') || undefined,
-    metadata: { trackingCode },
-  });
+  // § route เป็นเจ้าของ tx ชั่วคราวก่อน c1; helper ใช้ tx นี้โดยไม่เปิดซ้อน
+  await db.transaction((tx) =>
+    revokeConsentWithAudit(
+      {
+        userId: userRow.id,
+        caseId: caseRow.id,
+        trackingCode: trackingCode,
+        via: 'web',
+        ipAddress: ip,
+        userAgent: req.headers.get('user-agent') || undefined,
+      },
+      tx,
+    ),
+  );
 
   return NextResponse.json({
     success: true,

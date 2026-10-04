@@ -34,7 +34,12 @@ const { mockDb } = vi.hoisted(() => {
         return obj;
       }),
     };
-    for (const m of ['where', 'limit', 'values']) {
+    // § intake ใช้ ON CONFLICT/RETURNING ใน tx; mock ต้องคืน id ของแถวที่ insert
+    obj.values = vi.fn((row: Record<string, unknown>) => {
+      value = [row];
+      return obj;
+    });
+    for (const m of ['where', 'limit', 'onConflictDoNothing', 'returning']) {
       obj[m] = vi.fn(() => obj);
     }
     return obj;
@@ -43,6 +48,8 @@ const { mockDb } = vi.hoisted(() => {
   const mockDb = {
     select: vi.fn(() => makeThenable()),
     insert: vi.fn(() => makeThenable()),
+    // § ใช้ mockDb เดิมเป็น tx เพื่อทดสอบ bot flow ผ่าน createCase โดยไม่แตะ DB จริง
+    transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(mockDb)),
   };
   return { mockDb };
 });

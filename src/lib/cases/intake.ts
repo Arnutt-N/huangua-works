@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { getDb } from '../db';
+import { getDb, type DbOrTx } from '../db';
 import { firstOrUndefined } from '../db/query-helpers';
 import { cases, categories, lineUsers, users } from '../db/schema';
 import { generateId } from '../id';
@@ -82,24 +82,6 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
     }
   }
 
-  const submitterId = await resolveSubmitter(db, input);
-  if (!submitterId) {
-    return { ok: false, error: 'ไม่สามารถสร้างผู้ใช้งานได้', errorCode: 'internal' };
-  }
-
-  // § LIFF เป็นฟอร์มเว็บในหน้าต่าง LINE — consent เก็บเท่ากับทางเว็บ (ต่างจากบอท
-  // ซึ่งเก็บข้อมูลน้อยกว่าและไม่มี checkbox ความยินยอมในแชท)
-  if (input.channel === 'web' || input.origin === 'liff') {
-    await grantConsent({
-      userId: submitterId,
-      consentType: 'data_collection',
-      version: CONSENT_VERSION,
-      ipAddress: input.ipAddress,
-      userAgent: input.userAgent,
-      metadata: { via: input.origin === 'liff' ? 'liff_submit' : 'intake_submit' },
-    });
-  }
-
   const caseId = generateId();
   const fiscalYear = getFiscalYear(new Date());
   const estimatedDays = category.estimatedDays || 7;
@@ -107,6 +89,7 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
 
   // § ตรวจทุกรหัสที่สุ่มได้ก่อนใช้ — เดิมวนสุ่มใหม่ตอนชนแล้วออกจากลูปโดยไม่ได้ตรวจ
   // ตัวสุดท้าย ทำให้รหัสที่ไม่เคยผ่านการตรวจหลุดไปถึง insert แล้วพังที่ unique index
+  // § ออกเลขติดตามก่อนสร้างผู้แจ้ง เพื่อไม่ทิ้ง user/consent เมื่อออกเลขไม่ได้
   let trackingCode: string | null = null;
   for (let attempt = 0; attempt < 5; attempt++) {
     const candidate = generateTrackingCode();
@@ -122,53 +105,75 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
     return { ok: false, error: 'ไม่สามารถออกเลขติดตามได้ กรุณาลองใหม่', errorCode: 'internal' };
   }
 
-  await db.insert(cases).values({
-    id: caseId,
-    status: 'pending',
-    priority: 'normal',
-    title: input.title,
-    description: input.description,
-    location: input.location ?? '',
-    provinceId: input.provinceId ?? null,
-    districtId: input.districtId ?? null,
-    subDistrictId: input.subDistrictId ?? null,
-    villageId: input.villageId ?? null,
-    village: input.village || null,
-    categoryId: input.categoryId,
-    submittedBy: submitterId,
-    departmentId: category.defaultDepartmentId || null,
-    dueDate,
-    attachments: input.attachments ? JSON.stringify(input.attachments) : null,
-    metadata: JSON.stringify({
-      fiscalYear,
-      source: input.channel,
-      ...(input.origin === 'liff' ? { origin: 'liff' } : {}),
+  const issuedTrackingCode = trackingCode;
+
+  // § การเขียนผู้แจ้ง/link/consent/เรื่อง/dedup/audit ต้อง commit หรือ rollback พร้อมกัน
+  // คง resolveSubmitter และ consent เว็บ/LIFF ตาม baseline ก่อน c1
+  return db.transaction(async (tx): Promise<CaseIntakeResult> => {
+    const submitterId = await resolveSubmitter(tx, input);
+    if (!submitterId) {
+      return { ok: false, error: 'ไม่สามารถสร้างผู้ใช้งานได้', errorCode: 'internal' };
+    }
+
+    // § LIFF เป็นฟอร์มเว็บในหน้าต่าง LINE — consent เก็บเท่ากับทางเว็บ (ต่างจากบอท
+    // ซึ่งเก็บข้อมูลน้อยกว่าและไม่มี checkbox ความยินยอมในแชท)
+    if (input.channel === 'web' || input.origin === 'liff') {
+      await grantConsent({
+        userId: submitterId,
+        consentType: 'data_collection',
+        version: CONSENT_VERSION,
+        ipAddress: input.ipAddress,
+        userAgent: input.userAgent,
+        metadata: { via: input.origin === 'liff' ? 'liff_submit' : 'intake_submit' },
+      }, tx);
+    }
+
+    await tx.insert(cases).values({
+      id: caseId,
+      status: 'pending',
+      priority: 'normal',
+      title: input.title,
+      description: input.description,
+      location: input.location ?? '',
+      provinceId: input.provinceId ?? null,
+      districtId: input.districtId ?? null,
+      subDistrictId: input.subDistrictId ?? null,
+      villageId: input.villageId ?? null,
+      village: input.village || null,
+      categoryId: input.categoryId,
+      submittedBy: submitterId,
+      departmentId: category.defaultDepartmentId || null,
+      dueDate,
+      attachments: input.attachments ? JSON.stringify(input.attachments) : null,
+      metadata: JSON.stringify({
+        fiscalYear,
+        source: input.channel,
+        ...(input.origin === 'liff' ? { origin: 'liff' } : {}),
+        ipAddress: input.ipAddress,
+        userAgent: input.userAgent,
+      }),
+      trackingCode: issuedTrackingCode,
+    });
+
+    if (dedupKey) {
+      await recordDedupHash(dedupKey, input.title, input.description, caseId, tx);
+    }
+
+    await logAudit({
+      userId: submitterId,
+      action: AUDIT_ACTIONS.SUBMIT_CASE,
+      resource: 'cases',
+      resourceId: caseId,
       ipAddress: input.ipAddress,
       userAgent: input.userAgent,
-    }),
-    trackingCode,
+      metadata: { categoryId: input.categoryId, fiscalYear, channel: input.channel },
+    }, tx);
+
+    return { ok: true, caseId, trackingCode: issuedTrackingCode, estimatedDays };
   });
-
-  if (dedupKey) {
-    await recordDedupHash(dedupKey, input.title, input.description, caseId);
-  }
-
-  await logAudit({
-    userId: submitterId,
-    action: AUDIT_ACTIONS.SUBMIT_CASE,
-    resource: 'cases',
-    resourceId: caseId,
-    ipAddress: input.ipAddress,
-    userAgent: input.userAgent,
-    metadata: { categoryId: input.categoryId, fiscalYear, channel: input.channel },
-  });
-
-  return { ok: true, caseId, trackingCode, estimatedDays };
 }
 
-type Db = Awaited<ReturnType<typeof getDb>>;
-
-async function resolveSubmitter(db: Db, input: CaseIntakeInput): Promise<string | null> {
+async function resolveSubmitter(db: DbOrTx, input: CaseIntakeInput): Promise<string | null> {
   if (input.channel === 'line') {
     // § เดิม create user ใหม่ทุกครั้งแต่ไม่เขียน lineUsers.linkedUserId กลับ → แจ้งผ่านบอท
     // ครั้งที่ 2 ของ LINE user เดิมชน unique(users.email) กับ placeholder เดิมแล้วกลายเป็น 500
@@ -188,16 +193,24 @@ async function resolveSubmitter(db: Db, input: CaseIntakeInput): Promise<string 
       const existingUser = await firstOrUndefined(
         db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1)
       );
-      const userId = existingUser?.id ?? generateId();
+      let userId = existingUser?.id ?? generateId();
       if (!existingUser) {
-        await db.insert(users).values({
+        const inserted = await db.insert(users).values({
           id: userId,
           email,
           role: 'citizen',
           isActive: true,
           fullName: input.fullName || 'ผู้ใช้ LINE',
           metadata: JSON.stringify({ source: 'line_intake' }),
-        });
+        }).onConflictDoNothing({ target: users.email }).returning({ id: users.id });
+        // § unique conflict ต้องไม่ throw ใน tx; อ่านผู้ชนะหลัง ON CONFLICT แทน
+        if (!inserted[0]) {
+          const winner = await firstOrUndefined(
+            db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1),
+          );
+          if (!winner) throw new Error('ไม่สามารถสร้างผู้ใช้งานได้');
+          userId = winner.id;
+        }
       }
       if (lineRow) {
         await db
@@ -236,7 +249,7 @@ async function resolveSubmitter(db: Db, input: CaseIntakeInput): Promise<string 
   if (existing) return existing.id;
 
   const userId = generateId();
-  await db.insert(users).values({
+  const inserted = await db.insert(users).values({
     id: userId,
     email: cidEmail,
     role: 'citizen',
@@ -248,6 +261,12 @@ async function resolveSubmitter(db: Db, input: CaseIntakeInput): Promise<string 
       source: 'web_intake',
       ...(input.email ? { contactEmail: input.email } : {}),
     }),
-  });
-  return userId;
+  }).onConflictDoNothing({ target: users.email }).returning({ id: users.id });
+  // § ใช้ ON CONFLICT แทน catch unique เพื่อไม่ทำให้ transaction ทั้งก้อน abort
+  if (inserted[0]) return inserted[0].id;
+  const winner = await firstOrUndefined(
+    db.select({ id: users.id }).from(users).where(eq(users.email, cidEmail)).limit(1),
+  );
+  if (!winner) throw new Error('ไม่สามารถสร้างผู้ใช้งานได้');
+  return winner.id;
 }
