@@ -31,6 +31,10 @@ route เดิมเปิด tx เรียก helper ทั้งเว็�
 Task 3–4 ตามแผนเดิม คง parsed.data เพราะ c8 ยังไม่ merge; Task 5 gates ทีละคำสั่ง
 แล้ว commit local เฉพาะไฟล์งานนี้
 
+เพิ่มเติมจาก full-suite gate: src/lib/line/bot/case-flow.test.ts มี DB mock อีกชุดที่
+createCase ใช้จริง จึงต้องเพิ่ม transaction/ON CONFLICT/RETURNING เฉพาะ mock นี้
+ไม่แก้ src/lib/line/bot/case-flow.ts ซึ่งเป็น caller ที่ห้ามแตะ
+
 Test strategy: red → green ด้วย passthrough audit mock/Postgres จริงทุกหน่วย
 เพิ่มตรวจ route wiring เว็บ/LIFF และ unique conflict ที่ไม่ abort tx
 ทำทีละ Task ไม่มี tranche ขนานเพราะ RAM ต่ำ ความเสี่ยง unique collision/consent
@@ -1437,3 +1441,65 @@ gh pr create --title "refactor: เขียนข้อมูลกับ audit
 3. **Type consistency:** `revokeConsentWithAudit(w: ConsentWithdrawal, tx: DbOrTx)` ใช้ชื่อ field `userId/caseId/trackingCode/via/ipAddress/userAgent` ตรงกันใน Task 2 และแผน c1; `resolveCitizen(identity, tx)` / `recordIntakeConsent(..., tx)` รับ `DbOrTx` ✓; `recordDedupHash(…, caseId, tx)` ตรงกับ signature ใน Interfaces ✓; intake.test.ts คง "14 tests" ไว้
 
 **พฤติกรรมที่เปลี่ยน (ตั้งใจ):** (1) createCase ออกเลขติดตามก่อนสร้างผู้แจ้ง — ถ้าออกเลขไม่ได้จะไม่มีผู้ใช้/consent ค้าง (2) ทุกจุดหมวด A: audit ล้ม → ไม่มีการเปลี่ยนข้อมูล แทนที่จะเปลี่ยนแล้วตอบ error (3) ข้อความ error / status code / metadata ของ audit ไม่เปลี่ยน
+
+
+## ผลการดำเนินงาน c6 (2026-10-04)
+
+- [x] Task 0: branch refactor/audited-writes จาก b34ee5b; baseline 3 ไฟล์ / 40 tests ผ่าน
+- [x] Task 1: intake atomic ตามข้อยกเว้นก่อน c1; red 4 failed / 1 passed → green 5 integration tests;
+  unit เดิม 14 + unique-conflict regression 2 = 16; submit route integration 11 ผ่าน
+- [x] Task 2: helper ไม่เปิด tx; route เดิมเปิด tx ทั้งเว็บ/LIFF และคง c7;
+  helper integration 2 + route integration 5 ผ่าน รวม rollback/success/enforcement
+- [x] Task 3: users actions 4 จุดใน tx; integration 5 ผ่านและคง error/redirect เดิม
+- [x] Task 4: FAQ PATCH/DELETE ใน tx โดยคง parsed.data ก่อน c8; integration 3 ผ่าน
+- [x] Task 5: gates รวมผ่านจริงและตรวจขอบเขต diff; commit local เท่านั้น
+
+ผล gate รอบสุดท้าย (รันคำสั่งตามลำดับ ไม่มี suite/filter ที่ตัด integration):
+
+```text
+npx tsc --noEmit                                  exit 0
+npx eslint <13 ไฟล์ .ts ที่แตะ>                    exit 0; 0 errors / 0 warnings
+npx vitest run --maxWorkers=1 --no-file-parallelism exit 0
+ Test Files  59 passed (59)
+      Tests  533 passed (533)
+   Duration  316.83s
+```
+
+full-suite รอบแรก 530 passed / 3 failed เพราะ DB mock ใน case-flow.test.ts ไม่มี transaction
+แก้เฉพาะ mock ให้รับ tx/ON CONFLICT/RETURNING แล้ว focused tests 42 ผ่าน และ full suite รอบใหม่ผ่านครบ
+ไม่แก้ case-flow.ts หรือ caller อื่น; ปรับ test metadata assertion ให้ตรง object ที่อ่านจาก DB จริง
+และลบ declaration db ที่ซ้ำใน snippet test เดิม ไม่มี schema/migration หรือ seed เพิ่ม
+
+Self-review: audit หมวด A ส่ง tx ครบ 8 จุด; § comments เดิมและข้อความไทยใน source
+คงครบทุก literal/template; operations.ts และ callers 3 จุดไม่เปลี่ยน; c1 ไม่ถูกสร้าง/เรียก
+คืนไฟล์เดิมจาก stash แล้วและเก็บ stash@{0} ชื่อ pre-audited-writes สำรองไว้ โดยแผนนี้
+ถูกปรับตามที่ผู้ใช้อนุมัติ ต้นฉบับยังอยู่ใน stash
+
+ไม่ได้ทำ: push, PR, merge, Vercel Preview, หมวด B/D และ implementation c1 ตามขอบเขตที่กำหนด
+ไม่มีข้อสงสัยด้าน implementation ค้าง ส่วนการประกอบกับ c1 ให้ c1 ใช้ helper ใน tx ของตัวเอง
+
+ไฟล์ของงานนี้ (14 ไฟล์ รวมแผนและ test fixture ที่ full suite พบว่าต้องปรับ):
+
+```text
+docs/superpowers/plans/2026-10-03-audited-writes.md
+src/app/admin/actions/users.integration.test.ts
+src/app/admin/actions/users.ts
+src/app/api/consent/withdraw/route.integration.test.ts
+src/app/api/consent/withdraw/route.ts
+src/app/api/line/admin/faq/[id]/route.integration.test.ts
+src/app/api/line/admin/faq/[id]/route.ts
+src/lib/cases/intake.integration.test.ts
+src/lib/cases/intake.test.ts
+src/lib/cases/intake.ts
+src/lib/consent.integration.test.ts
+src/lib/consent.ts
+src/lib/dedup.ts
+src/lib/line/bot/case-flow.test.ts
+```
+
+Commits ก่อนบันทึกผลปิดงาน:
+- 2ad1608 docs(audit): ปรับแผน baseline ก่อน c1
+- 1513969 refactor(intake): intake atomic
+- f412f85 refactor(consent): helper/route withdrawal atomic
+- 932dc6a refactor(users): users actions atomic
+- 17130af refactor(chatbot): FAQ atomic
