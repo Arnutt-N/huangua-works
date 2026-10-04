@@ -16,3 +16,4 @@ export {
   type TrackedCaseView,
   type ViewContext,
 } from './view';
+export { withdrawCaseConsent, type OwnershipProof, type WithdrawResult } from './withdraw';

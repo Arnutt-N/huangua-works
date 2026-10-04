@@ -128,6 +128,9 @@ vi.mock('@/lib/dedup', () => ({
 }));
 vi.mock('@/lib/consent', () => ({
   grantConsent: vi.fn(async () => undefined),
+  // § intake → citizen-access/index ดึง withdraw.ts ซึ่ง import revokeConsentWithAudit —
+  // mock ทั้งโมดูลจึงต้องมี export นี้ด้วย ไม่งั้น import ล้มทั้งไฟล์
+  revokeConsentWithAudit: vi.fn(async () => undefined),
   CONSENT_VERSION: '1.0',
 }));
 vi.mock('@/lib/audit', async (importOriginal) => {
