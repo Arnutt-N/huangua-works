@@ -5,6 +5,12 @@
 export { MODE_TRANSITIONS, allowedSourceModes, canTransition, isHumanHandled } from './modes';
 export { httpLineTransport, type LineTransport } from './transport';
 export {
+  recordBotReplies,
+  recordInboundMessage,
+  type InboundMessage,
+  type InboundMessageType,
+} from './message-service';
+export {
   changeMode,
   linkCase,
   transferOwnership,
