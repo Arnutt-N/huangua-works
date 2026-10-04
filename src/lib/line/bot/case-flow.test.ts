@@ -39,7 +39,7 @@ const { mockDb } = vi.hoisted(() => {
       value = [row];
       return obj;
     });
-    for (const m of ['where', 'limit', 'onConflictDoNothing', 'returning']) {
+    for (const m of ['where', 'limit', 'onConflictDoNothing', 'onConflictDoUpdate', 'returning']) {
       obj[m] = vi.fn(() => obj);
     }
     return obj;

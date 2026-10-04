@@ -7,9 +7,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  * 1. ลูปกันชนของ trackingCode ต้องตรวจ "ทุก" รหัสที่สุ่มได้ก่อนใช้
  *    เดิมสุ่มใหม่ตอนชนแล้วออกจากลูปโดยไม่ได้ตรวจตัวสุดท้าย = รหัสที่ไม่เคยผ่าน
  *    การตรวจหลุดไปถึง insert แล้วพังที่ unique index
- * 2. ตัวตนของผู้แจ้งทางเว็บผูกกับ HMAC ของ CID เท่านั้น
- *    เดิมใช้ `input.email || cid-hash` ทำให้ยิง email ของเจ้าหน้าที่เข้ามาแล้วเคส
- *    ไปผูกกับบัญชีคนนั้นได้ ทั้งที่ endpoint ไม่ต้อง login
+ * 2. (ย้ายแล้ว) ตัวตนผู้แจ้งทางเว็บผูกกับ CID เท่านั้น — ทดสอบที่ interface ของ module
+ *    กับ Postgres จริงใน src/lib/cases/citizen-access/identity.integration.test.ts
  */
 
 const { mockState, mockDb } = vi.hoisted(() => {
@@ -19,7 +18,7 @@ const { mockState, mockDb } = vi.hoisted(() => {
     conflictWinner: null as { id: string; email: string } | null,
     /** แถวที่ query ตาราง users จะคืน (จำลอง user ที่มีอยู่แล้ว) */
     existingUsers: [] as Array<{ id: string; email: string }>,
-    /** email ที่ resolveSubmitter ใช้ค้น users จริงๆ */
+    /** email ที่ resolveCitizen ใช้ค้น users จริงๆ */
     userLookupEmails: [] as string[],
     insertedUsers: [] as Array<Record<string, unknown>>,
     insertedCases: [] as Array<Record<string, unknown>>,
@@ -99,6 +98,8 @@ const { mockState, mockDb } = vi.hoisted(() => {
         if (mockState.conflictWinner) mockState.existingUsers = [mockState.conflictWinner];
         return obj;
       }),
+      // § resolveCitizen ผูก line_users ด้วย ON CONFLICT DO UPDATE — mock คืน chain เดิม
+      onConflictDoUpdate: vi.fn(() => obj),
       returning: vi.fn(() => Promise.resolve(mockState.conflictWinner ? [] : [{ id: mockState.insertedUsers.at(-1)?.id }])),
       values: vi.fn((row: Record<string, unknown>) => {
         if (tableName === 'users' && !mockState.conflictWinner) mockState.insertedUsers.push(row);
@@ -212,59 +213,6 @@ describe('createCase · ลูปกันชนของ trackingCode', () => {
     expect(result.ok).toBe(false);
     // เริ่มที่ 100 เหลือ 95 = เรียกไป 5 ครั้งพอดี
     expect(mockState.collisionsRemaining).toBe(95);
-  });
-});
-
-describe('createCase · ตัวตนผู้แจ้งทางเว็บผูกกับ CID เท่านั้น', () => {
-  const cidEmail = () => `cid-${generateCidHash(VALID_CID)}@placeholder.local`;
-
-  it('ค้น user ด้วย cid-hash เมื่อไม่ได้กรอก email', async () => {
-    await createCase(webInput());
-    expect(mockState.userLookupEmails).toContain(cidEmail());
-  });
-
-  it('ยังค้นด้วย cid-hash แม้จะกรอก email มาด้วย — email ที่ไม่เคยยืนยันเป็น identity ไม่ได้', async () => {
-    await createCase(webInput({ email: 'staff@huangua.go.th' }));
-
-    expect(mockState.userLookupEmails).toContain(cidEmail());
-    expect(mockState.userLookupEmails).not.toContain('staff@huangua.go.th');
-  });
-
-  it('ไม่ผูกเคสกับบัญชีเจ้าหน้าที่ที่มีอยู่ เมื่อมีคนยิง email ของเจ้าหน้าที่เข้ามา', async () => {
-    // มีบัญชีเจ้าหน้าที่อยู่จริง แต่ค้นด้วย cid-hash จะไม่เจอ (mock คืน [] ให้ users)
-    mockState.existingUsers = [];
-    const result = await createCase(webInput({ email: 'staff@huangua.go.th' }));
-
-    expect(result.ok).toBe(true);
-    // สร้าง user ใหม่ที่ผูกกับ cid-hash ไม่ใช่ reuse บัญชีเจ้าหน้าที่
-    expect(mockState.insertedUsers).toHaveLength(1);
-    expect(mockState.insertedUsers[0]?.email).toBe(cidEmail());
-    expect(mockState.insertedUsers[0]?.role).toBe('citizen');
-  });
-
-  it('เก็บ email ที่กรอกเป็นช่องทางติดต่อใน metadata ไม่ใช่ identity key', async () => {
-    await createCase(webInput({ email: 'citizen@example.com' }));
-
-    const metadata = JSON.parse(String(mockState.insertedUsers[0]?.metadata));
-    expect(metadata.contactEmail).toBe('citizen@example.com');
-    expect(mockState.insertedUsers[0]?.email).toBe(cidEmail());
-  });
-
-  it('ไม่ใส่ contactEmail เมื่อไม่ได้กรอก email', async () => {
-    await createCase(webInput());
-
-    const metadata = JSON.parse(String(mockState.insertedUsers[0]?.metadata));
-    expect(metadata).not.toHaveProperty('contactEmail');
-    expect(metadata.source).toBe('web_intake');
-  });
-
-  it('ใช้ user เดิมเมื่อ CID เดิมเคยแจ้งไว้แล้ว', async () => {
-    mockState.existingUsers = [{ id: 'user-existing', email: cidEmail() }];
-    const result = await createCase(webInput());
-
-    expect(result.ok).toBe(true);
-    expect(mockState.insertedUsers).toHaveLength(0);
-    expect(mockState.insertedCases[0]?.submittedBy).toBe('user-existing');
   });
 });
 
