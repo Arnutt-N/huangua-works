@@ -4,6 +4,7 @@ import { closeDb, getDb } from '@/lib/db';
 import { auditLogs, cases, caseUpdates } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import { applyCaseUpdate, checkPermission, SYSTEM_ACTOR, type CaseActor } from './operations';
+import type { CaseStatus } from './state-machine';
 
 /**
  * Integration test — ต้องมี local Postgres (`docker compose up -d`) รันอยู่จริง
@@ -15,7 +16,7 @@ const SUPERVISOR: CaseActor = { userId: 'test-supervisor', role: 'head' };
 
 const createdCaseIds: string[] = [];
 
-async function createTestCase(status: 'pending' | 'received' | 'in_progress' | 'done' = 'pending') {
+async function createTestCase(status: CaseStatus = 'pending') {
   const db = await getDb();
   const id = generateId();
   await db.insert(cases).values({
@@ -232,5 +233,93 @@ describe('applyCaseUpdate — priority and comment', () => {
       comment: 'บันทึกภายใน',
       isPublic: false,
     });
+  });
+});
+
+/**
+ * § race ระหว่างผู้เขียนสองราย — เดิม applyCaseUpdate อ่านสถานะนอก transaction
+ * แล้ว UPDATE โดยกรองแค่ id ทำให้ทั้งสองฝ่ายผ่าน assertTransition จากสถานะเดิม
+ * (เช่น reviewing→rejected กับ reviewing→assigned) แล้วจบที่ rejected→assigned ซึ่งผิดกติกา
+ * รันหลายรอบเพราะ race เป็นเรื่องจังหวะ — รอบเดียวอาจบังเอิญไม่ชน
+ */
+const RACE_ROUNDS = 5;
+
+interface RaceSide {
+  newStatus: CaseStatus;
+  actor: CaseActor;
+}
+
+interface RaceScenario {
+  name: string;
+  initial: CaseStatus;
+  a: RaceSide;
+  b: RaceSide;
+}
+
+// ทั้งสองคู่ถูกเลือกให้ "ใครชนะก่อน อีกฝ่ายต้องถูกปฏิเสธ" ตาม ALLOWED_TRANSITIONS
+const RACE_SCENARIOS: RaceScenario[] = [
+  {
+    name: 'two staff: reviewing → rejected vs reviewing → assigned',
+    initial: 'reviewing',
+    a: { newStatus: 'rejected', actor: ACTOR },
+    b: { newStatus: 'assigned', actor: SUPERVISOR },
+  },
+  {
+    name: 'cron vs staff: done → closed vs done → in_progress',
+    initial: 'done',
+    a: { newStatus: 'closed', actor: SYSTEM_ACTOR },
+    b: { newStatus: 'in_progress', actor: ACTOR },
+  },
+];
+
+describe('applyCaseUpdate — concurrent writers', () => {
+  test.each(RACE_SCENARIOS)('$name — exactly one wins and timeline stays consistent', async ({ initial, a, b }) => {
+    const db = await getDb();
+
+    for (let round = 0; round < RACE_ROUNDS; round++) {
+      const id = await createTestCase(initial);
+
+      const [resultA, resultB] = await Promise.all([
+        applyCaseUpdate(id, { kind: 'status', newStatus: a.newStatus, isPublic: true }, a.actor),
+        applyCaseUpdate(id, { kind: 'status', newStatus: b.newStatus, isPublic: true }, b.actor),
+      ]);
+
+      const results = [resultA, resultB];
+      expect(results.filter((r) => r.ok), `round ${round}: winners`).toHaveLength(1);
+
+      // ฝ่ายแพ้ต้องถูกปฏิเสธโดย assertTransition (เหตุผลภาษาไทย) ไม่ใช่ error การบันทึกทั่วไป
+      const loser = results.find((r) => !r.ok);
+      expect(loser).toBeDefined();
+      if (loser && !loser.ok) {
+        expect(loser.error, `round ${round}: loser reason`).toMatch(/ไม่สามารถเปลี่ยน/);
+      }
+
+      const winnerStatus = resultA.ok ? a.newStatus : b.newStatus;
+      expect((await getCase(id)).status, `round ${round}: final status`).toBe(winnerStatus);
+
+      const statusChanges = (await getTimeline(id)).filter((u) => u.updateType === 'status_change');
+      expect(statusChanges, `round ${round}: timeline`).toHaveLength(1);
+      expect(statusChanges[0]).toMatchObject({ oldValue: initial, newValue: winnerStatus });
+
+      const audits = await db.select().from(auditLogs).where(eq(auditLogs.resourceId, id));
+      expect(audits.filter((row) => row.action === 'update_case_status'), `round ${round}: audit`).toHaveLength(1);
+    }
+  });
+
+  test('non-conflicting concurrent updates (status + comment) both succeed — lock serializes, not rejects', async () => {
+    const id = await createTestCase('received');
+
+    const [statusResult, commentResult] = await Promise.all([
+      applyCaseUpdate(id, { kind: 'status', newStatus: 'reviewing', isPublic: true }, ACTOR),
+      applyCaseUpdate(id, { kind: 'comment', comment: 'บันทึกระหว่างตรวจสอบ', isPublic: false }, SUPERVISOR),
+    ]);
+
+    expect(statusResult).toEqual({ ok: true });
+    expect(commentResult).toEqual({ ok: true });
+    expect((await getCase(id)).status).toBe('reviewing');
+
+    const timeline = await getTimeline(id);
+    expect(timeline).toHaveLength(2);
+    expect(timeline.map((u) => u.updateType).sort()).toEqual(['comment', 'status_change']);
   });
 });
