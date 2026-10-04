@@ -39,7 +39,7 @@ const { mockDb } = vi.hoisted(() => {
       value = [row];
       return obj;
     });
-    for (const m of ['where', 'limit', 'onConflictDoNothing', 'returning']) {
+    for (const m of ['where', 'limit', 'onConflictDoNothing', 'onConflictDoUpdate', 'returning']) {
       obj[m] = vi.fn(() => obj);
     }
     return obj;
@@ -58,7 +58,7 @@ vi.mock('@/lib/db', () => ({
   getDb: vi.fn(async () => mockDb),
 }));
 
-const { startCaseFlow, processCaseFlow } = await import('./case-flow');
+const { startCaseFlow, processCaseFlow, BOT_CONSENT_NOTICE } = await import('./case-flow');
 
 const LINE_USER_ID = 'U1234567890abcdef';
 
@@ -180,6 +180,22 @@ describe('case-flow · processCaseFlow · location step', () => {
     expect(text).toContain('ถนน-ทางเท้า');
     expect(text).toContain('ถนนพัง');
     expect(text).toContain('หน้าวัดหัวงัว');
+  });
+
+  it('§ สรุปก่อนยืนยันต้องแจ้งว่าการยืนยัน = ให้ความยินยอม (createCase บันทึก line_bot_submit)', async () => {
+    const s = state('location', {
+      categoryId: 'cat-road',
+      categoryName: 'ถนน-ทางเท้า',
+      title: 'ถนนพัง',
+      description: 'มีหลุมบ่อใหญ่',
+    });
+    const text = firstReplyText(await flow('หน้าวัดหัวงัว หมู่ 3', s));
+
+    expect(text).toContain('ยินยอม');
+    expect(text).toContain('043-601-494');
+    expect(text).toContain(BOT_CONSENT_NOTICE);
+    // ข้อความแจ้งต้องมาก่อนคำสั่ง "ยืนยัน" ไม่ใช่หลัง
+    expect(text.indexOf(BOT_CONSENT_NOTICE)).toBeLessThan(text.indexOf('พิมพ์ "ยืนยัน" เพื่อส่งเรื่อง'));
   });
 });
 

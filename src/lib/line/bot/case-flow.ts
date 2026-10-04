@@ -28,6 +28,14 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
   'ป้ายโฆษณา': ['ป้าย', 'โฆษณา', 'ป้ายผิด'],
 };
 
+/**
+ * § แจ้งเรื่องผ่านแชท = ให้ความยินยอม (ในแชทไม่มี checkbox) — ข้อความนี้ต้องอยู่ในสรุป
+ * ก่อนผู้ใช้พิมพ์ "ยืนยัน" เสมอ เพราะ createCase บันทึก consent via line_bot_submit
+ * ทันทีที่ยืนยัน (ดู citizen-access/consent-policy.ts) — ถ้าลบข้อความนี้ การบันทึกนั้นไม่มีฐานรองรับ
+ */
+export const BOT_CONSENT_NOTICE =
+  '🔒 การพิมพ์ "ยืนยัน" ถือว่าท่านยินยอมให้ อบต.หัวงัว เก็บและใช้ข้อมูลที่แจ้งในแชทนี้ (รวมถึงชื่อที่แสดงและรหัสผู้ใช้ LINE) เพื่อดำเนินการเรื่องของท่าน ตามนโยบายความเป็นส่วนตัวของ อบต. — หากต้องการถอนความยินยอม ติดต่อ 043-601-494';
+
 export async function startCaseFlow(): Promise<{ state: CaseFlowState; reply: LineOutgoingMessage }> {
   const db = await getDb();
   const cats = await db.select().from(categories).where(eq(categories.isActive, true));
@@ -94,7 +102,7 @@ export async function processCaseFlow(
         state: { ...state, step: 'confirm', location: text },
         replies: [{
           type: 'text',
-          text: `📋 สรุปเรื่องที่แจ้ง:\n\nหมวดหมู่: ${state.categoryName}\nหัวข้อ: ${state.title}\nรายละเอียด: ${state.description}\nสถานที่: ${text}\n\nพิมพ์ "ยืนยัน" เพื่อส่งเรื่อง หรือพิมพ์ "ยกเลิก" เพื่อเริ่มใหม่`,
+          text: `📋 สรุปเรื่องที่แจ้ง:\n\nหมวดหมู่: ${state.categoryName}\nหัวข้อ: ${state.title}\nรายละเอียด: ${state.description}\nสถานที่: ${text}\n\n${BOT_CONSENT_NOTICE}\n\nพิมพ์ "ยืนยัน" เพื่อส่งเรื่อง หรือพิมพ์ "ยกเลิก" เพื่อเริ่มใหม่`,
         }],
       };
     }

@@ -1,31 +1,22 @@
 /**
  * POST /api/consent/withdraw — ประชาชนถอนความยินยอม PDPA
  *
- * Body: { trackingCode, cid }
- * - ตรวจสอบว่า trackingCode + cid ตรงกับเคสที่มีอยู่
- * - บันทึก consent withdrawal record
- * - audit log
+ * Body: { trackingCode, cid } (เว็บ) หรือ { trackingCode } + liff session cookie (LINE)
+ * การพิสูจน์ความเป็นเจ้าของ / revoke / audit อยู่ใน citizen-access (withdrawCaseConsent)
  *
- * หลังถอน: เคสจะไม่แสดงใน /track (hasConsent คืน false)
+ * หลังถอน: เรื่องจะไม่แสดงในทุกช่องทาง (ติดตามเรื่องทางเว็บ / บอท LINE / เรื่องของฉันใน LIFF)
  *
  * Rate limit: 5 requests / 10 นาที per IP (กัน abuse)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { and, eq } from 'drizzle-orm';
-import { getDb } from '@/lib/db';
-import { firstOrUndefined } from '@/lib/db/query-helpers';
-import { cases, lineUsers, users } from '@/lib/db/schema';
-import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
 import { enforceRateLimit } from '@/lib/rate-limit/enforce';
 import { clientIpFromHeaders } from '@/lib/rate-limit/client-ip';
-import { normalizeTrackingCode } from '@/lib/case-tracking';
-import { generateCidHash } from '@/lib/cid-hmac';
-import { revokeConsentWithAudit } from '@/lib/consent';
+import { withdrawCaseConsent, type OwnershipProof } from '@/lib/cases/citizen-access';
 import { consentWithdrawSchema, consentWithdrawLineSchema, validateOrError } from '@/lib/validation';
 import { LIFF_SESSION_COOKIE, readLiffSessionValue } from '@/lib/liff/session';
 
-// § คำตอบเดียวสำหรับ "ไม่พบเคส" / "มีเคสแต่ CID ไม่ตรง" / "ไม่มี user row"
+// § คำตอบเดียวสำหรับ "ไม่พบเคส" / "มีเคสแต่ CID ไม่ตรง" / "ไม่มี user row" / "LINE ไม่ใช่เจ้าของ"
 // เดิมแยก 404 กับ 403 ทำให้บอกได้ว่า tracking code ไหนมีอยู่จริงโดยไม่ต้องรู้ CID
 // (เป็น enumeration oracle) — GET /api/cases/[id] ตั้งใจคืน 404 เหมือนกันหมดอยู่แล้ว
 // ที่นี่จึงต้องเดินตามแบบเดียวกัน
@@ -37,7 +28,7 @@ export async function POST(req: NextRequest) {
   // § Rate limit — 5 requests / 10 minutes (ถี่เกินไป = น่าสงสัย)
   // failOpen: false — endpoint นี้ยืนยันตัวตนด้วย trackingCode + CID และทำงานทำลายข้อมูล
   // (ถอนความยินยอม) ถ้า Redis ล่มแล้วปล่อยผ่าน = เดา CID ได้ไม่จำกัด นับเป็น auth path
-  // (บังคับที่ RATE_LIMIT_POLICIES.consentWithdraw — kind 'auth')
+  // (บังคับที่ RATE_LIMIT_POLICIES.consentWithdraw)
   const rateLimit = await enforceRateLimit('consentWithdraw', ip);
   if (!rateLimit.allowed) {
     return NextResponse.json(
@@ -54,130 +45,34 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const db = await getDb();
-
-  // § ทางถอนแบบ LIFF — ผู้ใช้ที่แจ้งผ่าน LIFF ไม่มี CID ในระบบ (D1) จึงยืนยันความ
-  // เป็นเจ้าของเคสด้วย liff session cookie แทน: เคสต้องถูกส่งโดย linkedUserId ของ
-  // LINE user คนนี้เท่านั้น
+  // § ทางถอนแบบ LIFF — ผู้ใช้ที่แจ้งผ่าน LINE ไม่มี CID ในระบบ (D1) จึงยืนยันความ
+  // เป็นเจ้าของเคสด้วย liff session cookie แทน
   const liffSession = readLiffSessionValue(req.cookies.get(LIFF_SESSION_COOKIE)?.value);
+  let trackingCode: string;
+  let proof: OwnershipProof;
   if (liffSession) {
     const validation = validateOrError(consentWithdrawLineSchema, body);
     if (!validation.success) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
-    const lineTrackingCode = normalizeTrackingCode(validation.data.trackingCode);
-    if (!lineTrackingCode) {
-      return NextResponse.json(WITHDRAW_DENIED, { status: 404 });
+    trackingCode = validation.data.trackingCode;
+    proof = { kind: 'line', lineUserId: liffSession.lineUserId };
+  } else {
+    const validation = validateOrError(consentWithdrawSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
-
-    const lineCaseRow = await firstOrUndefined(
-      db.select({ id: cases.id, submittedBy: cases.submittedBy }).from(cases).where(eq(cases.trackingCode, lineTrackingCode)).limit(1),
-    );
-    if (!lineCaseRow) {
-      return NextResponse.json(WITHDRAW_DENIED, { status: 404 });
-    }
-
-    const owned = await firstOrUndefined(
-      db
-        .select({ id: lineUsers.id })
-        .from(lineUsers)
-        .where(and(eq(lineUsers.lineUserId, liffSession.lineUserId), eq(lineUsers.linkedUserId, lineCaseRow.submittedBy)))
-        .limit(1),
-    );
-    if (!owned) {
-      await logAudit({
-        action: AUDIT_ACTIONS.CONSENT_WITHDRAW_DENIED,
-        resource: 'consent',
-        resourceId: lineCaseRow.id,
-        ipAddress: ip,
-        userAgent: req.headers.get('user-agent') || undefined,
-        metadata: { reason: 'not_case_owner_line' },
-      });
-      return NextResponse.json(WITHDRAW_DENIED, { status: 404 });
-    }
-
-    // § route เป็นเจ้าของ tx ชั่วคราวก่อน c1; helper ใช้ tx นี้โดยไม่เปิดซ้อน
-    await db.transaction((tx) =>
-      revokeConsentWithAudit(
-        {
-          userId: lineCaseRow.submittedBy,
-          caseId: lineCaseRow.id,
-          trackingCode: lineTrackingCode,
-          via: 'liff',
-          ipAddress: ip,
-          userAgent: req.headers.get('user-agent') || undefined,
-        },
-        tx,
-      ),
-    );
-
-    return NextResponse.json({
-      success: true,
-      message: 'ถอนความยินยอมเรียบร้อย — ข้อมูลของคุณจะไม่สามารถเข้าถึงได้ผ่านระบบติดตามเรื่อง',
-    });
+    trackingCode = validation.data.trackingCode;
+    proof = { kind: 'cid', cid: validation.data.cid };
   }
 
-  const validation = validateOrError(consentWithdrawSchema, body);
-  if (!validation.success) {
-    return NextResponse.json({ error: validation.error }, { status: 400 });
-  }
-
-  const { trackingCode: rawTrackingCode, cid } = validation.data;
-
-  // § Normalize tracking code
-  const trackingCode = normalizeTrackingCode(rawTrackingCode);
-  if (!trackingCode) {
-    // ไม่เปิดเผยว่า format ผิด — คืนคำตอบเดียวกับเคสไม่พบ
+  const result = await withdrawCaseConsent(trackingCode, proof, {
+    ipAddress: ip,
+    userAgent: req.headers.get('user-agent') || undefined,
+  });
+  if (!result.ok) {
     return NextResponse.json(WITHDRAW_DENIED, { status: 404 });
   }
-
-  // § Lookup case by trackingCode
-  const caseRow = await firstOrUndefined(
-    db.select({ id: cases.id, submittedBy: cases.submittedBy }).from(cases).where(eq(cases.trackingCode, trackingCode)).limit(1),
-  );
-
-  if (!caseRow) {
-    return NextResponse.json(WITHDRAW_DENIED, { status: 404 });
-  }
-
-  // § Verify CID matches — ตัวตนของผู้แจ้งทางเว็บผูกกับ HMAC ของ CID เสมอ
-  // (ดู resolveSubmitter ใน lib/cases/intake.ts — email ที่กรอกไม่ใช่ identity key)
-  const cidHash = generateCidHash(cid);
-  const cidEmail = `cid-${cidHash}@placeholder.local`;
-
-  const userRow = await firstOrUndefined(
-    db.select({ id: users.id, email: users.email }).from(users).where(eq(users.id, caseRow.submittedBy)).limit(1),
-  );
-
-  // § CID ไม่ตรงกับเจ้าของเคส (หรือหา user row ไม่เจอ) — คำตอบเดียวกับ "ไม่พบเคส"
-  // เพื่อไม่ให้แยกออกว่า tracking code นี้มีอยู่จริงหรือไม่
-  if (!userRow || userRow.email !== cidEmail) {
-    await logAudit({
-      action: AUDIT_ACTIONS.CONSENT_WITHDRAW_DENIED,
-      resource: 'consent',
-      resourceId: caseRow.id,
-      ipAddress: ip,
-      userAgent: req.headers.get('user-agent') || undefined,
-      metadata: { reason: userRow ? 'cid_mismatch' : 'submitter_missing' },
-    });
-    return NextResponse.json(WITHDRAW_DENIED, { status: 404 });
-  }
-
-  // § Revoke consent
-  // § route เป็นเจ้าของ tx ชั่วคราวก่อน c1; helper ใช้ tx นี้โดยไม่เปิดซ้อน
-  await db.transaction((tx) =>
-    revokeConsentWithAudit(
-      {
-        userId: userRow.id,
-        caseId: caseRow.id,
-        trackingCode: trackingCode,
-        via: 'web',
-        ipAddress: ip,
-        userAgent: req.headers.get('user-agent') || undefined,
-      },
-      tx,
-    ),
-  );
 
   return NextResponse.json({
     success: true,

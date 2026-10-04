@@ -1,6 +1,6 @@
 import { eq, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
-import { lineUsers, chatConversations, chatMessages, cases } from '@/lib/db/schema';
+import { lineUsers, chatConversations, chatMessages } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import { getProfile, replyMessage, sendTypingIndicator } from '../client';
 import type { LineWebhookEvent, LineMessageEvent, LineFollowEvent, LinePostbackEvent, LineOutgoingMessage } from '../types';
@@ -13,7 +13,7 @@ import { getWelcomeMessages } from './welcome';
 import { getChatSetting } from '../settings';
 import { caseStatusFlex } from '../messages/flex';
 import { getFaqReply } from '../messages/rich-menu';
-import { normalizeTrackingCode } from '@/lib/case-tracking';
+import { findTrackableCase } from '@/lib/cases/citizen-access';
 import { COPY } from '@/lib/copy';
 import { broadcast } from '../sse/broadcaster';
 
@@ -250,24 +250,14 @@ export async function routeBotMessage(
 }
 
 async function trackCase(db: Db, trackingCode: string): Promise<LineOutgoingMessage[]> {
-  // § ต้อง normalize ก่อนค้น — เดิมค้นตรง ๆ ด้วย code ที่พิมพ์มา ถ้าผู้ใช้พิมพ์
-  // เลขแบบมีเว้นวรรค (HG 4837 2915 6 ที่ระบบ format ให้) จะค้นไม่เจอ
-  const normalized = normalizeTrackingCode(trackingCode);
-  if (!normalized) {
+  // § normalize (เลขที่พิมพ์มีเว้นวรรค เช่น HG 4837 2915 6) + กติกาความยินยอม + audit
+  // อยู่ใน citizen-access — เดิมบอทค้นตรงไม่เช็คความยินยอม เรื่องที่เจ้าของถอนแล้ว
+  // ยังโชว์หัวเรื่อง+สถานะผ่านแชทได้ ทั้งที่เว็บตอบ 404
+  const view = await findTrackableCase(trackingCode, { channel: 'line_bot' }, db);
+  if (!view) {
     return [{ type: 'text', text: `ไม่พบเรื่องเลข ${trackingCode} กรุณาตรวจสอบเลขติดตามอีกครั้ง` }];
   }
-
-  const [caseRow] = await db
-    .select()
-    .from(cases)
-    .where(eq(cases.trackingCode, normalized))
-    .limit(1);
-
-  if (!caseRow) {
-    return [{ type: 'text', text: `ไม่พบเรื่องเลข ${trackingCode} กรุณาตรวจสอบเลขติดตามอีกครั้ง` }];
-  }
-
-  return [caseStatusFlex(caseRow.trackingCode!, caseRow.status, caseRow.title)];
+  return [caseStatusFlex(view.case.trackingCode, view.case.status, view.case.title)];
 }
 
 async function updateBotState(db: Db, lineUserPk: string, state: CaseFlowState | null) {

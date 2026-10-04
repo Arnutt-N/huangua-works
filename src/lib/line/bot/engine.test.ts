@@ -74,9 +74,14 @@ vi.mock('../messages/flex', () => ({
   })),
 }));
 
+vi.mock('@/lib/cases/citizen-access', () => ({
+  findTrackableCase: vi.fn(async () => null),
+}));
+
 import { routeBotMessage } from './engine';
 import { matchFaq } from './faq-matcher';
 import { startCaseFlow } from './case-flow';
+import { findTrackableCase } from '@/lib/cases/citizen-access';
 
 function makeEvent(text: string | null, type = 'text') {
   return {
@@ -163,6 +168,36 @@ describe('routeBotMessage — existing behavior (TDD safety net)', () => {
       expect(replies).toHaveLength(1);
       // ค้นไม่เจอก็ได้ (ไม่มีเคสจริง) — สำคัญคือไม่พังด้วย code ที่มีเว้นวรรค
       expect((replies[0] as { text: string }).text).toContain('ไม่พบ');
+    });
+
+    it('§ ส่งเลขที่ผู้ใช้พิมพ์ให้ citizen-access ช่องทาง line_bot — กติกาความยินยอมเดียวกับเว็บ', async () => {
+      const event = makeEvent('ติดตาม HG 0000 0000 0');
+      await routeBotMessage(mockDb, event, 'ติดตาม HG 0000 0000 0', 'user-pk', 'conv-1');
+      expect(findTrackableCase).toHaveBeenCalledWith('HG 0000 0000 0', { channel: 'line_bot' }, mockDb);
+    });
+
+    it('พบเรื่องที่ติดตามได้ → ตอบเป็น flex สถานะ', async () => {
+      vi.mocked(findTrackableCase).mockResolvedValueOnce({
+        case: {
+          id: 'case-1',
+          trackingCode: 'HG123456789',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          status: 'in_progress',
+          priority: 'normal',
+          title: 'ถนนพัง',
+          dueDate: null,
+          closedAt: null,
+        },
+        category: null,
+        updates: [],
+      });
+      const event = makeEvent('ติดตาม HG123456789');
+      const replies = await routeBotMessage(mockDb, event, 'ติดตาม HG123456789', 'user-pk', 'conv-1');
+
+      expect(replies).toHaveLength(1);
+      expect(replies[0]!.type).toBe('flex');
+      expect((replies[0] as { altText: string }).altText).toBe('สถานะ HG123456789');
     });
   });
 

@@ -30,6 +30,7 @@ import { auditLogs, cases, categories, consentRecords, dedupHashes, lineUsers, u
 import { generateCidHash, generateDedupHash } from '@/lib/cid-hmac';
 import { generateId } from '@/lib/id';
 import { createCase } from './intake';
+import { findTrackableCase } from './citizen-access';
 
 // CID ต่อรอบรัน (13 หลัก) — createCase ไม่ตรวจ checksum จึงใช้เลขสุ่มได้
 const RUN = Date.now().toString().slice(-9);
@@ -51,6 +52,10 @@ async function cleanupFixture(): Promise<void> {
     `ทดสอบ commit ครบ ${RUN}`,
     `ทดสอบ rollback line ใหม่ ${RUN}`,
     `ทดสอบ rollback line มีแถว ${RUN}`,
+    // § c1 ต่อท้าย — fixture ความยินยอม/การมองเห็น (citizen-case-access)
+    `บอท consent ${RUN}`,
+    `LIFF consent ${RUN}`,
+    `บอท ติดตามได้ ${RUN}`,
   ];
   const leaked = await db.select({ id: cases.id }).from(cases).where(inArray(cases.title, titles));
   const caseIds = [...new Set([...createdCaseIds, ...leaked.map((r) => r.id)])];
@@ -59,7 +64,8 @@ async function cleanupFixture(): Promise<void> {
     await db.delete(dedupHashes).where(inArray(dedupHashes.caseId, caseIds));
     await db.delete(cases).where(inArray(cases.id, caseIds));
   }
-  await db.delete(lineUsers).where(inArray(lineUsers.lineUserId, [LINE_NEW, LINE_EXISTING]));
+  // § LINE_BOT/LINE_LIFF ของ c1 ประกาศท้ายไฟล์ — afterAll รันหลัง module โหลดครบจึงอ้างได้
+  await db.delete(lineUsers).where(inArray(lineUsers.lineUserId, [LINE_NEW, LINE_EXISTING, LINE_BOT, LINE_LIFF]));
   const userRows = await db
     .select({ id: users.id })
     .from(users)
@@ -68,6 +74,8 @@ async function cleanupFixture(): Promise<void> {
         inArray(users.email, createdEmails),
         eq(users.email, `line-${LINE_NEW}@placeholder.local`),
         eq(users.email, `line-${LINE_EXISTING}@placeholder.local`),
+        eq(users.email, `line-${LINE_BOT}@placeholder.local`),
+        eq(users.email, `line-${LINE_LIFF}@placeholder.local`),
       ),
     );
   const userIds = userRows.map((u) => u.id);
@@ -210,5 +218,88 @@ describe('createCase · atomic (integration)', () => {
 
     const [row] = await db.select().from(lineUsers).where(eq(lineUsers.lineUserId, LINE_EXISTING));
     expect(row?.linkedUserId ?? null).toBeNull();
+  });
+});
+
+// ─── c1 ต่อท้าย: createCase × ความยินยอม (ไฟล์นี้ c6 เป็นเจ้าของโครง) ───
+// ใช้ RUN/categoryId/afterAll เดิม — ทุกช่องทางต้องมี record data_collection ตั้งแต่ตอนแจ้ง
+// (เดิมบอทไม่บันทึก → เรื่องจากบอท 404 บน /track)
+const LINE_BOT = `U-it-intake-bot-${RUN}`;
+const LINE_LIFF = `U-it-intake-liff-${RUN}`;
+const consentCaseIds: string[] = [];
+const consentSubmitterIds = new Set<string>();
+
+async function submitterOf(caseId: string): Promise<string> {
+  const db = await getDb();
+  const [row] = await db
+    .select({ submittedBy: cases.submittedBy })
+    .from(cases)
+    .where(eq(cases.id, caseId))
+    .limit(1);
+  if (!row) throw new Error(`ไม่พบเรื่อง ${caseId}`);
+  consentSubmitterIds.add(row.submittedBy);
+  return row.submittedBy;
+}
+
+async function grantedViasOf(userId: string): Promise<Array<string | undefined>> {
+  const db = await getDb();
+  const rows = await db.select().from(consentRecords).where(eq(consentRecords.userId, userId));
+  return rows
+    .filter((r) => r.isGranted && r.consentType === 'data_collection')
+    .map((r) => (r.metadata as { via?: string } | null)?.via);
+}
+
+describe('createCase · บันทึกความยินยอมทุกช่องทาง', () => {
+  test('แจ้งผ่านบอท LINE → บันทึก data_collection via line_bot_submit', async () => {
+    const result = await createCase({
+      channel: 'line',
+      lineUserId: LINE_BOT,
+      categoryId,
+      title: `บอท consent ${RUN}`,
+      description: 'รายละเอียดทดสอบช่องทางบอท',
+      location: 'ทดสอบ ตำบลหัวงัว',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    consentCaseIds.push(result.caseId);
+    expect(await grantedViasOf(await submitterOf(result.caseId))).toContain('line_bot_submit');
+  });
+
+  test('แจ้งผ่าน LIFF → ยังบันทึก via liff_submit ตามเดิม', async () => {
+    const result = await createCase({
+      channel: 'line',
+      origin: 'liff',
+      lineUserId: LINE_LIFF,
+      categoryId,
+      title: `LIFF consent ${RUN}`,
+      description: 'รายละเอียดทดสอบช่องทาง LIFF',
+      location: 'ทดสอบ ตำบลหัวงัว',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    consentCaseIds.push(result.caseId);
+    expect(await grantedViasOf(await submitterOf(result.caseId))).toContain('liff_submit');
+  });
+
+  test('เรื่องที่แจ้งผ่านบอทติดตามได้ทันทีทั้งทางเว็บและทางบอท', async () => {
+    const title = `บอท ติดตามได้ ${RUN}`;
+    const result = await createCase({
+      channel: 'line',
+      lineUserId: LINE_BOT,
+      categoryId,
+      title,
+      description: 'รายละเอียดทดสอบติดตามเรื่องจากบอท',
+      location: 'ทดสอบ ตำบลหัวงัว',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    consentCaseIds.push(result.caseId);
+    await submitterOf(result.caseId);
+
+    expect((await findTrackableCase(result.trackingCode, { channel: 'web' }))?.case.title).toBe(title);
+    expect(await findTrackableCase(result.trackingCode, { channel: 'line_bot' })).not.toBeNull();
   });
 });

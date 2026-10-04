@@ -1,15 +1,18 @@
 import { eq } from 'drizzle-orm';
-import { getDb, type DbOrTx } from '../db';
+import { getDb } from '../db';
 import { firstOrUndefined } from '../db/query-helpers';
-import { cases, categories, lineUsers, users } from '../db/schema';
+import { cases, categories } from '../db/schema';
 import { generateId } from '../id';
 import { generateTrackingCode } from '../case-tracking';
-import { generateCidHash } from '../cid-hmac';
-import { linePlaceholderEmail } from '../line/placeholder-email';
 import { checkDuplicate, recordDedupHash } from '../dedup';
-import { grantConsent, CONSENT_VERSION } from '../consent';
 import { AUDIT_ACTIONS, logAudit } from '../audit';
 import { getFiscalYear } from '../thai-date';
+import {
+  recordIntakeConsent,
+  resolveCitizen,
+  type CitizenIdentity,
+  type IntakeConsentVia,
+} from './citizen-access';
 
 export interface CaseIntakeInput {
   channel: 'web' | 'line';
@@ -108,25 +111,23 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
   const issuedTrackingCode = trackingCode;
 
   // § การเขียนผู้แจ้ง/link/consent/เรื่อง/dedup/audit ต้อง commit หรือ rollback พร้อมกัน
-  // คง resolveSubmitter และ consent เว็บ/LIFF ตาม baseline ก่อน c1
+  // ระบุตัวตนด้วย resolveCitizen ใน tx นี้ (ลบ resolveSubmitter แล้ว — ดู citizen-access)
   return db.transaction(async (tx): Promise<CaseIntakeResult> => {
-    const submitterId = await resolveSubmitter(tx, input);
-    if (!submitterId) {
+    const identity = citizenIdentityOf(input);
+    if (!identity) {
       return { ok: false, error: 'ไม่สามารถสร้างผู้ใช้งานได้', errorCode: 'internal' };
     }
+    const submitterId = await resolveCitizen(identity, tx);
 
-    // § LIFF เป็นฟอร์มเว็บในหน้าต่าง LINE — consent เก็บเท่ากับทางเว็บ (ต่างจากบอท
-    // ซึ่งเก็บข้อมูลน้อยกว่าและไม่มี checkbox ความยินยอมในแชท)
-    if (input.channel === 'web' || input.origin === 'liff') {
-      await grantConsent({
-        userId: submitterId,
-        consentType: 'data_collection',
-        version: CONSENT_VERSION,
-        ipAddress: input.ipAddress,
-        userAgent: input.userAgent,
-        metadata: { via: input.origin === 'liff' ? 'liff_submit' : 'intake_submit' },
-      }, tx);
-    }
+    // § ทุกช่องทางบันทึกความยินยอมตอนแจ้ง — เดิมบอทไม่บันทึกเพราะไม่มี checkbox ในแชท
+    // ผลคือเรื่องจากบอท 404 บน /track ขณะที่บอทเองโชว์ได้ (กติกาไม่เท่ากัน)
+    // ตอนนี้บอทแจ้ง BOT_CONSENT_NOTICE ก่อน "ยืนยัน" แล้วบันทึกเป็น line_bot_submit
+    await recordIntakeConsent(
+      submitterId,
+      intakeConsentVia(input),
+      { ipAddress: input.ipAddress, userAgent: input.userAgent },
+      tx,
+    );
 
     await tx.insert(cases).values({
       id: caseId,
@@ -173,100 +174,32 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
   });
 }
 
-async function resolveSubmitter(db: DbOrTx, input: CaseIntakeInput): Promise<string | null> {
+/**
+ * แปลง input ของการแจ้งเรื่องใหม่ → ตัวตนที่ citizen-access เข้าใจ
+ * เว็บผูกกับ CID / ช่องทาง LINE (บอท + LIFF) ผูกกับ lineUserId ที่ verify แล้ว
+ *
+ * § ขาด key (เว็บไม่มี cid / line ไม่มี lineUserId) ไม่เกิดจาก flow จริง (zod + session
+ * บังคับไว้แล้ว) — เดิมสาย line สร้าง user ลอยไม่ผูก link ซึ่งทำให้เรื่องนั้นไม่มีเจ้าของ
+ * ที่ติดตาม/ถอนความยินยอมได้ ตอนนี้ตอบ internal แทน
+ */
+function citizenIdentityOf(input: CaseIntakeInput): CitizenIdentity | null {
   if (input.channel === 'line') {
-    // § เดิม create user ใหม่ทุกครั้งแต่ไม่เขียน lineUsers.linkedUserId กลับ → แจ้งผ่านบอท
-    // ครั้งที่ 2 ของ LINE user เดิมชน unique(users.email) กับ placeholder เดิมแล้วกลายเป็น 500
-    // ตอนนี้ reuse row เดิมเสมอและเขียน link กลับ เพื่อให้ "เรื่องของฉัน" (LIFF) เห็น
-    // เคสที่แจ้งผ่านบอทด้วย
-    if (input.lineUserId) {
-      const lineRow = await firstOrUndefined(
-        db
-          .select({ id: lineUsers.id, linkedUserId: lineUsers.linkedUserId })
-          .from(lineUsers)
-          .where(eq(lineUsers.lineUserId, input.lineUserId))
-          .limit(1)
-      );
-      if (lineRow?.linkedUserId) return lineRow.linkedUserId;
-
-      const email = linePlaceholderEmail(input.lineUserId);
-      const existingUser = await firstOrUndefined(
-        db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1)
-      );
-      let userId = existingUser?.id ?? generateId();
-      if (!existingUser) {
-        const inserted = await db.insert(users).values({
-          id: userId,
-          email,
-          role: 'citizen',
-          isActive: true,
-          fullName: input.fullName || 'ผู้ใช้ LINE',
-          metadata: JSON.stringify({ source: 'line_intake' }),
-        }).onConflictDoNothing({ target: users.email }).returning({ id: users.id });
-        // § unique conflict ต้องไม่ throw ใน tx; อ่านผู้ชนะหลัง ON CONFLICT แทน
-        if (!inserted[0]) {
-          const winner = await firstOrUndefined(
-            db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1),
-          );
-          if (!winner) throw new Error('ไม่สามารถสร้างผู้ใช้งานได้');
-          userId = winner.id;
-        }
-      }
-      if (lineRow) {
-        await db
-          .update(lineUsers)
-          .set({ linkedUserId: userId, updatedAt: new Date() })
-          .where(eq(lineUsers.id, lineRow.id));
-      }
-      return userId;
-    }
-
-    // ไม่มี lineUserId (ไม่ควรเกิดจาก flow จริง) — สร้างแบบไม่ผูก link เหมือนเดิม
-    const userId = generateId();
-    await db.insert(users).values({
-      id: userId,
-      email: linePlaceholderEmail(generateId()),
-      role: 'citizen',
-      isActive: true,
-      fullName: input.fullName || 'ผู้ใช้ LINE',
-      metadata: JSON.stringify({ source: 'line_intake' }),
-    });
-    return userId;
+    return input.lineUserId
+      ? { kind: 'line', lineUserId: input.lineUserId, fullName: input.fullName, source: 'line_intake' }
+      : null;
   }
+  return input.cid
+    ? {
+        kind: 'cid',
+        cid: input.cid,
+        fullName: input.fullName,
+        phoneNumber: input.phoneNumber,
+        contactEmail: input.email,
+      }
+    : null;
+}
 
-  // § ตัวตนของผู้แจ้งทางเว็บผูกกับ CID เท่านั้น — ห้ามใช้ input.email เป็น lookup key
-  // เดิมใช้ `input.email || cid-hash` ซึ่งเปิดให้ใครก็ได้ยิง /api/cases/submit พร้อม email
-  // ของเจ้าหน้าที่ แล้วเคส + consent record ไปผูกกับบัญชีคนนั้นทั้งที่เขาไม่เคยยินยอม
-  // (endpoint นี้ไม่ต้อง login — email ที่ส่งมาไม่เคยถูกยืนยัน จึงเป็น identity ไม่ได้)
-  //
-  // ผลพลอยได้: เดิมคนที่กรอก email จริงจะถอนความยินยอมไม่ได้เลย เพราะ
-  // /api/consent/withdraw เทียบกับ `cid-<hash>@placeholder.local` เท่านั้น
-  // ผูกทุกคนด้วย CID hash เหมือนกันหมดแล้ว withdraw จึงทำงานครบทุกเคส
-  const cidEmail = `cid-${generateCidHash(input.cid!)}@placeholder.local`;
-  const existing = await firstOrUndefined(
-    db.select().from(users).where(eq(users.email, cidEmail)).limit(1)
-  );
-  if (existing) return existing.id;
-
-  const userId = generateId();
-  const inserted = await db.insert(users).values({
-    id: userId,
-    email: cidEmail,
-    role: 'citizen',
-    isActive: true,
-    fullName: input.fullName || 'ประชาชน',
-    phoneNumber: input.phoneNumber || null,
-    // § email ที่ประชาชนกรอกเก็บเป็น "ช่องทางติดต่อ" ใน metadata ไม่ใช่ identity key
-    metadata: JSON.stringify({
-      source: 'web_intake',
-      ...(input.email ? { contactEmail: input.email } : {}),
-    }),
-  }).onConflictDoNothing({ target: users.email }).returning({ id: users.id });
-  // § ใช้ ON CONFLICT แทน catch unique เพื่อไม่ทำให้ transaction ทั้งก้อน abort
-  if (inserted[0]) return inserted[0].id;
-  const winner = await firstOrUndefined(
-    db.select({ id: users.id }).from(users).where(eq(users.email, cidEmail)).limit(1),
-  );
-  if (!winner) throw new Error('ไม่สามารถสร้างผู้ใช้งานได้');
-  return winner.id;
+function intakeConsentVia(input: CaseIntakeInput): IntakeConsentVia {
+  if (input.channel === 'web') return 'intake_submit';
+  return input.origin === 'liff' ? 'liff_submit' : 'line_bot_submit';
 }
