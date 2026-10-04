@@ -70,24 +70,27 @@ export async function createUser(
     departmentId && departmentId !== '__none__' ? departmentId : null;
 
   try {
-    await db.insert(users).values({
-      id: newUserId,
-      email,
-      fullName,
-      role,
-      departmentId: deptValue,
-      passwordHash,
-      isActive: true,
-    });
+    // § เขียนข้อมูลผู้ใช้และ audit ใน tx เดียว — audit ล้มต้อง rollback ทั้งก้อน
+    await db.transaction(async (tx) => {
+      await tx.insert(users).values({
+        id: newUserId,
+        email,
+        fullName,
+        role,
+        departmentId: deptValue,
+        passwordHash,
+        isActive: true,
+      });
 
-    await logAudit({
-      userId: actor.id,
-      action: AUDIT_ACTIONS.CREATE_USER,
-      resource: 'users',
-      resourceId: newUserId,
-      ipAddress,
-      userAgent,
-      metadata: { email, fullName, role },
+      await logAudit({
+        userId: actor.id,
+        action: AUDIT_ACTIONS.CREATE_USER,
+        resource: 'users',
+        resourceId: newUserId,
+        ipAddress,
+        userAgent,
+        metadata: { email, fullName, role },
+      }, tx);
     });
   } catch (err) {
     console.error('[createUser] failed', err);
@@ -135,19 +138,22 @@ export async function toggleUserActive(
   const newActive = !target.isActive;
 
   try {
-    await db
-      .update(users)
-      .set({ isActive: newActive, updatedAt: new Date() })
-      .where(eq(users.id, userId));
+    // § เขียนข้อมูลผู้ใช้และ audit ใน tx เดียว — audit ล้มต้อง rollback ทั้งก้อน
+    await db.transaction(async (tx) => {
+      await tx
+        .update(users)
+        .set({ isActive: newActive, updatedAt: new Date() })
+        .where(eq(users.id, userId));
 
-    await logAudit({
-      userId: actor.id,
-      action: newActive ? AUDIT_ACTIONS.ACTIVATE_USER : AUDIT_ACTIONS.DEACTIVATE_USER,
-      resource: 'users',
-      resourceId: userId,
-      ipAddress,
-      userAgent,
-      metadata: { fullName: target.fullName, email: target.email, previousState: target.isActive },
+      await logAudit({
+        userId: actor.id,
+        action: newActive ? AUDIT_ACTIONS.ACTIVATE_USER : AUDIT_ACTIONS.DEACTIVATE_USER,
+        resource: 'users',
+        resourceId: userId,
+        ipAddress,
+        userAgent,
+        metadata: { fullName: target.fullName, email: target.email, previousState: target.isActive },
+      }, tx);
     });
   } catch (err) {
     console.error('[toggleUserActive] failed', err);
@@ -199,25 +205,28 @@ export async function updateUserRole(
   const deptValue = departmentId && departmentId !== '__none__' ? departmentId : null;
 
   try {
-    await db
-      .update(users)
-      .set({ role, departmentId: deptValue, updatedAt: new Date() })
-      .where(eq(users.id, userId));
+    // § เขียนข้อมูลผู้ใช้และ audit ใน tx เดียว — audit ล้มต้อง rollback ทั้งก้อน
+    await db.transaction(async (tx) => {
+      await tx
+        .update(users)
+        .set({ role, departmentId: deptValue, updatedAt: new Date() })
+        .where(eq(users.id, userId));
 
-    await logAudit({
-      userId: actor.id,
-      action: AUDIT_ACTIONS.UPDATE_USER_ROLE,
-      resource: 'users',
-      resourceId: userId,
-      ipAddress,
-      userAgent,
-      metadata: {
-        fullName: target.fullName,
-        email: target.email,
-        previousRole: target.role,
-        newRole: role,
-        departmentId: deptValue,
-      },
+      await logAudit({
+        userId: actor.id,
+        action: AUDIT_ACTIONS.UPDATE_USER_ROLE,
+        resource: 'users',
+        resourceId: userId,
+        ipAddress,
+        userAgent,
+        metadata: {
+          fullName: target.fullName,
+          email: target.email,
+          previousRole: target.role,
+          newRole: role,
+          departmentId: deptValue,
+        },
+      }, tx);
     });
   } catch (err) {
     console.error('[updateUserRole] failed', err);
@@ -256,20 +265,24 @@ export async function resetPassword(
   }
 
   try {
+    // § bcrypt อยู่นอก tx แต่ใน try เดิม เพื่อไม่ถือ connection ระหว่าง hash และคง error เดิม
     const passwordHash = await hashPassword(newPassword);
-    await db
-      .update(users)
-      .set({ passwordHash, updatedAt: new Date() })
-      .where(eq(users.id, userId));
+    // § เขียนข้อมูลผู้ใช้และ audit ใน tx เดียว — audit ล้มต้อง rollback ทั้งก้อน
+    await db.transaction(async (tx) => {
+      await tx
+        .update(users)
+        .set({ passwordHash, updatedAt: new Date() })
+        .where(eq(users.id, userId));
 
-    await logAudit({
-      userId: actor.id,
-      action: AUDIT_ACTIONS.RESET_USER_PASSWORD,
-      resource: 'users',
-      resourceId: userId,
-      ipAddress,
-      userAgent,
-      metadata: { fullName: target.fullName, email: target.email },
+      await logAudit({
+        userId: actor.id,
+        action: AUDIT_ACTIONS.RESET_USER_PASSWORD,
+        resource: 'users',
+        resourceId: userId,
+        ipAddress,
+        userAgent,
+        metadata: { fullName: target.fullName, email: target.email },
+      }, tx);
     });
   } catch (err) {
     console.error('[resetPassword] failed', err);
