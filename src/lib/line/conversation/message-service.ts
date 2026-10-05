@@ -188,6 +188,27 @@ async function insertAdminMessage(
     // § race เดียวกับ route เดิม: สอง request ชน unique client_temp_id → คนแพ้ reuse แถวผู้ชนะ
     .onConflictDoNothing()
     .returning({ id: chatMessages.id });
+
+  // ถ้าแพ้ race (ชน unique client_temp_id) ให้ reuse แถวผู้ชนะจาก DB
+  if (!inserted && input.clientTempId) {
+    const [winner] = await db
+      .select({ id: chatMessages.id, metadata: chatMessages.metadata })
+      .from(chatMessages)
+      .where(
+        and(
+          eq(chatMessages.conversationId, conv.id),
+          eq(chatMessages.clientTempId, input.clientTempId),
+        ),
+      )
+      .limit(1);
+    if (winner) {
+      if (getPushStatus(winner.metadata) === 'failed') {
+        return { kind: 'push_failed', messageId: winner.id, pushStatus: 'failed' };
+      }
+      return { kind: 'duplicate', messageId: winner.id, pushStatus: 'sent' };
+    }
+  }
+
   const finalId = inserted?.id ?? messageId;
 
   await db

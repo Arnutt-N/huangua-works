@@ -115,7 +115,7 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
   return db.transaction(async (tx): Promise<CaseIntakeResult> => {
     const identity = citizenIdentityOf(input);
     if (!identity) {
-      return { ok: false, error: 'ไม่สามารถสร้างผู้ใช้งานได้', errorCode: 'internal' };
+      throw new Error('ไม่สามารถสร้างผู้ใช้งานได้');
     }
     const submitterId = await resolveCitizen(identity, tx);
 
