@@ -238,7 +238,9 @@ The largest subsystem (`src/lib/line/`, `src/app/api/line/`, `src/app/admin/chat
 - `lib/line/sse/broadcaster.ts` — live admin chat pushed over SSE, fanned out through Redis
 - `lib/line/messages/` — Flex message and rich-menu builders
 
-**Bot runtime config lives in the database, not env.** `lib/line/settings.ts` reads `chatSettings` with a 60-second in-process cache — call `invalidateSettingsCache(key)` after any write, or admin edits won't take effect for a minute.
+**Bot runtime config lives in the database, not env.** Write settings only through `setChatSettings()` (`lib/line/settings.ts`) and intents only through `createIntent`/`updateIntent`/`deleteIntent` (`lib/line/bot/intent-store.ts`). Both write in a transaction, clear their own process cache, and `INCR` a version stamp in Redis (`lib/line/config-version.ts`); every process's `createVersionedCache()` checks that stamp at most every 3 s, so the webhook sees admin edits within seconds. There is no invalidate call for callers to remember. If Redis is down the 60-second TTL is the fallback.
+
+`bot_enabled = false` routes new messages to staff (`waiting_handoff`, one notice reply). Outside `business_hours` (Asia/Bangkok, `days` use `Date#getDay` numbering) the bot still answers FAQ/tracking but answers handoff requests with an "outside business hours" message instead of queueing — see `lib/line/business-hours.ts`.
 
 ### Cron
 
@@ -303,3 +305,55 @@ Canonical vocabulary, unchanged — `needs-triage`, `needs-info`, `ready-for-age
 
 Single-context — `CONTEXT.md` + `docs/adr/` at the repo root (neither exists yet;
 that's expected). See `docs/agents/domain.md`.
+
+<!-- graft:start -->
+## Graft — repo context graph
+
+This repo is indexed in `graft/`: small linked markdown nodes that explain each
+system and carry exact file:line spans, kept in sync with the code through git.
+
+For ANY task here — understanding how something works, finding where code lives,
+or scoping a change — get context from the graph before grepping or opening
+source files. Re-ask freely (it's cheap) and reuse literal identifiers you
+already have (symbol, error string, file name) as the query. New to this repo?
+Run `graft map` first — a token-budgeted orientation (dir clusters, hubs,
+hotspots), no LLM, no key.
+
+- Run `graft ask "<your question>" --source` → ranked nodes with the relevant
+  code spans inlined (each hit's ≤8-line crux by default; `--full` for whole
+  definitions when the crux isn't enough). Match the tool to the task shape:
+  for understanding or editing, the top node IS the answer — cite its
+  `covers:` file:line spans and edit straight from `--source`. For
+  exhaustive tasks ("every occurrence / every caller of this pattern"), ranked
+  results are top-N, not complete — run `graft grep "<literal>"` instead
+  (exhaustive over indexed files, grouped by enclosing symbol), falling back
+  to raw `grep -rn` only for unindexed files.
+- `graft skeleton <file>` → every definition's signature + span, ~10× cheaper
+  than reading the file; use it to skim an API surface.
+- `graft callers <symbol>` gives precomputed, exact edges — who calls this.
+  Add `--direction out` for what it calls, or `--depth N` to walk
+  transitively for the full blast radius. For structural questions, skip
+  ranking and use this directly.
+- Or browse: `graft/INDEX.md` lists every node; follow the links.
+- Monorepos and folders of multiple repos rank fairly across sub-projects —
+  hits carry `[scope/]` labels naming which one they're from. Narrow with
+  `graft ask "<task>" --in <scope>/` once you know where you're working.
+
+If a returned span is truncated ("+N more lines"), open the file at that exact
+range before finalizing. Only open source files when a node genuinely lacks a
+needed detail, and then at the exact file:line the node points to — never
+re-read whole files.
+
+After big code changes, refresh the graph with `graft build` (deterministic,
+no API key, $0).
+<!-- graft:end -->
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
