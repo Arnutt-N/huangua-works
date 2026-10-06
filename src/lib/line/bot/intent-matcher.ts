@@ -2,6 +2,12 @@ import { eq, and } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { chatIntents, chatIntentKeywords, chatIntentResponses, chatReplyObjects } from '@/lib/db/schema';
 import type { LineOutgoingMessage } from '../types';
+import { readConfigVersion } from '../config-version';
+import {
+  BOT_CONFIG_TTL_MS,
+  BOT_CONFIG_VERSION_CHECK_MS,
+  createVersionedCache,
+} from '../versioned-cache';
 
 export interface IntentMatch {
   intentId: string;
@@ -43,16 +49,9 @@ interface KeywordRow {
   intentName: string;
 }
 
-let keywordsCache: KeywordRow[] | null = null;
-let keywordsCacheTs = 0;
-const KEYWORDS_TTL_MS = 60_000;
-
-async function loadKeywords(): Promise<KeywordRow[]> {
-  if (keywordsCache && Date.now() - keywordsCacheTs < KEYWORDS_TTL_MS) {
-    return keywordsCache;
-  }
+async function loadActiveKeywords(): Promise<KeywordRow[]> {
   const db = await getDb();
-  const rows = await db
+  return db
     .select({
       keyword: chatIntentKeywords.keyword,
       matchType: chatIntentKeywords.matchType,
@@ -62,15 +61,20 @@ async function loadKeywords(): Promise<KeywordRow[]> {
     .from(chatIntentKeywords)
     .innerJoin(chatIntents, eq(chatIntentKeywords.intentId, chatIntents.id))
     .where(eq(chatIntents.isActive, true));
-
-  keywordsCache = rows;
-  keywordsCacheTs = Date.now();
-  return rows;
 }
 
+// § cache นี้เห็นการแก้ไขจาก admin process อื่นผ่านเลข version ใน Redis (scope 'intents')
+// ดู config-version.ts — Redis ล่มก็ยังมี TTL 60 วินาทีแบบเดิม
+const keywordCache = createVersionedCache<KeywordRow[]>({
+  load: loadActiveKeywords,
+  readVersion: () => readConfigVersion('intents'),
+  ttlMs: BOT_CONFIG_TTL_MS,
+  versionCheckMs: BOT_CONFIG_VERSION_CHECK_MS,
+});
+
+/** ผู้เรียกเดียวคือ intent-store.ts — route ไม่ต้องจำเรียกเองแล้ว */
 export function invalidateIntentCache(): void {
-  keywordsCache = null;
-  keywordsCacheTs = 0;
+  keywordCache.invalidate();
 }
 
 const MATCH_PRIORITY: Record<string, number> = {
@@ -84,7 +88,7 @@ export async function matchIntent(text: string): Promise<IntentMatch | null> {
   const normalized = text.trim().toLowerCase();
   if (!normalized) return null;
 
-  const keywords = await loadKeywords();
+  const keywords = await keywordCache.get();
 
   let bestIntentId: string | null = null;
   let bestIntentName = '';
