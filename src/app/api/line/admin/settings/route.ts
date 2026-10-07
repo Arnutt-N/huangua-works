@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getChatSetting, setChatSetting, invalidateSettingsCache, type ChatSettingsDefaults } from '@/lib/line/settings';
+import { getChatSetting, setChatSettings } from '@/lib/line/settings';
 import { parseBody } from '@/lib/api-helpers';
 import { requireStaffApi } from '@/lib/auth/require-staff';
 import { ADMIN_ROLES } from '@/lib/auth/roles';
@@ -8,14 +8,23 @@ import { z } from 'zod';
 
 export const runtime = 'nodejs';
 
+// 'HH:MM' 00:00–23:59 หรือ '24:00' (= สิ้นวัน) — ตรงกับ parseClockMinutes ใน business-hours.ts
+const CLOCK_PATTERN = /^(?:(?:[01]\d|2[0-3]):[0-5]\d|24:00)$/;
+
 const settingsSchema = z.object({
   welcome_message: z.string().min(1).max(1000).optional(),
   handoff_keywords: z.array(z.string().min(1).max(50)).min(1).max(20).optional(),
-  business_hours: z.object({
-    start: z.string().regex(/^\d{2}:\d{2}$/),
-    end: z.string().regex(/^\d{2}:\d{2}$/),
-    days: z.array(z.number().int().min(0).max(6)),
-  }).optional(),
+  business_hours: z
+    .object({
+      start: z.string().regex(CLOCK_PATTERN, 'เวลาเปิดต้องอยู่ในรูปแบบ HH:MM'),
+      end: z.string().regex(CLOCK_PATTERN, 'เวลาปิดต้องอยู่ในรูปแบบ HH:MM'),
+      days: z.array(z.number().int().min(0).max(6)).max(7),
+    })
+    // § 'HH:MM' เติมศูนย์ครบ จึงเทียบแบบ string ได้ถูกต้อง — ไม่รองรับช่วงข้ามเที่ยงคืน
+    // (บอทถือว่าค่าแบบนั้นเสียและ fail-open) จึงปฏิเสธตั้งแต่ตอนบันทึก
+    .refine((hours) => hours.start < hours.end, { message: 'เวลาเปิดต้องมาก่อนเวลาปิด' })
+    .transform((hours) => ({ ...hours, days: [...new Set(hours.days)].sort((a, b) => a - b) }))
+    .optional(),
   bot_enabled: z.boolean().optional(),
 });
 
@@ -52,14 +61,9 @@ export async function PUT(request: Request) {
   const result = await parseBody(settingsSchema, request);
   if (!result.ok) return result.response;
 
-  const entries = Object.entries(result.data) as [keyof ChatSettingsDefaults, unknown][];
-  for (const [key, value] of entries) {
-    if (value !== undefined) {
-      await setChatSetting(key, value as never);
-    }
-  }
-
-  invalidateSettingsCache();
+  // § บันทึกทุก key ใน transaction เดียว และ setChatSettings ประกาศการเปลี่ยนแปลงให้
+  // webhook process อื่นเอง — route ไม่ต้องเรียก invalidate อีกแล้ว
+  await setChatSettings(result.data);
 
   await logAudit({
     userId: authz.ctx.user.id,

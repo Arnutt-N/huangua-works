@@ -7,8 +7,7 @@ import { Settings, Save, Wifi, WifiOff } from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import { Button } from '@/components/ui/button';
 import { Label, Input, Textarea } from '@/components/ui/field';
-
-const DAY_LABELS = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+import { BUSINESS_DAY_LABELS as DAY_LABELS } from '@/lib/line/business-hours';
 
 export function SettingsClient() {
   const { data, loading, feedback, clearFeedback, mutate, setData } = useResource({
@@ -100,6 +99,7 @@ export function SettingsClient() {
           <label className="flex min-h-touch items-center gap-3">
             <input
               type="checkbox"
+              aria-label="เปิดใช้งานบอทตอบอัตโนมัติ"
               checked={data.bot_enabled}
               onChange={(e) => setData((prev) => (prev ? { ...prev, bot_enabled: e.target.checked } : prev))}
               className="h-5 w-5 rounded border-border accent-accent"

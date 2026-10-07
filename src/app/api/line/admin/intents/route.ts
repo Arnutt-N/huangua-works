@@ -2,13 +2,13 @@ import { NextResponse } from 'next/server';
 import { asc, eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { chatIntents, chatIntentKeywords, chatIntentResponses } from '@/lib/db/schema';
-import { generateId } from '@/lib/id';
 import { requireStaffApi } from '@/lib/auth/require-staff';
 import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit';
-import { invalidateIntentCache, validateRegex } from '@/lib/line/bot/intent-matcher';
+import { createIntent } from '@/lib/line/bot/intent-store';
 import { parseBody } from '@/lib/api-helpers';
 import { z } from 'zod';
+import { intentWriteErrorResponse } from './intent-response';
 
 export const runtime = 'nodejs';
 
@@ -65,52 +65,18 @@ export async function POST(request: Request) {
   const parsed = await parseBody(createSchema, request);
   if (!parsed.ok) return parsed.response;
 
-  const { name, description, isActive, keywords, responses } = parsed.data;
-
-  for (const kw of keywords) {
-    if (kw.matchType === 'regex') {
-      const check = validateRegex(kw.keyword);
-      if (!check.valid) {
-        return NextResponse.json({ error: `regex ไม่ถูกต้อง: ${check.error}` }, { status: 400 });
-      }
-    }
-  }
-
-  const db = await getDb();
-  const id = generateId();
-
-  await db.insert(chatIntents).values({ id, name, description, isActive });
-
-  await db.insert(chatIntentKeywords).values(
-    keywords.map((kw) => ({
-      id: generateId(),
-      intentId: id,
-      keyword: kw.keyword,
-      matchType: kw.matchType,
-    })),
-  );
-
-  await db.insert(chatIntentResponses).values(
-    responses.map((r) => ({
-      id: generateId(),
-      intentId: id,
-      replyType: r.replyType,
-      textContent: r.textContent ?? null,
-      replyObjectId: r.replyObjectId ?? null,
-      displayOrder: r.displayOrder,
-    })),
-  );
-
-  invalidateIntentCache();
+  // § intent-store ตรวจ regex, เขียนทั้งก้อนใน transaction และประกาศให้บอททุก process เอง
+  const result = await createIntent(parsed.data);
+  if (!result.ok) return intentWriteErrorResponse(result);
 
   await logAudit({
     userId: authz.ctx.user.id,
     action: AUDIT_ACTIONS.INTENT_CREATE,
     resource: 'chat_intents',
-    resourceId: id,
+    resourceId: result.id,
     ipAddress: authz.ctx.ipAddress,
     userAgent: authz.ctx.userAgent,
   });
 
-  return NextResponse.json({ ok: true, id }, { status: 201 });
+  return NextResponse.json({ ok: true, id: result.id }, { status: 201 });
 }

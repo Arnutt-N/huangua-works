@@ -89,6 +89,20 @@ describe('recordInboundMessage', () => {
     expect((await loadConv(id)).unreadAdmin).toBe(3);
   });
 
+  test('§ countUnread: true บังคับนับ unread แม้ห้องเป็น bot_active (engine ส่งมาตอน bot_enabled=false)', async () => {
+    const id = await createConv('bot_active', 5);
+    await recordInboundMessage({
+      conversationId: id,
+      mode: 'bot_active',
+      messageType: 'text',
+      textContent: 'บอทปิดอยู่ใช่ไหม',
+      locationData: null,
+      lineMessageId: 'line-msg-c5',
+      countUnread: true,
+    });
+    expect((await loadConv(id)).unreadAdmin).toBe(6);
+  });
+
   test('ข้อความไม่มี text (location) ใช้ "[location]" เป็นข้อความล่าสุด + เก็บ locationData', async () => {
     const id = await createConv('bot_active');
     const locationData = { title: 'บ้าน', address: 'หัวงัว', latitude: 16.4, longitude: 103.3 };
