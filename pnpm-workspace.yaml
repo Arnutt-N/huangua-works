@@ -3,3 +3,17 @@ allowBuilds:
   esbuild: true
   sharp: true
   unrs-resolver: true
+
+# § overrides ต้องอยู่ที่นี่ ไม่ใช่ package.json#pnpm — pnpm 11 (packageManager ใน package.json)
+# ไม่อ่าน overrides จาก package.json: เคยวางไว้ที่นั้นแล้ว lockfile ไม่มี `overrides:` และ
+# brace-expansion/js-yaml/nanoid/postcss ยังค้างเวอร์ชันที่มีช่องโหว่ (ยืนยันด้วย pnpm audit)
+# ใช้ ^ ผูกเพดาน major ไว้ทุกตัว — `>=` ไม่มีเพดานอาจข้าม major ได้ เช่น nanoid 5.x เป็น
+# ESM อย่างเดียว ทำให้ postcss ที่ require แบบ CJS พัง
+overrides:
+  sharp: ^0.35.5
+  brace-expansion@1: ^1.1.21
+  brace-expansion@2: ^2.1.7
+  brace-expansion@5: ^5.0.12
+  postcss@8: ^8.5.23
+  js-yaml@4: ^4.3.2
+  nanoid@3: ^3.3.18
