@@ -13,6 +13,7 @@ import {
   type CitizenIdentity,
   type IntakeConsentVia,
 } from './citizen-access';
+import { notifyNewCase } from '../notify';
 
 export interface CaseIntakeInput {
   channel: 'web' | 'line';
@@ -112,7 +113,7 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
 
   // § การเขียนผู้แจ้ง/link/consent/เรื่อง/dedup/audit ต้อง commit หรือ rollback พร้อมกัน
   // ระบุตัวตนด้วย resolveCitizen ใน tx นี้ (ลบ resolveSubmitter แล้ว — ดู citizen-access)
-  return db.transaction(async (tx): Promise<CaseIntakeResult> => {
+  const result = await db.transaction(async (tx): Promise<CaseIntakeResult> => {
     const identity = citizenIdentityOf(input);
     if (!identity) {
       throw new Error('ไม่สามารถสร้างผู้ใช้งานได้');
@@ -172,6 +173,25 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
 
     return { ok: true, caseId, trackingCode: issuedTrackingCode, estimatedDays };
   });
+
+  // § แจ้งเจ้าหน้าที่หลัง commit สำเร็จเท่านั้น — fail-open สองชั้น (notifyNewCase สัญญา
+  // ไม่ throw อยู่แล้ว + try/catch นี้กันของใหม่ในอนาคต) เพราะเคสถูกบันทึกไปแล้ว
+  // การแจ้งเตือนพังต้องไม่ลอยขึ้นไปทำให้ผู้แจ้งได้ error ทั้งที่เรื่องถูกรับไว้แล้ว
+  if (result.ok) {
+    try {
+      await notifyNewCase({
+        trackingCode: result.trackingCode,
+        title: input.title,
+        categoryName: category.name,
+        channel: input.channel,
+        location: input.location,
+      });
+    } catch (error) {
+      console.warn('[notify] new-case notice failed', error);
+    }
+  }
+
+  return result;
 }
 
 /**
