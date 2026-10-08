@@ -5,6 +5,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { CaseStatusBadge } from '../../components/ui/case-status-badge';
 import { Button } from '../../components/ui/button';
 import { FieldHint, Input, Label } from '../../components/ui/field';
+import { clearTrackDraft, readTrackDraft, saveTrackDraft } from '../../components/forms/non-pii-draft';
 import { cn } from '../../lib/cn';
 import { COPY } from '../../lib/copy';
 import type { CaseStatus } from '../../lib/cases/state-machine';
@@ -57,6 +58,21 @@ export function TrackForm({ initialId }: { initialId?: string }) {
   const [isSearching, setIsSearching] = useState(() => Boolean(initialId));
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CaseDetail | null>(null);
+  const [draftReady, setDraftReady] = useState(false);
+
+  useEffect(() => {
+    // § ไม่อ่าน storage ขณะ SSR และไม่ให้ draft ชนะเลขติดตามจาก URL
+    const timer = window.setTimeout(() => {
+      const draft = readTrackDraft();
+      setTrackId((current) => initialId ?? (current || draft?.trackId || ''));
+      setDraftReady(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [initialId]);
+
+  useEffect(() => {
+    if (draftReady) saveTrackDraft(trackId);
+  }, [trackId, draftReady]);
 
   useEffect(() => {
     if (!initialId) return;
@@ -107,12 +123,18 @@ export function TrackForm({ initialId }: { initialId?: string }) {
           <h2 className="text-xl font-semibold">ค้นหาเรื่อง</h2>
         </div>
 
+        <p className="mt-3 text-sm text-muted">
+          บันทึกเฉพาะเลขติดตามที่ครบเป็นดราฟต์บนเครื่องนี้อัตโนมัติ ไม่บันทึกข้อมูลผู้แจ้ง
+          หากใช้เครื่องร่วมกับผู้อื่น ให้กดล้างดราฟต์เมื่อใช้งานเสร็จ
+        </p>
+
         <div className="mt-5">
           <Label htmlFor="trackId">{COPY.TRACKING_CODE}เรื่อง</Label>
           <Input
             id="trackId"
             placeholder="เช่น HG483729156"
             invalid={!!error}
+            aria-describedby={error ? 'trackId-error' : 'trackId-hint'}
             value={trackId}
             onChange={(e) => setTrackId(e.target.value)}
           />
@@ -124,20 +146,34 @@ export function TrackForm({ initialId }: { initialId?: string }) {
           disabled={isSearching}
         >
           {isSearching ? (
-            <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+            <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
           ) : (
             <Search className="h-5 w-5" aria-hidden="true" />
           )}
-          ค้นหาเรื่อง
+          {isSearching ? 'กำลังค้นหา...' : 'ค้นหาเรื่อง'}
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          className="mt-3 px-7"
+          disabled={isSearching}
+          onClick={() => {
+            clearTrackDraft();
+            setTrackId('');
+            setError(null);
+            setResult(null);
+          }}
+        >
+          ล้างดราฟต์
         </Button>
 
         {error ? (
-          <p role="alert" className="mt-3 flex items-start gap-2 text-sm font-semibold text-danger-ink">
+          <p id="trackId-error" role="alert" className="mt-3 flex items-start gap-2 text-sm font-semibold text-danger-ink">
             <AlertCircle className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
             {error}
           </p>
         ) : (
-          <FieldHint>เลขติดตามอยู่ในหน้ายืนยันหลังส่งเรื่องที่หน้าแจ้งเรื่องใหม่</FieldHint>
+          <FieldHint id="trackId-hint">เลขติดตามอยู่ในหน้ายืนยันหลังส่งเรื่องที่หน้าแจ้งเรื่องใหม่</FieldHint>
         )}
       </form>
 

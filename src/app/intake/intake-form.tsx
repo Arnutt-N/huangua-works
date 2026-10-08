@@ -24,6 +24,7 @@ import {
 import { isValidCid, sanitizeCid, formatCid } from '../../lib/cid-checksum';
 import { COPY } from '../../lib/copy';
 import { useLiff } from '../../components/liff/liff-provider';
+import { clearIntakeDraft, readIntakeDraft, saveIntakeDraft } from '../../components/forms/non-pii-draft';
 
 export interface IntakeCategory {
   id: string;
@@ -123,6 +124,21 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
 
   const liff = useLiff();
   const liffMode = liff.authenticated;
+  const [draftReady, setDraftReady] = useState(false);
+
+  useEffect(() => {
+    // § อ่านหลัง mount เท่านั้น และคืนเฉพาะหมวด ไม่คืน PII หรือความยินยอมเดิม
+    const timer = window.setTimeout(() => {
+      const draft = readIntakeDraft(categories.map((category) => category.id));
+      if (draft) setForm((prev) => prev.categoryId ? prev : { ...prev, categoryId: draft.categoryId });
+      setDraftReady(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [categories]);
+
+  useEffect(() => {
+    if (draftReady && !result) saveIntakeDraft(form.categoryId, categories.map((category) => category.id));
+  }, [form.categoryId, categories, draftReady, result]);
 
   // ชื่อจากโปรไฟล์ LINE — เติมครั้งเดียวเมื่อฟอร์มยังว่าง ไม่เขียนทับที่ผู้ใช้พิมพ์/ลบเอง
   // (render-adjust pattern: setState ระหว่าง render ตอนค่าภายนอกเปลี่ยน ตาม
@@ -251,6 +267,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
         return;
       }
 
+      clearIntakeDraft();
       setResult({ caseId: data.caseId, trackingCode: data.trackingCode, message: data.message });
     } catch {
       setSubmitError('เชื่อมต่อระบบไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่');
@@ -298,6 +315,10 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
 
   return (
     <form className="mt-8 flex flex-col gap-6" noValidate onSubmit={handleSubmit}>
+      <p className="text-sm text-muted">
+        บันทึกเฉพาะหมวดเรื่องเป็นดราฟต์บนเครื่องนี้อัตโนมัติ ไม่บันทึกชื่อ เลขบัตรประชาชน
+        เบอร์โทร ที่อยู่ หรือข้อความที่กรอก เมื่อกลับมาหน้านี้จะคืนหมวดเรื่องให้
+      </p>
       {submitError && (
         <div
           role="alert"
@@ -328,10 +349,11 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
               name="name"
               placeholder="เช่น นายสมชาย ใจดี"
               invalid={!!fieldErrors.fullName}
+              aria-describedby={fieldErrors.fullName ? 'name-error' : undefined}
               value={form.fullName}
               onChange={(e) => updateField('fullName', e.target.value)}
             />
-            <FieldError>{fieldErrors.fullName}</FieldError>
+            <FieldError id="name-error">{fieldErrors.fullName}</FieldError>
           </div>
           {!liffMode && (
             <div>
@@ -342,6 +364,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
                 inputMode="numeric"
                 placeholder="กรอกตัวเลข 13 หลัก"
                 invalid={!!fieldErrors.cid}
+                aria-describedby={fieldErrors.cid ? 'cid-error' : undefined}
                 value={form.cid}
                 onChange={(e) => updateField('cid', e.target.value)}
                 onBlur={() => {
@@ -349,7 +372,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
                   if (digits.length === 13) updateField('cid', formatCid(digits));
                 }}
               />
-              {fieldErrors.cid && <FieldError>{fieldErrors.cid}</FieldError>}
+              {fieldErrors.cid && <FieldError id="cid-error">{fieldErrors.cid}</FieldError>}
             </div>
           )}
         </div>
@@ -374,7 +397,11 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
           <div>
             <Label htmlFor="cat">หมวดเรื่อง</Label>
             <Select value={form.categoryId} onValueChange={(v) => updateField('categoryId', v)}>
-              <SelectTrigger id="cat" aria-invalid={!!fieldErrors.categoryId || undefined}>
+              <SelectTrigger
+                id="cat"
+                aria-invalid={!!fieldErrors.categoryId || undefined}
+                aria-describedby={fieldErrors.categoryId ? 'cat-error' : undefined}
+              >
                 <SelectValue placeholder="เลือกหมวดที่ใกล้เรื่องของท่าน" />
               </SelectTrigger>
               <SelectContent>
@@ -385,7 +412,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
                 ))}
               </SelectContent>
             </Select>
-            <FieldError>{fieldErrors.categoryId}</FieldError>
+            <FieldError id="cat-error">{fieldErrors.categoryId}</FieldError>
           </div>
           <div>
             <Label htmlFor="title">หัวเรื่อง</Label>
@@ -394,10 +421,11 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
               name="title"
               placeholder="เช่น ถนนหน้าบ้านเป็นหลุมเป็นบ่อ"
               invalid={!!fieldErrors.title}
+              aria-describedby={fieldErrors.title ? 'title-error' : undefined}
               value={form.title}
               onChange={(e) => updateField('title', e.target.value)}
             />
-            <FieldError>{fieldErrors.title}</FieldError>
+            <FieldError id="title-error">{fieldErrors.title}</FieldError>
           </div>
           <div>
             <Label htmlFor="detail">รายละเอียด</Label>
@@ -407,13 +435,14 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
               rows={5}
               placeholder="บอกเล่าเรื่องที่เกิด เวลา ความเสียหาย ฯลฯ"
               invalid={!!fieldErrors.detail}
+              aria-describedby={fieldErrors.detail ? 'detail-error' : 'detail-hint'}
               value={form.detail}
               onChange={(e) => updateField('detail', e.target.value)}
             />
             {fieldErrors.detail ? (
-              <FieldError>{fieldErrors.detail}</FieldError>
+              <FieldError id="detail-error">{fieldErrors.detail}</FieldError>
             ) : (
-              <FieldHint>ยิ่งละเอียด เจ้าหน้าที่เข้าใจและดำเนินการได้เร็วขึ้น</FieldHint>
+              <FieldHint id="detail-hint">ยิ่งละเอียด เจ้าหน้าที่เข้าใจและดำเนินการได้เร็วขึ้น</FieldHint>
             )}
           </div>
         </div>
@@ -423,7 +452,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
       <SectionCard>
         <SectionHeading icon={MapPin}>ที่ตั้ง</SectionHeading>
         {geoError && (
-          <p role="alert" className="mt-4 flex items-start gap-2 rounded-xl border border-danger-ink/30 bg-danger-soft px-4 py-3 text-sm font-semibold text-danger-ink">
+          <p id="geo-error" role="alert" className="mt-4 flex items-start gap-2 rounded-xl border border-danger-ink/30 bg-danger-soft px-4 py-3 text-sm font-semibold text-danger-ink">
             <AlertCircle className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
             {geoError}
           </p>
@@ -432,7 +461,11 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
           <div>
             <Label htmlFor="province">จังหวัด</Label>
             <Select value={form.provinceId} onValueChange={handleProvinceChange}>
-              <SelectTrigger id="province" aria-invalid={!!fieldErrors.provinceId || undefined}>
+              <SelectTrigger
+                id="province"
+                aria-invalid={!!fieldErrors.provinceId || undefined}
+                aria-describedby={[fieldErrors.provinceId && 'province-error', geoError && 'geo-error'].filter(Boolean).join(' ') || undefined}
+              >
                 <SelectValue placeholder="เลือกจังหวัด" />
               </SelectTrigger>
               <SelectContent>
@@ -443,7 +476,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
                 ))}
               </SelectContent>
             </Select>
-            <FieldError>{fieldErrors.provinceId}</FieldError>
+            <FieldError id="province-error">{fieldErrors.provinceId}</FieldError>
           </div>
           <div>
             <Label htmlFor="district">อำเภอ</Label>
@@ -452,7 +485,11 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
               onValueChange={handleDistrictChange}
               disabled={!form.provinceId || loadingGeo === 'districts'}
             >
-              <SelectTrigger id="district" aria-invalid={!!fieldErrors.districtId || undefined}>
+              <SelectTrigger
+                id="district"
+                aria-invalid={!!fieldErrors.districtId || undefined}
+                aria-describedby={fieldErrors.districtId ? 'district-error' : undefined}
+              >
                 <SelectValue placeholder={loadingGeo === 'districts' ? 'กำลังโหลด...' : 'เลือกอำเภอ'} />
               </SelectTrigger>
               <SelectContent>
@@ -463,7 +500,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
                 ))}
               </SelectContent>
             </Select>
-            <FieldError>{fieldErrors.districtId}</FieldError>
+            <FieldError id="district-error">{fieldErrors.districtId}</FieldError>
           </div>
           <div>
             <Label htmlFor="subdistrict">ตำบล</Label>
@@ -472,7 +509,11 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
               onValueChange={handleSubDistrictChange}
               disabled={!form.districtId || loadingGeo === 'subdistricts'}
             >
-              <SelectTrigger id="subdistrict" aria-invalid={!!fieldErrors.subDistrictId || undefined}>
+              <SelectTrigger
+                id="subdistrict"
+                aria-invalid={!!fieldErrors.subDistrictId || undefined}
+                aria-describedby={fieldErrors.subDistrictId ? 'subdistrict-error' : undefined}
+              >
                 <SelectValue placeholder={loadingGeo === 'subdistricts' ? 'กำลังโหลด...' : 'เลือกตำบล'} />
               </SelectTrigger>
               <SelectContent>
@@ -483,7 +524,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
                 ))}
               </SelectContent>
             </Select>
-            <FieldError>{fieldErrors.subDistrictId}</FieldError>
+            <FieldError id="subdistrict-error">{fieldErrors.subDistrictId}</FieldError>
           </div>
         </div>
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
@@ -542,7 +583,10 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
       <div className="glass rounded-xl p-6 shadow-sm sm:p-8">
         <label className="border-border bg-surface-sunken/30 flex items-start gap-3 rounded-xl border p-4">
           <input
+            id="consent"
             type="checkbox"
+            aria-invalid={!!fieldErrors.consent || undefined}
+            aria-describedby={fieldErrors.consent ? 'consent-error' : undefined}
             aria-label="ยินยอมให้เก็บข้อมูลตามกฎหมายว่าด้วยการคุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562"
             className="mt-1 h-5 w-5 flex-none rounded border-border-strong text-accent-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
             checked={form.consent}
@@ -553,7 +597,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
             ตามกฎหมายว่าด้วยการคุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562
           </span>
         </label>
-        <FieldError>{fieldErrors.consent}</FieldError>
+        <FieldError id="consent-error">{fieldErrors.consent}</FieldError>
       </div>
 
       {/* actions */}
@@ -564,6 +608,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
           size="lg"
           disabled={isSubmitting}
           onClick={() => {
+            clearIntakeDraft();
             setForm(initialForm);
             setFieldErrors({});
             setSubmitError(null);
@@ -574,7 +619,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
           }}
           className="h-12 px-6 text-base"
         >
-          ล้างทั้งหมด
+          ล้างดราฟต์และข้อมูล
         </Button>
         <Button
           type="submit"
@@ -584,7 +629,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
         >
           {isSubmitting ? (
             <>
-              <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+              <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
               กำลังส่งเรื่อง...
             </>
           ) : (
