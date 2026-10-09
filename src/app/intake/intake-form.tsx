@@ -23,6 +23,7 @@ import {
 } from '../../components/ui/select';
 import { isValidCid, sanitizeCid, formatCid } from '../../lib/cid-checksum';
 import { COPY } from '../../lib/copy';
+import { HONEYPOT_FIELD, MIN_SUBMIT_MS } from '../../lib/anti-spam';
 import { useLiff } from '../../components/liff/liff-provider';
 import { clearIntakeDraft, readIntakeDraft, saveIntakeDraft } from '../../components/forms/non-pii-draft';
 
@@ -140,6 +141,17 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
     if (draftReady && !result) saveIntakeDraft(form.categoryId, categories.map((category) => category.id));
   }, [form.categoryId, categories, draftReady, result]);
 
+  // § กันสแปม (ดู src/lib/anti-spam.ts) — input ลวงที่ผู้ใช้จริงไม่มีทางกรอก
+  // (อยู่นอกจอ + aria-hidden + นอก tab order) กับเวลาที่ฟอร์ม mount เอาไว้
+  // จับบอทที่ส่งเร็วเกินคน ใช้ ref เพื่อไม่ให้ re-render ฟอร์ม
+  // § formStartedAt ตั้งใน effect (mount) ไม่ใช่ตอน render เพราะ Date.now
+  // เป็น impure function (กฎ react-hooks/purity) — effect รันก่อนผู้ใช้กดส่งได้เสมอ
+  const honeypotRef = useRef<HTMLInputElement>(null);
+  const formStartedAtRef = useRef<number>(0);
+  useEffect(() => {
+    if (formStartedAtRef.current === 0) formStartedAtRef.current = Date.now();
+  }, []);
+
   // ชื่อจากโปรไฟล์ LINE — เติมครั้งเดียวเมื่อฟอร์มยังว่าง ไม่เขียนทับที่ผู้ใช้พิมพ์/ลบเอง
   // (render-adjust pattern: setState ระหว่าง render ตอนค่าภายนอกเปลี่ยน ตาม
   // https://react.dev/learn/you-might-not-need-an-effect — ไม่ใช้ effect เพราะ
@@ -234,8 +246,15 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
+    const websiteUrl = honeypotRef.current?.value || undefined;
+    const formStartedAt = formStartedAtRef.current || undefined;
     setIsSubmitting(true);
     try {
+      // § ผู้ใช้กรอกไวหรือเติมอัตโนมัติรอครบเกณฑ์ก่อนส่ง ไม่ได้รับ error เพราะเร็วเกินไป
+      // เก็บสัญญาณตั้งแต่กดส่ง ส่วน server ยังตรวจเองเพื่อกันการข้ามขั้นตอนนี้
+      // นาฬิกาถอยหลังระหว่างกรอกต้องไม่ทำให้รอนานเกิน 2 วินาที
+      const remaining = formStartedAt === undefined ? 0 : Math.min(MIN_SUBMIT_MS, MIN_SUBMIT_MS - (Date.now() - formStartedAt));
+      if (remaining > 0) await new Promise<void>((resolve) => window.setTimeout(resolve, remaining));
       const res = await fetch('/api/cases/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -253,6 +272,10 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
           villageId: form.villageId ? Number(form.villageId) : undefined,
           village: form.village.trim() || undefined,
           consent: form.consent,
+          // § สัญญาณกันสแปม — ฟิลด์ลวง (บอทกรอก = โดนปฏิเสธ) + เวลา mount ฟอร์ม
+          // (0 = effect ยังไม่รัน ส่ง undefined ให้ server ข้ามสัญญาณเวลาไป)
+          websiteUrl,
+          formStartedAt,
         }),
       });
 
@@ -319,6 +342,22 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
         บันทึกเฉพาะหมวดเรื่องเป็นดราฟต์บนเครื่องนี้อัตโนมัติ ไม่บันทึกชื่อ เลขบัตรประชาชน
         เบอร์โทร ที่อยู่ หรือข้อความที่กรอก เมื่อกลับมาหน้านี้จะคืนหมวดเรื่องให้
       </p>
+      {/* § Honeypot กันบอท — ผู้ใช้จริงมองไม่เห็น (อยู่นอกจอ ไม่รับโฟกัส ไม่อ่านออกเสียง)
+          บอทที่กรอกทุก field จะติดกับแล้วโดน server ปฏิเสธ ดู src/lib/anti-spam.ts
+          § ใช้ aria-label แทน label element เพราะกฎ control-has-associated-label
+          ของ repo ต้องการ accessible name ตรงที่ control (label element ผ่านไม่ได้) */}
+      <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', top: 'auto', width: '1px', height: '1px', overflow: 'hidden' }}>
+        <input
+          ref={honeypotRef}
+          id={HONEYPOT_FIELD}
+          name={HONEYPOT_FIELD}
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+          aria-hidden="true"
+          aria-label="เว็บไซต์"
+        />
+      </div>
       {submitError && (
         <div
           role="alert"

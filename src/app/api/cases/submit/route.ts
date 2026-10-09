@@ -9,8 +9,17 @@ import { isValidCid } from '@/lib/cid-checksum';
 import { enforceRateLimit } from '@/lib/rate-limit/enforce';
 import { clientIpFromHeaders } from '@/lib/rate-limit/client-ip';
 import { submitCaseSchema, submitCaseLineSchema, validateOrError } from '@/lib/validation';
+import { isSpamSubmission } from '@/lib/anti-spam';
 import { createCase } from '@/lib/cases/intake';
 import { LIFF_SESSION_COOKIE, readLiffSessionValue } from '@/lib/liff/session';
+
+// § ใช้คำตอบเดียวกับข้อมูลผิดรูปแบบ เพื่อไม่เปิดเผยว่าสัญญาณกันสแปมใดทำงาน
+function invalidSubmissionResponse() {
+  return NextResponse.json(
+    { error: 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบแล้วลองใหม่' },
+    { status: 400 },
+  );
+}
 
 export async function POST(req: NextRequest) {
   const ip = clientIpFromHeaders(req.headers);
@@ -34,13 +43,32 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    return invalidSubmissionResponse();
+  }
+
+  // § กันสแปม (honeypot + จับเวลากรอก) — ตรวจก่อน validate เพื่อตัดบอททิ้งเร็ว
+  // error ต้อง generic เหมือน validation ทั่วไป ห้ามบอกว่าโดนจับว่าเป็นบอท
+  // (ดู src/lib/anti-spam.ts) — ตรวจจาก body ดิบเพราะทั้งสอง schema มีฟิลด์นี้
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+    return invalidSubmissionResponse();
+  }
+  const raw = body as { websiteUrl?: unknown; formStartedAt?: unknown };
+  if (
+    isSpamSubmission(
+      {
+        websiteUrl: typeof raw.websiteUrl === 'string' ? raw.websiteUrl : undefined,
+        formStartedAt: typeof raw.formStartedAt === 'number' ? raw.formStartedAt : undefined,
+      },
+      Date.now(),
+    )
+  ) {
+    return invalidSubmissionResponse();
   }
 
   if (liffSession) {
     const validation = validateOrError(submitCaseLineSchema, body);
     if (!validation.success) {
-      return NextResponse.json({ error: validation.error }, { status: 400 });
+      return invalidSubmissionResponse();
     }
     const { fullName, phoneNumber, email, categoryId, title, description, location, provinceId, districtId, subDistrictId, villageId, village, attachments } = validation.data;
 
@@ -86,14 +114,14 @@ export async function POST(req: NextRequest) {
 
   const validation = validateOrError(submitCaseSchema, body);
   if (!validation.success) {
-    return NextResponse.json({ error: validation.error }, { status: 400 });
+    return invalidSubmissionResponse();
   }
 
   const { cid, fullName, phoneNumber, email, categoryId, title, description, location, provinceId, districtId, subDistrictId, villageId, village, attachments } = validation.data;
 
   // § CID checksum check (zod ตรวจ format 13 หลักเท่านั้น — checksum ตรวจที่นี่)
   if (!isValidCid(cid)) {
-    return NextResponse.json({ error: 'เลขบัตรประชาชนไม่ถูกต้อง' }, { status: 400 });
+    return invalidSubmissionResponse();
   }
 
   const result = await createCase({
