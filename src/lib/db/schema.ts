@@ -847,3 +847,46 @@ export const mediaFiles = pgTable(
     uploadedByIdx: index('media_files_uploaded_by_idx').on(table.uploadedBy),
   })
 );
+
+// ────────────────────────────────────────────────────────────────────────────
+// § Queue Bookings (จองคิวนัดช่าง — P2-03)
+// ช่องทางประชาชนจองวัน/ช่วงเวลาให้ช่าง อบต. เข้าดูหน้างาน (ไฟฟ้า/ประปา/ถนน)
+// ────────────────────────────────────────────────────────────────────────────
+
+export const queueBookingStatusEnum = pgEnum('queue_booking_status', [
+  'booked',
+  'confirmed',
+  'done',
+  'cancelled',
+]);
+
+export const queueBookings = pgTable(
+  'queue_bookings',
+  {
+    id: text('id').primaryKey(), // UUID v7 (generateId)
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+
+    fullName: text('full_name').notNull(),
+    phoneNumber: text('phone_number').notNull(), // ช่องทางติดต่อกลับ — บังคับ
+    serviceType: text('service_type').notNull(), // ประเภทงานช่าง (ข้อความอิสระ)
+    note: text('note'), // รายละเอียดเพิ่มเติมจากผู้จอง
+
+    // § เก็บเป็น date (YYYY-MM-DD) ไม่ใช่ timestamp — คิวนัดอ้าง "วัน" ปฏิทินไทย
+    // ไม่มีประเด็น timezone; slot แยกเป็นคอลัมน์ข้อความตาม QUEUE_SLOT_IDS
+    bookingDate: date('booking_date').notNull(),
+    slot: text('slot').notNull(),
+
+    status: queueBookingStatusEnum().notNull().default('booked'),
+    adminNote: text('admin_note'), // โน้ตภายในของเจ้าหน้าที่
+  },
+  (table) => ({
+    dateIdx: index('queue_bookings_booking_date_idx').on(table.bookingDate),
+    statusIdx: index('queue_bookings_status_idx').on(table.status),
+    // § กันจองซ้ำช่วงเดียวกันระดับ DB (หนึ่งช่วงรับหนึ่งคิว) — ยกเว้นคิวที่
+    // ยกเลิกแล้วให้จองทับได้ จึงต้องเป็น partial index ไม่ใช่ unique ธรรมดา
+    slotTakenIdx: uniqueIndex('queue_bookings_date_slot_idx')
+      .on(table.bookingDate, table.slot)
+      .where(sql`status <> 'cancelled'`),
+  })
+);

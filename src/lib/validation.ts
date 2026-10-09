@@ -466,6 +466,126 @@ export const toggleActiveFormSchema = z.object({
 });
 
 // ────────────────────────────────────────────────────────────────────────────
+// § จองคิวนัดช่าง (P2-03) — POST/GET /api/queue + server action ฝั่งเจ้าหน้าที่
+// ────────────────────────────────────────────────────────────────────────────
+
+/** ช่วงเวลานัดช่าง — วันละ 4 ช่วง, id เสถียรเก็บลงคอลัมน์ slot ตรง ๆ */
+export const QUEUE_SLOT_IDS = ['slot_1', 'slot_2', 'slot_3', 'slot_4'] as const;
+export type QueueSlotId = (typeof QUEUE_SLOT_IDS)[number];
+
+/** ป้ายช่วงเวลาไทย — ใช้ร่วมกันทั้งหน้า public, API response และหน้าแอดมิน */
+export const QUEUE_SLOT_LABELS: Record<QueueSlotId, string> = {
+  slot_1: 'เช้า 09:00–10:30',
+  slot_2: 'เช้า 10:30–12:00',
+  slot_3: 'บ่าย 13:00–14:30',
+  slot_4: 'บ่าย 14:30–16:00',
+};
+
+export const queueSlotSchema = z.enum(QUEUE_SLOT_IDS);
+
+/** mirror pgEnum queue_booking_status (ดู schema.ts — ค่าเพิ่ม/ลดต้องแก้ทั้งคู่) */
+export const queueBookingStatusSchema = z.enum(['booked', 'confirmed', 'done', 'cancelled']);
+export type QueueBookingStatus = z.infer<typeof queueBookingStatusSchema>;
+
+export const QUEUE_BOOKING_STATUS_LABELS: Record<QueueBookingStatus, string> = {
+  booked: 'จองแล้ว',
+  confirmed: 'ยืนยันแล้ว',
+  done: 'เสร็จแล้ว',
+  cancelled: 'ยกเลิกแล้ว',
+};
+
+/** จองล่วงหน้าได้ไม่เกิน 30 วัน — UI (min/max ของ date input) อ่านค่านี้ด้วย */
+export const QUEUE_BOOKING_WINDOW_DAYS = 30;
+
+/** แปลง Date → YYYY-MM-DD ตามเวลาท้องถิ่น (ห้ามใช้ toISOString — ได้วัน UTC ผิดวัน) */
+export function toLocalISODate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * วันที่นัด — YYYY-MM-DD, ตั้งแต่วันนี้ถึง +30 วัน, เฉพาะวันจันทร์–ศุกร์ (วันราชการ)
+ *
+ * § ตรวจ "วันที่มีอยู่จริง" ด้วยการประกอบ Date กลับแล้วเทียบ — new Date('2026-02-30')
+ * ไม่ throw แต่เลื่อนเป็น 2 มี.ค. ถ้าไม่เทียบจะหลุดเข้าไปจองวันที่ไม่มีอยู่จริง
+ */
+export const queueBookingDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'รูปแบบวันที่ไม่ถูกต้อง (YYYY-MM-DD)')
+  .refine(
+    (v) => {
+      const d = new Date(`${v}T00:00:00`);
+      return !Number.isNaN(d.getTime()) && toLocalISODate(d) === v;
+    },
+    { message: 'วันที่ไม่ถูกต้อง' },
+  )
+  .refine(
+    (v) => {
+      const today = toLocalISODate(new Date());
+      // § เทียบสตริง YYYY-MM-DD ตรง ๆ ได้เพราะ zero-padded — ลำดับตัวอักษร = ลำดับวัน
+      const max = new Date();
+      max.setDate(max.getDate() + QUEUE_BOOKING_WINDOW_DAYS);
+      return v >= today && v <= toLocalISODate(max);
+    },
+    { message: `จองได้ตั้งแต่วันนี้ถึงล่วงหน้า ${QUEUE_BOOKING_WINDOW_DAYS} วัน` },
+  )
+  .refine((v) => new Date(`${v}T00:00:00`).getDay() >= 1 && new Date(`${v}T00:00:00`).getDay() <= 5, {
+    message: 'รับนัดเฉพาะวันจันทร์–ศุกร์ (วันราชการ)',
+  });
+
+/** เบอร์ติดต่อกลับ — บังคับ (ต่างจาก phoneSchema ของ intake ที่ optional) */
+export const queuePhoneSchema = z
+  .string()
+  .trim()
+  .regex(/^0[0-9]{8,9}$/, 'เบอร์โทรต้องเป็นตัวเลข 9-10 หลัก ขึ้นต้นด้วย 0');
+
+export const queueServiceTypeSchema = z
+  .string()
+  .trim()
+  .min(2, 'กรุณาระบุประเภทงานช่าง (เช่น ไฟฟ้าดับ ท่อประปาแตก)')
+  .max(100, 'ประเภทงานช่างยาวเกิน 100 ตัวอักษร');
+
+export const queueNoteSchema = z
+  .string()
+  .trim()
+  .max(500, 'รายละเอียดยาวเกิน 500 ตัวอักษร')
+  .optional()
+  .or(z.literal(''));
+
+/**
+ * POST /api/queue — ประชาชนจองคิวนัดช่าง
+ *
+ * § consent เป็นหลักฐาน PDPA ว่าผู้จองยินยอมให้เก็บชื่อ–เบอร์เพื่อติดต่อเรื่องนัดช่าง
+ * ช่องทางนี้ไม่มี user row (ไม่ต้อง login) จึงไม่มีแถวใน consent_records —
+ * หลักฐานการยินยอมคือตัวแถวการจองเอง (created_at = เวลากดยินยอม)
+ */
+export const createQueueBookingSchema = z.object({
+  fullName: fullNameSchema,
+  phoneNumber: queuePhoneSchema,
+  serviceType: queueServiceTypeSchema,
+  note: queueNoteSchema,
+  bookingDate: queueBookingDateSchema,
+  slot: queueSlotSchema,
+  consent: z.literal(true, {
+    message: 'กรุณายินยอมให้เก็บชื่อ–เบอร์โทรเพื่อติดต่อเรื่องนัดช่าง',
+  }),
+});
+
+/** GET /api/queue?date= — ดูช่วงที่ว่างของวัน (คืนเฉพาะสถานะว่าง/ไม่ว่าง ไม่มี PII) */
+export const queueAvailabilityQuerySchema = z.object({
+  date: queueBookingDateSchema,
+});
+
+/** server action ฝั่งเจ้าหน้าที่ — เปลี่ยนสถานะคิว + โน้ตภายใน */
+export const updateQueueBookingFormSchema = z.object({
+  id: uuidSchema,
+  status: queueBookingStatusSchema,
+  adminNote: z.string().trim().max(500, 'โน้ตยาวเกิน 500 ตัวอักษร').optional().or(z.literal('')),
+});
+
+// ────────────────────────────────────────────────────────────────────────────
 // § Helpers
 // ────────────────────────────────────────────────────────────────────────────
 
