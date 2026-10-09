@@ -131,7 +131,7 @@ export const submitCaseSchema = z.object({
   }),
   // § สัญญาณกันสแปม (ดู src/lib/anti-spam.ts) — optional เพื่อให้ client เก่าส่งได้
   // ฟิลด์ลวงต้องว่างสนิท ผู้ใช้จริงกรอกไม่ได้เพราะซ่อนจากจอ+AT+tab order
-  websiteUrl: z.string().max(200).optional(),
+  websiteUrl: z.string().max(200).nullish(),
   // เวลาที่ฟอร์ม mount (epoch ms) — server เทียบกับเวลาปัจจุบันว่าส่งเร็วเกินคนหรือไม่
   formStartedAt: z.number().int().positive().optional(),
   attachments: z

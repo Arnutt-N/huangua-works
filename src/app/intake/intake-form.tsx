@@ -23,6 +23,7 @@ import {
 } from '../../components/ui/select';
 import { isValidCid, sanitizeCid, formatCid } from '../../lib/cid-checksum';
 import { COPY } from '../../lib/copy';
+import { HONEYPOT_FIELD, MIN_SUBMIT_MS } from '../../lib/anti-spam';
 import { useLiff } from '../../components/liff/liff-provider';
 
 export interface IntakeCategory {
@@ -229,8 +230,15 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
+    const websiteUrl = honeypotRef.current?.value || undefined;
+    const formStartedAt = formStartedAtRef.current || undefined;
     setIsSubmitting(true);
     try {
+      // § ผู้ใช้กรอกไวหรือเติมอัตโนมัติรอครบเกณฑ์ก่อนส่ง ไม่ได้รับ error เพราะเร็วเกินไป
+      // เก็บสัญญาณตั้งแต่กดส่ง ส่วน server ยังตรวจเองเพื่อกันการข้ามขั้นตอนนี้
+      // นาฬิกาถอยหลังระหว่างกรอกต้องไม่ทำให้รอนานเกิน 2 วินาที
+      const remaining = formStartedAt === undefined ? 0 : Math.min(MIN_SUBMIT_MS, MIN_SUBMIT_MS - (Date.now() - formStartedAt));
+      if (remaining > 0) await new Promise<void>((resolve) => window.setTimeout(resolve, remaining));
       const res = await fetch('/api/cases/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -250,8 +258,8 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
           consent: form.consent,
           // § สัญญาณกันสแปม — ฟิลด์ลวง (บอทกรอก = โดนปฏิเสธ) + เวลา mount ฟอร์ม
           // (0 = effect ยังไม่รัน ส่ง undefined ให้ server ข้ามสัญญาณเวลาไป)
-          websiteUrl: honeypotRef.current?.value || undefined,
-          formStartedAt: formStartedAtRef.current || undefined,
+          websiteUrl,
+          formStartedAt,
         }),
       });
 
@@ -320,11 +328,12 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
       <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', top: 'auto', width: '1px', height: '1px', overflow: 'hidden' }}>
         <input
           ref={honeypotRef}
-          id="website_url"
-          name="website_url"
+          id={HONEYPOT_FIELD}
+          name={HONEYPOT_FIELD}
           type="text"
           tabIndex={-1}
           autoComplete="off"
+          aria-hidden="true"
           aria-label="เว็บไซต์"
         />
       </div>

@@ -16,7 +16,7 @@
 /** ชื่อ field ลวงในฟอร์ม (ต้องตรงกับ name ใน intake-form.tsx) */
 export const HONEYPOT_FIELD = 'website_url';
 
-/** เวากรอกขั้นต่ำที่ยอมรับได้ (มิลลิวินาที) */
+/** เวลากรอกขั้นต่ำที่ยอมรับได้ (มิลลิวินาที) */
 export const MIN_SUBMIT_MS = 2000;
 
 export interface SpamSignals {
@@ -40,7 +40,7 @@ export function isSpamSubmission(signals: SpamSignals, now: number): boolean {
   // ค่าติดลบ/อนาคต (นาฬิกา client เพี้ยน) ถือว่าไม่น่าสงสัย ไม่ปฏิเสธผู้ใช้จริง
   if (
     typeof signals.formStartedAt === 'number' &&
-    Number.isFinite(signals.formStartedAt) &&
+    Number.isSafeInteger(signals.formStartedAt) &&
     signals.formStartedAt > 0 &&
     signals.formStartedAt <= now &&
     now - signals.formStartedAt < MIN_SUBMIT_MS

@@ -55,3 +55,32 @@ describe('isSpamSubmission', () => {
     expect(HONEYPOT_FIELD).toBe('website_url');
   });
 });
+
+describe('กรณีขอบของสัญญาณกันสแปม', () => {
+  it.each([null, undefined, ''])('websiteUrl ว่างแบบ %s ไม่ใช่สแปม', (websiteUrl) => {
+    expect(isSpamSubmission({ websiteUrl, formStartedAt: NOW - 30_000 }, NOW)).toBe(false);
+  });
+
+  it.each([' ', '\t\n', '\u00a0'])('whitespace ยังเป็นการกรอกฟิลด์ลวง: %j', (websiteUrl) => {
+    expect(isSpamSubmission({ websiteUrl, formStartedAt: NOW - 30_000 }, NOW)).toBe(true);
+  });
+
+  it.each([0, -1, NaN, Infinity, NOW - 1000.5])('ไม่ใช้เวลาที่ผิดรูปแบบเป็นสัญญาณ: %s', (formStartedAt) => {
+    // schema ฝั่ง route ต้องปฏิเสธเวลา 0/ทศนิยม ไม่ถือว่านี่เป็นการยอมรับ request
+    expect(isSpamSubmission({ websiteUrl: '', formStartedAt }, NOW)).toBe(false);
+  });
+
+  it.each([0, 1, 1999])('ใช้เวลา %s ms ยังต่ำกว่าเกณฑ์', (elapsed) => {
+    expect(isSpamSubmission({ websiteUrl: '', formStartedAt: NOW - elapsed }, NOW)).toBe(true);
+  });
+
+  it.each([2000, 2001, 30_000, 3_600_000])('ผู้ใช้กรอก %s ms ไม่ถูกปฏิเสธจากเวลา', (elapsed) => {
+    expect(isSpamSubmission({ websiteUrl: '', formStartedAt: NOW - elapsed }, NOW)).toBe(false);
+  });
+
+  it('คงเกณฑ์ 2 วินาทีและนาฬิกา client อนาคตไม่ทำให้ผู้ใช้จริงพลาด', () => {
+    expect(MIN_SUBMIT_MS).toBe(2000);
+    expect(isSpamSubmission({ websiteUrl: '', formStartedAt: NOW + 1 }, NOW)).toBe(false);
+    expect(isSpamSubmission({ websiteUrl: 'กรอกแล้ว', formStartedAt: NOW + 60_000 }, NOW)).toBe(true);
+  });
+});
