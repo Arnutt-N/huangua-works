@@ -53,20 +53,13 @@ export function QueueBookingForm() {
   const range = queueDateRange();
   // § กัน response เก่าทับ response ใหม่เมื่อเปลี่ยนวันรัว ๆ (ยิงใน handler ไม่มี effect cleanup)
   const dateRequestId = useRef(0);
+  // § วันที่ล่าสุดในช่อง — คู่กับ state `date` ไว้ให้ async continuation (409 refresh)
+  // เทียบว่าผู้ใช้เปลี่ยนวันระหว่างรอ response หรือไม่ (closure ใน handler จับค่าเก่า)
+  const dateRef = useRef('');
 
-  // § โหลดช่วงว่างใน onChange ตรง ๆ ไม่ผ่าน useEffect — วันหยุดราชการ (ส–อา)
-  // ไม่ต้องยิง API เพราะ server ปฏิเสธอยู่แล้ว แค่แสดงทุกช่วงว่าไม่ว่าง
-  function handleDateChange(value: string) {
-    setDate(value);
-    setSlot('');
-    if (!value) {
-      setSlots(buildSlotAvailability([]));
-      return;
-    }
-    if (!isBusinessDay(value)) {
-      setSlots(buildSlotAvailability(['slot_1', 'slot_2', 'slot_3', 'slot_4']));
-      return;
-    }
+  // § ทางโหลดตารางช่วงว่างทางเดียว — ทั้งเปลี่ยนวันและรีเฟรชหลัง 409 ผ่านนี่เท่านั้น
+  // ทุกครั้งที่ยิงจะขึ้นเลข request ใหม่ response ที่เลขไม่ตรงจะถูกทิ้งเสมอ
+  function loadAvailability(value: string) {
     const requestId = ++dateRequestId.current;
     setSlotsLoading(true);
     fetch(`/api/queue?date=${value}`)
@@ -94,6 +87,23 @@ export function QueueBookingForm() {
       .finally(() => {
         if (requestId === dateRequestId.current) setSlotsLoading(false);
       });
+  }
+
+  // § โหลดช่วงว่างใน onChange ตรง ๆ ไม่ผ่าน useEffect — วันหยุดราชการ (ส–อา)
+  // ไม่ต้องยิง API เพราะ server ปฏิเสธอยู่แล้ว แค่แสดงทุกช่วงว่าไม่ว่าง
+  function handleDateChange(value: string) {
+    setDate(value);
+    dateRef.current = value;
+    setSlot('');
+    if (!value) {
+      setSlots(buildSlotAvailability([]));
+      return;
+    }
+    if (!isBusinessDay(value)) {
+      setSlots(buildSlotAvailability(['slot_1', 'slot_2', 'slot_3', 'slot_4']));
+      return;
+    }
+    loadAvailability(value);
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -134,11 +144,10 @@ export function QueueBookingForm() {
       };
       if (!res.ok || !data.success || !data.booking) {
         // § 409 = ช่วงนี้มีคนจองตัดหน้าไปแล้ว — รีเฟรชตารางช่วงว่างให้เห็นสถานะใหม่ทันที
+        // แต่เฉพาะเมื่อผู้ใช้ยังอยู่ที่วันเดิม: ถ้าเปลี่ยนวันระหว่างรอ POST แล้วดึงวันเก่า
+        // มาทับ จะเอาตารางผิดวันมาแสดง (fetch ของวันใหม่ออกไปก่อนแล้ว)
         if (res.status === 409) {
-          const avail = await fetch(`/api/queue?date=${date}`).then((r) => r.json()) as {
-            slots?: QueueSlotAvailability[];
-          };
-          if (avail.slots) setSlots(avail.slots);
+          if (dateRef.current === date) loadAvailability(date);
           setSlot('');
         }
         setSubmitError(data.error ?? 'จองคิวไม่สำเร็จ กรุณาลองใหม่');
@@ -180,6 +189,7 @@ export function QueueBookingForm() {
               onClick={() => {
                 setResult(null);
                 setDate('');
+                dateRef.current = '';
                 setFullName('');
                 setPhoneNumber('');
                 setServiceType('');
