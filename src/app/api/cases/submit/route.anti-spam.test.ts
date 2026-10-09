@@ -32,14 +32,21 @@ beforeEach(() => {
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-describe('submit route — honeypot และ validation ใช้ error กลาง', () => {
-  it.each([false, true])('spam และ validation ปกติแยกจาก HTTP/body ไม่ได้ (LIFF=%s)', async (liff) => {
+describe('submit route — กันสแปม', () => {
+  it.each([false, true])('body ว่างเป็น object ไม่มีฟิลด์ → validation ปกติบอกฟิลด์ (LIFF=%s)', async (liff) => {
     if (liff) mocks.liff.mockReturnValue({ lineUserId: 'line-test' });
-    const ordinary = await POST(request({}));
+    const response = await POST(request({}));
+    expect(response.status).toBe(400);
+    // § ผิดพลาดของผู้ใช้จริงตอบข้อความระบุฟิลด์ได้ — ผู้ใช้แก้ตามได้ บอทไม่สนแก้
+    const body = await response.json() as { error: string };
+    expect(body.error).not.toEqual(genericError.error);
+    expect(mocks.createCase).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])('สัญญาณกันสแปมและ honeypot ตอบข้อความกลาง ไม่บอกว่าติดสัญญาณไหน (LIFF=%s)', async (liff) => {
+    if (liff) mocks.liff.mockReturnValue({ lineUserId: 'line-test' });
     const spam = await POST(request({ ...validBody, websiteUrl: 'https://spam.example' }));
-    expect(ordinary.status).toBe(400);
-    expect(spam.status).toBe(ordinary.status);
-    expect(await ordinary.json()).toEqual(genericError);
+    expect(spam.status).toBe(400);
     expect(await spam.json()).toEqual(genericError);
     expect(mocks.createCase).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
@@ -80,14 +87,16 @@ describe('submit route — honeypot และ validation ใช้ error กล�
     expect(mocks.rateLimit).toHaveBeenCalledOnce();
   });
 
-  it.each([0, NOW - 1000.5, NOW - 30_000.5, -1])('เวลา 0/ทศนิยม/ติดลบ %s ถูกปฏิเสธด้วย validation', async (formStartedAt) => {
+  // § เวลาที่ไม่ใช่จำนวนเต็มบวกถูก schema ปฏิเสธก่อน → เป็นผิดพลาดผู้ใช้ ตอบข้อความระบุฟิลด์
+  it.each([0, NOW - 1000.5, NOW - 30_000.5, -1])('เวลาผิดรูปแบบ %s ถูกปฏิเสธด้วย validation', async (formStartedAt) => {
     const response = await POST(request({ ...validBody, formStartedAt }));
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual(genericError);
+    expect(await response.json()).not.toEqual(genericError);
     expect(mocks.createCase).not.toHaveBeenCalled();
   });
 
-  it.each([0, 1999])('ส่งก่อนครบเกณฑ์ %s ms ถูกปฏิเสธบน server แม้ bypass client', async (elapsed) => {
+  // § เวลาเร็วเกินเกณฑ์ = โดนสัญญาณกันสแปม → ต้อง generic ไม่บอกว่าติดเพราะอะไร
+  it.each([0, 1999])('ส่งก่อนครบเกณฑ์ %s ms ถูกปฏิเสธเป็นสัญญาณ', async (elapsed) => {
     const response = await POST(request({ ...validBody, formStartedAt: NOW - elapsed }));
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual(genericError);
@@ -104,10 +113,11 @@ describe('submit route — honeypot และ validation ใช้ error กล�
     expect(mocks.rateLimit).toHaveBeenCalledTimes(2);
   });
 
-  it('CID checksum ผิดไม่เปิดเผยเหตุผลเฉพาะเมื่อเทียบกับ honeypot', async () => {
+  it('CID checksum ผิดบอกผู้ใช้ว่าผิดเลขบัตร ไม่เปิดเผยสัญญาณกันสแปม', async () => {
     const response = await POST(request({ ...validBody, cid: prefix + ((Number(validBody.cid.at(-1)) + 1) % 10) }));
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual(genericError);
+    const body = await response.json() as { error: string };
+    expect(body.error).toBe('เลขบัตรประชาชนไม่ถูกต้อง');
     expect(mocks.createCase).not.toHaveBeenCalled();
   });
 

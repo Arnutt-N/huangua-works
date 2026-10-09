@@ -13,8 +13,11 @@ import { isSpamSubmission } from '@/lib/anti-spam';
 import { createCase } from '@/lib/cases/intake';
 import { LIFF_SESSION_COOKIE, readLiffSessionValue } from '@/lib/liff/session';
 
-// § ใช้คำตอบเดียวกับข้อมูลผิดรูปแบบ เพื่อไม่เปิดเผยว่าสัญญาณกันสแปมใดทำงาน
-function invalidSubmissionResponse() {
+// § ใช้ได้เฉพาะตอนปฏิเสธเพราะสัญญาณกันสแปมเท่านั้น — ไม่อนุญาตให้ error ละเอียด
+// อธิบายว่าโดนจับเพราะอะไร เพราะบอทจะเอาไปปรับตัว (ดู src/lib/anti-spam.ts)
+// § ผิดพลาดในการกรอกของผู้ใช้จริงต้องตอบเหมือนเดิม — คืนข้อความที่ระบุฟิลด์ได้
+// เพราะผู้ใช้แก้ไขตามได้ แต่บอทไม่สนแก้ และการรวมของคนละงานก็ลืมความต่างนี้ไป
+function spamRejectionResponse() {
   return NextResponse.json(
     { error: 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบแล้วลองใหม่' },
     { status: 400 },
@@ -43,14 +46,13 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return invalidSubmissionResponse();
+    return spamRejectionResponse();
   }
 
   // § กันสแปม (honeypot + จับเวลากรอก) — ตรวจก่อน validate เพื่อตัดบอททิ้งเร็ว
-  // error ต้อง generic เหมือน validation ทั่วไป ห้ามบอกว่าโดนจับว่าเป็นบอท
-  // (ดู src/lib/anti-spam.ts) — ตรวจจาก body ดิบเพราะทั้งสอง schema มีฟิลด์นี้
+  // error ต้อง generic เช่นกัน ห้ามบอกว่าโดนจับว่าเป็นบอท (ดู src/lib/anti-spam.ts)
   if (body === null || typeof body !== 'object' || Array.isArray(body)) {
-    return invalidSubmissionResponse();
+    return spamRejectionResponse();
   }
   const raw = body as { websiteUrl?: unknown; formStartedAt?: unknown };
   if (
@@ -62,13 +64,13 @@ export async function POST(req: NextRequest) {
       Date.now(),
     )
   ) {
-    return invalidSubmissionResponse();
+    return spamRejectionResponse();
   }
 
   if (liffSession) {
     const validation = validateOrError(submitCaseLineSchema, body);
     if (!validation.success) {
-      return invalidSubmissionResponse();
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
     const { fullName, phoneNumber, email, categoryId, title, description, location, provinceId, districtId, subDistrictId, villageId, village, attachments } = validation.data;
 
@@ -114,14 +116,14 @@ export async function POST(req: NextRequest) {
 
   const validation = validateOrError(submitCaseSchema, body);
   if (!validation.success) {
-    return invalidSubmissionResponse();
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
   const { cid, fullName, phoneNumber, email, categoryId, title, description, location, provinceId, districtId, subDistrictId, villageId, village, attachments } = validation.data;
 
   // § CID checksum check (zod ตรวจ format 13 หลักเท่านั้น — checksum ตรวจที่นี่)
   if (!isValidCid(cid)) {
-    return invalidSubmissionResponse();
+    return NextResponse.json({ error: 'เลขบัตรประชาชนไม่ถูกต้อง' }, { status: 400 });
   }
 
   const result = await createCase({
