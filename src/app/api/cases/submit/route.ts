@@ -9,6 +9,7 @@ import { isValidCid } from '@/lib/cid-checksum';
 import { enforceRateLimit } from '@/lib/rate-limit/enforce';
 import { clientIpFromHeaders } from '@/lib/rate-limit/client-ip';
 import { submitCaseSchema, submitCaseLineSchema, validateOrError } from '@/lib/validation';
+import { isSpamSubmission } from '@/lib/anti-spam';
 import { createCase } from '@/lib/cases/intake';
 import { LIFF_SESSION_COOKIE, readLiffSessionValue } from '@/lib/liff/session';
 
@@ -37,8 +38,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  if (liffSession) {
-    const validation = validateOrError(submitCaseLineSchema, body);
+  // § กันสแปม (honeypot + จับเวลากรอก) — ตรวจก่อน validate เพื่อตัดบอททิ้งเร็ว
+  // error ต้อง generic เหมือน validation ทั่วไป ห้ามบอกว่าโดนจับว่าเป็นบอท
+  // (ดู src/lib/anti-spam.ts) — ตรวจจาก body ดิบเพราะทั้งสอง schema มีฟิลด์นี้
+  const raw = body as { websiteUrl?: unknown; formStartedAt?: unknown };
+  if (
+    isSpamSubmission(
+      {
+        websiteUrl: typeof raw.websiteUrl === 'string' ? raw.websiteUrl : undefined,
+        formStartedAt: typeof raw.formStartedAt === 'number' ? raw.formStartedAt : undefined,
+      },
+      Date.now(),
+    )
+  ) {
+    return NextResponse.json(
+      { error: 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบแล้วลองใหม่' },
+      { status: 400 },
+    );
+  }
+
+  if (liffSession) {    const validation = validateOrError(submitCaseLineSchema, body);
     if (!validation.success) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
