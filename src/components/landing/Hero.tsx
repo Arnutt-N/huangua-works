@@ -14,9 +14,25 @@ import {
   Wrench,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useSyncExternalStore } from 'react';
 import { Button } from '../ui/button';
 import { cn } from '@/lib/cn';
 import { COPY } from '@/lib/copy';
+import { getFiscalYearBE } from '@/lib/thai-date';
+
+function subscribeFiscalYear(onChange: () => void) {
+  const timer = window.setInterval(onChange, 60_000);
+  document.addEventListener('visibilitychange', onChange);
+
+  return () => {
+    window.clearInterval(timer);
+    document.removeEventListener('visibilitychange', onChange);
+  };
+}
+
+function getCurrentFiscalYearBE() {
+  return getFiscalYearBE(new Date());
+}
 
 const serviceChips = [
   { label: 'ไฟฟ้าสาธารณะ', icon: Zap },
@@ -26,8 +42,14 @@ const serviceChips = [
   { label: 'เรื่องอื่นๆ', icon: Wrench },
 ];
 
-export function Hero() {
+export function Hero({ initialFiscalYearBE }: { initialFiscalYearBE: number }) {
   const reduce = useReducedMotion();
+  // § ใช้ปีจาก HTML ระหว่าง hydration แล้วอ่านเวลาปัจจุบันเพื่อแก้ปีเก่าใน ISR cache
+  const fiscalYearBE = useSyncExternalStore(
+    subscribeFiscalYear,
+    getCurrentFiscalYearBE,
+    () => initialFiscalYearBE,
+  );
 
   return (
     <section
@@ -63,7 +85,7 @@ export function Hero() {
                 <span className="pulse-ring bg-accent absolute inset-0 rounded-full" />
                 <span className="bg-accent-strong relative h-2 w-2 rounded-full" />
               </span>
-              ระบบออนไลน์ใหม่ ปี 2569
+              ระบบออนไลน์ใหม่ ปีงบประมาณ {fiscalYearBE}
             </motion.div>
 
             {/* Title */}

@@ -7,6 +7,7 @@ import { HowItWorks } from '@/components/landing/HowItWorks';
 import { CTA } from '@/components/landing/CTA';
 import { Footer } from '@/components/landing/Footer';
 import { LiffStateRedirect } from '@/components/liff/liff-state-redirect';
+import { getFiscalYearBE } from '@/lib/thai-date';
 
 /**
  * หน้า landing (/) — cache ทุก 1 ชั่วโมง (ISR)
@@ -43,7 +44,7 @@ export default function Home() {
       <LiffStateRedirect />
       <Navbar />
       <main className="flex-1">
-        <Hero />
+        <Hero initialFiscalYearBE={getFiscalYearBE(new Date())} />
         <Suspense fallback={<StatsFallback />}>
           <Stats />
         </Suspense>

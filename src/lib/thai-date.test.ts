@@ -29,6 +29,14 @@ describe('toGregorianYear', () => {
 });
 
 describe('getFiscalYear', () => {
+  test.each([
+    ['2026-09-30T16:59:59.999Z', 2026],
+    ['2026-09-30T17:00:00.000Z', 2027],
+    ['2026-12-31T17:00:00.000Z', 2027],
+  ])('คำนวณปีงบประมาณตามเวลาไทย ณ %s', (instant, expected) => {
+    expect(getFiscalYear(new Date(instant))).toBe(expected);
+  });
+
   test('Jan-Sep maps to the same calendar year', () => {
     expect(getFiscalYear(new Date(2026, 0, 1))).toBe(2026); // Jan
     expect(getFiscalYear(new Date(2026, 8, 30))).toBe(2026); // Sep 30
@@ -78,6 +86,14 @@ describe('formatThaiDateTimeShort', () => {
 });
 
 describe('getFiscalYearBE', () => {
+  test.each([
+    ['2026-09-30T16:59:59.999Z', 2569],
+    ['2026-09-30T17:00:00.000Z', 2570],
+    ['2026-10-10T00:00:00.000Z', 2570],
+  ])('แสดงปีงบประมาณ พ.ศ. ตามเวลาไทย ณ %s', (instant, expected) => {
+    expect(getFiscalYearBE(new Date(instant))).toBe(expected);
+  });
+
   test('returns the fiscal year in Buddhist era for a Jan-Sep date', () => {
     // fiscal year for a June 2026 date is calendar 2026 -> BE 2569
     expect(getFiscalYearBE(new Date(2026, 5, 15))).toBe(2569);

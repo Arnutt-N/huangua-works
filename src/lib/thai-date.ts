@@ -18,22 +18,23 @@ export function toGregorianYear(buddhistYear: number): number {
   return buddhistYear - 543;
 }
 
+const fiscalYearFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'Asia/Bangkok',
+  year: 'numeric',
+  month: 'numeric',
+});
+
 /**
  * ปีงบประมาณไทย (Thai fiscal year) — 1 ต.ค. YYYY-1 → 30 ก.ย. YYYY
  * ถ้าอยู่ระหว่าง ม.ค.-ก.ย. → ปีงบ = ปีปัจจุบัน
  * ถ้าอยู่ระหว่าง ต.ค.-ธ.ค. → ปีงบ = ปีถัดไป
  */
 export function getFiscalYear(date: Date): number {
-  const year = date.getFullYear();
-  const month = date.getMonth(); // 0-indexed (0=Jan, 9=Oct)
+  const parts = fiscalYearFormatter.formatToParts(date);
+  const year = Number(parts.find((part) => part.type === 'year')?.value);
+  const month = Number(parts.find((part) => part.type === 'month')?.value);
 
-  // Oct-Dec → fiscal year = next year
-  if (month >= 9) {
-    return year + 1;
-  }
-
-  // Jan-Sep → fiscal year = current year
-  return year;
+  return month >= 10 ? year + 1 : year;
 }
 
 /**
@@ -101,5 +102,5 @@ export function formatThaiDateTimeShort(date: Date): string {
  * ปีงบประมาณไทย พ.ศ. (fiscal year in Buddhist Era)
  */
 export function getFiscalYearBE(date: Date): number {
-  return toBuddhistYear(new Date(getFiscalYear(date), 0, 1));
+  return getFiscalYear(date) + 543;
 }
