@@ -46,6 +46,7 @@ storybook-static/
 coverage/
 test-results/
 playwright-report/
+.verify-evidence/
 playwright/.cache/
 .nyc_output/
 
