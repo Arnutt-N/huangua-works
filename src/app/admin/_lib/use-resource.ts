@@ -88,14 +88,17 @@ export function useResource<TData>(options: UseResourceOptions<TData>): UseResou
   }, []);
 
   // ปลด timer แจ้งผลตอน unmount + ยกเลิก seq ของ reload ที่ค้าง (manual reload ไม่ได้อยู่ใน effect)
-  useEffect(
-    () => () => {
+  // § setup ต้องชุบ mounted กลับเป็น true เสมอ — StrictMode จำลอง unmount→remount ตอน mount
+  // ถ้า setup ทำแค่ return cleanup ค่า false จาก cleanup จำลองจะค้างถาวร แล้ว load/reload
+  // ทุกครั้ง early-return ที่ !mountedRef (ค้าง loading ทั้งที่ API ตอบ 200)
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
       mountedRef.current = false;
       seqRef.current += 1;
       if (notifyTimerRef.current !== null) clearTimeout(notifyTimerRef.current);
-    },
-    [],
-  );
+    };
+  }, []);
 
   const reload = useCallback(async () => {
     const seq = ++seqRef.current;

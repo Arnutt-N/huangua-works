@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { act, cleanup, renderHook } from '@testing-library/react';
+import { StrictMode, createElement } from 'react';
+import { act, cleanup, render, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiResult } from './admin-api';
-import { useResource } from './use-resource';
+import { useResource, type UseResourceResult } from './use-resource';
 
 interface Row {
   id: string;
@@ -254,6 +255,34 @@ describe('useResource', () => {
 
     unmount();
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('StrictMode จำลอง unmount→remount ตอน mount: โหลดครั้งแรกยังสำเร็จ ไม่ค้าง loading', async () => {
+    // § dev เปิด reactStrictMode — effect ถูก setup→cleanup→setup ตอน mount ถ้า guard
+    // จำ mounted=false จาก cleanup จำลองโดยไม่ชุบกลับ load/reload จะ early-return ถาวร
+    // (หน้าแชตค้าง skeleton ทั้งที่ API ตอบ 200 — จับได้จาก e2e/admin-chat.spec.ts)
+    // § ต้องใช้ render (ไม่ใช่ renderHook) — renderHook ไม่จำลอง StrictMode double-effect
+    // (พิสูจน์แล้ว: setup รันครั้งเดียว) จึงจับบั๊กนี้ไม่ได้
+    const adapter = makeAdapter({ items: [{ id: '1', name: 'a' }], total: 1 });
+    // § เก็บผ่านกล่อง (ไม่ใช่ let เปล่า) — TS ไม่ตาม assignment ใน closure ทำให้ narrowing เหลือ null
+    const captured: { current: UseResourceResult<Page> | null } = { current: null };
+    function Harness() {
+      captured.current = useResource({ load: adapter.load });
+      return null;
+    }
+    render(createElement(StrictMode, null, createElement(Harness)));
+    await flush(0);
+
+    expect(captured.current?.loading).toBe(false);
+    expect(captured.current?.data?.total).toBe(1);
+
+    // reload หลัง remount (เช่น SSE onOpen ของหน้าแชต) ต้องยังทำงาน
+    adapter.state.page = { items: [{ id: '2', name: 'b' }], total: 1 };
+    await act(async () => {
+      await captured.current?.reload();
+    });
+    expect(captured.current?.loading).toBe(false);
+    expect(captured.current?.data?.items[0]?.id).toBe('2');
   });
 
   it('setData แก้ค่าฝั่ง client ได้ (optimistic) และ reload ดันค่าจริงกลับมา', async () => {

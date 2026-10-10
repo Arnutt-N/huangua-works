@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { eq } from 'drizzle-orm';
 import { closeDb, getDb } from '../src/lib/db';
-import { cases, dedupHashes, users } from '../src/lib/db/schema';
+import { cases, consentRecords, dedupHashes, users } from '../src/lib/db/schema';
 import { fillGeographyCascade, loadFirstGeography, type Geography } from './helpers/geography';
 import { E2E_CLIENT_IP, resetRateLimits } from './helpers/reset-rate-limits';
 import { rateLimitKey } from '../src/lib/rate-limit/policies';
@@ -22,7 +22,12 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   const db = await getDb();
   for (const id of createdCaseIds) {
+    // § อ่านผู้แจ้งจากเคสก่อนลบ เพราะอีเมลจริงสร้างจาก HMAC ของ CID
+    const submitters = await db.select({ userId: cases.submittedBy }).from(cases).where(eq(cases.id, id));
     await db.delete(dedupHashes).where(eq(dedupHashes.caseId, id));
+    for (const { userId } of submitters) {
+      await db.delete(consentRecords).where(eq(consentRecords.userId, userId));
+    }
     await db.delete(cases).where(eq(cases.id, id));
   }
   await db.delete(users).where(eq(users.email, TEST_EMAIL));

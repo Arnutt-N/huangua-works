@@ -131,6 +131,7 @@ export function BroadcastClient() {
             <div>
               <Label htmlFor="bc-schedule">ตั้งเวลาส่ง (เว้นว่าง = สร้างเป็นร่าง)</Label>
               <input
+                aria-label="ตั้งเวลาส่ง (เว้นว่าง = สร้างเป็นร่าง)"
                 id="bc-schedule"
                 type="datetime-local"
                 value={scheduleAt}

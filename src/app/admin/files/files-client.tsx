@@ -63,7 +63,7 @@ export function FilesClient() {
           icon={<ImageIcon className="h-4 w-4" />}
           action={
             <>
-              <input ref={fileRef} type="file" className="hidden" onChange={handleUpload} accept="image/*,.pdf" />
+              <input aria-label="อัปโหลดไฟล์สื่อ" ref={fileRef} type="file" className="hidden" onChange={handleUpload} accept="image/*,.pdf" />
               <Button onClick={() => fileRef.current?.click()} disabled={uploading || !storageOk} className="min-h-touch gap-1.5">
                 <Upload className="h-4 w-4" /> {uploading ? 'กำลังอัปโหลด...' : 'อัปโหลด'}
               </Button>

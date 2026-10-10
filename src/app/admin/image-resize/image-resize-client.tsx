@@ -112,7 +112,7 @@ export function ImageResizeClient() {
           </div>
 
           <div>
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+            <input aria-label="เลือกรูป" ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
             <Button variant="outline" onClick={() => fileRef.current?.click()} className="min-h-touch gap-1.5">
               <Upload className="h-4 w-4" /> เลือกรูป
             </Button>
@@ -130,14 +130,14 @@ export function ImageResizeClient() {
                   <img src={resized} alt="ย่อแล้ว" className="max-h-48 rounded-lg border border-border object-contain" />
                 ) : (
                   <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted">
-                    กด "ย่อรูป" เพื่อดูผลลัพธ์
+                    กด &quot;ย่อรูป&quot; เพื่อดูผลลัพธ์
                   </div>
                 )}
               </div>
             </div>
           )}
 
-          <canvas ref={canvasRef} className="hidden" />
+          <canvas aria-hidden="true" ref={canvasRef} className="hidden" />
 
           {original && (
             <div className="flex gap-2">
