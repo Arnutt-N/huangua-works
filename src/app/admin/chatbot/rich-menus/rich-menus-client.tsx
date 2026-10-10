@@ -95,7 +95,7 @@ export function RichMenusClient() {
         {loading ? (
           <div className="py-12 text-center text-muted">กำลังโหลด...</div>
         ) : items.length === 0 ? (
-          <div className="py-12 text-center text-muted">ยังไม่มี Rich Menu — กด "สร้าง" เพื่อเริ่ม</div>
+          <div className="py-12 text-center text-muted">ยังไม่มี Rich Menu — กด &quot;สร้าง&quot; เพื่อเริ่ม</div>
         ) : (
           <div className="space-y-3">
             {items.map((item) => (

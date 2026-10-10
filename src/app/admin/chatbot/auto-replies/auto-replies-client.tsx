@@ -129,7 +129,7 @@ export function AutoRepliesClient() {
           <div className="py-12 text-center text-muted">กำลังโหลด...</div>
         ) : items.length === 0 ? (
           <div className="py-12 text-center text-muted">
-            ยังไม่มี FAQ — กด "เพิ่ม FAQ" เพื่อเริ่มสร้าง
+            ยังไม่มี FAQ — กด &quot;เพิ่ม FAQ&quot; เพื่อเริ่มสร้าง
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -261,6 +261,7 @@ export function AutoRepliesClient() {
 
               <label className="flex min-h-touch items-center gap-2 pt-6">
                 <input
+                  aria-label="ใช้งาน"
                   type="checkbox"
                   checked={form.isActive}
                   onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}

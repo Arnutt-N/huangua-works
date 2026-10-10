@@ -119,7 +119,7 @@ export function ReplyObjectsClient() {
         {loading ? (
           <div className="py-12 text-center text-muted">กำลังโหลด...</div>
         ) : items.length === 0 ? (
-          <div className="py-12 text-center text-muted">ยังไม่มี reply object — กด "สร้าง" เพื่อเริ่ม</div>
+          <div className="py-12 text-center text-muted">ยังไม่มี reply object — กด &quot;สร้าง&quot; เพื่อเริ่ม</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -203,7 +203,7 @@ export function ReplyObjectsClient() {
             </div>
 
             <label className="flex min-h-touch items-center gap-2">
-              <input type="checkbox" checked={form.isActive} onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))} className="h-5 w-5 rounded border-border accent-accent" />
+              <input aria-label="ใช้งาน" type="checkbox" checked={form.isActive} onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))} className="h-5 w-5 rounded border-border accent-accent" />
               <span className="text-sm">ใช้งาน</span>
             </label>
           </div>
