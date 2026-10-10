@@ -1,9 +1,47 @@
 import { expect, test } from '@playwright/test';
+import { eq } from 'drizzle-orm';
+import { closeDb, getDb } from '../src/lib/db';
+import { chatConversations, lineUsers } from '../src/lib/db/schema';
+import { generateId } from '../src/lib/id';
 import { E2E_CLIENT_IP, resetRateLimits } from './helpers/reset-rate-limits';
 import { rateLimitKey } from '../src/lib/rate-limit/policies';
 
 const ADMIN_EMAIL = 'admin@huangua.go.th';
 const ADMIN_PASSWORD = 'ChangeMe123!'; // local dev seed password (scripts/seed.ts)
+
+// § spec นี้ seed บทสนทนาของตัวเอง — ไม่พึ่งผลรันค้างจาก scripts/test-webhook.ts อีกต่อไป
+// (แพตเทิร์นเดียวกับ e2e/track.spec.ts: seed ใน beforeAll + ลบใน afterAll)
+const TEST_LINE_USER_ID = 'U_test_local_webhook_user';
+let testLineUserRowId: string;
+let testConversationId: string;
+
+test.beforeAll(async () => {
+  const db = await getDb();
+
+  testLineUserRowId = generateId();
+  await db.insert(lineUsers).values({
+    id: testLineUserRowId,
+    lineUserId: TEST_LINE_USER_ID,
+    // § รายการแชตแสดง displayName ตรง ๆ — ใช้ค่าเดียวกับ lineUserId เพื่อให้ locator 'U_test_local' เดิมยังเจอ
+    displayName: TEST_LINE_USER_ID,
+  });
+
+  testConversationId = generateId();
+  await db.insert(chatConversations).values({
+    id: testConversationId,
+    lineUserId: TEST_LINE_USER_ID,
+    mode: 'bot_active',
+    lastMessageText: 'ข้อความทดสอบ E2E (admin-chat)',
+    lastMessageAt: new Date(),
+  });
+});
+
+test.afterAll(async () => {
+  const db = await getDb();
+  await db.delete(chatConversations).where(eq(chatConversations.id, testConversationId));
+  await db.delete(lineUsers).where(eq(lineUsers.id, testLineUserRowId));
+  await closeDb();
+});
 
 test.beforeEach(async () => {
   await resetRateLimits(rateLimitKey('adminLoginIp', E2E_CLIENT_IP), rateLimitKey('adminLoginEmail', ADMIN_EMAIL));
@@ -32,11 +70,9 @@ test.describe('admin chat page', () => {
     // Chat header visible
     await expect(page.getByLabel('ค้นหาการสนทนา')).toBeVisible({ timeout: 20_000 });
 
-    // Should show the test conversation created by webhook test (U_test_local_webhook_user)
-    // or empty state if DB was cleaned
-    const conversationList = page.locator('button:has-text("U_test_local")');
-    const emptyState = page.getByText('ยังไม่มีการสนทนา');
-    await expect(conversationList.or(emptyState)).toBeVisible({ timeout: 15_000 });
+    // บทสนทนาถูก seed ใน beforeAll — ต้องเห็นปุ่มบทสนทนาเสมอ (ไม่มี fallback empty state)
+    const conversationButton = page.locator('button:has-text("U_test_local")');
+    await expect(conversationButton).toBeVisible({ timeout: 15_000 });
   });
 
   test('selecting a conversation shows messages panel', async ({ page }) => {
