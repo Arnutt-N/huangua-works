@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { verifyLineSignature } from '@/lib/line/signature';
 import { handleEvent } from '@/lib/line/bot/engine';
 import { redis } from '@/lib/upstash';
+import { enforceRateLimit } from '@/lib/rate-limit/enforce';
+import { clientIpFromHeaders } from '@/lib/rate-limit/client-ip';
 import type { LineWebhookEvent, LineWebhookRequestBody } from '@/lib/line/types';
 
 export const runtime = 'nodejs';
@@ -30,6 +32,16 @@ export async function POST(request: Request) {
 
   if (!verifyLineSignature(body, signature)) {
     return NextResponse.json({ message: 'Invalid signature' }, { status: 401 });
+  }
+
+  // § rate limit ต่อ IP หลัง verify — request ปลอมไม่เปลือง quota, flood จริงโดน 429
+  // policy lineWebhookIp เป็น kind public (fail-open: Redis ล่มยังรับ webhook ได้)
+  const rateLimit = await enforceRateLimit('lineWebhookIp', clientIpFromHeaders(request.headers));
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { message: `ส่งคำขอถี่เกินไป กรุณารอ ${rateLimit.reset} วินาที` },
+      { status: 429, headers: { 'Retry-After': String(rateLimit.reset) } },
+    );
   }
 
   const parsed: LineWebhookRequestBody = JSON.parse(body);

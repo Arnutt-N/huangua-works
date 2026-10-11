@@ -40,6 +40,9 @@ export const RATE_LIMIT_POLICIES = {
   // ยืนยันตัวตนด้วย trackingCode + CID และทำงานทำลายข้อมูล (ถอนความยินยอม)
   consentWithdraw: { prefix: 'rate:consent-withdraw', limit: 5, windowSeconds: 600, kind: 'auth', failClosed: true },
   submit: { prefix: 'rate:submit', limit: 3, windowSeconds: 300, kind: 'public', failClosed: false },
+  // LINE webhook เป็น public surface เดียวที่รับ request จากภายนอกโดยไม่ผ่าน auth —
+  // flood จาก user เดียวยิง DB/LINE ได้ไม่จำกัด จึงต้องมี limit ต่อ IP (fail-open: บริการประชาชนห้ามล่มตาม Redis)
+  lineWebhookIp: { prefix: 'rate:line-webhook:ip', limit: 60, windowSeconds: 60, kind: 'public', failClosed: false },
   // กัน brute force tracking code — public แต่ข้อมูลที่คืนถอด PII แล้ว
   track: { prefix: 'rate:track', limit: 10, windowSeconds: 300, kind: 'public', failClosed: false },
 } as const satisfies Record<string, RateLimitPolicy>;
