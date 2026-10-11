@@ -13,6 +13,14 @@ export function SettingsClient() {
   const { data, loading, feedback, clearFeedback, mutate, setData } = useResource({
     load: adminApi.getSettings,
   });
+  // § ตั้งค่ากลางโหลดแยกอีกก้อน รูปเดียวกับบอท: derive ค่าจาก server แทน useEffect setState
+  const system = useResource({ load: adminApi.getSystemSettings });
+  const conns = useResource({ load: adminApi.listApiConnections });
+  const [sysSaving, setSysSaving] = useState(false);
+  const [maintenance, setMaintenance] = useState<boolean | null>(null);
+  const [retentionText, setRetentionText] = useState<string | null>(null);
+  const maintenanceValue = maintenance ?? system.data?.maintenance_mode ?? false;
+  const retentionValue = retentionText ?? String(system.data?.audit_retention_days ?? 365);
   const [saving, setSaving] = useState(false);
   // § keywordsText = null แปลว่ายังไม่เคยพิมพ์ → derive ค่าจาก server แทนที่จะ
   //   useEffect setState (rule set-state-in-effect จับการ setState ใน effect)
@@ -35,6 +43,27 @@ export function SettingsClient() {
       { reload: false }, // คงค่าที่ผู้ใช้แก้ค้างไว้ในหน้า — ไม่ดึงทับจาก server
     );
     setSaving(false);
+  }
+
+  async function handleSystemSave() {
+    const days = Number(retentionValue);
+    if (!Number.isInteger(days) || days < 30 || days > 3650) {
+      system.clearFeedback();
+      await system.mutate(() => Promise.resolve({ ok: false as const, error: 'จำนวนวันต้องอยู่ระหว่าง 30 ถึง 3650', status: 400 }), 'บันทึกตั้งค่ากลางสำเร็จ', { reload: false });
+      return;
+    }
+    setSysSaving(true);
+    system.clearFeedback();
+    await system.mutate(
+      () => adminApi.saveSystemSettings({ maintenance_mode: maintenanceValue, audit_retention_days: days }),
+      'บันทึกตั้งค่ากลางสำเร็จ',
+      { reload: false },
+    );
+    setSysSaving(false);
+  }
+
+  async function handleRefresh(provider: string) {
+    await conns.mutate(() => adminApi.refreshApiConnection(provider), 'ตรวจสถานะสำเร็จ', { reload: true });
   }
 
   function toggleDay(day: number) {
@@ -69,6 +98,81 @@ export function SettingsClient() {
           {feedback.msg}
         </div>
       )}
+
+      <AdminCard>
+        <AdminCardTitle icon={<Settings className="h-4 w-4" />}>
+          ตั้งค่ากลางระบบ
+        </AdminCardTitle>
+        {system.loading ? (
+          <div className="py-4 text-center text-sm text-muted">กำลังโหลด...</div>
+        ) : system.data ? (
+          <div className="space-y-5">
+            {system.feedback && (
+              <div role="status" className={`rounded-lg px-4 py-3 text-sm font-medium ${system.feedback.type === 'success' ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}>
+                {system.feedback.msg}
+              </div>
+            )}
+            <label className="flex min-h-touch items-center gap-3">
+              <input
+                type="checkbox"
+                aria-label="โหมดปิดปรับปรุงระบบ"
+                checked={maintenanceValue}
+                onChange={(e) => setMaintenance(e.target.checked)}
+                className="h-5 w-5 rounded border-border accent-accent"
+              />
+              <span className="text-sm font-medium text-ink">โหมดปิดปรับปรุงระบบ</span>
+            </label>
+            <div>
+              <Label htmlFor="retention-days">เก็บ log นาน (วัน, 30 ถึง 3650)</Label>
+              <Input
+                id="retention-days"
+                type="number"
+                min={30}
+                max={3650}
+                value={retentionValue}
+                onChange={(e) => setRetentionText(e.target.value)}
+                className="w-40"
+              />
+            </div>
+            <div className="text-sm text-muted">องค์กรเริ่มต้น: {system.data.import_default_org}</div>
+            <div className="flex justify-end">
+              <Button onClick={handleSystemSave} disabled={sysSaving} className="min-h-touch gap-2">
+                <Save className="h-4 w-4" />
+                {sysSaving ? 'กำลังบันทึก...' : 'บันทึกตั้งค่ากลาง'}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </AdminCard>
+
+      <AdminCard>
+        <AdminCardTitle>การเชื่อมต่อภายนอก</AdminCardTitle>
+        {conns.loading ? (
+          <div className="py-4 text-center text-sm text-muted">กำลังโหลด...</div>
+        ) : (
+          <div className="space-y-3">
+            {conns.feedback && (
+              <div role="status" className={`rounded-lg px-4 py-3 text-sm font-medium ${conns.feedback.type === 'success' ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}>
+                {conns.feedback.msg}
+              </div>
+            )}
+            {(conns.data?.items ?? []).map((conn) => (
+              <div key={conn.provider} className="flex min-h-touch items-center justify-between gap-3 rounded-lg border border-border px-3 py-2">
+                <div className="text-sm">
+                  <span className="font-medium text-ink">{conn.provider}</span>
+                  <span className="text-muted"> — {conn.status}{conn.lastCheckedAt ? ` (ตรวจล่าสุด ${conn.lastCheckedAt})` : ''}</span>
+                </div>
+                <Button onClick={() => handleRefresh(conn.provider)} className="min-h-touch" variant="secondary">
+                  ตรวจใหม่
+                </Button>
+              </div>
+            ))}
+            {(conns.data?.items ?? []).length === 0 && (
+              <div className="text-sm text-muted">ยังไม่เคยกดตรวจ กดตรวจใหม่เพื่อเพิ่มรายการ</div>
+            )}
+          </div>
+        )}
+      </AdminCard>
 
       <AdminCard>
         <AdminCardTitle icon={<Settings className="h-4 w-4" />}>
