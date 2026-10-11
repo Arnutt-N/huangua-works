@@ -15,6 +15,17 @@ vi.mock('@/lib/auth/require-staff', () => ({
 
 vi.mock('@/lib/line/sse/broadcaster', () => ({ broadcast: vi.fn() }));
 
+// § circuit breaker (T2) อ่าน state ผ่าน @upstash/redis ซึ่งใช้ global fetch —
+// test นี้ stub fetch เพื่อจำลอง LINE API ถ้าไม่ mock redis ของ breaker, mockImplementationOnce(500)
+// จะถูก breaker กินไปก่อนแล้ว push ได้ 200 แทน 502 จึง mock ให้วงจรปิดเสมอ
+vi.mock('@/lib/upstash', () => ({
+  redis: {
+    get: vi.fn(async () => null),
+    set: vi.fn(async () => 'OK'),
+    del: vi.fn(async () => 1),
+  },
+}));
+
 import { broadcast } from '@/lib/line/sse/broadcaster';
 import { POST } from './route';
 
@@ -120,7 +131,8 @@ describe('POST /api/line/admin/conversations/[id]/messages', () => {
 
     const retried = await POST(postRequest(conversationId, { text: 'ลองใหม่', clientTempId: tempId }), params(conversationId));
     expect(retried.status).toBe(200);
-    expect(await retried.json()).toEqual({ ok: true, messageId: failedBody.messageId, pushStatus: 'sent', duplicate: true });
+    const retriedBody = await retried.json();
+    expect(retriedBody).toEqual({ ok: true, messageId: failedBody.messageId, pushStatus: 'sent', duplicate: true });
     expect(pushBodies()).toHaveLength(2);
     expect(await messagesByTempId(tempId)).toHaveLength(1);
   });

@@ -39,5 +39,9 @@ export async function POST(
       return NextResponse.json({ ok: true, messageId: result.messageId, pushStatus: result.pushStatus, duplicate: true });
     case 'sent':
       return NextResponse.json({ ok: true, messageId: result.messageId, pushStatus: result.pushStatus });
+    case 'pending':
+      // § ไม่ควรถึง — pending เป็น state ภายใน sendAdminReply เท่านั้น (insert แล้ว push ต่อทันที)
+      // ถ้าหลุดมาถึงนี่คือบั๊ก: ข้อความค้าง sending โดยไม่มี push ตาม
+      return NextResponse.json({ error: 'internal' }, { status: 500 });
   }
 }
