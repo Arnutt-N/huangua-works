@@ -71,7 +71,13 @@ export function useMessages(loadConversations: () => void) {
         const { ok, data } = await sendReply(conversationId, text, tempId);
         if (!ok) {
           markFailed();
-          setActionError(data?.error ?? 'ส่งข้อความไม่สำเร็จ');
+          // § 502 push_failed = ข้อความอยู่ใน DB แล้ว (มี messageId) แต่ส่งถึง LINE ไม่สำเร็จ —
+          // retry ด้วย tempId เดิมเข้า path retry push ไม่สร้างแถวซ้ำ ต้องบอกให้ชัด
+          setActionError(
+            data?.pushStatus === 'failed'
+              ? 'ส่งถึง LINE ไม่สำเร็จ — ข้อความถูกบันทึกแล้ว แตะเพื่อลองส่งอีกครั้ง'
+              : (data?.error ?? 'ส่งข้อความไม่สำเร็จ'),
+          );
           return;
         }
         setMessages((prev) =>

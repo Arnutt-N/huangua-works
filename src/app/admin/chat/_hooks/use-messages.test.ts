@@ -83,4 +83,19 @@ describe('useMessages dedup (applyIncoming)', () => {
     // idempotent: retry ใช้ clientTempId เดิม
     expect(sendReply.mock.calls[1]?.[2]).toBe(failed.clientTempId);
   });
+
+  it('server 502 push_failed (ข้อความอยู่ DB แล้วแต่ส่งถึง LINE ไม่สำเร็จ) → บอกให้ retry ด้วย tempId เดิม', async () => {
+    sendReply.mockResolvedValueOnce({
+      ok: false,
+      data: { error: 'ส่งข้อความไป LINE ไม่สำเร็จ', messageId: 'srv-2', pushStatus: 'failed' },
+    });
+    const { result } = renderHook(() => useMessages(vi.fn()));
+
+    await act(async () => {
+      result.current.send('conv-1', 'LINE ล่ม');
+    });
+    expect(result.current.messages[0]?.status).toBe('failed');
+    // § ข้อความอยู่ใน DB แล้ว (มี messageId จริง) — retry ด้วย tempId เดิมจะไม่สร้างซ้ำ
+    expect(result.current.actionError).toBe('ส่งถึง LINE ไม่สำเร็จ — ข้อความถูกบันทึกแล้ว แตะเพื่อลองส่งอีกครั้ง');
+  });
 });
