@@ -33,6 +33,7 @@ describe('RATE_LIMIT_POLICIES · auth path ต้อง fail-closed', () => {
   it('public path เปิดเมื่อ Redis ล่ม — บริการประชาชนต้องไม่ล่มตาม Redis', () => {
     expect(RATE_LIMIT_POLICIES.submit).toMatchObject({ kind: 'public', failClosed: false });
     expect(RATE_LIMIT_POLICIES.track).toMatchObject({ kind: 'public', failClosed: false });
+    expect(RATE_LIMIT_POLICIES.lineWebhookIp).toMatchObject({ kind: 'public', failClosed: false });
   });
 });
 
@@ -48,6 +49,7 @@ describe('RATE_LIMIT_POLICIES · ค่าเท่าเดิมก่อน r
     ['consentWithdraw', 5, 600],
     ['submit', 3, 300],
     ['track', 10, 300],
+    ['lineWebhookIp', 60, 60],
   ])('%s = %i ครั้ง / %i วินาที', (name, limit, windowSeconds) => {
     expect(RATE_LIMIT_POLICIES[name]).toMatchObject({ limit, windowSeconds });
   });
@@ -66,6 +68,7 @@ describe('rateLimitKey · รูปแบบ key เหมือนเดิม�
     ['consentWithdraw', '203.0.113.5', 'rate:consent-withdraw:203.0.113.5'],
     ['submit', '::1', 'rate:submit:::1'],
     ['track', '203.0.113.5', 'rate:track:203.0.113.5'],
+    ['lineWebhookIp', '203.0.113.5', 'rate:line-webhook:ip:203.0.113.5'],
   ])('%s + %s → %s', (name, subject, expected) => {
     expect(rateLimitKey(name, subject)).toBe(expected);
   });

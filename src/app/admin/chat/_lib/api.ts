@@ -49,6 +49,7 @@ export interface ApiResult {
   ok: boolean;
   error?: string;
   messageId?: string;
+  pushStatus?: 'sent' | 'failed';
 }
 
 export async function sendReply(

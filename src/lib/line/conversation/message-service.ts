@@ -102,6 +102,7 @@ export type SendAdminReplyResult =
   | { kind: 'sent'; messageId: string; pushStatus: 'sent' }
   | { kind: 'duplicate'; messageId: string; pushStatus: 'sent' }
   | { kind: 'push_failed'; messageId: string; pushStatus: 'failed' }
+  | { kind: 'pending'; messageId: string; pushStatus: 'sending' }
   | { kind: 'not_found' };
 
 /**
@@ -150,14 +151,33 @@ export async function sendAdminReply(
     }
   }
 
-  // § ไม่ใช้ tx: push LINE เป็น side effect นอก DB ที่ rollback ไม่ได้ — จัดลำดับ
-  // push → insert → conversation → broadcast ให้แถวเดียวกับ route เดิมทุกประการ
+  // § persist-ก่อน-push: insert แถว pending ก่อน แล้วค่อย push — ถ้า insert ล้มจะไม่มี
+  // push หลุดออกไป (ghost message: ประชาชนได้ข้อความที่ไม่มีใน DB) ต่างจากลำดับเดิม
+  // push → insert ที่ push สำเร็จแต่ insert ล้มแล้วกู้ไม่ได้
+  const pending = await insertAdminMessage(db, conv, input, 'sending');
+  if (pending.kind !== 'pending') return pending;
   try {
     await transport.push(conv.lineUserId, [{ type: 'text', text: input.text }]);
   } catch {
-    return insertAdminMessage(db, conv, input, 'failed', false);
+    await markPushStatus(db, pending.messageId, 'failed');
+    return { kind: 'push_failed', messageId: pending.messageId, pushStatus: 'failed' };
   }
-  return insertAdminMessage(db, conv, input, 'sent', true);
+  await markPushStatus(db, pending.messageId, 'sent');
+  await touchConversationAdminReply(db, conv.id, input.text);
+  broadcast({
+    type: 'new_message',
+    conversationId: conv.id,
+    payload: {
+      id: pending.messageId,
+      sender: 'admin',
+      messageType: 'text',
+      textContent: input.text,
+      adminUserId: input.adminUserId,
+      clientTempId: input.clientTempId ?? null,
+      createdAt: new Date().toISOString(),
+    },
+  });
+  return { kind: 'sent', messageId: pending.messageId, pushStatus: 'sent' };
 }
 
 interface ReplyConv {
@@ -176,8 +196,7 @@ async function insertAdminMessage(
   db: Awaited<ReturnType<typeof getDb>>,
   conv: ReplyConv,
   input: AdminReplyInput,
-  pushStatus: 'sent' | 'failed',
-  shouldBroadcast: boolean,
+  pushStatus: 'sending',
 ): Promise<SendAdminReplyResult> {
   const messageId = generateId();
   const [inserted] = await db
@@ -218,31 +237,33 @@ async function insertAdminMessage(
 
   const finalId = inserted?.id ?? messageId;
 
+  return { kind: 'pending', messageId: finalId, pushStatus: 'sending' };
+}
+
+async function markPushStatus(
+  db: Awaited<ReturnType<typeof getDb>>,
+  messageId: string,
+  pushStatus: 'sent' | 'failed',
+): Promise<void> {
+  await db
+    .update(chatMessages)
+    .set({ metadata: { pushStatus } })
+    .where(eq(chatMessages.id, messageId));
+}
+
+async function touchConversationAdminReply(
+  db: Awaited<ReturnType<typeof getDb>>,
+  conversationId: string,
+  text: string,
+): Promise<void> {
   await db
     .update(chatConversations)
     .set({
-      lastMessageText: input.text,
+      lastMessageText: text,
       lastMessageAt: new Date(),
       lastMessageSender: 'admin',
       unreadAdmin: 0,
       updatedAt: new Date(),
     })
-    .where(eq(chatConversations.id, conv.id));
-
-  if (!shouldBroadcast) return { kind: 'push_failed', messageId: finalId, pushStatus: 'failed' };
-
-  broadcast({
-    type: 'new_message',
-    conversationId: conv.id,
-    payload: {
-      id: finalId,
-      sender: 'admin',
-      messageType: 'text',
-      textContent: input.text,
-      adminUserId: input.adminUserId,
-      clientTempId: input.clientTempId ?? null,
-      createdAt: new Date().toISOString(),
-    },
-  });
-  return { kind: 'sent', messageId: finalId, pushStatus: 'sent' };
+    .where(eq(chatConversations.id, conversationId));
 }

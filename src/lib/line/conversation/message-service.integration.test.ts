@@ -208,4 +208,25 @@ describe('sendAdminReply', () => {
     expect(await sendAdminReply({ conversationId: generateId(), adminUserId: ADMIN, text: 'x' }, transport)).toEqual({ kind: 'not_found' });
     expect(transport.calls).toHaveLength(0);
   });
+
+  test('persist ก่อน push เสมอ — แถว DB เกิดก่อน push ถูกเรียก (กัน ghost message)', async () => {
+    const id = await createConv('human_active');
+    const order: string[] = [];
+    const inner = createRecordingTransport();
+    const transport = {
+      ...inner,
+      push: (async (...args: Parameters<typeof inner.push>) => {
+        // § แถวต้องอยู่ใน DB แล้วก่อน push ออก — ไม่งั้น push สำเร็จแต่ insert ล้ม = ghost
+        order.push((await loadMessages(id)).length > 0 ? 'push-after-insert' : 'push-before-insert');
+        return inner.push(...args);
+      }) as typeof inner.push,
+    };
+
+    await sendAdminReply(
+      { conversationId: id, adminUserId: ADMIN, text: 'ลำดับถูก', clientTempId: `t-order-${id}` },
+      transport,
+    );
+
+    expect(order).toEqual(['push-after-insert']);
+  });
 });
