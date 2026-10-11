@@ -6,6 +6,7 @@ import { generateId } from '../id';
 import { AUDIT_ACTIONS, logAudit, type AuditAction } from '../audit';
 import { CASE_SUPERVISOR_ROLES } from '../auth/roles';
 import { assertTransition, type CaseStatus } from './state-machine';
+import { BUDGET_LABELS_TH, type BudgetStatus } from './budget';
 
 type UpdateType = (typeof updateTypeEnum.enumValues)[number];
 
@@ -14,6 +15,9 @@ export type CasePatch =
   | { kind: 'assignment'; officerId: string | null }
   | { kind: 'department'; departmentId: string | null }
   | { kind: 'priority'; priority: 'normal' | 'urgent' }
+  | { kind: 'budget'; budgetStatus: BudgetStatus }
+  | { kind: 'budget_amount'; budgetAmount: number | null }
+  | { kind: 'action_details'; actionDetails: string | null }
   | { kind: 'comment'; comment: string; isPublic: boolean };
 
 export interface CaseActor {
@@ -33,6 +37,11 @@ const PATCH_PERMISSIONS: Record<CasePatch['kind'], readonly string[] | null> = {
   assignment: null,
   department: CASE_SUPERVISOR_ROLES,
   priority: null,
+  // § เรื่องเงินและรายละเอียดปฏิบัติงานให้ supervisor ขึ้นไปเท่านั้น
+  // (สอดคล้องกับ changeBudget/changeBudgetAmount/changeActionDetails ใน actions)
+  budget: CASE_SUPERVISOR_ROLES,
+  budget_amount: CASE_SUPERVISOR_ROLES,
+  action_details: CASE_SUPERVISOR_ROLES,
   comment: null,
 };
 
@@ -41,6 +50,9 @@ const PATCH_AUDIT_ACTIONS: Record<CasePatch['kind'], AuditAction> = {
   assignment: AUDIT_ACTIONS.ASSIGN_CASE,
   department: AUDIT_ACTIONS.CHANGE_CASE_DEPARTMENT,
   priority: AUDIT_ACTIONS.UPDATE_CASE_PRIORITY,
+  budget: AUDIT_ACTIONS.UPDATE_CASE_BUDGET,
+  budget_amount: AUDIT_ACTIONS.UPDATE_CASE_BUDGET_AMOUNT,
+  action_details: AUDIT_ACTIONS.UPDATE_CASE_ACTION_DETAILS,
   comment: AUDIT_ACTIONS.ADD_CASE_COMMENT,
 };
 
@@ -82,6 +94,9 @@ export async function applyCaseUpdate(
             id: cases.id,
             status: cases.status,
             priority: cases.priority,
+            budgetStatus: cases.budgetStatus,
+            budgetAmount: cases.budgetAmount,
+            actionDetails: cases.actionDetails,
             assignedTo: cases.assignedTo,
             departmentId: cases.departmentId,
             title: cases.title,
@@ -147,7 +162,7 @@ type TimelineResult =
  */
 export function buildTimeline(
   patch: CasePatch,
-  current: { status: string; priority: string; assignedTo: string | null; departmentId: string | null },
+  current: { status: string; priority: string; budgetStatus: string; budgetAmount: number | null; actionDetails: string | null; assignedTo: string | null; departmentId: string | null },
 ): TimelineResult {
   switch (patch.kind) {
     case 'status': {
@@ -232,6 +247,64 @@ export function buildTimeline(
         },
         auditMeta: { from: current.priority, to: patch.priority },
         updateSet: { priority: patch.priority },
+      };
+    }
+
+    case 'budget': {
+      if (current.budgetStatus === patch.budgetStatus) {
+        return { error: 'สถานะงบประมาณเหมือนเดิม' };
+      }
+      return {
+        entry: {
+          updateType: 'metadata_change',
+          oldValue: current.budgetStatus,
+          newValue: patch.budgetStatus,
+          // § ค่าที่เก็บเป็น enum ภาษาอังกฤษ ('unspecified'/'has_budget') ไม่ใช่ข้อความอ่านออก
+          // และ /track ไม่แสดง field งบประมาณ — จึงเป็น internal เหมือน assignment
+          // (ต่างจาก priority ที่ผู้แจ้งควรได้รู้) comment ภาษาไทยมีไว้ให้เจ้าหน้าที่อ่านใน timeline
+          comment: `เปลี่ยนสถานะงบประมาณเป็น "${BUDGET_LABELS_TH[patch.budgetStatus]}"`,
+          isPublic: false,
+        },
+        auditMeta: { from: current.budgetStatus, to: patch.budgetStatus },
+        updateSet: { budgetStatus: patch.budgetStatus },
+      };
+    }
+
+    case 'budget_amount': {
+      if (current.budgetAmount === patch.budgetAmount) {
+        return { error: 'ยอดงบประมาณเท่าเดิม' };
+      }
+      const label =
+        patch.budgetAmount === null ? 'ล้างยอดงบประมาณ' : `บันทึกงบประมาณที่ใช้ ${patch.budgetAmount.toLocaleString('th-TH')} บาท`;
+      return {
+        entry: {
+          updateType: 'metadata_change',
+          oldValue: current.budgetAmount === null ? null : String(current.budgetAmount),
+          newValue: patch.budgetAmount === null ? null : String(patch.budgetAmount),
+          comment: label,
+          // § ตัวเลขเงินเป็น internal — ไม่ขึ้น /track (เหตุผลเดียวกับ budget)
+          isPublic: false,
+        },
+        auditMeta: { from: current.budgetAmount, to: patch.budgetAmount },
+        updateSet: { budgetAmount: patch.budgetAmount },
+      };
+    }
+
+    case 'action_details': {
+      if ((current.actionDetails ?? '') === (patch.actionDetails ?? '')) {
+        return { error: 'รายละเอียดการดำเนินการเหมือนเดิม' };
+      }
+      return {
+        entry: {
+          updateType: 'metadata_change',
+          oldValue: current.actionDetails,
+          newValue: patch.actionDetails,
+          comment: 'อัปเดตรายละเอียดการดำเนินการ',
+          // § เนื้อหาปฏิบัติงานอาจมีชื่อคน/เบอร์โทร — internal เสมอ
+          isPublic: false,
+        },
+        auditMeta: { length: patch.actionDetails?.length ?? 0 },
+        updateSet: { actionDetails: patch.actionDetails },
       };
     }
 

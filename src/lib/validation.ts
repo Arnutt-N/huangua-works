@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ALL_STATUSES } from './cases/state-machine';
+import { ALL_BUDGET_STATUSES } from './cases/budget';
 import { STAFF_ROLES } from './auth/roles';
 import { CONVERSATION_MODES } from './line/chat-modes';
 
@@ -93,6 +94,8 @@ export const trackingCodeSchema = z
 // ────────────────────────────────────────────────────────────────────────────
 
 export const caseStatusSchema = z.enum(ALL_STATUSES);
+
+export const budgetStatusSchema = z.enum(ALL_BUDGET_STATUSES);
 
 export const casePrioritySchema = z.enum(['normal', 'urgent']);
 
@@ -316,6 +319,22 @@ export const setPriorityFormSchema = z.object({
   priority: casePrioritySchema,
 });
 
+export const changeBudgetFormSchema = z.object({
+  caseId: uuidSchema,
+  budgetStatus: budgetStatusSchema,
+});
+
+export const changeBudgetAmountFormSchema = z.object({
+  caseId: uuidSchema,
+  // § ช่องว่าง = ล้างยอด (null) — จำนวนเงินต้องเป็นเลขเต็มบาท ไม่ติดลบ
+  budgetAmount: z.string().trim().max(15).optional().or(z.literal('')),
+});
+
+export const changeActionDetailsFormSchema = z.object({
+  caseId: uuidSchema,
+  actionDetails: z.string().trim().max(2000, 'รายละเอียดยาวเกิน 2000 ตัวอักษร').optional().or(z.literal('')),
+});
+
 export const addUpdateFormSchema = z.object({
   caseId: uuidSchema,
   comment: commentSchema,
@@ -458,6 +477,43 @@ export const categoryFormSchema = z.object({
 export const toggleActiveFormSchema = z.object({
   id: z.string().min(1),
   kind: z.enum(['department', 'category']),
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// § Citizens — บัญชีประชาชน (/admin/citizens, superadmin เท่านั้น)
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * แก้ไขข้อมูลติดต่อของประชาชน — contactEmail เก็บใน users.metadata เท่านั้น
+ * (email คอลัมน์คือ identity key: cid-/line-/legacy- placeholder ห้ามแก้ตรงนี้)
+ */
+export const updateCitizenFormSchema = z.object({
+  userId: uuidSchema,
+  fullName: fullNameSchema,
+  phoneNumber: phoneSchema,
+  // § เว้นว่างได้ (ลบช่องทางติดต่อ) — ถ้ากรอกต้องเป็นอีเมลจริง (reuse emailSchema)
+  contactEmail: emailSchema.optional().or(z.literal('')),
+});
+
+/** ตั้งเลขบัตรให้บัญชีประชาชน — checksum ตรวจแยกด้วย isValidCid (ไม่ใช่แค่ 13 หลัก) */
+export const setCitizenCidFormSchema = z.object({
+  userId: uuidSchema,
+  cid: cidSchema,
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// § Responsible map — แผนที่ผู้รับผิดชอบย้อนหลัง (/admin/responsible, superadmin)
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * departmentId บังคับเสมอ — map ที่ยังไม่ตัดสิน (seed 'system') ต้องถูก edit ให้มี
+ * หน่วยงานก่อน dry-run จะผ่าน (ดู legacy-import.ts) จึงไม่มีเหตุผลให้สร้างแถว
+ * ที่ไม่มีหน่วยงานเพิ่มอีก ส่วน assignedTo (เจ้าหน้าที่) เว้นว่างได้
+ */
+export const responsibleFormSchema = z.object({
+  raw: z.string().trim().min(1, 'กรุณากรอกค่าดิบ').max(200, 'ค่าดิบยาวเกิน 200 ตัวอักษร'),
+  departmentId: uuidSchema,
+  assignedTo: z.string().optional().or(z.literal('')),
 });
 
 // ────────────────────────────────────────────────────────────────────────────

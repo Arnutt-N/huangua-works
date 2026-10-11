@@ -109,8 +109,8 @@ describe('state-machine · ALLOWED_TRANSITIONS', () => {
 });
 
 describe('state-machine · STATUS_LABELS_TH', () => {
-  it('covers all 8 statuses', () => {
-    expect(Object.keys(STATUS_LABELS_TH)).toHaveLength(8);
+  it('covers all 9 statuses', () => {
+    expect(Object.keys(STATUS_LABELS_TH)).toHaveLength(9);
   });
   it('uses Thai for received', () => {
     expect(STATUS_LABELS_TH.received).toBe('รับเรื่อง');
@@ -118,8 +118,8 @@ describe('state-machine · STATUS_LABELS_TH', () => {
 });
 
 describe('state-machine · STATUS_LABELS_TH_CITIZEN', () => {
-  it('covers all 8 statuses', () => {
-    expect(Object.keys(STATUS_LABELS_TH_CITIZEN)).toHaveLength(8);
+  it('covers all 9 statuses', () => {
+    expect(Object.keys(STATUS_LABELS_TH_CITIZEN)).toHaveLength(9);
   });
   it('pins citizen wording where it differs from admin register', () => {
     expect(STATUS_LABELS_TH_CITIZEN.received).toBe('รับเรื่องแล้ว');
@@ -131,8 +131,8 @@ describe('state-machine · STATUS_LABELS_TH_CITIZEN', () => {
 });
 
 describe('state-machine · OPEN_STATUSES', () => {
-  it('contains the 5 open statuses', () => {
-    expect(OPEN_STATUSES).toEqual(['pending', 'received', 'reviewing', 'assigned', 'in_progress']);
+  it('contains the 6 open statuses', () => {
+    expect(OPEN_STATUSES).toEqual(['pending', 'received', 'reviewing', 'awaiting_budget', 'assigned', 'in_progress']);
   });
   it('is disjoint from TERMINAL_STATUSES', () => {
     expect(OPEN_STATUSES.filter((s) => TERMINAL_STATUSES.includes(s))).toEqual([]);
@@ -156,25 +156,47 @@ describe('state-machine · isCaseStatus', () => {
 });
 
 describe('state-machine · ALL_STATUSES', () => {
-  it('has 8 entries', () => {
-    expect(ALL_STATUSES).toHaveLength(8);
+  it('has 9 entries', () => {
+    expect(ALL_STATUSES).toHaveLength(9);
   });
 });
 
 describe('state-machine · statusProgress', () => {
-  it('pending = ~14% (1/7)', () => {
-    expect(statusProgress('pending')).toBe(14);
+  it('pending = ~13% (1/8)', () => {
+    expect(statusProgress('pending')).toBe(13);
   });
-  it('received = ~29% (2/7)', () => {
-    expect(statusProgress('received')).toBe(29);
+  it('received = 25% (2/8)', () => {
+    expect(statusProgress('received')).toBe(25);
   });
-  it('closed = 100% (7/7)', () => {
+  it('awaiting_budget = 50% (4/8)', () => {
+    expect(statusProgress('awaiting_budget')).toBe(50);
+  });
+  it('closed = 100% (8/8)', () => {
     expect(statusProgress('closed')).toBe(100);
   });
   it('rejected = 100% (terminal)', () => {
     expect(statusProgress('rejected')).toBe(100);
   });
-  it('in_progress = ~71% (5/7)', () => {
-    expect(statusProgress('in_progress')).toBe(71);
+  it('in_progress = 75% (6/8)', () => {
+    expect(statusProgress('in_progress')).toBe(75);
+  });
+});
+
+describe('state-machine · awaiting_budget transitions', () => {
+  it('reviewing → awaiting_budget ผ่าน', () => {
+    expect(assertTransition('reviewing', 'awaiting_budget')).toEqual({ ok: true });
+  });
+  it('awaiting_budget → assigned ผ่าน', () => {
+    expect(assertTransition('awaiting_budget', 'assigned')).toEqual({ ok: true });
+  });
+  it('awaiting_budget → reviewing ย้อนกลับได้', () => {
+    expect(assertTransition('awaiting_budget', 'reviewing')).toEqual({ ok: true });
+  });
+  it('awaiting_budget → done ตรงไม่ได้', () => {
+    expect(assertTransition('awaiting_budget', 'done').ok).toBe(false);
+  });
+  it('มี label ภาษาไทยทั้งสอง register', () => {
+    expect(STATUS_LABELS_TH.awaiting_budget).toBe('รออนุมัติงบประมาณ');
+    expect(STATUS_LABELS_TH_CITIZEN.awaiting_budget).toBe('รออนุมัติงบประมาณ');
   });
 });

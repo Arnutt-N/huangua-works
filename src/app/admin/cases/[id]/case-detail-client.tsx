@@ -14,11 +14,19 @@ import {
 import {
   addUpdate,
   assignOfficer,
+  changeActionDetails,
+  changeBudget,
+  changeBudgetAmount,
   changeDepartment,
   changeStatus,
   setPriority,
   type CaseActionState,
 } from '@/app/admin/actions/cases';
+import {
+  ALL_BUDGET_STATUSES,
+  BUDGET_LABELS_TH,
+  type BudgetStatus,
+} from '@/lib/cases/budget';
 import {
   ALL_STATUSES,
   STATUS_LABELS_TH,
@@ -42,6 +50,9 @@ interface CaseDetailClientProps {
   caseId: string;
   currentStatus: CaseStatus;
   currentPriority: 'normal' | 'urgent';
+  currentBudgetStatus: BudgetStatus;
+  currentBudgetAmount: number | null;
+  currentActionDetails: string | null;
   currentAssignedTo: string | null;
   currentDepartmentId: string | null;
   officers: OfficerOption[];
@@ -55,6 +66,9 @@ export function CaseDetailClient({
   caseId,
   currentStatus,
   currentPriority,
+  currentBudgetStatus,
+  currentBudgetAmount,
+  currentActionDetails,
   currentAssignedTo,
   currentDepartmentId,
   officers,
@@ -76,6 +90,18 @@ export function CaseDetailClient({
   );
   const [priorityState, priorityAction, priorityPending] = useActionState(
     setPriority,
+    initialActionState
+  );
+  const [budgetState, budgetAction, budgetPending] = useActionState(
+    changeBudget,
+    initialActionState
+  );
+  const [budgetAmountState, budgetAmountAction, budgetAmountPending] = useActionState(
+    changeBudgetAmount,
+    initialActionState
+  );
+  const [actionDetailsState, actionDetailsAction, actionDetailsPending] = useActionState(
+    changeActionDetails,
     initialActionState
   );
   const [commentState, commentAction, commentPending] = useActionState(
@@ -244,6 +270,76 @@ export function CaseDetailClient({
         </form>
       </ActionCard>
 
+      {/* ── สถานะงบประมาณ ── */}
+      <ActionCard title="สถานะงบประมาณ">
+        <form action={budgetAction} className="space-y-3">
+          <input type="hidden" name="caseId" value={caseId} />
+          <div>
+            <Label htmlFor="budgetStatus">งบประมาณ</Label>
+            <Select name="budgetStatus" defaultValue={currentBudgetStatus}>
+              <SelectTrigger id="budgetStatus">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ALL_BUDGET_STATUSES.map((b) => (
+                  <SelectItem key={b} value={b}>
+                    {BUDGET_LABELS_TH[b]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {budgetState.error && <ErrorText>{budgetState.error}</ErrorText>}
+          <Button type="submit" size="sm" variant="secondary" disabled={budgetPending}>
+            {budgetPending ? 'กำลังบันทึก...' : 'บันทึก'}
+          </Button>
+        </form>
+      </ActionCard>
+
+      {/* ── ยอดงบประมาณที่ใช้ ── */}
+      <ActionCard title="งบประมาณที่ใช้">
+        <form action={budgetAmountAction} className="space-y-3">
+          <input type="hidden" name="caseId" value={caseId} />
+          <div>
+            <Label htmlFor="budgetAmount">จำนวนเงิน (บาท)</Label>
+            <Input
+              id="budgetAmount"
+              name="budgetAmount"
+              inputMode="numeric"
+              maxLength={12}
+              defaultValue={currentBudgetAmount === null ? '' : String(currentBudgetAmount)}
+              placeholder="เช่น 15000 — เว้นว่างเพื่อล้างยอด"
+            />
+          </div>
+          {budgetAmountState.error && <ErrorText>{budgetAmountState.error}</ErrorText>}
+          <Button type="submit" size="sm" variant="secondary" disabled={budgetAmountPending}>
+            {budgetAmountPending ? 'กำลังบันทึก...' : 'บันทึก'}
+          </Button>
+        </form>
+      </ActionCard>
+
+      {/* ── รายละเอียดการดำเนินการ ── */}
+      <ActionCard title="รายละเอียดการดำเนินการ">
+        <form action={actionDetailsAction} className="space-y-3">
+          <input type="hidden" name="caseId" value={caseId} />
+          <div>
+            <Label htmlFor="actionDetails">สิ่งที่ทำไปแล้ว (ภายใน)</Label>
+            <Textarea
+              id="actionDetails"
+              name="actionDetails"
+              rows={3}
+              maxLength={2000}
+              defaultValue={currentActionDetails ?? ''}
+              placeholder="เช่น เทคอนกรีตเสริมผิวทาง 50 เมตร"
+            />
+          </div>
+          {actionDetailsState.error && <ErrorText>{actionDetailsState.error}</ErrorText>}
+          <Button type="submit" size="sm" variant="secondary" disabled={actionDetailsPending}>
+            {actionDetailsPending ? 'กำลังบันทึก...' : 'บันทึก'}
+          </Button>
+        </form>
+      </ActionCard>
+
       {/* ── เพิ่มความคืบหน้า ── */}
       <ActionCard title="เพิ่มความคืบหน้า">
         <form action={commentAction} className="space-y-3">
@@ -332,6 +428,9 @@ export function SuccessToast({ ok }: { ok: string | null }) {
     assign: 'อัปเดตการมอบหมายเรียบร้อย',
     department: 'อัปเดตหน่วยงานเรียบร้อย',
     priority: 'อัปเดตความเร่งด่วนเรียบร้อย',
+    budget: 'อัปเดตสถานะงบประมาณเรียบร้อย',
+    budget_amount: 'บันทึกยอดงบประมาณเรียบร้อย',
+    action_details: 'บันทึกรายละเอียดการดำเนินการเรียบร้อย',
     comment: 'เพิ่มความคืบหน้าเรียบร้อย',
   };
   const msg = messages[ok] ?? 'บันทึกเรียบร้อย';

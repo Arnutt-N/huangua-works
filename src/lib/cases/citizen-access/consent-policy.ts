@@ -1,6 +1,6 @@
 import { sql, type AnyColumn, type SQL } from 'drizzle-orm';
 import type { DbOrTx } from '../../db';
-import { consentRecords } from '../../db/schema';
+import { consentRecords, users } from '../../db/schema';
 import { grantConsent, CONSENT_VERSION } from '../../consent';
 
 /** ช่องทางที่ให้ความยินยอมตอนแจ้งเรื่องใหม่ — เก็บใน consent_records.metadata.via */
@@ -48,6 +48,15 @@ export async function recordIntakeConsent(
  * § เป็น correlated subquery ใน WHERE เดียวกับ lookup — "ไม่พบ" กับ "ถอนแล้ว"
  * จึงแยกกันไม่ออกจากภายนอก (กัน enumeration) และ list ไม่ต้องยิง N query
  */
+/**
+ * กติกาเดียวของทุกช่องทาง (เว็บ / บอท / LIFF): ประชาชนเห็นเรื่องได้ก็ต่อเมื่อ record
+ * data_collection ล่าสุดของเจ้าของเรื่องเป็นการให้ความยินยอม
+ *
+ * § บัญชีที่ถูกระงับ (users.is_active = false) มองไม่เห็นเรื่องทุกช่องทาง
+ * ปิดใช้งาน = เพิกถอนการเข้าถึงชั่วคราวโดยไม่ต้องแตะ consent record — เปิดใช้ใหม่
+ * เรื่องกลับมาให้เห็นทันที (ไม่ต้องขอความยินยอมใหม่) ต่างจากการถอนความยินยอม
+ * ที่ต้อง grant ใหม่เท่านั้นถึงจะกลับมา
+ */
 export function consentActiveFor(ownerId: AnyColumn): SQL {
   return sql`coalesce((
     select ${consentRecords.isGranted}
@@ -55,6 +64,11 @@ export function consentActiveFor(ownerId: AnyColumn): SQL {
     where ${consentRecords.userId} = ${ownerId}
       and ${consentRecords.consentType} = 'data_collection'
     order by ${consentRecords.createdAt} desc, ${consentRecords.id} desc
+    limit 1
+  ), false) and coalesce((
+    select ${users.isActive}
+    from ${users}
+    where ${users.id} = ${ownerId}
     limit 1
   ), false)`;
 }

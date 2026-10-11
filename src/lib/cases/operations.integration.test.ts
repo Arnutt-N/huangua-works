@@ -323,3 +323,40 @@ describe('applyCaseUpdate — concurrent writers', () => {
     expect(timeline.map((u) => u.updateType).sort()).toEqual(['comment', 'status_change']);
   });
 });
+
+describe('applyCaseUpdate — budget amount and action details', () => {
+  test('บันทึกยอดงบ + รายละเอียดการดำเนินการ เป็น internal พร้อม audit', async () => {
+    const id = await createTestCase('in_progress');
+
+    const amountResult = await applyCaseUpdate(id, { kind: 'budget_amount', budgetAmount: 15000 }, SUPERVISOR);
+    expect(amountResult).toEqual({ ok: true });
+    expect((await getCase(id)).budgetAmount).toBe(15000);
+
+    const sameResult = await applyCaseUpdate(id, { kind: 'budget_amount', budgetAmount: 15000 }, SUPERVISOR);
+    expect(sameResult.ok).toBe(false);
+
+    const detailsResult = await applyCaseUpdate(
+      id,
+      { kind: 'action_details', actionDetails: 'เทคอนกรีตเสริมผิวทาง 50 เมตร' },
+      SUPERVISOR,
+    );
+    expect(detailsResult).toEqual({ ok: true });
+    expect((await getCase(id)).actionDetails).toBe('เทคอนกรีตเสริมผิวทาง 50 เมตร');
+
+    const timeline = await getTimeline(id);
+    const kinds = timeline.map((u) => [u.updateType, u.isPublic]);
+    expect(kinds).toContainEqual(['metadata_change', false]);
+
+    const db = await getDb();
+    const audits = await db.select({ action: auditLogs.action }).from(auditLogs).where(eq(auditLogs.resourceId, id));
+    const actions = audits.map((a) => a.action);
+    expect(actions).toContain('update_case_budget_amount');
+    expect(actions).toContain('update_case_action_details');
+  });
+
+  test('officer เปลี่ยนยอดงบไม่ได้ (ต้อง supervisor)', async () => {
+    const id = await createTestCase('in_progress');
+    const result = await applyCaseUpdate(id, { kind: 'budget_amount', budgetAmount: 500 }, ACTOR);
+    expect(result.ok).toBe(false);
+  });
+});

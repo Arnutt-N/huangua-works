@@ -139,6 +139,24 @@ export interface SettingsData {
 
 export type SettingsInput = Omit<SettingsData, 'line'>;
 
+export interface SystemSettingsData {
+  maintenance_mode: boolean;
+  audit_retention_days: number;
+  import_default_org: 'huangua';
+}
+
+export interface SystemSettingsInput {
+  maintenance_mode?: boolean;
+  audit_retention_days?: number;
+}
+
+export interface ApiConnectionItem {
+  provider: string;
+  endpoint: string;
+  status: string;
+  lastCheckedAt: string | null;
+}
+
 export interface ChatbotStats {
   messages: { totalIn: number; totalOut: number };
   faq: { total: number; active: number; hits: number; hitRate: number };
@@ -244,6 +262,14 @@ export const adminApi = {
     request<SettingsData>('/api/line/admin/settings'),
   saveSettings: (payload: SettingsInput): Promise<ApiResult<OkBody>> =>
     request<OkBody>('/api/line/admin/settings', withBody('PUT', payload)),
+  getSystemSettings: (): Promise<ApiResult<SystemSettingsData>> =>
+    request<SystemSettingsData>('/api/admin/system-settings'),
+  saveSystemSettings: (payload: SystemSettingsInput): Promise<ApiResult<OkBody>> =>
+    request<OkBody>('/api/admin/system-settings', withBody('PUT', payload)),
+  listApiConnections: (): Promise<ApiResult<ListOf<ApiConnectionItem>>> =>
+    request<ListOf<ApiConnectionItem>>('/api/admin/api-connections'),
+  refreshApiConnection: (provider: string): Promise<ApiResult<OkBody>> =>
+    request<OkBody>('/api/admin/api-connections', withBody('POST', { provider })),
   getChatbotStats: (): Promise<ApiResult<ChatbotStats>> =>
     request<ChatbotStats>('/api/line/admin/chatbot-stats'),
 };

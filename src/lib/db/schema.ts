@@ -12,6 +12,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { ALL_STATUSES } from '../cases/state-machine';
+import { ALL_BUDGET_STATUSES } from '../cases/budget';
 import { ALL_ROLES } from '../auth/roles';
 import { CONVERSATION_MODES } from '../line/chat-modes';
 
@@ -34,6 +35,8 @@ import { CONVERSATION_MODES } from '../line/chat-modes';
 export const userRoleEnum = pgEnum('user_role', ALL_ROLES);
 
 export const caseStatusEnum = pgEnum('case_status', ALL_STATUSES);
+
+export const budgetStatusEnum = pgEnum('budget_status', ALL_BUDGET_STATUSES);
 
 export const casePriorityEnum = pgEnum('case_priority', ['normal', 'urgent']);
 
@@ -81,6 +84,8 @@ export const users = pgTable(
     email: text('email').notNull().unique(),
     role: userRoleEnum().notNull(),
     departmentId: text('department_id'), // FK departments.id (nullable สำหรับ citizen)
+    // § หน่วยงานต้นสังกัดระดับองค์กร เผื่อสเกลหลาย อบต. ตอนนี้ค่าเดียวเสมอ
+    orgId: text('org_id').notNull().default('huangua'),
     isActive: boolean('is_active').notNull().default(true),
     fullName: text('full_name').notNull(),
     phoneNumber: text('phone_number'),
@@ -93,6 +98,7 @@ export const users = pgTable(
     emailIdx: index('users_email_idx').on(table.email),
     roleIdx: index('users_role_idx').on(table.role),
     deptIdx: index('users_department_id_idx').on(table.departmentId),
+    orgIdx: index('users_org_id_idx').on(table.orgId),
   })
 );
 
@@ -140,9 +146,12 @@ export const departments = pgTable(
     color: text('color'), // oklch(...) for UI badge
     icon: text('icon'), // lucide icon name
     isActive: boolean('is_active').notNull().default(true),
+    // § ดู users.orgId ประกอบ เผื่อสเกลหลาย อบต. ตอนนี้ค่าเดียวเสมอ
+    orgId: text('org_id').notNull().default('huangua'),
   },
   (table) => ({
     slugIdx: index('departments_slug_idx').on(table.slug),
+    orgIdx: index('departments_org_id_idx').on(table.orgId),
   })
 );
 
@@ -164,9 +173,12 @@ export const categories = pgTable(
     defaultDepartmentId: text('default_department_id'), // FK departments.id
     estimatedDays: integer('estimated_days').default(7),
     isActive: boolean('is_active').notNull().default(true),
+    // § ดู users.orgId ประกอบ เผื่อสเกลหลาย อบต. ตอนนี้ค่าเดียวเสมอ
+    orgId: text('org_id').notNull().default('huangua'),
   },
   (table) => ({
     slugIdx: index('categories_slug_idx').on(table.slug),
+    orgIdx: index('categories_org_id_idx').on(table.orgId),
   })
 );
 
@@ -261,6 +273,10 @@ export const cases = pgTable(
     status: caseStatusEnum().notNull().default('pending'),
     priority: casePriorityEnum().notNull().default('normal'),
 
+    // § สถานะงบประมาณแยกจาก status — status.awaiting_budget คือขั้นตอนงาน
+    // ส่วน field นี้คือสถานะเงิน (งานเสร็จแต่เบิกงบไม่จบเป็นไปได้ จึงต้องแยกกัน)
+    budgetStatus: budgetStatusEnum('budget_status').notNull().default('unspecified'),
+
     // Content
     title: text('title').notNull(),
     description: text('description').notNull(),
@@ -279,6 +295,8 @@ export const cases = pgTable(
     submittedBy: text('submitted_by').notNull(), // FK users.id (citizen)
     assignedTo: text('assigned_to'), // FK users.id (officer)
     departmentId: text('department_id'), // FK departments.id
+    // § ดู users.orgId ประกอบ เผื่อสเกลหลาย อบต. ตอนนี้ค่าเดียวเสมอ
+    orgId: text('org_id').notNull().default('huangua'),
 
     // Tracking
     dueDate: timestamp('due_date', { mode: 'date' }),
@@ -288,6 +306,24 @@ export const cases = pgTable(
     // null = เคสเก่าก่อนใช้ระบบนี้ → ปิด track (คืน 404)
     // lookup ผ่าน /api/cases/[id] ใช้ค่านี้แทน PK เพื่อไม่เปิดเผย UUID ที่เดาได้ (UUID v7 timestamp-ordered)
     trackingCode: text('tracking_code'),
+
+    // § legacy import provenance (นำเข้าทะเบียน Excel ย้อนหลัง) — ทุกแถวนำเข้า
+    // isHistorical = true เสมอ; cron close-stale ข้ามแถวกลุ่มนี้ ไม่ปิดอัตโนมัติ
+    // sourceKey ผูก workbook_sha256 + sheet + row จาก staging (unique ห้ามซ้ำ)
+    // legacySubmitterName เก็บชื่อดิบจาก Excel ไว้ให้ staff ดู (PII — ไม่ขึ้นจอประชาชน)
+    sourceKey: text('source_key'),
+    importBatchId: text('import_batch_id'), // FK import_batches.id
+    legacySubmitterName: text('legacy_submitter_name'),
+    // § ค่าดิบคอลัมน์ผู้รับผิดชอบจาก Excel — ใช้ตัดสินว่า map แถวไหนยังถูกอ้างอิง
+    // (ลบ map ที่เรื่องย้อนหลังอ้างถึงไม่ได้ ต้องปิดใช้แทน)
+    legacyResponsibleRaw: text('legacy_responsible_raw'),
+    isHistorical: boolean('is_historical').notNull().default(false),
+    // § งบประมาณที่ใช้ไป (บาท) — null = ยังไม่บันทึก กรอกโดย staff ภายหลังเท่านั้น
+    // นำเข้าไม่เคยเติมยอดเงินเอง (Excel ไม่มีตัวเลข มีแต่โน้ตขั้นตอน)
+    budgetAmount: integer('budget_amount'),
+    // § รายละเอียดการดำเนินการ — นำเข้าจากคอลัมน์หมายเหตุของ Excel ตรงๆ
+    // ต่างจาก description (รายละเอียดปัญหา) และไม่ขึ้นจอประชาชน (internal)
+    actionDetails: text('action_details'),
 
     // Metadata
     attachments: jsonb('attachments'), // JSON array: [{ url, type, size }]
@@ -299,6 +335,7 @@ export const cases = pgTable(
     assignedToIdx: index('cases_assigned_to_idx').on(table.assignedTo),
     categoryIdx: index('cases_category_id_idx').on(table.categoryId),
     deptIdx: index('cases_department_id_idx').on(table.departmentId),
+    orgIdx: index('cases_org_id_idx').on(table.orgId),
     provinceIdx: index('cases_province_id_idx').on(table.provinceId),
     districtIdx: index('cases_district_id_idx').on(table.districtId),
     subDistrictIdx: index('cases_sub_district_id_idx').on(table.subDistrictId),
@@ -307,6 +344,13 @@ export const cases = pgTable(
     trackingCodeIdx: uniqueIndex('cases_tracking_code_idx')
       .on(table.trackingCode)
       .where(sql`tracking_code IS NOT NULL`),
+    // § partial unique index — เฉพาะ row นำเข้าที่มี source_key; retry แบบ idempotent
+    // ใช้ ON CONFLICT DO NOTHING แล้ว reconcile ยอด (รูปแบบเดียวกับ trackingCodeIdx)
+    sourceKeyIdx: uniqueIndex('cases_source_key_idx')
+      .on(table.sourceKey)
+      .where(sql`source_key IS NOT NULL`),
+    importBatchIdx: index('cases_import_batch_id_idx').on(table.importBatchId),
+    historicalIdx: index('cases_is_historical_idx').on(table.isHistorical),
   })
 );
 
@@ -347,6 +391,51 @@ export const caseUpdates = pgTable(
     caseIdx: index('case_updates_case_id_idx').on(table.caseId),
     userIdx: index('case_updates_user_id_idx').on(table.userId),
     createdAtIdx: index('case_updates_created_at_idx').on(table.createdAt),
+  })
+);
+
+// ────────────────────────────────────────────────────────────────────────────
+// § Import Batches + Legacy Responsible Map (นำเข้าทะเบียน Excel ย้อนหลัง)
+// import_batches หนึ่งแถวต่อการ apply หนึ่ง workbook — sourceSha256 unique กันรันซ้ำ
+// legacy_responsible_map ตัดสินโดยคน: ค่าดิบคอลัมน์ผู้รับผิดชอบ → department/staff
+// แถวที่ยังไม่มี map ค้าง write_gate blocked ใน staging ต่อไป ไม่เข้า DB
+// ────────────────────────────────────────────────────────────────────────────
+
+export const importBatches = pgTable(
+  'import_batches',
+  {
+    id: text('id').primaryKey(), // UUID v7
+    createdAt: timestamp('created_at', { mode: 'date' })
+      .notNull()
+      .defaultNow(),
+    sourceSha256: text('source_sha256').notNull().unique(), // workbook hash จาก manifest
+    fileName: text('file_name').notNull(),
+    rowCount: integer('row_count').notNull(), // records ใน staging
+    importedCount: integer('imported_count').notNull().default(0),
+    skippedCount: integer('skipped_count').notNull().default(0), // sourceKey ซ้ำ (retry)
+    operatorUserId: text('operator_user_id').notNull(), // staff ผู้สั่ง apply
+    notes: text('notes'), // JSON: { resolutions, masterSha256, ... }
+  },
+  (table) => ({
+    sourceSha256Idx: uniqueIndex('import_batches_source_sha256_idx').on(table.sourceSha256),
+  })
+);
+
+export const legacyResponsibleMap = pgTable(
+  'legacy_responsible_map',
+  {
+    raw: text('raw').primaryKey(), // ค่าดิบคอลัมน์ผู้รับผิดชอบ (normalized)
+    departmentId: text('department_id'), // FK departments.id
+    assignedTo: text('assigned_to'), // FK users.id (officer) — nullable
+    // § ปิดใช้แทนการลบ — แถว inactive ถือว่ายังไม่ตัดสิน dry-run ค้าง blocked ต่อไป
+    isActive: boolean('is_active').notNull().default(true),
+    decidedBy: text('decided_by').notNull(), // staff ผู้ตัดสิน
+    decidedAt: timestamp('decided_at', { mode: 'date' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    departmentIdx: index('legacy_responsible_map_department_id_idx').on(table.departmentId),
   })
 );
 
@@ -581,6 +670,56 @@ export const chatSettings = pgTable(
   },
   (table) => ({
     keyIdx: uniqueIndex('chat_settings_key_idx').on(table.key),
+  })
+);
+
+// ────────────────────────────────────────────────────────────────────────────
+// § System Settings (ตั้งค่ากลางทั้งระบบ: key คู่ value ชุดปิดตายผ่าน zod)
+// รูปเดียวกับ chatSettings ด้านบน ต่างแค่ key อยู่ใน allowlist ของ system module
+// ────────────────────────────────────────────────────────────────────────────
+
+export const systemSettings = pgTable(
+  'system_settings',
+  {
+    id: text('id').primaryKey(), // UUID v7
+    createdAt: timestamp('created_at', { mode: 'date' })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' })
+      .notNull()
+      .defaultNow(),
+    key: text('key').notNull().unique(),
+    value: jsonb('value').notNull(),
+    description: text('description'),
+  },
+  (table) => ({
+    keyIdx: uniqueIndex('system_settings_key_idx').on(table.key),
+  })
+);
+
+// ────────────────────────────────────────────────────────────────────────────
+// § API Connections (ปลายทางเชื่อมต่อภายนอก: เก็บแค่ endpoint กับสถานะ)
+// ห้ามเก็บ secret ดิบทุกกรณี secret อยู่ใน env ต่อไป provider กับ status เป็นค่าปิดตาย
+// ────────────────────────────────────────────────────────────────────────────
+
+export const apiConnections = pgTable(
+  'api_connections',
+  {
+    id: text('id').primaryKey(), // UUID v7
+    createdAt: timestamp('created_at', { mode: 'date' })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' })
+      .notNull()
+      .defaultNow(),
+    provider: text('provider').notNull().unique(), // line s3 smtp เท่านั้น
+    endpoint: text('endpoint').notNull(), // ไม่มี secret ปน
+    status: text('status').notNull().default('unknown'), // unknown connected degraded down
+    lastCheckedAt: timestamp('last_checked_at', { mode: 'date' }),
+    metadata: jsonb('metadata'),
+  },
+  (table) => ({
+    providerIdx: uniqueIndex('api_connections_provider_idx').on(table.provider),
   })
 );
 

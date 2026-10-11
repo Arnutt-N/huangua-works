@@ -27,10 +27,30 @@ export type CitizenIdentity =
       /** โปรไฟล์ LINE ล่าสุด (จาก ID token) — เขียนทับ line_users เมื่อส่งมา */
       profile?: { displayName?: string; pictureUrl?: string };
       source: 'line_intake' | 'liff_session';
+    }
+  | {
+      kind: 'legacy';
+      /** ชื่อดิบจากทะเบียน Excel — ไม่ใช่ identity ที่ verify แล้ว */
+      name: string;
     };
 
 type CidIdentity = Extract<CitizenIdentity, { kind: 'cid' }>;
 type LineIdentity = Extract<CitizenIdentity, { kind: 'line' }>;
+type LegacyIdentity = Extract<CitizenIdentity, { kind: 'legacy' }>;
+
+/** normalize ชื่อแบบเดียวกับเครื่องมือเตรียม (scripts/prepare-excel-intake.py normalized) */
+export function normalizeLegacyName(name: string): string {
+  return name.split(/\s+/).filter(Boolean).join(' ');
+}
+
+/**
+ * placeholder email ของผู้แจ้งย้อนหลัง — key ด้วย HMAC ไม่ใช้ชื่อดิบเป็น lookup key
+ * § จงใจไม่มี consent record: consentActiveFor จึงเป็น false และ /track คืน 404
+ * จนกว่าเจ้าของจะมา claim ด้วย CID/LINE ภายหลัง (งานอนาคต นอก scope import)
+ */
+export function legacyPlaceholderEmail(name: string): string {
+  return `legacy-${generateCidHash(normalizeLegacyName(name))}@placeholder.local`;
+}
 
 /**
  * placeholder email ของผู้แจ้งทางเว็บ — ใช้ภายใน module เท่านั้น (identity + withdraw)
@@ -43,9 +63,9 @@ export function cidPlaceholderEmail(cid: string): string {
 /** คืน users.id ของประชาชน — สร้างแถว users / ผูก line_users ให้ถ้ายังไม่มี */
 export async function resolveCitizen(identity: CitizenIdentity, db?: DbOrTx): Promise<string> {
   const _db = db ?? (await getDb());
-  return identity.kind === 'cid'
-    ? resolveCidCitizen(_db, identity)
-    : resolveLineCitizen(_db, identity);
+  if (identity.kind === 'cid') return resolveCidCitizen(_db, identity);
+  if (identity.kind === 'line') return resolveLineCitizen(_db, identity);
+  return resolveLegacyCitizen(_db, identity);
 }
 
 async function findUserIdByEmail(db: DbOrTx, email: string): Promise<string | undefined> {
@@ -72,6 +92,23 @@ async function insertUserOrReuse(db: DbOrTx, row: typeof users.$inferInsert): Pr
   return inserted[0]?.id ?? (await findUserIdByEmail(db, row.email)) ?? row.id;
 }
 
+async function resolveLegacyCitizen(db: DbOrTx, identity: LegacyIdentity): Promise<string> {
+  const name = normalizeLegacyName(identity.name);
+  if (!name) throw new Error('ชื่อผู้แจ้งย้อนหลังว่างเปล่า');
+  const email = legacyPlaceholderEmail(name);
+  const existing = await findUserIdByEmail(db, email);
+  if (existing) return existing;
+
+  return insertUserOrReuse(db, {
+    id: generateId(),
+    email,
+    role: 'citizen',
+    isActive: true,
+    fullName: name,
+    phoneNumber: null,
+    metadata: JSON.stringify({ source: 'legacy_import' }),
+  });
+}
 async function resolveCidCitizen(db: DbOrTx, identity: CidIdentity): Promise<string> {
   // § ตัวตนของผู้แจ้งทางเว็บผูกกับ CID เท่านั้น — ห้ามใช้ email ที่กรอกเป็น lookup key
   // เดิมใช้ `input.email || cid-hash` ซึ่งเปิดให้ใครก็ได้ยิง /api/cases/submit พร้อม email
