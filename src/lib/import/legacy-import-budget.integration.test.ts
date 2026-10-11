@@ -29,7 +29,7 @@ const RAW_NULL = `it-budget-raw-null-${RUN}`;
 const RAW_INACTIVE = `it-budget-raw-inactive-${RUN}`;
 const RAW_OK = `it-budget-raw-ok-${RUN}`;
 
-const SOURCES = [`it-budget-src-a-${RUN}`, `it-budget-src-b-${RUN}`, `it-budget-src-c-${RUN}`];
+const SOURCES = [`it-budget-src-a-${RUN}`, `it-budget-src-b-${RUN}`, `it-budget-src-c-${RUN}`, `it-budget-src-d-${RUN}`];
 
 let operatorId = '';
 let categoryId = '';
@@ -209,6 +209,29 @@ describe('slice A · apply เขียน budgetStatus + legacyResponsibleRaw',
     await expect(
       applyImport({ bundle, classified, operatorUserId: operatorId, sourceName: 'it-budget' }),
     ).rejects.toThrow();
+  });
+
+  test('apply ยอม map ที่ active แต่ department ว่าง (เคสเข้าโดย department ว่าง)', async () => {
+    const bundle = parseBundle(
+      manifestFor(SOURCES[3]!),
+      `${queueLine(SOURCES[3]!, 'it-budget-key-nulldept', 9, ['responsible_mapping_unresolved', 'submitter_identity_unresolved'])}\n`,
+      `${rowLine('it-budget-key-nulldept', 9, RAW_NULL, 'done')}\n`,
+    );
+    const classified = classifyRows(bundle, { statusByKey: {}, dateByKey: {}, categoryByKey: {} });
+    const result = await applyImport({
+      bundle,
+      classified,
+      operatorUserId: operatorId,
+      sourceName: 'it-budget',
+    });
+    expect(result.imported).toBe(1);
+
+    const db = await getDb();
+    const rows = await db.select().from(cases).where(eq(cases.sourceKey, 'it-budget-key-nulldept'));
+    expect(rows).toHaveLength(1);
+    for (const row of rows) createdCaseIds.push(row.id);
+    expect(only(rows).departmentId).toBeNull();
+    expect(only(rows).legacyResponsibleRaw).toBe(RAW_NULL);
   });
 });
 
