@@ -12,6 +12,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { ALL_STATUSES } from '../cases/state-machine';
+import { ALL_BUDGET_STATUSES } from '../cases/budget';
 import { ALL_ROLES } from '../auth/roles';
 import { CONVERSATION_MODES } from '../line/chat-modes';
 
@@ -34,6 +35,8 @@ import { CONVERSATION_MODES } from '../line/chat-modes';
 export const userRoleEnum = pgEnum('user_role', ALL_ROLES);
 
 export const caseStatusEnum = pgEnum('case_status', ALL_STATUSES);
+
+export const budgetStatusEnum = pgEnum('budget_status', ALL_BUDGET_STATUSES);
 
 export const casePriorityEnum = pgEnum('case_priority', ['normal', 'urgent']);
 
@@ -261,6 +264,10 @@ export const cases = pgTable(
     status: caseStatusEnum().notNull().default('pending'),
     priority: casePriorityEnum().notNull().default('normal'),
 
+    // § สถานะงบประมาณแยกจาก status — status.awaiting_budget คือขั้นตอนงาน
+    // ส่วน field นี้คือสถานะเงิน (งานเสร็จแต่เบิกงบไม่จบเป็นไปได้ จึงต้องแยกกัน)
+    budgetStatus: budgetStatusEnum('budget_status').notNull().default('unspecified'),
+
     // Content
     title: text('title').notNull(),
     description: text('description').notNull(),
@@ -296,6 +303,9 @@ export const cases = pgTable(
     sourceKey: text('source_key'),
     importBatchId: text('import_batch_id'), // FK import_batches.id
     legacySubmitterName: text('legacy_submitter_name'),
+    // § ค่าดิบคอลัมน์ผู้รับผิดชอบจาก Excel — ใช้ตัดสินว่า map แถวไหนยังถูกอ้างอิง
+    // (ลบ map ที่เรื่องย้อนหลังอ้างถึงไม่ได้ ต้องปิดใช้แทน)
+    legacyResponsibleRaw: text('legacy_responsible_raw'),
     isHistorical: boolean('is_historical').notNull().default(false),
 
     // Metadata
@@ -399,6 +409,8 @@ export const legacyResponsibleMap = pgTable(
     raw: text('raw').primaryKey(), // ค่าดิบคอลัมน์ผู้รับผิดชอบ (normalized)
     departmentId: text('department_id'), // FK departments.id
     assignedTo: text('assigned_to'), // FK users.id (officer) — nullable
+    // § ปิดใช้แทนการลบ — แถว inactive ถือว่ายังไม่ตัดสิน dry-run ค้าง blocked ต่อไป
+    isActive: boolean('is_active').notNull().default(true),
     decidedBy: text('decided_by').notNull(), // staff ผู้ตัดสิน
     decidedAt: timestamp('decided_at', { mode: 'date' })
       .notNull()

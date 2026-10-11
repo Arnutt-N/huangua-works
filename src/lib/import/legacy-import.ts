@@ -300,11 +300,10 @@ export async function dryRun(bundle: StagedBundle, classified: ClassifiedRow[]):
       const live = c.categorySlugFinal ? liveBySlug.get(c.categorySlugFinal) : undefined;
       // § row.categoryId จาก master snapshot วันเตรียม — ต้องตรงกับ live slug และ active
       if (!live || !live.isActive) extra.push('category_unresolved');
-      // § ผู้รับผิดชอบต้องมี map และ department ใน map ต้องมีจริงใน live DB
+      // § ผู้รับผิดชอบต้องมี map ที่ "ตัดสินแล้ว": แถว active + ระบุหน่วยงานที่มีจริงใน live DB
+      // seed 'system' ที่ยังไม่ระบุหน่วยงานจึงค้าง blocked จนกว่า staff จะตัดสิน (ดู migration)
       const mapEntry = mapByRaw.get(c.row.raw.responsibleRaw.trim());
-      if (!mapEntry) {
-        extra.push('responsible_mapping_unresolved');
-      } else if (mapEntry.departmentId && !liveDeptSet.has(mapEntry.departmentId)) {
+      if (!mapEntry || !mapEntry.isActive || !mapEntry.departmentId || !liveDeptSet.has(mapEntry.departmentId)) {
         extra.push('responsible_mapping_unresolved');
       }
       // § ชื่อผู้แจ้งว่าง = สร้างตัวตนไม่ได้ (ห้ามเดาชื่อ)
@@ -359,6 +358,8 @@ export async function applyImport(options: ApplyOptions): Promise<{ batchId: str
     const liveBySlug = new Map(liveCategories.map((c) => [c.slug, c]));
     const mapRows = await tx.select().from(legacyResponsibleMap);
     const mapByRaw = new Map(mapRows.map((m) => [m.raw, m]));
+    // § กัน department หายระหว่าง dry-run กับ apply — เขียน departmentId ลอยไม่ได้
+    const liveDeptIds = new Set((await tx.select({ id: departments.id }).from(departments)).map((d) => d.id));
 
     const batchId = generateId();
     await tx.insert(importBatches).values({
@@ -383,7 +384,11 @@ export async function applyImport(options: ApplyOptions): Promise<{ batchId: str
         throw new ImportError('แถวไม่ผ่าน gate สุดท้ายก่อนเขียน');
       }
       const mapEntry = mapByRaw.get(raw.responsibleRaw.trim());
-      if (!mapEntry) throw new ImportError('แถวไม่มี responsible map');
+      // § ปฏิเสธ map ที่ยังไม่ตัดสิน (inactive / ยังไม่ระบุหน่วยงาน) — คู่กับ dry-run ข้างบน
+      if (!mapEntry || !mapEntry.isActive) throw new ImportError('แถวไม่มี responsible map ที่ใช้งานได้');
+      if (!mapEntry.departmentId || !liveDeptIds.has(mapEntry.departmentId)) {
+        throw new ImportError('แถวนี้ยังไม่มีการตัดสินหน่วยงานรับผิดชอบ');
+      }
       const submitterName = normalizeLegacyName(raw.submitterName);
       if (!submitterName) throw new ImportError('แถวไม่มีชื่อผู้แจ้ง');
 
@@ -399,6 +404,8 @@ export async function applyImport(options: ApplyOptions): Promise<{ batchId: str
       await tx.insert(cases).values({
         id: caseId,
         status: c.statusFinal,
+        // § สถานะเงินแยกจากขั้นตอนงาน — รออนุมัติงบเท่านั้นที่รองบ ที่เหลือไม่ระบุ
+        budgetStatus: c.statusFinal === 'awaiting_budget' ? 'awaiting_budget' : 'unspecified',
         title: mapping.title,
         description: mapping.description,
         location: mapping.location,
@@ -413,6 +420,7 @@ export async function applyImport(options: ApplyOptions): Promise<{ batchId: str
         sourceKey: c.row.sourceKey,
         importBatchId: batchId,
         legacySubmitterName: submitterName,
+        legacyResponsibleRaw: raw.responsibleRaw.trim() || null,
         isHistorical: true,
         createdAt: evidenceDate,
         updatedAt: evidenceDate,

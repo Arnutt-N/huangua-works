@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ALL_STATUSES } from './cases/state-machine';
+import { ALL_BUDGET_STATUSES } from './cases/budget';
 import { STAFF_ROLES } from './auth/roles';
 import { CONVERSATION_MODES } from './line/chat-modes';
 
@@ -93,6 +94,8 @@ export const trackingCodeSchema = z
 // ────────────────────────────────────────────────────────────────────────────
 
 export const caseStatusSchema = z.enum(ALL_STATUSES);
+
+export const budgetStatusSchema = z.enum(ALL_BUDGET_STATUSES);
 
 export const casePrioritySchema = z.enum(['normal', 'urgent']);
 

@@ -16,6 +16,7 @@ import { buildTimeline } from './operations';
 const CURRENT = {
   status: 'received',
   priority: 'normal',
+  budgetStatus: 'unspecified',
   assignedTo: null,
   departmentId: null,
 };
@@ -73,6 +74,30 @@ describe('buildTimeline — privacy invariant', () => {
       expect(result.entry.isPublic).toBe(true);
       expect(result.entry.updateType).toBe('metadata_change'); // ใช้ type ร่วมกับ department
       expect(result.entry.newValue).toBe('urgent');
+    }
+  });
+});
+
+describe('buildTimeline — budget', () => {
+  it('ค่าเดิม → error ภาษาไทย (กัน timeline ขยะจากการกดซ้ำ)', () => {
+    const result = buildTimeline({ kind: 'budget', budgetStatus: 'unspecified' }, CURRENT);
+    expect('error' in result && result.error).toBe('สถานะงบประมาณเหมือนเดิม');
+  });
+
+  /**
+   * § งบประมาณเป็น internal โดยตั้งใจ — ค่าที่เก็บเป็น enum ภาษาอังกฤษ
+   * ไม่ใช่ข้อความอ่านออก และ /track ไม่มี field งบประมาณให้ประชาชนดู
+   * ถ้าเผลอตั้ง true จะไม่มี type error — เทสต์นี้คือด่านเดียวที่จับได้
+   * (pattern เดียวกับ privacy invariant ของ assignment ด้านบน)
+   */
+  it('เปลี่ยนงบประมาณต้องไม่เป็น public — ค่าเป็น enum ภายใน', () => {
+    const result = buildTimeline({ kind: 'budget', budgetStatus: 'has_budget' }, CURRENT);
+    expect('entry' in result).toBe(true);
+    if ('entry' in result) {
+      expect(result.entry.isPublic).toBe(false);
+      expect(result.entry.updateType).toBe('metadata_change');
+      expect(result.entry.oldValue).toBe('unspecified');
+      expect(result.entry.newValue).toBe('has_budget');
     }
   });
 });
