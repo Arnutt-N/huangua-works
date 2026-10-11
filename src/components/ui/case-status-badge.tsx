@@ -21,6 +21,7 @@ const statusClasses: Record<CaseStatus, string> = {
   pending: 'bg-ink/5 text-ink ring-ink/15',
   received: 'bg-accent-sunken text-accent-strong ring-accent-strong/20',
   reviewing: 'bg-warning-soft text-warning-ink ring-warning-ink/20',
+  awaiting_budget: 'bg-warning-soft text-warning-ink ring-warning-ink/20',
   assigned: 'bg-warning-soft text-warning-ink ring-warning-ink/20',
   in_progress: 'bg-warning-soft text-warning-ink ring-warning-ink/20',
   done: 'bg-success-soft text-success-ink ring-success-ink/20',

@@ -9,6 +9,7 @@ const STATUS_COLORS: Record<CaseStatus, string> = {
   pending: '#9B9B9B',
   received: '#4A90D9',
   reviewing: '#F5A623',
+  awaiting_budget: '#F5A623',
   assigned: '#7B68EE',
   in_progress: '#F5A623',
   done: '#7ED321',

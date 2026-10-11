@@ -289,6 +289,15 @@ export const cases = pgTable(
     // lookup ผ่าน /api/cases/[id] ใช้ค่านี้แทน PK เพื่อไม่เปิดเผย UUID ที่เดาได้ (UUID v7 timestamp-ordered)
     trackingCode: text('tracking_code'),
 
+    // § legacy import provenance (นำเข้าทะเบียน Excel ย้อนหลัง) — ทุกแถวนำเข้า
+    // isHistorical = true เสมอ; cron close-stale ข้ามแถวกลุ่มนี้ ไม่ปิดอัตโนมัติ
+    // sourceKey ผูก workbook_sha256 + sheet + row จาก staging (unique ห้ามซ้ำ)
+    // legacySubmitterName เก็บชื่อดิบจาก Excel ไว้ให้ staff ดู (PII — ไม่ขึ้นจอประชาชน)
+    sourceKey: text('source_key'),
+    importBatchId: text('import_batch_id'), // FK import_batches.id
+    legacySubmitterName: text('legacy_submitter_name'),
+    isHistorical: boolean('is_historical').notNull().default(false),
+
     // Metadata
     attachments: jsonb('attachments'), // JSON array: [{ url, type, size }]
     metadata: jsonb('metadata'), // JSON: { coordinates, internalNotes, etc }
@@ -307,6 +316,13 @@ export const cases = pgTable(
     trackingCodeIdx: uniqueIndex('cases_tracking_code_idx')
       .on(table.trackingCode)
       .where(sql`tracking_code IS NOT NULL`),
+    // § partial unique index — เฉพาะ row นำเข้าที่มี source_key; retry แบบ idempotent
+    // ใช้ ON CONFLICT DO NOTHING แล้ว reconcile ยอด (รูปแบบเดียวกับ trackingCodeIdx)
+    sourceKeyIdx: uniqueIndex('cases_source_key_idx')
+      .on(table.sourceKey)
+      .where(sql`source_key IS NOT NULL`),
+    importBatchIdx: index('cases_import_batch_id_idx').on(table.importBatchId),
+    historicalIdx: index('cases_is_historical_idx').on(table.isHistorical),
   })
 );
 
@@ -347,6 +363,49 @@ export const caseUpdates = pgTable(
     caseIdx: index('case_updates_case_id_idx').on(table.caseId),
     userIdx: index('case_updates_user_id_idx').on(table.userId),
     createdAtIdx: index('case_updates_created_at_idx').on(table.createdAt),
+  })
+);
+
+// ────────────────────────────────────────────────────────────────────────────
+// § Import Batches + Legacy Responsible Map (นำเข้าทะเบียน Excel ย้อนหลัง)
+// import_batches หนึ่งแถวต่อการ apply หนึ่ง workbook — sourceSha256 unique กันรันซ้ำ
+// legacy_responsible_map ตัดสินโดยคน: ค่าดิบคอลัมน์ผู้รับผิดชอบ → department/staff
+// แถวที่ยังไม่มี map ค้าง write_gate blocked ใน staging ต่อไป ไม่เข้า DB
+// ────────────────────────────────────────────────────────────────────────────
+
+export const importBatches = pgTable(
+  'import_batches',
+  {
+    id: text('id').primaryKey(), // UUID v7
+    createdAt: timestamp('created_at', { mode: 'date' })
+      .notNull()
+      .defaultNow(),
+    sourceSha256: text('source_sha256').notNull().unique(), // workbook hash จาก manifest
+    fileName: text('file_name').notNull(),
+    rowCount: integer('row_count').notNull(), // records ใน staging
+    importedCount: integer('imported_count').notNull().default(0),
+    skippedCount: integer('skipped_count').notNull().default(0), // sourceKey ซ้ำ (retry)
+    operatorUserId: text('operator_user_id').notNull(), // staff ผู้สั่ง apply
+    notes: text('notes'), // JSON: { resolutions, masterSha256, ... }
+  },
+  (table) => ({
+    sourceSha256Idx: uniqueIndex('import_batches_source_sha256_idx').on(table.sourceSha256),
+  })
+);
+
+export const legacyResponsibleMap = pgTable(
+  'legacy_responsible_map',
+  {
+    raw: text('raw').primaryKey(), // ค่าดิบคอลัมน์ผู้รับผิดชอบ (normalized)
+    departmentId: text('department_id'), // FK departments.id
+    assignedTo: text('assigned_to'), // FK users.id (officer) — nullable
+    decidedBy: text('decided_by').notNull(), // staff ผู้ตัดสิน
+    decidedAt: timestamp('decided_at', { mode: 'date' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    departmentIdx: index('legacy_responsible_map_department_id_idx').on(table.departmentId),
   })
 );
 

@@ -22,7 +22,9 @@ export async function GET(req: NextRequest) {
   const staleCases = await db
     .select({ id: cases.id })
     .from(cases)
-    .where(and(eq(cases.status, 'done'), lt(cases.updatedAt, staleThreshold)));
+    // § ข้ามเรื่องนำเข้าย้อนหลัง — updatedAt ของแถว historical คือวันที่รับเรื่องจริง
+    // จึงเก่ากว่า threshold เสมอ ถ้าไม่ข้ามจะถูกปิดอัตโนมัติทั้งหมดตั้งแต่ cron รอบแรก
+    .where(and(eq(cases.status, 'done'), eq(cases.isHistorical, false), lt(cases.updatedAt, staleThreshold)));
 
   let closedCount = 0;
   const failures: string[] = [];

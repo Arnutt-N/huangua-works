@@ -59,6 +59,7 @@ export const AUDIT_ACTIONS = {
   RICH_MENU_PUBLISH: 'rich_menu_publish',
   MEDIA_UPLOAD: 'media_upload',
   MEDIA_DELETE: 'media_delete',
+  IMPORT_CASE: 'import_case',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
