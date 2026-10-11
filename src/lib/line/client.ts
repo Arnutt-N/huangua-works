@@ -1,4 +1,5 @@
 import type { LineOutgoingMessage, LineProfile } from './types';
+import { withLineCircuit } from './circuit-breaker';
 
 export const LINE_API_BASE = 'https://api.line.me/v2/bot';
 export const LINE_DATA_BASE = 'https://api-data.line.me/v2/bot';
@@ -22,15 +23,18 @@ export function getHeaders(): HeadersInit {
 }
 
 async function postLine(endpoint: string, payload: unknown): Promise<void> {
-  const res = await fetch(`${LINE_API_BASE}${endpoint}`, {
-    method: 'POST',
-    headers: getHeaders(),
-    body: JSON.stringify(payload),
+  // § circuit breaker ห่อทุก POST — LINE ล่ม 5 ครั้งติด open 30s แล้ว fast-fail
+  await withLineCircuit(endpoint, async () => {
+    const res = await fetch(`${LINE_API_BASE}${endpoint}`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      throw new LineApiError(endpoint, res.status, detail.slice(0, 500));
+    }
   });
-  if (!res.ok) {
-    const detail = await res.text().catch(() => '');
-    throw new LineApiError(endpoint, res.status, detail.slice(0, 500));
-  }
 }
 
 export async function replyMessage(replyToken: string, messages: LineOutgoingMessage[]): Promise<void> {

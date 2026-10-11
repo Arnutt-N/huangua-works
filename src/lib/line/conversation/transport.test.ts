@@ -1,6 +1,16 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { httpLineTransport } from './transport';
 import { createRecordingTransport } from './recording-transport';
+
+// § client.ts ห่อ postLine ด้วย circuit breaker (อ่าน Redis state) — test นี้ mock
+// redis ของ breaker ให้ closed เสมอ เพื่อพิสูจน์แค่ transport behavior
+vi.mock('@/lib/upstash', () => ({
+  redis: {
+    get: vi.fn(async () => null),
+    set: vi.fn(async () => 'OK'),
+    del: vi.fn(async () => 1),
+  },
+}));
 
 const TEXT = [{ type: 'text' as const, text: 'สวัสดีครับ' }];
 
