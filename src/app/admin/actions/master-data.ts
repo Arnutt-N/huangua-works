@@ -22,10 +22,10 @@ import { ADMIN_ROLES } from '@/lib/auth/roles';
  * สองตารางนี้เป็น "โครง" ที่ทุกเรื่องแจ้งอ้างถึง การแก้จึงกระทบทั้งระบบ
  * จำกัดสิทธิ์ head/superadmin เหมือน /admin/users
  *
- * § ไม่มีปุ่มลบถาวร — ใช้ปิดใช้งาน (isActive=false) แทน
- * cases.departmentId / cases.categoryId ชี้มาที่แถวเหล่านี้ ถ้าลบทิ้งเรื่องเก่าจะ
- * อ้างถึงของที่ไม่มีอยู่ และรายงานย้อนหลังจะอ่านไม่ออก การปิดใช้งานทำให้หมวดนั้น
- * หายจาก dropdown ของฟอร์มแจ้งเรื่องใหม่ แต่เรื่องเดิมยังแสดงชื่อได้ถูกต้อง
+ * § ลบถาวรได้เฉพาะหน่วยงานที่ไม่มีใครอ้างถึงจาก 4 ที่ (cases.departmentId,
+ * users.departmentId, categories.defaultDepartmentId, legacyResponsibleMap.departmentId)
+ * ถ้ามีอ้างถึงให้ปิดใช้งาน (isActive=false) แทน ไม่งั้นเรื่องเก่าจะอ้างถึงของที่ไม่มีอยู่
+ * รายงานย้อนหลังอ่านไม่ออก การปิดใช้งานทำให้หายจาก dropdown ฟอร์มใหม่ แต่เรื่องเดิมยังแสดงชื่อได้ถูกต้อง
  */
 
 export interface MasterDataActionState {
