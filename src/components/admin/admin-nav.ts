@@ -12,6 +12,8 @@ import {
   HeartPulse,
   Settings,
   Palette,
+  ListChecks,
+  ContactRound,
   type LucideIcon,
 } from 'lucide-react';
 import { ADMIN_ROLES, type UserRole } from '@/lib/auth/roles';
@@ -45,6 +47,11 @@ export interface AdminNavItem {
   href: string;
   icon: LucideIcon;
   supervisorOnly?: boolean;
+  /**
+   * หน้า superadmin เท่านั้น — ซ่อนจาก head ด้วย (ต่างจาก supervisorOnly ที่ head เห็น)
+   * ต้องตรงกับ requireStaff(SUPERADMIN_ONLY) ใน page.tsx มิฉะนั้น head จะเจอทางตัน
+   */
+  superadminOnly?: boolean;
 }
 
 export interface AdminNavGroup {
@@ -118,6 +125,22 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         icon: FolderCog,
         supervisorOnly: true,
       },
+      {
+        key: 'citizens',
+        label: 'บัญชีประชาชน',
+        href: '/admin/citizens',
+        icon: ContactRound,
+        supervisorOnly: true,
+        superadminOnly: true,
+      },
+      {
+        key: 'responsible',
+        label: 'ผู้รับผิดชอบย้อนหลัง',
+        href: '/admin/responsible',
+        icon: ListChecks,
+        supervisorOnly: true,
+        superadminOnly: true,
+      },
       { key: 'files', label: 'ไฟล์สื่อ', href: '/admin/files', icon: Image, supervisorOnly: true },
       { key: 'image-resize', label: 'ย่อรูป', href: '/admin/image-resize', icon: Image, supervisorOnly: true },
       { key: 'settings', label: 'ตั้งค่า', href: '/admin/settings', icon: Settings, supervisorOnly: true },
@@ -135,7 +158,9 @@ export function isSupervisor(role: UserRole): boolean {
 }
 
 export function visibleNavItems(role: UserRole, items: AdminNavItem[]): AdminNavItem[] {
-  return items.filter((item) => !item.supervisorOnly || isSupervisor(role));
+  return items.filter(
+    (item) => (!item.supervisorOnly || isSupervisor(role)) && (!item.superadminOnly || role === 'superadmin'),
+  );
 }
 
 /**

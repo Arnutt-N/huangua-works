@@ -319,6 +319,11 @@ export const setPriorityFormSchema = z.object({
   priority: casePrioritySchema,
 });
 
+export const changeBudgetFormSchema = z.object({
+  caseId: uuidSchema,
+  budgetStatus: budgetStatusSchema,
+});
+
 export const addUpdateFormSchema = z.object({
   caseId: uuidSchema,
   comment: commentSchema,
@@ -483,6 +488,21 @@ export const updateCitizenFormSchema = z.object({
 export const setCitizenCidFormSchema = z.object({
   userId: uuidSchema,
   cid: cidSchema,
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// § Responsible map — แผนที่ผู้รับผิดชอบย้อนหลัง (/admin/responsible, superadmin)
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * departmentId บังคับเสมอ — map ที่ยังไม่ตัดสิน (seed 'system') ต้องถูก edit ให้มี
+ * หน่วยงานก่อน dry-run จะผ่าน (ดู legacy-import.ts) จึงไม่มีเหตุผลให้สร้างแถว
+ * ที่ไม่มีหน่วยงานเพิ่มอีก ส่วน assignedTo (เจ้าหน้าที่) เว้นว่างได้
+ */
+export const responsibleFormSchema = z.object({
+  raw: z.string().trim().min(1, 'กรุณากรอกค่าดิบ').max(200, 'ค่าดิบยาวเกิน 200 ตัวอักษร'),
+  departmentId: uuidSchema,
+  assignedTo: z.string().optional().or(z.literal('')),
 });
 
 // ────────────────────────────────────────────────────────────────────────────

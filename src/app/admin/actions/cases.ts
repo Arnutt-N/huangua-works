@@ -10,6 +10,7 @@ import {
   assignOfficerFormSchema,
   changeDepartmentFormSchema,
   setPriorityFormSchema,
+  changeBudgetFormSchema,
   addUpdateFormSchema,
   validateFormData,
 } from '@/lib/validation';
@@ -111,6 +112,31 @@ export async function setPriority(
   revalidatePath(`/admin/cases/${caseId}`);
   revalidatePath('/admin');
   redirect(`/admin/cases/${caseId}?ok=priority`);
+}
+
+/**
+ * เปลี่ยนสถานะงบประมาณ — เรื่องเงินจึงจำกัด supervisor ขึ้นไป (เหมือนเปลี่ยนหน่วยงาน)
+ * timeline เป็น internal (ประชาชนไม่เห็นงบ) บันทึก audit UPDATE_CASE_BUDGET
+ */
+export async function changeBudget(
+  _prevState: CaseActionState,
+  formData: FormData
+): Promise<CaseActionState> {
+  const auth = await requireStaff(CASE_SUPERVISOR_ROLES);
+  const v = validateFormData(changeBudgetFormSchema, formData);
+  if (!v.success) return { error: v.error };
+  const { caseId, budgetStatus } = v.data;
+
+  const result = await applyCaseUpdate(caseId, {
+    kind: 'budget',
+    budgetStatus,
+  }, toActor(auth));
+
+  if (!result.ok) return { error: result.error };
+
+  revalidatePath(`/admin/cases/${caseId}`);
+  revalidatePath('/admin');
+  redirect(`/admin/cases/${caseId}?ok=budget`);
 }
 
 export async function addUpdate(

@@ -14,11 +14,17 @@ import {
 import {
   addUpdate,
   assignOfficer,
+  changeBudget,
   changeDepartment,
   changeStatus,
   setPriority,
   type CaseActionState,
 } from '@/app/admin/actions/cases';
+import {
+  ALL_BUDGET_STATUSES,
+  BUDGET_LABELS_TH,
+  type BudgetStatus,
+} from '@/lib/cases/budget';
 import {
   ALL_STATUSES,
   STATUS_LABELS_TH,
@@ -42,6 +48,7 @@ interface CaseDetailClientProps {
   caseId: string;
   currentStatus: CaseStatus;
   currentPriority: 'normal' | 'urgent';
+  currentBudgetStatus: BudgetStatus;
   currentAssignedTo: string | null;
   currentDepartmentId: string | null;
   officers: OfficerOption[];
@@ -55,6 +62,7 @@ export function CaseDetailClient({
   caseId,
   currentStatus,
   currentPriority,
+  currentBudgetStatus,
   currentAssignedTo,
   currentDepartmentId,
   officers,
@@ -76,6 +84,10 @@ export function CaseDetailClient({
   );
   const [priorityState, priorityAction, priorityPending] = useActionState(
     setPriority,
+    initialActionState
+  );
+  const [budgetState, budgetAction, budgetPending] = useActionState(
+    changeBudget,
     initialActionState
   );
   const [commentState, commentAction, commentPending] = useActionState(
@@ -244,6 +256,32 @@ export function CaseDetailClient({
         </form>
       </ActionCard>
 
+      {/* ── สถานะงบประมาณ ── */}
+      <ActionCard title="สถานะงบประมาณ">
+        <form action={budgetAction} className="space-y-3">
+          <input type="hidden" name="caseId" value={caseId} />
+          <div>
+            <Label htmlFor="budgetStatus">งบประมาณ</Label>
+            <Select name="budgetStatus" defaultValue={currentBudgetStatus}>
+              <SelectTrigger id="budgetStatus">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ALL_BUDGET_STATUSES.map((b) => (
+                  <SelectItem key={b} value={b}>
+                    {BUDGET_LABELS_TH[b]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {budgetState.error && <ErrorText>{budgetState.error}</ErrorText>}
+          <Button type="submit" size="sm" variant="secondary" disabled={budgetPending}>
+            {budgetPending ? 'กำลังบันทึก...' : 'บันทึก'}
+          </Button>
+        </form>
+      </ActionCard>
+
       {/* ── เพิ่มความคืบหน้า ── */}
       <ActionCard title="เพิ่มความคืบหน้า">
         <form action={commentAction} className="space-y-3">
@@ -332,6 +370,7 @@ export function SuccessToast({ ok }: { ok: string | null }) {
     assign: 'อัปเดตการมอบหมายเรียบร้อย',
     department: 'อัปเดตหน่วยงานเรียบร้อย',
     priority: 'อัปเดตความเร่งด่วนเรียบร้อย',
+    budget: 'อัปเดตสถานะงบประมาณเรียบร้อย',
     comment: 'เพิ่มความคืบหน้าเรียบร้อย',
   };
   const msg = messages[ok] ?? 'บันทึกเรียบร้อย';

@@ -18,6 +18,7 @@ import {
 } from '@/lib/db/schema';
 import { requireStaff } from '@/lib/auth/require-staff';
 import { CASE_SUPERVISOR_ROLES } from '@/lib/auth/roles';
+import { BUDGET_LABELS_TH } from '@/lib/cases/budget';
 import { getActiveDepartments, getActiveOfficers } from '@/lib/queries/lookups';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { STATUS_LABELS_TH } from '@/lib/cases/state-machine';
@@ -60,6 +61,7 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
         location: cases.location,
         status: cases.status,
         priority: cases.priority,
+        budgetStatus: cases.budgetStatus,
         createdAt: cases.createdAt,
         updatedAt: cases.updatedAt,
         dueDate: cases.dueDate,
@@ -200,6 +202,11 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
                   ฉุกเฉิน
                 </span>
               )}
+              {caseRow.budgetStatus !== 'unspecified' && (
+                <span className="rounded-pill bg-warning-soft px-2 py-0.5 font-semibold text-warning-ink ring-1 ring-warning-ink/20 ring-inset">
+                  {BUDGET_LABELS_TH[caseRow.budgetStatus]}
+                </span>
+              )}
             </div>
             <h1 className="mt-2 text-2xl font-bold text-ink sm:text-3xl">
               {caseRow.title}
@@ -273,6 +280,7 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
             caseId={caseRow.id}
             currentStatus={caseRow.status}
             currentPriority={caseRow.priority}
+            currentBudgetStatus={caseRow.budgetStatus}
             currentAssignedTo={caseRow.assignedTo}
             currentDepartmentId={caseRow.departmentId}
             officers={officerOptions}

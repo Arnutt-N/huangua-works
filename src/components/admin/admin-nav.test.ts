@@ -39,6 +39,19 @@ describe('visibleNavGroups', () => {
     }
   });
 
+  it('head เห็นเมนู supervisor แต่ไม่เห็นเมนู superadminOnly', () => {
+    const keys = visibleNavGroups('head').flatMap((g) => g.items).map((i) => i.key);
+    expect(keys).toContain('audit');
+    expect(keys).not.toContain('citizens');
+    expect(keys).not.toContain('responsible');
+  });
+
+  it('superadmin เห็นเมนู superadminOnly ด้วย', () => {
+    const keys = visibleNavGroups('superadmin').flatMap((g) => g.items).map((i) => i.key);
+    expect(keys).toContain('citizens');
+    expect(keys).toContain('responsible');
+  });
+
   it('visibleNavItems กรองตาม supervisorOnly ถูกต้อง', () => {
     const items = ADMIN_NAV_GROUPS.flatMap((g) => g.items);
     const forOfficer = visibleNavItems('officer', items);
@@ -62,6 +75,8 @@ const PAGE_OF: Record<string, string> = {
   reports: 'src/app/admin/reports/page.tsx',
   chat: 'src/app/admin/chat/page.tsx',
   users: 'src/app/admin/users/page.tsx',
+  citizens: 'src/app/admin/citizens/page.tsx',
+  responsible: 'src/app/admin/responsible/page.tsx',
   'master-data': 'src/app/admin/master-data/page.tsx',
   chatbot: 'src/app/admin/chatbot/page.tsx',
   'auto-replies': 'src/app/admin/chatbot/auto-replies/page.tsx',
@@ -85,12 +100,17 @@ describe('nav ↔ route guard', () => {
     }
   });
 
-  it.each(items)('เมนู "$label" — supervisorOnly ตรงกับ guard ในหน้า', (item) => {
+  it.each(items)('เมนู "$label" — flag ตรงกับ guard ในหน้า', (item) => {
     const file = PAGE_OF[item.key];
     if (!file) return;
     const src = readFileSync(resolve(process.cwd(), file), 'utf8');
     const usesAdminGuard = /requireStaff\(\s*ADMIN_ROLES\s*\)/.test(src);
-    expect(usesAdminGuard).toBe(Boolean(item.supervisorOnly));
+    const usesSuperadminGuard = /requireStaff\(\s*SUPERADMIN_ONLY\s*\)/.test(src);
+    if (item.superadminOnly) {
+      expect(usesSuperadminGuard).toBe(true);
+    } else {
+      expect(usesAdminGuard).toBe(Boolean(item.supervisorOnly));
+    }
   });
 });
 
