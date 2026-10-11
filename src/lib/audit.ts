@@ -59,6 +59,7 @@ export const AUDIT_ACTIONS = {
   CHATBOT_SETTINGS_UPDATE: 'chatbot_settings_update',
   SYSTEM_SETTING_UPDATE: 'system_setting_update',
   API_CONNECTION_UPDATE: 'api_connection_update',
+  MCP_TOOL_CALL: 'mcp_tool_call',
   FAQ_CREATE: 'faq_create',
   FAQ_UPDATE: 'faq_update',
   FAQ_DELETE: 'faq_delete',
