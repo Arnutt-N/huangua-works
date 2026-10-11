@@ -41,4 +41,5 @@ proof ที่ขับ entry point หน่วยเดียวไม่พ�
 - [แจ้งเรื่องใหม่ (intake)](./intake.md) — ฟอร์มสาธารณะ `/intake` รวม geography cascade, PDPA consent, dedup
 - [ค้นหาและติดตามเรื่อง (track)](./track.md) — `/track` ค้นหาด้วยเลขติดตาม + "เรื่องของฉัน" ผ่าน LIFF
 - [เข้าสู่ระบบ admin](./admin-auth.md) — login/logout/session lifetime/route guarding ที่ `/admin/*`
+- [แชทกับประชาชนผ่าน LINE](./admin-chat.md) — โต๊ะงาน `/admin/chat`: รายการ/กรอง/ค้นหา/ตอบกลับ/canned/tags/SSE
 - [LINE chatbot webhook](./line-webhook.md) — ยิง event เข้า `/api/line/webhook` จริงแล้วเช็ก reply/handoff

@@ -40,7 +40,7 @@ Preconditions:
 
 ## Gotchas
 
-- `LINE_CHANNEL_SECRET` ไม่ได้ตั้งใน `.env.local` → `scripts/test-webhook.ts` ออกทันทีด้วยข้อความ `LINE_CHANNEL_SECRET ไม่ได้ตั้งใน .env.local` (exit 1) และ signature gate ตอบ 401 ทุก request — บนเครื่องที่ไม่มี secret จริง การยืนยัน bot engine เลยทำไม่ได้ ค่านี้ไม่อยู่ใน `verify-env` ที่บังคับ build จึงดูเหมือน "bอทเงียบ" เงียบ ๆ
+- `LINE_CHANNEL_SECRET` ไม่ได้ตั้งใน `.env.local` → `scripts/test-webhook.ts` ออกทันทีด้วยข้อความ `LINE_CHANNEL_SECRET ไม่ได้ตั้งใน .env.local` (exit 1) และ signature gate ตอบ 401 ทุก request — บนเครื่องที่ไม่มี secret จริง การยืนยัน bot engine เลยทำไม่ได้ ค่านี้ไม่อยู่ใน `verify-env` ที่บังคับ build จึงดูเหมือน "บอทเงียบ" เงียบ ๆ
 - **argv ของ test-webhook พลิกกับที่ intuition คิด:** `argv[2]` = BASE URL, `argv[3]` = event type (`scripts/test-webhook.ts:21-22`) คำสั่งสั้น `npx tsx scripts/test-webhook.ts handoff` จะพัง เพราะ BASE กลายเป็น `follow`/`handoff` (invalid URL) ต้องเขียน BASE เสมอ — default ของ script คือ `:3001` ซึ่งไม่มีอะไรรันอยู่ ต้องบังคับ `http://localhost:3000`
 - `curl -d '{}'` ที่ส่ง signature ถูกต้องไม่ได้พิสูจน์ gate — secret ตรงแล้ว body `{}` ไม่มี `events` → `parsed.events.map` throw → Next ตอบ **500** ไม่ได้ 200 ยืนยัน gate ด้วย (ก) ไม่ส่ง header (401) หรือ (ข) ส่ง header มั่ว (401)
 - **webhook ไม่มี rate limit ของตัวเอง** — ไม่มี policy key สำหรับ webhook เลย Redis ถูกใช้แค่ dedup `webhook:event:<id>` (TTL 300s, fail-open เมื่อ Redis ล่ม) ไม่มีทางได้ 429 จาก webhook นี้เอง
