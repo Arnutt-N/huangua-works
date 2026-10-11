@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { caseStatusFlex, faqMenuFlex, handoffNotifyFlex } from './flex';
+import { caseStatusFlex, faqMenuFlex, handoffNotifyFlex, caseConfirmFlex, parseConfirmPostback, type CaseConfirmSummary } from './flex';
 import type { LineOutgoingMessage } from '../types';
 
 type FlexMsg = Extract<LineOutgoingMessage, { type: 'flex' }>;
@@ -110,5 +110,105 @@ describe('handoffNotifyFlex', () => {
     const body = msg.contents.body as { contents: Array<Record<string, unknown>> };
     expect(body.contents).toHaveLength(2);
     expect(body.contents[0]).toHaveProperty('weight', 'bold');
+  });
+});
+
+describe('parseConfirmPostback', () => {
+  it('accepts all 6 protocol members', () => {
+    const datas = [
+      'confirm:ok',
+      'confirm:cancel',
+      'confirm:edit:category',
+      'confirm:edit:title',
+      'confirm:edit:description',
+      'confirm:edit:location',
+    ];
+    for (const data of datas) {
+      expect(parseConfirmPostback(data)).toBe(data);
+    }
+  });
+
+  it('rejects non-confirm postbacks with null', () => {
+    expect(parseConfirmPostback('faq:select:1')).toBeNull();
+    expect(parseConfirmPostback('confirm:delete')).toBeNull();
+    expect(parseConfirmPostback('')).toBeNull();
+  });
+});
+
+describe('caseConfirmFlex', () => {
+  const summary: CaseConfirmSummary = {
+    categoryName: 'ถนน-ทางเท้า',
+    title: 'ถนนพังหน้าบ้าน',
+    description: 'มีหลุมบ่อใหญ่กลางถนน',
+    location: 'หน้าวัดหัวงัว หมู่ 3',
+  };
+  // § ข้อความยินยอมสมมติของเทสต์ — wiring กับ BOT_CONSENT_NOTICE จริงตรวจที่ case-flow.test.ts
+  const consent = 'การกดยืนยันถือว่ายินยอมให้เก็บข้อมูล ติดต่อ 043-601-494';
+
+  function bodyContents(msg: LineOutgoingMessage) {
+    return (asFlex(msg).contents.body as { contents: Array<Record<string, unknown>> }).contents;
+  }
+
+  function footerContents(msg: LineOutgoingMessage) {
+    return (asFlex(msg).contents.footer as { contents: Array<Record<string, unknown>> }).contents;
+  }
+
+  /** เก็บ action postback ทั้ง bubble (แถวช่อง + footer) */
+  function postbackActions(msg: LineOutgoingMessage): Array<{ label: unknown; data: unknown }> {
+    const c = asFlex(msg).contents as {
+      body: { contents: Array<Record<string, unknown>> };
+      footer: { contents: Array<Record<string, unknown>> };
+    };
+    const out: Array<{ label: unknown; data: unknown }> = [];
+    const visit = (node: Record<string, unknown>) => {
+      const action = node.action as Record<string, unknown> | undefined;
+      if (action?.type === 'postback') out.push({ label: action.label, data: action.data });
+      const kids = node.contents as Array<Record<string, unknown>> | undefined;
+      kids?.forEach(visit);
+    };
+    [...c.body.contents, ...c.footer.contents].forEach(visit);
+    return out;
+  }
+
+  it('returns a bubble flex message', () => {
+    const msg = asFlex(caseConfirmFlex(summary, consent));
+    expect(msg.contents.type).toBe('bubble');
+    expect(msg.contents).toHaveProperty('header');
+    expect(msg.contents).toHaveProperty('body');
+    expect(msg.contents).toHaveProperty('footer');
+  });
+
+  it('has one edit button per field (4 buttons with confirm:edit:* data)', () => {
+    const actions = postbackActions(caseConfirmFlex(summary, consent));
+    const edits = actions.filter((a) => typeof a.data === 'string' && a.data.startsWith('confirm:edit:'));
+    expect(edits.map((a) => a.data).sort()).toEqual([
+      'confirm:edit:category',
+      'confirm:edit:description',
+      'confirm:edit:location',
+      'confirm:edit:title',
+    ]);
+  });
+
+  it('footer has confirm (confirm:ok) and cancel (confirm:cancel) buttons', () => {
+    const buttons = footerContents(caseConfirmFlex(summary, consent));
+    expect(buttons).toHaveLength(2);
+    const datas = buttons.map((b) => (b.action as Record<string, unknown>).data);
+    expect(datas).toEqual(['confirm:ok', 'confirm:cancel']);
+  });
+
+  it('body shows all 4 field values', () => {
+    const flat = JSON.stringify(bodyContents(caseConfirmFlex(summary, consent)));
+    for (const value of Object.values(summary)) {
+      expect(flat).toContain(value);
+    }
+  });
+
+  it('altText carries the full summary including the consent wording', () => {
+    const msg = asFlex(caseConfirmFlex(summary, consent));
+    expect(msg.altText).toContain('สรุปเรื่องที่แจ้ง');
+    for (const value of Object.values(summary)) {
+      expect(msg.altText).toContain(value);
+    }
+    expect(msg.altText).toContain(consent);
   });
 });
