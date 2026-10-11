@@ -302,7 +302,7 @@ export const cases = pgTable(
     dueDate: timestamp('due_date', { mode: 'date' }),
     closedAt: timestamp('closed_at', { mode: 'date' }),
 
-    // § citizen-facing tracking code: HN + 9 หลักสุ่ม (คล้าย EMS ไปรษณีย์ไทย)
+    // § citizen-facing tracking code: HG + 9 หลักสุ่ม (คล้าย EMS ไปรษณีย์ไทย)
     // null = เคสเก่าก่อนใช้ระบบนี้ → ปิด track (คืน 404)
     // lookup ผ่าน /api/cases/[id] ใช้ค่านี้แทน PK เพื่อไม่เปิดเผย UUID ที่เดาได้ (UUID v7 timestamp-ordered)
     trackingCode: text('tracking_code'),

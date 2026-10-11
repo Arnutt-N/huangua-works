@@ -116,3 +116,140 @@ export function handoffNotifyFlex(): LineOutgoingMessage {
     },
   };
 }
+
+// ─── ยืนยันเรื่อง (confirm bubble + ปุ่มแก้รายช่อง) ─────────────────────────
+
+/** ช่องที่แก้จาก bubble ยืนยันได้ — ตรงกับ step ของ case-flow ทีละตัว */
+export type ConfirmEditableField = 'category' | 'title' | 'description' | 'location';
+
+/**
+ * § postback protocol ของ bubble ยืนยัน — union ปิด (ไม่มี prefix match กว้างๆ)
+ * engine แยก confirm:* ออกจาก postback อื่นด้วย parseConfirmPostback เท่านั้น
+ */
+export type CaseConfirmPostbackData =
+  | 'confirm:ok'
+  | 'confirm:cancel'
+  | 'confirm:edit:category'
+  | 'confirm:edit:title'
+  | 'confirm:edit:description'
+  | 'confirm:edit:location';
+
+const CONFIRM_POSTBACKS: ReadonlySet<string> = new Set<string>([
+  'confirm:ok',
+  'confirm:cancel',
+  'confirm:edit:category',
+  'confirm:edit:title',
+  'confirm:edit:description',
+  'confirm:edit:location',
+]);
+
+/** แยก postback ดิบที่ข้าม boundary (webhook) เข้ามา — ไม่ใช่สมาชิก union คืน null */
+export function parseConfirmPostback(data: string): CaseConfirmPostbackData | null {
+  if (!CONFIRM_POSTBACKS.has(data)) return null;
+  return data as CaseConfirmPostbackData;
+}
+
+export interface CaseConfirmSummary {
+  categoryName: string;
+  title: string;
+  description: string;
+  location: string;
+}
+
+const CONFIRM_FIELD_ROWS: ReadonlyArray<{ field: ConfirmEditableField; label: string; key: keyof CaseConfirmSummary }> = [
+  { field: 'category', label: 'หมวดหมู่', key: 'categoryName' },
+  { field: 'title', label: 'หัวข้อ', key: 'title' },
+  { field: 'description', label: 'รายละเอียด', key: 'description' },
+  { field: 'location', label: 'สถานที่', key: 'location' },
+];
+
+/**
+ * bubble สรุปก่อนส่งเรื่อง — 4 แถวช่อง + ปุ่มแก้ไขรายช่อง (postback) + ยืนยัน/ยกเลิก
+ *
+ * § consentNotice ต้องเป็น BOT_CONSENT_NOTICE จาก case-flow (ส่งเข้ามาเป็น param
+ * แทน import ตรงเพื่อเลี่ยง import cycle flex ↔ case-flow) — ข้อความนี้อยู่ในทั้ง
+ * body และ altText เพราะ createCase บันทึก consent via line_bot_submit ทันทีที่ยืนยัน
+ */
+export function caseConfirmFlex(summary: CaseConfirmSummary, consentNotice: string): LineOutgoingMessage {
+  const altText =
+    `📋 สรุปเรื่องที่แจ้ง:\n\nหมวดหมู่: ${summary.categoryName}\nหัวข้อ: ${summary.title}\nรายละเอียด: ${summary.description}\nสถานที่: ${summary.location}\n\n${consentNotice}\n\nกดปุ่ม "ยืนยัน" เพื่อส่งเรื่อง หรือพิมพ์ "ยืนยัน" / "ยกเลิก" ได้เช่นกัน`;
+
+  return {
+    type: 'flex',
+    altText,
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          { type: 'text', text: '📋 สรุปเรื่องที่แจ้ง', color: '#FFFFFF', weight: 'bold' },
+        ],
+        backgroundColor: '#4A90D9',
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: [
+          ...CONFIRM_FIELD_ROWS.map((row) => ({
+            type: 'box',
+            layout: 'horizontal',
+            contents: [
+              {
+                type: 'box',
+                layout: 'vertical',
+                flex: 4,
+                contents: [
+                  { type: 'text', text: row.label, size: 'sm', color: '#9B9B9B' },
+                  { type: 'text', text: summary[row.key], wrap: true, size: 'md' },
+                ],
+              },
+              {
+                type: 'button',
+                action: {
+                  type: 'postback',
+                  label: `แก้${row.label}`,
+                  data: `confirm:edit:${row.field}`,
+                  displayText: `แก้${row.label}`,
+                },
+                style: 'secondary',
+                height: 'sm',
+                flex: 1,
+              },
+            ],
+          })),
+          { type: 'separator', margin: 'md' },
+          { type: 'text', text: consentNotice, wrap: true, size: 'xs', color: '#9B9B9B', margin: 'md' },
+        ],
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          {
+            type: 'button',
+            action: {
+              type: 'postback',
+              label: 'ยืนยันส่งเรื่อง',
+              data: 'confirm:ok',
+              displayText: 'ยืนยัน',
+            },
+            style: 'primary',
+          },
+          {
+            type: 'button',
+            action: {
+              type: 'postback',
+              label: 'ยกเลิก',
+              data: 'confirm:cancel',
+              displayText: 'ยกเลิก',
+            },
+            style: 'secondary',
+          },
+        ],
+      },
+    },
+  };
+}
