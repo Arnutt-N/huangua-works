@@ -58,7 +58,7 @@ vi.mock('@/lib/db', () => ({
   getDb: vi.fn(async () => mockDb),
 }));
 
-const { startCaseFlow, processCaseFlow, BOT_CONSENT_NOTICE } = await import('./case-flow');
+const { startCaseFlow, processCaseFlow, handleConfirmPostback, BOT_CONSENT_NOTICE } = await import('./case-flow');
 
 const LINE_USER_ID = 'U1234567890abcdef';
 
@@ -72,7 +72,14 @@ function flow(input: string, st: CaseFlowState | null) {
 
 function firstReplyText(result: { replies: Array<{ type: string; text?: string }> }): string {
   const r = result.replies[0];
-  return (r as { text: string }).text;
+  if (r?.type !== 'text' || typeof r.text !== 'string') throw new Error('expected text reply');
+  return r.text;
+}
+
+function firstReplyAltText(result: { replies: Array<{ type: string; altText?: string }> }): string {
+  const r = result.replies[0];
+  if (r?.type !== 'flex' || typeof r.altText !== 'string') throw new Error('expected flex reply with altText');
+  return r.altText;
 }
 
 describe('case-flow · processCaseFlow · category step', () => {
@@ -165,7 +172,7 @@ describe('case-flow · processCaseFlow · description step', () => {
 });
 
 describe('case-flow · processCaseFlow · location step', () => {
-  it('stores location and advances to confirm with summary', async () => {
+  it('stores location and advances to confirm with a Flex summary bubble', async () => {
     const s = state('location', {
       categoryId: 'cat-road',
       categoryName: 'ถนน-ทางเท้า',
@@ -175,11 +182,12 @@ describe('case-flow · processCaseFlow · location step', () => {
     const result = await flow('หน้าวัดหัวงัว หมู่ 3', s);
     expect(result.state?.step).toBe('confirm');
     expect(result.state?.location).toBe('หน้าวัดหัวงัว หมู่ 3');
-    const text = firstReplyText(result);
-    expect(text).toContain('สรุปเรื่องที่แจ้ง');
-    expect(text).toContain('ถนน-ทางเท้า');
-    expect(text).toContain('ถนนพัง');
-    expect(text).toContain('หน้าวัดหัวงัว');
+    expect(result.replies[0]?.type).toBe('flex');
+    const alt = firstReplyAltText(result);
+    expect(alt).toContain('สรุปเรื่องที่แจ้ง');
+    expect(alt).toContain('ถนน-ทางเท้า');
+    expect(alt).toContain('ถนนพัง');
+    expect(alt).toContain('หน้าวัดหัวงัว');
   });
 
   it('§ สรุปก่อนยืนยันต้องแจ้งว่าการยืนยัน = ให้ความยินยอม (createCase บันทึก line_bot_submit)', async () => {
@@ -189,13 +197,13 @@ describe('case-flow · processCaseFlow · location step', () => {
       title: 'ถนนพัง',
       description: 'มีหลุมบ่อใหญ่',
     });
-    const text = firstReplyText(await flow('หน้าวัดหัวงัว หมู่ 3', s));
+    const alt = firstReplyAltText(await flow('หน้าวัดหัวงัว หมู่ 3', s));
 
-    expect(text).toContain('ยินยอม');
-    expect(text).toContain('043-601-494');
-    expect(text).toContain(BOT_CONSENT_NOTICE);
-    // ข้อความแจ้งต้องมาก่อนคำสั่ง "ยืนยัน" ไม่ใช่หลัง
-    expect(text.indexOf(BOT_CONSENT_NOTICE)).toBeLessThan(text.indexOf('พิมพ์ "ยืนยัน" เพื่อส่งเรื่อง'));
+    expect(alt).toContain('ยินยอม');
+    expect(alt).toContain('043-601-494');
+    expect(alt).toContain(BOT_CONSENT_NOTICE);
+    // ข้อความแจ้งต้องมาก่อนคำแนะนำวิธียืนยัน ไม่ใช่หลัง
+    expect(alt.indexOf(BOT_CONSENT_NOTICE)).toBeLessThan(alt.indexOf('กดปุ่ม'));
   });
 });
 
@@ -252,5 +260,98 @@ describe('case-flow · startCaseFlow', () => {
     const result = await startCaseFlow();
     expect(result.state.step).toBe('category');
     expect(result.reply.type).toBe('flex');
+  });
+});
+
+describe('case-flow · handleConfirmPostback · edit round-trip', () => {
+  const confirmState: CaseFlowState = {
+    step: 'confirm',
+    categoryId: 'cat-road',
+    categoryName: 'ถนน-ทางเท้า',
+    title: 'ถนนพัง',
+    description: 'มีหลุมบ่อใหญ่',
+    location: 'หน้าวัด ม.3',
+  };
+
+  function postback(data: Parameters<typeof handleConfirmPostback>[0], st: CaseFlowState | null) {
+    return handleConfirmPostback(data, st, LINE_USER_ID);
+  }
+
+  it('confirm:ok submits (same path as typing ยืนยัน) → tracking code', async () => {
+    const result = await postback('confirm:ok', confirmState);
+    expect(result?.state).toBeNull();
+    expect(firstReplyText(result!)).toMatch(/(HN|HG)\d{9}/);
+    expect(mockDb.insert).toHaveBeenCalled();
+  });
+
+  it('confirm:cancel cancels → state null', async () => {
+    const result = await postback('confirm:cancel', confirmState);
+    expect(result?.state).toBeNull();
+    expect(firstReplyText(result!)).toContain('ยกเลิก');
+  });
+
+  it('edit title: jumps to title prompt, answer returns to confirm Flex with edited title', async () => {
+    const edit = await postback('confirm:edit:title', confirmState);
+    expect(edit?.state?.step).toBe('title');
+    expect(edit?.state?.editingField).toBe('title');
+    expect(firstReplyText(edit!)).toContain('หัวข้อเรื่อง');
+
+    const back = await flow('ถนนพังเพิ่มอีกจุด', edit!.state);
+    expect(back.state?.step).toBe('confirm');
+    expect(back.state?.editingField).toBeNull();
+    expect(back.replies[0]?.type).toBe('flex');
+    expect(firstReplyAltText(back)).toContain('ถนนพังเพิ่มอีกจุด');
+    expect(firstReplyAltText(back)).toContain(BOT_CONSENT_NOTICE);
+  });
+
+  it('edit title then confirm submits with the edited title', async () => {
+    const edit = await postback('confirm:edit:title', confirmState);
+    const back = await flow('หัวข้อที่แก้แล้ว', edit!.state);
+    const done = await flow('ยืนยัน', back.state);
+    expect(done.state).toBeNull();
+    expect(firstReplyText(done)).toContain('เลขติดตาม');
+    // § submit path เดิม — เรื่องที่สร้างต้องใช้หัวข้อที่แก้ (นับแถว insert ไม่แตะ PII)
+    const inserts = vi.mocked(mockDb.insert).mock.calls.length;
+    expect(inserts).toBeGreaterThan(0);
+    expect(back.state?.title).toBe('หัวข้อที่แก้แล้ว');
+  });
+
+  it('edit description: answer returns to confirm with edited description', async () => {
+    const edit = await postback('confirm:edit:description', confirmState);
+    expect(edit?.state?.step).toBe('description');
+    const back = await flow('รายละเอียดที่แก้แล้วยาวพอ', edit!.state);
+    expect(back.state?.step).toBe('confirm');
+    expect(firstReplyAltText(back)).toContain('รายละเอียดที่แก้แล้วยาวพอ');
+  });
+
+  it('edit location: answer returns to confirm with edited location', async () => {
+    const edit = await postback('confirm:edit:location', confirmState);
+    expect(edit?.state?.step).toBe('location');
+    const back = await flow('สถานที่ใหม่ หมู่ 5', edit!.state);
+    expect(back.state?.step).toBe('confirm');
+    expect(firstReplyAltText(back)).toContain('สถานที่ใหม่ หมู่ 5');
+  });
+
+  it('edit category: jumps to category menu, answer returns to confirm with new category', async () => {
+    const edit = await postback('confirm:edit:category', confirmState);
+    expect(edit?.state?.step).toBe('category');
+    expect(edit?.replies[0]?.type).toBe('flex');
+
+    const back = await flow('ไฟฟ้า', edit!.state);
+    expect(back.state?.step).toBe('confirm');
+    expect(back.state?.categoryName).toBe('ไฟฟ้า-แสงสว่าง');
+    expect(firstReplyAltText(back)).toContain('ไฟฟ้า-แสงสว่าง');
+  });
+
+  it('returns null outside confirm step (stale postback → engine stays log-only)', async () => {
+    expect(await postback('confirm:ok', state('title', { categoryId: 'cat-road' }))).toBeNull();
+    expect(await postback('confirm:edit:title', null)).toBeNull();
+  });
+
+  it('text ยืนยัน/ยกเลิก still works after an edit round-trip (backward compat)', async () => {
+    const edit = await postback('confirm:edit:location', confirmState);
+    const back = await flow('ที่เดิม', edit!.state);
+    const cancelled = await flow('ยกเลิก', back.state);
+    expect(cancelled.state).toBeNull();
   });
 });

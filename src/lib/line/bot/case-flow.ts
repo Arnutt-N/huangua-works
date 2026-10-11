@@ -3,7 +3,14 @@ import { getDb } from '@/lib/db';
 import { categories } from '@/lib/db/schema';
 import { createCase } from '@/lib/cases/intake';
 import type { LineOutgoingMessage } from '../types';
-import { faqMenuFlex } from '../messages/flex';
+import {
+  caseConfirmFlex,
+  faqMenuFlex,
+  type CaseConfirmPostbackData,
+  type ConfirmEditableField,
+} from '../messages/flex';
+
+export type { CaseConfirmPostbackData, ConfirmEditableField };
 
 export interface CaseFlowState {
   step: 'category' | 'title' | 'description' | 'location' | 'confirm';
@@ -13,6 +20,12 @@ export interface CaseFlowState {
   description?: string;
   location?: string;
   missCount?: number;
+  /**
+   * § ช่องที่ย้อนกลับมาแก้จาก bubble ยืนยัน — ตอบคำถามช่องนี้แล้วกลับไป confirm
+   * ทันที (ส่ง Flex ใหม่) แทนการเดินหน้าต่อ ใช้ flag เดียวแทน boolean กระจาย
+   * null/undefined = เดินหน้าโฟลวปกติ
+   */
+  editingField?: ConfirmEditableField | null;
 }
 
 const CATEGORY_KEYWORDS: Record<string, string[]> = {
@@ -37,15 +50,43 @@ export const BOT_CONSENT_NOTICE =
   '🔒 การพิมพ์ "ยืนยัน" ถือว่าท่านยินยอมให้ อบต.หัวงัว เก็บและใช้ข้อมูลที่แจ้งในแชทนี้ (รวมถึงชื่อที่แสดงและรหัสผู้ใช้ LINE) เพื่อดำเนินการเรื่องของท่าน ตามนโยบายความเป็นส่วนตัวของ อบต. — หากต้องการถอนความยินยอม ติดต่อ 043-601-494';
 
 export async function startCaseFlow(): Promise<{ state: CaseFlowState; reply: LineOutgoingMessage }> {
-  const db = await getDb();
-  const cats = await db.select().from(categories).where(eq(categories.isActive, true));
-
-  const catList = cats.map((c) => ({ label: c.name, value: c.id }));
-
   return {
     state: { step: 'category' },
-    reply: faqMenuFlex(catList),
+    reply: faqMenuFlex(await fetchActiveCategories()),
   };
+}
+
+/** รายการหมวดหมู่ที่เปิดรับ — ใช้ร่วมกันทั้งเริ่มโฟลวใหม่และย้อนแก้หมวดหมู่จาก bubble ยืนยัน */
+async function fetchActiveCategories(): Promise<Array<{ label: string; value: string }>> {
+  const db = await getDb();
+  const cats = await db.select().from(categories).where(eq(categories.isActive, true));
+  return cats.map((c) => ({ label: c.name, value: c.id }));
+}
+
+const DESCRIPTION_PROMPT = 'กรุณาอธิบายรายละเอียดเพิ่มเติม เช่น ปัญหาเป็นอย่างไร เกิดขึ้นเมื่อไหร่';
+const LOCATION_PROMPT = 'กรุณาระบุสถานที่ของเรื่องที่แจ้ง เช่น "หน้าวัดหัวงัว หมู่ 3" หรือส่ง location จาก LINE ได้ครับ';
+const CANCELLED_TEXT = 'ยกเลิกแล้วครับ พิมพ์ "แจ้งเรื่องใหม่" เพื่อเริ่มใหม่ได้ตลอด';
+
+function titlePrompt(categoryName: string | undefined): string {
+  return `หมวดหมู่: ${categoryName}\n\nกรุณาพิมพ์หัวข้อเรื่อง (สรุปสั้นๆ) เช่น "ถนนเป็นหลุมหน้าวัด"`;
+}
+
+/** ตอบช่องที่แก้เสร็จแล้ว → กลับไป confirm พร้อมส่ง Flex สรุปใหม่ (ล้าง flag ทุกครั้ง) */
+function backToConfirm(state: CaseFlowState): { state: CaseFlowState; replies: LineOutgoingMessage[] } {
+  const confirmed: CaseFlowState = { ...state, step: 'confirm', editingField: null };
+  return { state: confirmed, replies: [buildConfirmReply(confirmed)] };
+}
+
+function buildConfirmReply(state: CaseFlowState): LineOutgoingMessage {
+  return caseConfirmFlex(
+    {
+      categoryName: state.categoryName ?? '',
+      title: state.title ?? '',
+      description: state.description ?? '',
+      location: state.location ?? '',
+    },
+    BOT_CONSENT_NOTICE,
+  );
 }
 
 export async function processCaseFlow(
@@ -71,9 +112,11 @@ export async function processCaseFlow(
           replies: [{ type: 'text', text: 'กรุณาเลือกหมวดหมู่จากรายการด้านบน หรือพิมพ์ชื่อหมวดหมู่ เช่น ถนน, ไฟฟ้า, น้ำประปา, ขยะ' }],
         };
       }
+      const next: CaseFlowState = { ...state, step: 'title', categoryId: matched.id, categoryName: matched.name, missCount: 0 };
+      if (state.editingField) return backToConfirm(next);
       return {
-        state: { step: 'title', categoryId: matched.id, categoryName: matched.name, missCount: 0 },
-        replies: [{ type: 'text', text: `หมวดหมู่: ${matched.name}\n\nกรุณาพิมพ์หัวข้อเรื่อง (สรุปสั้นๆ) เช่น "ถนนเป็นหลุมหน้าวัด"` }],
+        state: next,
+        replies: [{ type: 'text', text: titlePrompt(matched.name) }],
       };
     }
 
@@ -81,9 +124,12 @@ export async function processCaseFlow(
       if (text.length < 3) {
         return { state, replies: [{ type: 'text', text: 'หัวข้อสั้นเกินไป กรุณาพิมพ์อย่างน้อย 3 ตัวอักษร' }] };
       }
+      const next: CaseFlowState = { ...state, step: 'description', title: text };
+      // § ย้อนแก้จาก bubble ยืนยัน → ตอบช่องนี้เสร็จกลับไป confirm ทันที ไม่เดินหน้าต่อ
+      if (state.editingField) return backToConfirm(next);
       return {
-        state: { ...state, step: 'description', title: text },
-        replies: [{ type: 'text', text: 'กรุณาอธิบายรายละเอียดเพิ่มเติม เช่น ปัญหาเป็นอย่างไร เกิดขึ้นเมื่อไหร่' }],
+        state: next,
+        replies: [{ type: 'text', text: DESCRIPTION_PROMPT }],
       };
     }
 
@@ -91,47 +137,99 @@ export async function processCaseFlow(
       if (text.length < 5) {
         return { state, replies: [{ type: 'text', text: 'รายละเอียดสั้นเกินไป กรุณาอธิบายเพิ่มเติมอีกนิดครับ' }] };
       }
+      const next: CaseFlowState = { ...state, step: 'location', description: text };
+      if (state.editingField) return backToConfirm(next);
       return {
-        state: { ...state, step: 'location', description: text },
-        replies: [{ type: 'text', text: 'กรุณาระบุสถานที่ของเรื่องที่แจ้ง เช่น "หน้าวัดหัวงัว หมู่ 3" หรือส่ง location จาก LINE ได้ครับ' }],
+        state: next,
+        replies: [{ type: 'text', text: LOCATION_PROMPT }],
       };
     }
 
     case 'location': {
-      return {
-        state: { ...state, step: 'confirm', location: text },
-        replies: [{
-          type: 'text',
-          text: `📋 สรุปเรื่องที่แจ้ง:\n\nหมวดหมู่: ${state.categoryName}\nหัวข้อ: ${state.title}\nรายละเอียด: ${state.description}\nสถานที่: ${text}\n\n${BOT_CONSENT_NOTICE}\n\nพิมพ์ "ยืนยัน" เพื่อส่งเรื่อง หรือพิมพ์ "ยกเลิก" เพื่อเริ่มใหม่`,
-        }],
-      };
+      const next: CaseFlowState = { ...state, step: 'confirm', location: text, editingField: null };
+      return { state: next, replies: [buildConfirmReply(next)] };
     }
 
     case 'confirm': {
       if (text.includes('ยกเลิก') || text.toLowerCase() === 'cancel') {
-        return { state: null, replies: [{ type: 'text', text: 'ยกเลิกแล้วครับ พิมพ์ "แจ้งเรื่องใหม่" เพื่อเริ่มใหม่ได้ตลอด' }] };
+        return { state: null, replies: [{ type: 'text', text: CANCELLED_TEXT }] };
       }
       if (text.includes('ยืนยัน') || text.toLowerCase() === 'confirm' || text === 'ใช่' || text === 'ok') {
-        const submission = await submitLineCase(state, lineUserId);
-        if (submission.ok) {
-          return {
-            state: null,
-            replies: [{ type: 'text', text: `✅ ส่งเรื่องเรียบร้อยแล้ว!\n\nเลขติดตาม: ${submission.trackingCode}\n\nพิมพ์ "ติดตาม ${submission.trackingCode}" เพื่อตรวจสอบสถานะได้ตลอด 24 ชม.` }],
-          };
-        }
-        // § dedup duplicate — channel 'line' พิสูจน์เจ้าของได้ createCase จึงคืน
-        // trackingCode ของเรื่องเดิมให้ผู้ใช้กลับไปติดตามเองได้ (review PR #74)
-        if (submission.duplicateTrackingCode) {
-          return {
-            state: null,
-            replies: [{ type: 'text', text: `คุณเคยแจ้งเรื่องนี้ไปแล้วภายใน 7 วัน\n\nเลขติดตามของเรื่องเดิม: ${submission.duplicateTrackingCode}\n\nพิมพ์ "ติดตาม ${submission.duplicateTrackingCode}" เพื่อตรวจสอบสถานะ` }],
-          };
-        }
-        throw new Error(`LINE case creation failed: ${submission.message}`);
+        return submitConfirm(state, lineUserId);
       }
       return { state, replies: [{ type: 'text', text: 'กรุณาพิมพ์ "ยืนยัน" เพื่อส่งเรื่อง หรือ "ยกเลิก" เพื่อเริ่มใหม่' }] };
     }
   }
+}
+
+/**
+ * จัดการ postback จาก bubble ยืนยัน — engine เรียกหลัง parseConfirmPostback ผ่านแล้ว
+ * state ไม่ใช่ confirm (เช่น กดปุ่มซ้ำหลังส่งเรื่องแล้ว) คืน null ให้ engine คงพฤติกรรมเดิม (log only)
+ */
+export async function handleConfirmPostback(
+  data: CaseConfirmPostbackData,
+  state: CaseFlowState | null,
+  lineUserId: string,
+): Promise<{ state: CaseFlowState | null; replies: LineOutgoingMessage[] } | null> {
+  if (!state || state.step !== 'confirm') return null;
+
+  switch (data) {
+    // § confirm:ok เดิน path เดียวกับพิมพ์ "ยืนยัน" — submit path เดียวกันผ่าน resolveCitizen
+    case 'confirm:ok':
+      return submitConfirm(state, lineUserId);
+    case 'confirm:cancel':
+      return { state: null, replies: [{ type: 'text', text: CANCELLED_TEXT }] };
+    case 'confirm:edit:category':
+      return {
+        state: { ...state, step: 'category', editingField: 'category' },
+        replies: [faqMenuFlex(await fetchActiveCategories())],
+      };
+    case 'confirm:edit:title':
+      return {
+        state: { ...state, step: 'title', editingField: 'title' },
+        replies: [{ type: 'text', text: titlePrompt(state.categoryName) }],
+      };
+    case 'confirm:edit:description':
+      return {
+        state: { ...state, step: 'description', editingField: 'description' },
+        replies: [{ type: 'text', text: DESCRIPTION_PROMPT }],
+      };
+    case 'confirm:edit:location':
+      return {
+        state: { ...state, step: 'location', editingField: 'location' },
+        replies: [{ type: 'text', text: LOCATION_PROMPT }],
+      };
+    default: {
+      const _exhaustive: never = data;
+      return _exhaustive;
+    }
+  }
+}
+
+/**
+ * ส่งเรื่องจาก confirm — path เดียวกันทั้งพิมพ์ "ยืนยัน" และกดปุ่ม confirm:ok
+ * (tracking-code shape ผ่าน resolveCitizen ใน createCase เหมือนเดิม ไม่แตะ submit path)
+ */
+async function submitConfirm(
+  state: CaseFlowState,
+  lineUserId: string,
+): Promise<{ state: CaseFlowState | null; replies: LineOutgoingMessage[] }> {
+  const submission = await submitLineCase(state, lineUserId);
+  if (submission.ok) {
+    return {
+      state: null,
+      replies: [{ type: 'text', text: `✅ ส่งเรื่องเรียบร้อยแล้ว!\n\nเลขติดตาม: ${submission.trackingCode}\n\nพิมพ์ "ติดตาม ${submission.trackingCode}" เพื่อตรวจสอบสถานะได้ตลอด 24 ชม.` }],
+    };
+  }
+  // § dedup duplicate — channel 'line' พิสูจน์เจ้าของได้ createCase จึงคืน
+  // trackingCode ของเรื่องเดิมให้ผู้ใช้กลับไปติดตามเองได้ (review PR #74)
+  if (submission.duplicateTrackingCode) {
+    return {
+      state: null,
+      replies: [{ type: 'text', text: `คุณเคยแจ้งเรื่องนี้ไปแล้วภายใน 7 วัน\n\nเลขติดตามของเรื่องเดิม: ${submission.duplicateTrackingCode}\n\nพิมพ์ "ติดตาม ${submission.duplicateTrackingCode}" เพื่อตรวจสอบสถานะ` }],
+    };
+  }
+  throw new Error(`LINE case creation failed: ${submission.message}`);
 }
 
 /**
