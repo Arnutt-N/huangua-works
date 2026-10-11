@@ -39,6 +39,7 @@ export const AUDIT_ACTIONS = {
   DEPARTMENT_UPDATE: 'department_update',
   DEPARTMENT_ACTIVATE: 'department_activate',
   DEPARTMENT_DEACTIVATE: 'department_deactivate',
+  DEPARTMENT_DELETE: 'department_delete',
   CATEGORY_CREATE: 'category_create',
   CATEGORY_UPDATE: 'category_update',
   CATEGORY_ACTIVATE: 'category_activate',

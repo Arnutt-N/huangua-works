@@ -9,6 +9,7 @@ import {
   Pencil,
   Plus,
   Power,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FieldHint, Input, Label, Textarea } from '@/components/ui/field';
@@ -30,6 +31,7 @@ import {
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import { EmptyState } from '@/components/admin/empty-state';
 import {
+  deleteDepartment,
   saveCategory,
   saveDepartment,
   toggleActive,
@@ -130,6 +132,7 @@ export function DepartmentsCard({ rows }: { rows: DepartmentRow[] }) {
                   </DialogContent>
                 </Dialog>
                 <ToggleButton id={d.id} kind="department" isActive={d.isActive} name={d.name} />
+                <DeleteDepartmentDialog row={d} open={openId === `del-${d.id}`} onOpenChange={(o) => setOpenId(o ? `del-${d.id}` : null)} />
               </div>
             </li>
           ))}
@@ -410,6 +413,50 @@ function ActiveBadge({ isActive }: { isActive: boolean }) {
     >
       {isActive ? 'ใช้งาน' : 'ปิดใช้งาน'}
     </span>
+  );
+}
+
+function DeleteDepartmentDialog({ row, open, onOpenChange }: { row: DepartmentRow; open: boolean; onOpenChange: (o: boolean) => void }) {
+  const [state, action, pending] = useActionState(deleteDepartment, initial);
+
+  useEffect(() => {
+    if (state.success) onOpenChange(false);
+  }, [state.success, onOpenChange]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          aria-label={`ลบหน่วยงาน ${row.name}`}
+          className="text-danger-ink hover:text-danger-ink"
+        >
+          <Trash2 className="h-4 w-4" aria-hidden="true" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>ลบหน่วยงาน</DialogTitle>
+          <DialogDescription>
+            {`ลบ “${row.name}” ถาวรหรือไม่ (ทำแล้วทำเลย) — ถ้ามีเรื่องหรือผู้ใช้อ้างถึงจะลบไม่ได้ ให้ปิดใช้งานแทน`}
+          </DialogDescription>
+        </DialogHeader>
+        <form action={action} className="space-y-4">
+          <input type="hidden" name="id" value={row.id} />
+          {state.error && <FormAlert>{state.error}</FormAlert>}
+          <div className="flex justify-end gap-2 pt-1">
+            <Button type="button" variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
+              ยกเลิก
+            </Button>
+            <Button type="submit" size="sm" variant="destructive" disabled={pending}>
+              {pending ? 'กำลังลบ...' : 'ลบถาวร'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

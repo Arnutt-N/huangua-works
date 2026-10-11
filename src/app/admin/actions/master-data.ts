@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { and, eq, ne, or } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
-import { categories, departments } from '@/lib/db/schema';
+import { cases, categories, departments, legacyResponsibleMap, users } from '@/lib/db/schema';
 import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
 import { generateId } from '@/lib/id';
 import { requireStaff } from '@/lib/auth/require-staff';
@@ -220,4 +220,45 @@ export async function toggleActive(formData: FormData): Promise<void> {
   });
 
   revalidatePath('/admin/master-data');
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// ลบหน่วยงานถาวร (เฉพาะที่ไม่มีใครอ้างถึง — มีอ้างถึงให้ปิดใช้งานแทน)
+// ────────────────────────────────────────────────────────────────────────────
+
+export async function deleteDepartment(
+  _prevState: MasterDataActionState,
+  formData: FormData,
+): Promise<MasterDataActionState> {
+  const { user: actor, ipAddress, userAgent } = await requireStaff(ADMIN_ROLES);
+
+  const id = String(formData.get('id') ?? '').trim();
+  if (!id) return { error: 'ไม่พบหน่วยงานที่ระบุ' };
+  const db = await getDb();
+  const target = await firstOrUndefined(
+    db.select({ id: departments.id, name: departments.name }).from(departments).where(eq(departments.id, id)).limit(1),
+  );
+  if (!target) return { error: 'ไม่พบหน่วยงานที่ระบุ' };
+
+  // § ลบไม่ได้ถ้ามีอ้างถึงจาก 4 ที่ — ให้ปิดใช้งานแทน (pattern เดียวกับ responsible)
+  const refs = await Promise.all([
+    firstOrUndefined(db.select({ id: cases.id }).from(cases).where(eq(cases.departmentId, id)).limit(1)),
+    firstOrUndefined(db.select({ id: users.id }).from(users).where(eq(users.departmentId, id)).limit(1)),
+    firstOrUndefined(db.select({ id: categories.id }).from(categories).where(eq(categories.defaultDepartmentId, id)).limit(1)),
+    firstOrUndefined(db.select({ raw: legacyResponsibleMap.raw }).from(legacyResponsibleMap).where(eq(legacyResponsibleMap.departmentId, id)).limit(1)),
+  ]);
+  if (refs.some(Boolean)) return { error: 'ลบหน่วยงานนี้ไม่ได้ — มีเรื่อง ผู้ใช้ หมวดหมู่ หรือแผนที่อ้างถึงอยู่ ให้ปิดใช้งานแทน' };
+
+  await db.delete(departments).where(eq(departments.id, id));
+  await logAudit({
+    userId: actor.id,
+    action: AUDIT_ACTIONS.DEPARTMENT_DELETE,
+    resource: 'departments',
+    resourceId: id,
+    ipAddress,
+    userAgent,
+    metadata: { name: target.name },
+  });
+  revalidatePath('/admin/master-data');
+  return { error: null, success: 'ลบหน่วยงานแล้ว' };
 }
