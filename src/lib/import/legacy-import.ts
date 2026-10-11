@@ -388,10 +388,12 @@ export async function applyImport(options: ApplyOptions): Promise<{ batchId: str
         throw new ImportError('แถวไม่ผ่าน gate สุดท้ายก่อนเขียน');
       }
       const mapEntry = mapByRaw.get(raw.responsibleRaw.trim());
-      // § ปฏิเสธ map ที่ยังไม่ตัดสิน (inactive / ยังไม่ระบุหน่วยงาน) — คู่กับ dry-run ข้างบน
+      // § นโยบายใช้ค่าดิบ: map ที่ยังไม่ตัดสิน (active แต่ department ว่าง) นำเข้าได้
+      // โดย department ว่าง แล้วค่อยผูกหน่วยงานทีหลังผ่าน settings — ตรงกับ dry-run
+      // ที่ให้ null dept ผ่าน ปฏิเสธเฉพาะ map หาย inactive หรือชี้หน่วยงานที่ไม่มีจริง
       if (!mapEntry || !mapEntry.isActive) throw new ImportError('แถวไม่มี responsible map ที่ใช้งานได้');
-      if (!mapEntry.departmentId || !liveDeptIds.has(mapEntry.departmentId)) {
-        throw new ImportError('แถวนี้ยังไม่มีการตัดสินหน่วยงานรับผิดชอบ');
+      if (mapEntry.departmentId && !liveDeptIds.has(mapEntry.departmentId)) {
+        throw new ImportError('แถวนี้ชี้หน่วยงานที่ไม่มีอยู่จริง');
       }
       const submitterName = normalizeLegacyName(raw.submitterName);
       if (!submitterName) throw new ImportError('แถวไม่มีชื่อผู้แจ้ง');
