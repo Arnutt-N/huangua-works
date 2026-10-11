@@ -57,6 +57,8 @@ export const AUDIT_ACTIONS = {
   RESPONSIBLE_DEACTIVATE: 'responsible_deactivate',
   RESPONSIBLE_DELETE: 'responsible_delete',
   CHATBOT_SETTINGS_UPDATE: 'chatbot_settings_update',
+  SYSTEM_SETTING_UPDATE: 'system_setting_update',
+  API_CONNECTION_UPDATE: 'api_connection_update',
   FAQ_CREATE: 'faq_create',
   FAQ_UPDATE: 'faq_update',
   FAQ_DELETE: 'faq_delete',

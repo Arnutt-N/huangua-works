@@ -84,6 +84,8 @@ export const users = pgTable(
     email: text('email').notNull().unique(),
     role: userRoleEnum().notNull(),
     departmentId: text('department_id'), // FK departments.id (nullable สำหรับ citizen)
+    // § หน่วยงานต้นสังกัดระดับองค์กร เผื่อสเกลหลาย อบต. ตอนนี้ค่าเดียวเสมอ
+    orgId: text('org_id').notNull().default('huangua'),
     isActive: boolean('is_active').notNull().default(true),
     fullName: text('full_name').notNull(),
     phoneNumber: text('phone_number'),
@@ -96,6 +98,7 @@ export const users = pgTable(
     emailIdx: index('users_email_idx').on(table.email),
     roleIdx: index('users_role_idx').on(table.role),
     deptIdx: index('users_department_id_idx').on(table.departmentId),
+    orgIdx: index('users_org_id_idx').on(table.orgId),
   })
 );
 
@@ -143,9 +146,12 @@ export const departments = pgTable(
     color: text('color'), // oklch(...) for UI badge
     icon: text('icon'), // lucide icon name
     isActive: boolean('is_active').notNull().default(true),
+    // § ดู users.orgId ประกอบ เผื่อสเกลหลาย อบต. ตอนนี้ค่าเดียวเสมอ
+    orgId: text('org_id').notNull().default('huangua'),
   },
   (table) => ({
     slugIdx: index('departments_slug_idx').on(table.slug),
+    orgIdx: index('departments_org_id_idx').on(table.orgId),
   })
 );
 
@@ -167,9 +173,12 @@ export const categories = pgTable(
     defaultDepartmentId: text('default_department_id'), // FK departments.id
     estimatedDays: integer('estimated_days').default(7),
     isActive: boolean('is_active').notNull().default(true),
+    // § ดู users.orgId ประกอบ เผื่อสเกลหลาย อบต. ตอนนี้ค่าเดียวเสมอ
+    orgId: text('org_id').notNull().default('huangua'),
   },
   (table) => ({
     slugIdx: index('categories_slug_idx').on(table.slug),
+    orgIdx: index('categories_org_id_idx').on(table.orgId),
   })
 );
 
@@ -286,6 +295,8 @@ export const cases = pgTable(
     submittedBy: text('submitted_by').notNull(), // FK users.id (citizen)
     assignedTo: text('assigned_to'), // FK users.id (officer)
     departmentId: text('department_id'), // FK departments.id
+    // § ดู users.orgId ประกอบ เผื่อสเกลหลาย อบต. ตอนนี้ค่าเดียวเสมอ
+    orgId: text('org_id').notNull().default('huangua'),
 
     // Tracking
     dueDate: timestamp('due_date', { mode: 'date' }),
@@ -324,6 +335,7 @@ export const cases = pgTable(
     assignedToIdx: index('cases_assigned_to_idx').on(table.assignedTo),
     categoryIdx: index('cases_category_id_idx').on(table.categoryId),
     deptIdx: index('cases_department_id_idx').on(table.departmentId),
+    orgIdx: index('cases_org_id_idx').on(table.orgId),
     provinceIdx: index('cases_province_id_idx').on(table.provinceId),
     districtIdx: index('cases_district_id_idx').on(table.districtId),
     subDistrictIdx: index('cases_sub_district_id_idx').on(table.subDistrictId),
@@ -658,6 +670,56 @@ export const chatSettings = pgTable(
   },
   (table) => ({
     keyIdx: uniqueIndex('chat_settings_key_idx').on(table.key),
+  })
+);
+
+// ────────────────────────────────────────────────────────────────────────────
+// § System Settings (ตั้งค่ากลางทั้งระบบ: key คู่ value ชุดปิดตายผ่าน zod)
+// รูปเดียวกับ chatSettings ด้านบน ต่างแค่ key อยู่ใน allowlist ของ system module
+// ────────────────────────────────────────────────────────────────────────────
+
+export const systemSettings = pgTable(
+  'system_settings',
+  {
+    id: text('id').primaryKey(), // UUID v7
+    createdAt: timestamp('created_at', { mode: 'date' })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' })
+      .notNull()
+      .defaultNow(),
+    key: text('key').notNull().unique(),
+    value: jsonb('value').notNull(),
+    description: text('description'),
+  },
+  (table) => ({
+    keyIdx: uniqueIndex('system_settings_key_idx').on(table.key),
+  })
+);
+
+// ────────────────────────────────────────────────────────────────────────────
+// § API Connections (ปลายทางเชื่อมต่อภายนอก: เก็บแค่ endpoint กับสถานะ)
+// ห้ามเก็บ secret ดิบทุกกรณี secret อยู่ใน env ต่อไป provider กับ status เป็นค่าปิดตาย
+// ────────────────────────────────────────────────────────────────────────────
+
+export const apiConnections = pgTable(
+  'api_connections',
+  {
+    id: text('id').primaryKey(), // UUID v7
+    createdAt: timestamp('created_at', { mode: 'date' })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' })
+      .notNull()
+      .defaultNow(),
+    provider: text('provider').notNull().unique(), // line s3 smtp เท่านั้น
+    endpoint: text('endpoint').notNull(), // ไม่มี secret ปน
+    status: text('status').notNull().default('unknown'), // unknown connected degraded down
+    lastCheckedAt: timestamp('last_checked_at', { mode: 'date' }),
+    metadata: jsonb('metadata'),
+  },
+  (table) => ({
+    providerIdx: uniqueIndex('api_connections_provider_idx').on(table.provider),
   })
 );
 
