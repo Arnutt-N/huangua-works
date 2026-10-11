@@ -23,6 +23,8 @@ export type AdminTab =
   | 'reports'
   | 'chat'
   | 'users'
+  | 'citizens'
+  | 'responsible'
   | 'audit'
   | 'master-data'
   | 'profile'

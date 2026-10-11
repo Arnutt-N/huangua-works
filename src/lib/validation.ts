@@ -464,6 +464,28 @@ export const toggleActiveFormSchema = z.object({
 });
 
 // ────────────────────────────────────────────────────────────────────────────
+// § Citizens — บัญชีประชาชน (/admin/citizens, superadmin เท่านั้น)
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * แก้ไขข้อมูลติดต่อของประชาชน — contactEmail เก็บใน users.metadata เท่านั้น
+ * (email คอลัมน์คือ identity key: cid-/line-/legacy- placeholder ห้ามแก้ตรงนี้)
+ */
+export const updateCitizenFormSchema = z.object({
+  userId: uuidSchema,
+  fullName: fullNameSchema,
+  phoneNumber: phoneSchema,
+  // § เว้นว่างได้ (ลบช่องทางติดต่อ) — ถ้ากรอกต้องเป็นอีเมลจริง (reuse emailSchema)
+  contactEmail: emailSchema.optional().or(z.literal('')),
+});
+
+/** ตั้งเลขบัตรให้บัญชีประชาชน — checksum ตรวจแยกด้วย isValidCid (ไม่ใช่แค่ 13 หลัก) */
+export const setCitizenCidFormSchema = z.object({
+  userId: uuidSchema,
+  cid: cidSchema,
+});
+
+// ────────────────────────────────────────────────────────────────────────────
 // § Helpers
 // ────────────────────────────────────────────────────────────────────────────
 

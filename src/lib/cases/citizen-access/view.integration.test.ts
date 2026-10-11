@@ -220,3 +220,59 @@ describe('§ ถอนความยินยอมแล้ว — ซ่อ�
     expect(await findTrackableCase(CODE_A, { channel: 'web' })).not.toBeNull();
   });
 });
+
+describe('§ ปิดใช้งานบัญชี — หายจากทุกช่องทางโดยไม่แตะ consent record', () => {
+  const CODE_DEACT = `HG4${SUFFIX}`;
+  const LINE_DEACT = `U-it-ca-deact-${RUN}`;
+
+  test('isActive=false ซ่อนทุกช่องทาง เปิดใหม่กลับมาโดยไม่ต้องยินยอมใหม่', async () => {
+    const db = await getDb();
+    const uid = generateId();
+    await db.insert(users).values({
+      id: uid,
+      email: `it-ca-view-deact-${RUN}@placeholder.local`,
+      role: 'citizen',
+      isActive: true,
+      fullName: 'ผู้แจ้งทดสอบการระงับ',
+    });
+    await db.insert(consentRecords).values({
+      id: generateId(),
+      userId: uid,
+      consentType: 'data_collection',
+      version: '1.1',
+      isGranted: true,
+      grantedAt: new Date(),
+    });
+    const cid = generateId();
+    await db.insert(cases).values({
+      id: cid,
+      status: 'received',
+      title: 'เรื่องทดสอบการระงับบัญชี',
+      description: 'รายละเอียดทดสอบ',
+      location: 'ตำบลหัวงัว',
+      categoryId,
+      submittedBy: uid,
+      trackingCode: CODE_DEACT,
+    });
+    const lrow = generateId();
+    await db.insert(lineUsers).values({ id: lrow, lineUserId: LINE_DEACT, linkedUserId: uid });
+
+    try {
+      expect(await findTrackableCase(CODE_DEACT, { channel: 'web' })).not.toBeNull();
+
+      await db.update(users).set({ isActive: false }).where(eq(users.id, uid));
+      expect(await findTrackableCase(CODE_DEACT, { channel: 'web' })).toBeNull();
+      expect(await findTrackableCase(CODE_DEACT, { channel: 'line_bot' })).toBeNull();
+      expect(await listMyCases(LINE_DEACT)).toEqual([]);
+
+      await db.update(users).set({ isActive: true }).where(eq(users.id, uid));
+      expect(await findTrackableCase(CODE_DEACT, { channel: 'web' })).not.toBeNull();
+    } finally {
+      await db.delete(auditLogs).where(eq(auditLogs.resourceId, cid));
+      await db.delete(cases).where(eq(cases.id, cid));
+      await db.delete(consentRecords).where(eq(consentRecords.userId, uid));
+      await db.delete(lineUsers).where(eq(lineUsers.id, lrow));
+      await db.delete(users).where(eq(users.id, uid));
+    }
+  });
+});
