@@ -21,6 +21,8 @@ export const AUDIT_ACTIONS = {
   CHANGE_CASE_DEPARTMENT: 'change_case_department',
   UPDATE_CASE_PRIORITY: 'update_case_priority',
   UPDATE_CASE_BUDGET: 'update_case_budget',
+  UPDATE_CASE_BUDGET_AMOUNT: 'update_case_budget_amount',
+  UPDATE_CASE_ACTION_DETAILS: 'update_case_action_details',
   ADD_CASE_COMMENT: 'add_case_comment',
   CREATE_USER: 'create_user',
   UPDATE_USER_ROLE: 'update_user_role',

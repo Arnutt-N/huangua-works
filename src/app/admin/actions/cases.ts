@@ -11,6 +11,8 @@ import {
   changeDepartmentFormSchema,
   setPriorityFormSchema,
   changeBudgetFormSchema,
+  changeBudgetAmountFormSchema,
+  changeActionDetailsFormSchema,
   addUpdateFormSchema,
   validateFormData,
 } from '@/lib/validation';
@@ -137,6 +139,60 @@ export async function changeBudget(
   revalidatePath(`/admin/cases/${caseId}`);
   revalidatePath('/admin');
   redirect(`/admin/cases/${caseId}?ok=budget`);
+}
+
+/**
+ * บันทึกยอดงบประมาณที่ใช้ (บาท) — ช่องว่างคือล้างยอด supervisor ขึ้นไปเท่านั้น
+ */
+export async function changeBudgetAmount(
+  _prevState: CaseActionState,
+  formData: FormData
+): Promise<CaseActionState> {
+  const auth = await requireStaff(CASE_SUPERVISOR_ROLES);
+  const v = validateFormData(changeBudgetAmountFormSchema, formData);
+  if (!v.success) return { error: v.error };
+  const { caseId, budgetAmount } = v.data;
+
+  let amount: number | null = null;
+  if (budgetAmount !== undefined && budgetAmount !== '') {
+    if (!/^\d{1,12}$/.test(budgetAmount)) return { error: 'ยอดงบประมาณต้องเป็นตัวเลขบาท ไม่ติดลบ' };
+    amount = Number(budgetAmount);
+  }
+
+  const result = await applyCaseUpdate(caseId, {
+    kind: 'budget_amount',
+    budgetAmount: amount,
+  }, toActor(auth));
+
+  if (!result.ok) return { error: result.error };
+
+  revalidatePath(`/admin/cases/${caseId}`);
+  revalidatePath('/admin');
+  redirect(`/admin/cases/${caseId}?ok=budget_amount`);
+}
+
+/**
+ * แก้ไขรายละเอียดการดำเนินการ — ช่องว่างคือล้าง supervisor ขึ้นไปเท่านั้น
+ */
+export async function changeActionDetails(
+  _prevState: CaseActionState,
+  formData: FormData
+): Promise<CaseActionState> {
+  const auth = await requireStaff(CASE_SUPERVISOR_ROLES);
+  const v = validateFormData(changeActionDetailsFormSchema, formData);
+  if (!v.success) return { error: v.error };
+  const { caseId, actionDetails } = v.data;
+
+  const result = await applyCaseUpdate(caseId, {
+    kind: 'action_details',
+    actionDetails: actionDetails && actionDetails !== '' ? actionDetails : null,
+  }, toActor(auth));
+
+  if (!result.ok) return { error: result.error };
+
+  revalidatePath(`/admin/cases/${caseId}`);
+  revalidatePath('/admin');
+  redirect(`/admin/cases/${caseId}?ok=action_details`);
 }
 
 export async function addUpdate(

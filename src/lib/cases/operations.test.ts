@@ -17,6 +17,8 @@ const CURRENT = {
   status: 'received',
   priority: 'normal',
   budgetStatus: 'unspecified',
+  budgetAmount: null,
+  actionDetails: null,
   assignedTo: null,
   departmentId: null,
 };
@@ -98,6 +100,29 @@ describe('buildTimeline — budget', () => {
       expect(result.entry.updateType).toBe('metadata_change');
       expect(result.entry.oldValue).toBe('unspecified');
       expect(result.entry.newValue).toBe('has_budget');
+    }
+  });
+});
+
+describe('buildTimeline — budget amount and action details', () => {
+  it('budget_amount เปลี่ยนค่าได้ เป็น internal', () => {
+    const result = buildTimeline({ kind: 'budget_amount', budgetAmount: 15000 }, CURRENT);
+    expect('entry' in result).toBe(true);
+    if ('entry' in result) {
+      expect(result.entry.isPublic).toBe(false);
+      expect(result.entry.newValue).toBe('15000');
+    }
+  });
+  it('budget_amount เท่าเดิมถูกปฏิเสธ', () => {
+    const same = { ...CURRENT, budgetAmount: 15000 };
+    expect(buildTimeline({ kind: 'budget_amount', budgetAmount: 15000 }, same)).toHaveProperty('error');
+  });
+  it('action_details เปลี่ยนค่าได้ เป็น internal', () => {
+    const result = buildTimeline({ kind: 'action_details', actionDetails: 'เทคอนกรีตแล้ว' }, CURRENT);
+    expect('entry' in result).toBe(true);
+    if ('entry' in result) {
+      expect(result.entry.isPublic).toBe(false);
+      expect(result.entry.newValue).toBe('เทคอนกรีตแล้ว');
     }
   });
 });

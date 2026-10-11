@@ -220,6 +220,7 @@ export function classifyRows(bundle: StagedBundle, resolution: Resolution): Clas
 export interface CaseMapping {
   title: string;
   description: string;
+  actionDetails: string | null;
   location: string;
   village: string | null;
   legacySubmitterName: string;
@@ -238,14 +239,16 @@ export function buildCaseMapping(raw: {
 }): CaseMapping {
   const detail = raw.detail.trim();
   const villageRaw = raw.villageRaw.trim();
+  const note = raw.note.trim();
+  // § หมายเหตุอยู่บ้านใหม่ของตัวเอง (action_details) ไม่ซ้ำใน description อีก
   const lines = [detail];
-  if (raw.note.trim()) lines.push(`หมายเหตุ: ${raw.note.trim()}`);
   lines.push(
     `เลขที่รับ: ${raw.receiptNo.trim() || '-'} | ช่องทาง: ${raw.channel.trim() || '-'} | สถานะต้นฉบับ: ${raw.statusRaw.trim() || '-'} | วันที่รับ: ${raw.dateFinal} | แหล่ง: excel-legacy (${raw.sourceSha256.slice(0, 12)})`,
   );
   return {
     title: detail || `เรื่องร้องเรียนเลขที่ ${raw.receiptNo.trim() || '-'}`,
     description: lines.filter(Boolean).join('\n'),
+    actionDetails: note || null,
     location: villageRaw || 'ไม่ระบุ',
     village: villageRaw || null,
     legacySubmitterName: '',
@@ -300,10 +303,11 @@ export async function dryRun(bundle: StagedBundle, classified: ClassifiedRow[]):
       const live = c.categorySlugFinal ? liveBySlug.get(c.categorySlugFinal) : undefined;
       // § row.categoryId จาก master snapshot วันเตรียม — ต้องตรงกับ live slug และ active
       if (!live || !live.isActive) extra.push('category_unresolved');
-      // § ผู้รับผิดชอบต้องมี map ที่ "ตัดสินแล้ว": แถว active + ระบุหน่วยงานที่มีจริงใน live DB
-      // seed 'system' ที่ยังไม่ระบุหน่วยงานจึงค้าง blocked จนกว่า staff จะตัดสิน (ดู migration)
+      // § ผู้รับผิดชอบยึดค่าดิบจาก Excel เป็นหลัก (นโยบาย: ใช้ตามทะเบียน ถ้าผิดแก้ทีหลัง)
+      // map ต้องมีอยู่ + active; department ว่างได้ (ค่อยผูกหน่วยงานทีหลังผ่าน settings)
+      // แต่ถ้าระบุ department มาแล้วต้องมีจริงใน live DB
       const mapEntry = mapByRaw.get(c.row.raw.responsibleRaw.trim());
-      if (!mapEntry || !mapEntry.isActive || !mapEntry.departmentId || !liveDeptSet.has(mapEntry.departmentId)) {
+      if (!mapEntry || !mapEntry.isActive || (mapEntry.departmentId && !liveDeptSet.has(mapEntry.departmentId))) {
         extra.push('responsible_mapping_unresolved');
       }
       // § ชื่อผู้แจ้งว่าง = สร้างตัวตนไม่ได้ (ห้ามเดาชื่อ)
@@ -408,6 +412,8 @@ export async function applyImport(options: ApplyOptions): Promise<{ batchId: str
         budgetStatus: c.statusFinal === 'awaiting_budget' ? 'awaiting_budget' : 'unspecified',
         title: mapping.title,
         description: mapping.description,
+        actionDetails: mapping.actionDetails,
+        budgetAmount: null,
         location: mapping.location,
         village: mapping.village,
         categoryId: live.id,

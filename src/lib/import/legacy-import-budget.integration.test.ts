@@ -141,7 +141,7 @@ afterAll(async () => {
 });
 
 describe('slice A · dry-run กับ map ที่ยังไม่ตัดสิน', () => {
-  test('null dept และ inactive ค้าง responsible_mapping_unresolved และไม่เขียนอะไรเลย', async () => {
+  test('null dept ผ่านตามนโยบายใช้ค่าดิบ (inactive เท่านั้นที่ค้าง) และไม่เขียนอะไรเลย', async () => {
     const bundle = parseBundle(
       manifestFor(SOURCES[0]!),
       `${queueLine(SOURCES[0]!, 'it-budget-key-null', 4, ['responsible_mapping_unresolved', 'submitter_identity_unresolved'])}\n` +
@@ -151,12 +151,12 @@ describe('slice A · dry-run กับ map ที่ยังไม่ตัด�
     const classified = classifyRows(bundle, { statusByKey: {}, dateByKey: {}, categoryByKey: {} });
     const report = await dryRun(bundle, classified);
     expect(report.records).toBe(2);
-    expect(report.importable).toBe(0);
-    expect(report.blocked).toBe(2);
+    expect(report.importable).toBe(1);
+    expect(report.blocked).toBe(1);
     expect(report.batchExists).toBe(false);
-    for (const block of report.blocks) {
-      expect(block.codes).toContain('responsible_mapping_unresolved');
-    }
+    expect(report.blocks).toHaveLength(1);
+    expect(only(report.blocks).sourceKey).toBe('it-budget-key-inactive');
+    expect(only(report.blocks).codes).toContain('responsible_mapping_unresolved');
 
     // § dry-run อ่านอย่างเดียว — ต้องไม่มี batch row เกิดขึ้น
     const db = await getDb();

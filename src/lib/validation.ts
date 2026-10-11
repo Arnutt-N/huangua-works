@@ -324,6 +324,17 @@ export const changeBudgetFormSchema = z.object({
   budgetStatus: budgetStatusSchema,
 });
 
+export const changeBudgetAmountFormSchema = z.object({
+  caseId: uuidSchema,
+  // § ช่องว่าง = ล้างยอด (null) — จำนวนเงินต้องเป็นเลขเต็มบาท ไม่ติดลบ
+  budgetAmount: z.string().trim().max(15).optional().or(z.literal('')),
+});
+
+export const changeActionDetailsFormSchema = z.object({
+  caseId: uuidSchema,
+  actionDetails: z.string().trim().max(2000, 'รายละเอียดยาวเกิน 2000 ตัวอักษร').optional().or(z.literal('')),
+});
+
 export const addUpdateFormSchema = z.object({
   caseId: uuidSchema,
   comment: commentSchema,

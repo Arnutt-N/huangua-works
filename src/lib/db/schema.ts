@@ -307,6 +307,12 @@ export const cases = pgTable(
     // (ลบ map ที่เรื่องย้อนหลังอ้างถึงไม่ได้ ต้องปิดใช้แทน)
     legacyResponsibleRaw: text('legacy_responsible_raw'),
     isHistorical: boolean('is_historical').notNull().default(false),
+    // § งบประมาณที่ใช้ไป (บาท) — null = ยังไม่บันทึก กรอกโดย staff ภายหลังเท่านั้น
+    // นำเข้าไม่เคยเติมยอดเงินเอง (Excel ไม่มีตัวเลข มีแต่โน้ตขั้นตอน)
+    budgetAmount: integer('budget_amount'),
+    // § รายละเอียดการดำเนินการ — นำเข้าจากคอลัมน์หมายเหตุของ Excel ตรงๆ
+    // ต่างจาก description (รายละเอียดปัญหา) และไม่ขึ้นจอประชาชน (internal)
+    actionDetails: text('action_details'),
 
     // Metadata
     attachments: jsonb('attachments'), // JSON array: [{ url, type, size }]

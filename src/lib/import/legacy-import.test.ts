@@ -159,8 +159,14 @@ describe('legacy-import · buildCaseMapping', () => {
     const m = buildCaseMapping({ ...base, detail: '  ' });
     expect(m.title).toBe('เรื่องร้องเรียนเลขที่ R1');
   });
-  it('หมายเหตุว่างไม่ทิ้งบรรทัดขยะ', () => {
+  it('หมายเหตุย้ายไป actionDetails ไม่ซ้ำใน description', () => {
+    const m = buildCaseMapping({ ...base, note: 'เทคอนกรีตแล้ว' });
+    expect(m.actionDetails).toBe('เทคอนกรีตแล้ว');
+    expect(m.description).not.toContain('เทคอนกรีตแล้ว');
+    expect(m.description).toContain('เลขที่รับ: R1');
+  });
+  it('หมายเหตุว่างได้ actionDetails เป็น null', () => {
     const m = buildCaseMapping(base);
-    expect(m.description).not.toContain('หมายเหตุ:');
+    expect(m.actionDetails).toBeNull();
   });
 });

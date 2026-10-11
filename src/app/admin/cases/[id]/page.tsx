@@ -62,6 +62,8 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
         status: cases.status,
         priority: cases.priority,
         budgetStatus: cases.budgetStatus,
+        budgetAmount: cases.budgetAmount,
+        actionDetails: cases.actionDetails,
         createdAt: cases.createdAt,
         updatedAt: cases.updatedAt,
         dueDate: cases.dueDate,
@@ -269,6 +271,12 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
             <h2 className="mb-2 text-sm font-bold text-muted">รายละเอียด</h2>
             <p className="whitespace-pre-wrap text-sm text-ink">{caseRow.description}</p>
           </div>
+          {caseRow.actionDetails && (
+            <div>
+              <h2 className="mb-2 text-sm font-bold text-muted">รายละเอียดการดำเนินการ (ภายใน)</h2>
+              <p className="whitespace-pre-wrap text-sm text-ink">{caseRow.actionDetails}</p>
+            </div>
+          )}
         </div>
       </header>
 
@@ -281,6 +289,8 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
             currentStatus={caseRow.status}
             currentPriority={caseRow.priority}
             currentBudgetStatus={caseRow.budgetStatus}
+            currentBudgetAmount={caseRow.budgetAmount}
+            currentActionDetails={caseRow.actionDetails}
             currentAssignedTo={caseRow.assignedTo}
             currentDepartmentId={caseRow.departmentId}
             officers={officerOptions}
