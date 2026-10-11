@@ -52,7 +52,7 @@ docker compose down            # container หยุด, volume postgres-data �
 
 **§ ถ้า `docker compose down` แล้ว port 3000 ยัง LISTENING** — Playwright `webServer`
 (`reuseExistingServer: true`) สปอน dev server เองตอนรัน e2e และไม่ฆ่าตอนจบ
-หาอỘเจ้าของ port แล้ว kill by PID เท่านั้น อย่า kill by process name:
+หาเจ้าของ port แล้ว kill by PID เท่านั้น อย่า kill by process name:
 
 ```bash
 netstat -ano | grep LISTENING | grep ':3000\b'   # เอาคอลลี่สุดท้าย = PID
@@ -75,8 +75,16 @@ netstat -ano | grep LISTENING | grep -E ':(3000|5433|8081)\b'
 for p in / /intake /track /admin/login /api/provinces; do
   printf '%s -> %s\n' "$p" "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000$p)"
 done
+# § /admin และ /admin/chat ตอบ 307 (redirect ไป /admin/login) = ปกป้องถูก ไม่ใช่พัง
+# ถ้าได้ 200 ทั้งที่ไม่ล็อกอิน = auth gate เพี้ยน ตรวจ src/proxy.ts ทันที
 
-# 4. DB มีข้อมูลพื้นฐานไหม (geography ว่าง = ฟอร์ม intake ส่งไม่ได้เลย)
+# 4. LINE rows ไม่ให้มี U_test_local_webhook_user ค้าง (พิษต่อ admin-chat spec)
+# scripts/test-webhook.ts สร้าง row นี้แบบไม่ลบ — ถ้าค้างไว้ admin-chat beforeAll จะ
+# throw บน unique constraint ทั้ง spec ล้ม 6/6 ที่ setup (ไม่มี afterAll รัน)
+npx tsx scripts/check-line-db.ts
+# ถ้า line_users มีแถวนั้น: ลบแถว chat_conversations + line_users ของ user นั้นก่อน
+
+# 5. DB มีข้อมูลพื้นฐานไหม (geography ว่าง = ฟอร์ม intake ส่งไม่ได้เลย)
 npx tsx -e "
 import{config}from'dotenv';config({path:'.env.local'});
 import{sql}from'drizzle-orm';import{getDb,closeDb}from'./src/lib/db';
@@ -144,7 +152,7 @@ TypeError จาก invalid URL ที่แสดงข้อความ "ไ�
 |---|---|
 | UI flow | Playwright trace + screenshot (`--trace on --screenshot on`) และ `--reporter=html` → `playwright-report/` |
 | API | response body + HTTP status (`curl -s -w '\n%{http_code}'`) |
-| LINE bot | stdout ของ `test-webhook.ts` + row ที่พึ่งสร้างใน `conversations` / `line_users` |
+| LINE bot | stdout ของ `test-webhook.ts` + row ที่เพิ่งสร้างใน `chat_conversations` / `line_users` |
 | Console error | Playwright listener บน `pageerror` — มีแบบใน `e2e/admin-chat.spec.ts` |
 
 **Proof standards (บังคับ):**
@@ -180,7 +188,7 @@ docker compose down            # container หยุด, DB data ยังอย
 | ไฟล์ | ทำไร | invoke |
 |---|---|---|
 | `e2e/helpers/geography.ts` | `loadFirstGeography()` + `fillGeographyCascade(page, geo)` — cascade จังหวัด/อำเภอ/ตำบล โดยหยิบชื่อจาก DB แถวแรก | import ใน spec ใหม่ |
-| `e2e/helpers/reset-rate-limits.ts` | `resetRateLimits(rateLimitKey('submit','::1'))` — ล้าง rate-limit ก่อน drive มือ เก้ณฑ์ 429 | import หรือยิง Redis `DEL` ตรงๆ |
+| `e2e/helpers/reset-rate-limits.ts` | `resetRateLimits(rateLimitKey('submit','::1'))` — ล้าง rate-limit ก่อน drive มือ กัน 429 | import หรือยิง Redis `DEL` ตรงๆ |
 | `scripts/test-webhook.ts` | LINE webhook end-to-end จาก shell | `npx tsx scripts/test-webhook.ts http://localhost:3000 <follow\|message\|handoff>` (BASE มาก่อน event เสมอ) |
 | `.claude/skills/verify/features/` | feature map — หน้าจอไหนขับยังไง, observable end state คือไร | อ่านก่อนเลือก feature ที่จะพิสูจน์ |
 
