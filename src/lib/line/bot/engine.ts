@@ -7,11 +7,11 @@ import type { ConversationMode } from '../chat-modes';
 import { matchFaq } from './faq-matcher';
 import { matchIntent } from './intent-matcher';
 import { parseResponseText } from './response-parser';
-import { startCaseFlow, processCaseFlow, type CaseFlowState } from './case-flow';
+import { startCaseFlow, processCaseFlow, handleConfirmPostback, type CaseFlowState } from './case-flow';
 import { isHandoffRequest, triggerHandoff } from './handoff';
 import { getWelcomeMessages } from './welcome';
 import { getChatSetting } from '../settings';
-import { caseStatusFlex } from '../messages/flex';
+import { caseStatusFlex, parseConfirmPostback } from '../messages/flex';
 import { getFaqReply } from '../messages/rich-menu';
 import { findTrackableCase } from '@/lib/cases/citizen-access';
 import { COPY } from '@/lib/copy';
@@ -44,7 +44,7 @@ export async function handleEvent(event: LineWebhookEvent, transport: LineTransp
       await handleFollowEvent(db, event, conversation.id, transport);
       break;
     case 'postback':
-      await handlePostbackEvent(db, event, conversation.id);
+      await handlePostbackEvent(db, event, conversation.id, transport);
       break;
     case 'unfollow':
       break;
@@ -288,7 +288,7 @@ async function handleFollowEvent(db: Db, event: LineFollowEvent, conversationId:
   await transport.reply(event.replyToken, replies);
 }
 
-async function handlePostbackEvent(db: Db, event: LinePostbackEvent, conversationId: string) {
+async function handlePostbackEvent(db: Db, event: LinePostbackEvent, conversationId: string, transport: LineTransport = httpLineTransport) {
   await db.insert(chatMessages).values({
     id: generateId(),
     conversationId,
@@ -297,4 +297,26 @@ async function handlePostbackEvent(db: Db, event: LinePostbackEvent, conversatio
     textContent: `[postback] ${event.postback.data}`,
     metadata: event.postback.params ?? null,
   });
+
+  // § postback ที่ไม่ใช่ confirm protocol คงพฤติกรรมเดิม: log only ไม่ตอบอะไร
+  const confirmData = parseConfirmPostback(event.postback.data);
+  if (!confirmData) return;
+
+  const [lineUser] = await db
+    .select()
+    .from(lineUsers)
+    .where(eq(lineUsers.lineUserId, event.source.userId))
+    .limit(1);
+  const botState = (lineUser?.botState as CaseFlowState | null) ?? null;
+  // § นอก confirm step (เช่น กดปุ่มซ้ำหลังส่งเรื่องแล้ว) คืน null → คง log-only ไม่ตอบซ้ำ
+  const result = await handleConfirmPostback(confirmData, botState, event.source.userId);
+  if (!result) return;
+
+  if (lineUser) {
+    await updateBotState(db, lineUser.id, result.state);
+  }
+  // § persist-ก่อน-reply เหมือนสาย message — ตอบผ่าน transport เดิม
+  // (circuit breaker ห่อทุก POST ใน client.ts) ห้ามยิง LINE ตรง
+  await recordBotReplies(conversationId, result.replies);
+  await transport.reply(event.replyToken, result.replies.slice(0, 5));
 }

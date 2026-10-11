@@ -46,6 +46,7 @@ vi.mock('./case-flow', () => ({
     state: null,
     replies: [{ type: 'text', text: 'ดำเนินการต่อ' }],
   })),
+  handleConfirmPostback: vi.fn(async () => null),
 }));
 
 vi.mock('../messages/flex', () => ({
