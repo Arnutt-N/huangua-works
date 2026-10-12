@@ -63,16 +63,20 @@ export default async function TrackPage({
               </h2>
               <ul className="mt-4 space-y-3" data-testid="my-cases-list">
                 {myCases.map((item) => (
-                  <li
-                    key={item.trackingCode}
-                    className="border-border bg-surface-raised flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3"
-                  >
-                    <CaseStatusBadge status={item.status} register="citizen" />
-                    <span className="text-ink min-w-0 flex-1 truncate text-sm font-medium" title={item.title}>
-                      {item.title}
-                    </span>
-                    <span className="text-muted font-mono text-xs">{item.trackingCode}</span>
-                    <span className="text-muted text-xs">อัปเดต {formatThaiDateLong(new Date(item.updatedAt))}</span>
+                  <li key={item.trackingCode}>
+                    <Link
+                      href={`/track?id=${item.trackingCode}`}
+                      className="border-border bg-surface-raised flex min-h-touch flex-col gap-1.5 rounded-lg border px-4 py-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
+                    >
+                      <span className="flex flex-wrap items-center gap-2">
+                        <CaseStatusBadge status={item.status} register="citizen" />
+                        <span className="font-mono text-sm font-semibold text-accent-strong">{item.trackingCode}</span>
+                      </span>
+                      <span className="line-clamp-2 text-sm font-medium text-ink" title={item.title}>
+                        {item.title}
+                      </span>
+                      <span className="text-xs text-muted">อัปเดต {formatThaiDateLong(new Date(item.updatedAt))}</span>
+                    </Link>
                   </li>
                 ))}
               </ul>
