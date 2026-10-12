@@ -22,7 +22,7 @@ export default async function AdminLoginPage({
   return (
     <div className="min-h-dvh bg-surface text-ink">
       <Navbar />
-      <main className="relative overflow-hidden mesh-gradient">
+      <main id="main" className="relative overflow-hidden mesh-gradient">
         <div className="absolute inset-0 thai-pattern pointer-events-none" />
         <div className="relative z-10 mx-auto flex w-full max-w-md flex-col px-4 pb-16 pt-24 sm:px-6 sm:pt-28">
           <Link
