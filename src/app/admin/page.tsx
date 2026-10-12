@@ -139,6 +139,7 @@ export default async function AdminDashboardPage() {
             value={totalInProgress}
             icon={Activity}
             variant="gold"
+            className="shadow-accent-drop"
           />
           <KpiCard
             label="ปิดสำเร็จ"
@@ -188,7 +189,13 @@ export default async function AdminDashboardPage() {
                   <div className="flex-1">
                     <div className="h-2.5 overflow-hidden rounded-pill bg-ink/10 ring-1 ring-ink/5 ring-inset">
                       <div
-                        className="h-full rounded-pill bg-accent-strong transition-all duration-slow ease-out-expo"
+                        className={
+                          item.status === 'done' || item.status === 'closed'
+                            ? 'h-full rounded-pill bg-success-ink transition-all duration-slow ease-out-expo'
+                            : item.status === 'rejected'
+                              ? 'h-full rounded-pill bg-danger-ink transition-all duration-slow ease-out-expo'
+                              : 'h-full rounded-pill bg-accent-strong transition-all duration-slow ease-out-expo'
+                        }
                         style={{ width: `${(item.count / maxStatusCount) * 100}%` }}
                       />
                     </div>
