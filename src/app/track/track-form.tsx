@@ -98,7 +98,7 @@ export function TrackForm({ initialId }: { initialId?: string }) {
     <>
       <form
         onSubmit={handleSubmit}
-        className="glass mt-8 rounded-xl p-6 shadow-sm sm:p-8"
+        className="glass-panel mt-8 rounded-xl p-6 shadow-sm sm:p-8"
       >
         <div className="flex items-center gap-3">
           <span className="bg-accent-100 flex h-10 w-10 items-center justify-center rounded-xl">
@@ -143,7 +143,7 @@ export function TrackForm({ initialId }: { initialId?: string }) {
 
       {result && (
         <section aria-labelledby="result" className="mt-8">
-          <div className="glass rounded-xl p-6 shadow-sm sm:p-8">
+          <div className="glass-panel rounded-xl p-6 shadow-sm sm:p-8">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm text-muted">

@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   Loader2,
   MapPin,
-  Paperclip,
   User,
   FileText,
 } from 'lucide-react';
@@ -97,7 +96,7 @@ function validate(form: FormState, skipIdentity: boolean): FieldErrors {
 
 function SectionCard({ children }: { children: React.ReactNode }) {
   return (
-    <section className="glass rounded-xl p-6 shadow-sm sm:p-8">
+    <section className="glass-panel rounded-xl p-6 shadow-sm sm:p-8">
       {children}
     </section>
   );
@@ -513,6 +512,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
               name="village"
               placeholder="เช่น บ้านหัวงัว หมู่ 5"
               value={form.village}
+              disabled={!!form.villageId}
               onChange={(e) => updateField('village', e.target.value)}
             />
           </div>
@@ -529,17 +529,8 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
         </div>
       </SectionCard>
 
-      {/* ไฟล์แนบ */}
-      <SectionCard>
-        <SectionHeading icon={Paperclip}>รูปภาพประกอบ (ไม่จำเป็น)</SectionHeading>
-        <div className="mt-5 rounded-xl border border-dashed border-border-strong bg-surface-sunken/30 px-4 py-8 text-center">
-          <p className="text-sm text-muted">ลากไฟล์มาวาง หรือเลือกจากเครื่อง (สูงสุด 5 รูป)</p>
-          <p className="mt-1 text-xs text-muted">ยังไม่เปิดใช้งานในเฟสนี้</p>
-        </div>
-      </SectionCard>
-
       {/* PDPA consent */}
-      <div className="glass rounded-xl p-6 shadow-sm sm:p-8">
+      <div className="glass-panel rounded-xl p-6 shadow-sm sm:p-8">
         <label className="border-border bg-surface-sunken/30 flex items-start gap-3 rounded-xl border p-4">
           <input
             type="checkbox"

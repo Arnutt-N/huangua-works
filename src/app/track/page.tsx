@@ -56,7 +56,7 @@ export default async function TrackPage({
           <p className="mt-3 text-lg text-muted">กรอกเลขติดตามเรื่อง เพื่อดูสถานะเรื่องที่ท่านแจ้ง</p>
 
           {myCases.length > 0 && (
-            <section className="glass mt-8 rounded-xl p-6 shadow-sm" aria-labelledby="my-cases-heading">
+            <section className="glass-panel mt-8 rounded-xl p-6 shadow-sm" aria-labelledby="my-cases-heading">
               <h2 id="my-cases-heading" className="text-xl font-semibold">
                 {COPY.MY_CASES}{' '}
                 <span className="text-sm font-normal text-muted">(จากบัญชี LINE ของท่าน)</span>
