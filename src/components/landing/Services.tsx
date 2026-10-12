@@ -86,8 +86,10 @@ export function Services() {
               transition={{ delay: i * 0.1 }}
               whileHover={{ y: -5 }}
               className={cn(
-                'glass rounded-lg p-6 shadow-sm transition-shadow hover:shadow-md',
-                i === 0 && 'bg-accent-gradient border-transparent text-on-accent shadow-accent-glow',
+                'rounded-lg p-6 transition-shadow',
+                i === 0
+                  ? 'bg-accent-gradient border border-transparent text-on-accent shadow-accent-glow'
+                  : 'glass shadow-sm hover:shadow-md',
               )}
             >
               <div className={cn('flex h-14 w-14 items-center justify-center rounded-xl', i === 0 ? 'bg-white/20' : service.bgClass)}>

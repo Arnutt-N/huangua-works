@@ -189,7 +189,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
   }
 
   function handleProvinceChange(value: string) {
-    setForm((prev) => ({ ...prev, provinceId: value, districtId: '', subDistrictId: '', villageId: '' }));
+    setForm((prev) => ({ ...prev, provinceId: value, districtId: '', subDistrictId: '', villageId: '', village: '' }));
     setDistricts([]);
     setSubdistricts([]);
     setVillagesList([]);
@@ -197,14 +197,14 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
   }
 
   function handleDistrictChange(value: string) {
-    setForm((prev) => ({ ...prev, districtId: value, subDistrictId: '', villageId: '' }));
+    setForm((prev) => ({ ...prev, districtId: value, subDistrictId: '', villageId: '', village: '' }));
     setSubdistricts([]);
     setVillagesList([]);
     loadSubdistricts(value);
   }
 
   function handleSubDistrictChange(value: string) {
-    setForm((prev) => ({ ...prev, subDistrictId: value, villageId: '' }));
+    setForm((prev) => ({ ...prev, subDistrictId: value, villageId: '', village: '' }));
     setVillagesList([]);
     loadVillages(value);
   }
@@ -260,7 +260,7 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
 
   if (result) {
     return (
-      <div className="glass mt-8 rounded-xl px-6 py-10 text-center shadow-lg">
+      <div className="glass-panel mt-8 rounded-xl px-6 py-10 text-center shadow-lg">
         <span className="bg-accent-100 mx-auto flex h-16 w-16 items-center justify-center rounded-full">
           <CheckCircle2 className="text-accent-strong h-8 w-8" aria-hidden="true" />
         </span>
@@ -490,7 +490,10 @@ export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
             <Label htmlFor="villageId">หมู่บ้าน</Label>
             <Select
               value={form.villageId}
-              onValueChange={(v) => updateField('villageId', v)}
+              onValueChange={(v) => {
+                updateField('villageId', v);
+                if (v) updateField('village', '');
+              }}
               disabled={!form.subDistrictId || loadingGeo === 'villages'}
             >
               <SelectTrigger id="villageId">
