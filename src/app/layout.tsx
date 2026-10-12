@@ -89,6 +89,7 @@ export default function RootLayout({
   return (
     <html lang="th" data-theme="light" className={noto.variable} suppressHydrationWarning>
       <body>
+        <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-md focus:bg-accent-strong focus:px-4 focus:py-2 focus:text-on-accent">ข้ามไปเนื้อหาหลัก</a>
         {children}
         <Analytics />
       </body>

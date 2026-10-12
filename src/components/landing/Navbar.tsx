@@ -43,25 +43,25 @@ export function Navbar() {
           <div className="hidden items-center gap-8 md:flex">
             <Link
               href="/#home"
-              className="text-sm font-medium transition-colors hover:text-accent"
+              className="rounded-sm text-sm font-medium transition-colors hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
             >
               หน้าแรก
             </Link>
             <Link
               href="/#services"
-              className="text-sm font-medium transition-colors hover:text-accent"
+              className="rounded-sm text-sm font-medium transition-colors hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
             >
               บริการ
             </Link>
             <Link
               href="/#how-it-works"
-              className="text-sm font-medium transition-colors hover:text-accent"
+              className="rounded-sm text-sm font-medium transition-colors hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
             >
               ขั้นตอน
             </Link>
             <Link
               href="/track"
-              className="text-sm font-medium transition-colors hover:text-accent"
+              className="rounded-sm text-sm font-medium transition-colors hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
             >
               {COPY.TRACK_LABEL}
             </Link>
@@ -71,7 +71,7 @@ export function Navbar() {
           <div className="flex items-center gap-2 sm:gap-3">
             <Link
               href="/admin/login"
-              className="hidden min-h-touch items-center whitespace-nowrap rounded-md px-3 text-sm font-medium text-ink/80 transition-colors hover:bg-surface-sunken hover:text-ink sm:inline-flex"
+              className="hidden min-h-touch items-center whitespace-nowrap rounded-md px-3 text-sm font-medium text-ink/80 transition-colors hover:bg-surface-sunken hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong sm:inline-flex"
             >
               เข้าสู่ระบบ
             </Link>
@@ -90,7 +90,7 @@ export function Navbar() {
             <button
               type="button"
               onClick={() => setMobileOpen((open) => !open)}
-              className="flex h-10 w-10 items-center justify-center rounded-lg transition-colors hover:bg-surface-sunken md:hidden"
+              className="flex h-11 w-11 items-center justify-center rounded-lg transition-colors hover:bg-surface-sunken focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong md:hidden"
               aria-label={mobileOpen ? 'ปิดเมนู' : 'เปิดเมนู'}
               aria-expanded={mobileOpen}
               aria-controls="mobile-nav-menu"
@@ -148,7 +148,7 @@ function MobileLink({
       href={href}
       onClick={onClick}
       role="menuitem"
-      className="flex min-h-touch items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-surface-sunken"
+      className="flex min-h-touch items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-surface-sunken focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
     >
       {icon}
       {children}

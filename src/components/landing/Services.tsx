@@ -85,13 +85,18 @@ export function Services() {
               viewport={{ once: true }}
               transition={{ delay: i * 0.1 }}
               whileHover={{ y: -5 }}
-              className="glass rounded-lg p-6 shadow-lg transition-shadow hover:shadow-xl"
+              className={cn(
+                'rounded-lg p-6 transition-shadow',
+                i === 0
+                  ? 'bg-accent-gradient border border-transparent text-on-accent shadow-accent-glow'
+                  : 'glass shadow-sm hover:shadow-md',
+              )}
             >
-              <div className={cn('flex h-14 w-14 items-center justify-center rounded-xl', service.bgClass)}>
-                <service.icon className={cn('h-7 w-7', service.iconClass)} />
+              <div className={cn('flex h-14 w-14 items-center justify-center rounded-xl', i === 0 ? 'bg-white/20' : service.bgClass)}>
+                <service.icon className={cn('h-7 w-7', i === 0 ? 'text-on-accent' : service.iconClass)} />
               </div>
-              <h3 className="mt-4 text-lg font-semibold">{service.title}</h3>
-              <p className="mt-2 text-sm text-muted">{service.description}</p>
+              <h3 className={cn('mt-4 text-lg font-semibold', i === 0 && 'text-on-accent')}>{service.title}</h3>
+              <p className={cn('mt-2 text-sm', i === 0 ? 'text-accent-100' : 'text-muted')}>{service.description}</p>
             </motion.div>
           ))}
         </div>

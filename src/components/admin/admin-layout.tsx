@@ -132,7 +132,7 @@ export function AdminLayout({
           <button
             type="button"
             onClick={() => setMobileOpen(false)}
-            className="ml-auto flex h-9 w-9 flex-none items-center justify-center rounded-md text-muted hover:bg-accent-sunken hover:text-ink lg:hidden"
+            className="ml-auto flex h-11 w-11 flex-none items-center justify-center rounded-md text-muted hover:bg-accent-sunken hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong lg:hidden"
             aria-label="ปิดเมนู"
           >
             <X className="h-5 w-5" aria-hidden="true" />
@@ -144,7 +144,7 @@ export function AdminLayout({
             type="button"
             onClick={toggleCollapsed}
             className={cn(
-              'hidden h-9 w-9 flex-none items-center justify-center rounded-md text-muted hover:bg-accent-sunken hover:text-ink lg:flex',
+              'hidden h-11 w-11 flex-none items-center justify-center rounded-md text-muted hover:bg-accent-sunken hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong lg:flex',
               collapsed ? 'lg:mx-auto' : 'lg:ml-auto',
             )}
             aria-label={collapsed ? 'ขยายแถบเมนู' : 'ย่อแถบเมนู'}
@@ -204,7 +204,7 @@ export function AdminLayout({
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
-            className="flex h-10 w-10 flex-none items-center justify-center rounded-md text-ink hover:bg-accent-sunken lg:hidden"
+            className="flex h-11 w-11 flex-none items-center justify-center rounded-md text-ink hover:bg-accent-sunken focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong lg:hidden"
             aria-label="เปิดเมนู"
             aria-expanded={mobileOpen}
           >
@@ -220,7 +220,7 @@ export function AdminLayout({
           <UserMenu fullName={user.fullName} email={user.email} role={user.role} />
         </header>
 
-        <main className="flex-1">{children}</main>
+        <main id="main" className="flex-1">{children}</main>
       </div>
     </div>
   );

@@ -234,7 +234,7 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
       <motion.div
         animate={reduce ? undefined : { y: [0, -10, 0] }}
         transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-        className="glass absolute -left-6 -top-6 z-20 hidden rounded-lg p-3 shadow-lg sm:block"
+        className="glass absolute -left-6 -top-6 z-20 hidden rounded-lg p-3 shadow-md sm:block"
       >
         <div className="flex items-center gap-2">
           <div className="bg-accent-100 flex h-9 w-9 items-center justify-center rounded-full">
@@ -242,7 +242,7 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
           </div>
           <div>
             <p className="text-xs font-semibold">ดำเนินการเสร็จสิ้น</p>
-            <p className="text-[10px] text-muted">วันนี้ 23 เรื่อง</p>
+            <p className="text-xs text-muted">วันนี้ 23 เรื่อง</p>
           </div>
         </div>
       </motion.div>
@@ -250,7 +250,7 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
       <motion.div
         animate={reduce ? undefined : { y: [0, 10, 0] }}
         transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
-        className="glass absolute -bottom-4 -right-4 z-20 hidden rounded-lg p-3 shadow-lg sm:block"
+        className="glass absolute -bottom-4 -right-4 z-20 hidden rounded-lg p-3 shadow-md sm:block"
       >
         <div className="flex items-center gap-2">
           <div className="bg-warning-soft flex h-9 w-9 items-center justify-center rounded-full">
@@ -258,7 +258,7 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
           </div>
           <div>
             <p className="text-xs font-semibold">เวลาตอบสนอง</p>
-            <p className="text-[10px] text-muted">เฉลี่ย 18 ชม.</p>
+            <p className="text-xs text-muted">เฉลี่ย 18 ชม.</p>
           </div>
         </div>
       </motion.div>
@@ -267,14 +267,14 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
       <motion.div
         whileHover={reduce ? undefined : { y: -5 }}
         transition={{ type: 'spring', stiffness: 200, damping: 20 }}
-        className="shadow-accent-drop relative overflow-hidden rounded-xl border bg-surface-raised shadow-2xl"
+        className="shadow-accent-drop relative overflow-hidden rounded-xl border bg-surface-raised"
       >
         {/* Header */}
         <div className="bg-accent-gradient p-5 text-on-accent">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-accent-100 text-xs">เลขติดตาม</p>
-              <p className="text-sm font-bold">HG123456789</p>
+              <p className="text-sm font-bold">HG-XXXX-XXXX</p>
             </div>
             {/* § พื้นขาวโปร่งคงเป็น literal — surface-raised ไม่ใช่สีขาวในธีมมืด
                 การแทนด้วย token จะทำให้ป้ายนี้กลืนหายบน gradient (tokens.css ใช้
@@ -288,7 +288,7 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
                 transition={{ duration: 1.5, repeat: Infinity }}
                 className="bg-accent-gold h-2 w-2 rounded-full"
               />
-              <span className="text-[11px] font-medium">กำลังดำเนินการ</span>
+              <span className="text-xs font-medium">กำลังดำเนินการ</span>
             </div>
           </div>
         </div>
@@ -356,14 +356,14 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
                       type: 'spring',
                     }}
                     className={cn(
-                      'flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold',
+                      'flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold',
                       step.done ? 'bg-accent text-on-accent' : 'bg-accent-sunken text-muted',
                       step.active && 'ring-4 outline-accent-100 outline-3',
                     )}
                   >
                     {step.done ? '✓' : i + 1}
                   </motion.div>
-                  <span className="text-center text-[10px] text-muted">{step.label}</span>
+                  <span className="text-center text-xs text-muted">{step.label}</span>
                 </div>
               ))}
             </div>
@@ -372,15 +372,15 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
           {/* Assignee */}
           <div className="border-border flex items-center justify-between border-t pt-2">
             <div className="flex items-center gap-2">
-              <div className="bg-accent-gradient-br flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold text-on-accent">
+              <div className="bg-accent-gradient-br flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-on-accent">
                 <Wrench className="h-3.5 w-3.5" />
               </div>
               <div>
-                <p className="text-[11px] font-medium">เจ้าหน้าที่ผู้รับผิดชอบ</p>
-                <p className="text-[10px] text-muted">งานไฟฟ้า • กองช่าง</p>
+                <p className="text-xs font-medium">เจ้าหน้าที่ผู้รับผิดชอบ</p>
+                <p className="text-xs text-muted">งานไฟฟ้า • กองช่าง</p>
               </div>
             </div>
-            <span className="text-accent text-[10px] font-medium">อัปเดต 2 นาทีที่แล้ว</span>
+            <span className="text-accent text-xs font-medium">อัปเดต 2 นาทีที่แล้ว</span>
           </div>
         </div>
       </motion.div>

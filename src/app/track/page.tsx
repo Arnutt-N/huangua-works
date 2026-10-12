@@ -41,7 +41,7 @@ export default async function TrackPage({
   return (
     <div className="min-h-dvh bg-surface text-ink">
       <Navbar />
-      <main className="relative overflow-hidden mesh-gradient">
+      <main id="main" className="relative overflow-hidden mesh-gradient">
         <div className="absolute inset-0 thai-pattern pointer-events-none" />
         <div className="relative z-10 mx-auto w-full max-w-3xl px-4 pb-16 pt-24 sm:px-6 sm:pb-20 sm:pt-28">
           <Link
@@ -56,23 +56,27 @@ export default async function TrackPage({
           <p className="mt-3 text-lg text-muted">กรอกเลขติดตามเรื่อง เพื่อดูสถานะเรื่องที่ท่านแจ้ง</p>
 
           {myCases.length > 0 && (
-            <section className="glass mt-8 rounded-xl p-6 shadow-sm" aria-labelledby="my-cases-heading">
+            <section className="glass-panel mt-8 rounded-xl p-6 shadow-sm" aria-labelledby="my-cases-heading">
               <h2 id="my-cases-heading" className="text-xl font-semibold">
                 {COPY.MY_CASES}{' '}
                 <span className="text-sm font-normal text-muted">(จากบัญชี LINE ของท่าน)</span>
               </h2>
               <ul className="mt-4 space-y-3" data-testid="my-cases-list">
                 {myCases.map((item) => (
-                  <li
-                    key={item.trackingCode}
-                    className="border-border bg-surface-raised flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3"
-                  >
-                    <CaseStatusBadge status={item.status} register="citizen" />
-                    <span className="text-ink min-w-0 flex-1 truncate text-sm font-medium" title={item.title}>
-                      {item.title}
-                    </span>
-                    <span className="text-muted font-mono text-xs">{item.trackingCode}</span>
-                    <span className="text-muted text-xs">อัปเดต {formatThaiDateLong(new Date(item.updatedAt))}</span>
+                  <li key={item.trackingCode}>
+                    <Link
+                      href={`/track?id=${item.trackingCode}`}
+                      className="border-border bg-surface-raised flex min-h-touch flex-col gap-1.5 rounded-lg border px-4 py-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
+                    >
+                      <span className="flex flex-wrap items-center gap-2">
+                        <CaseStatusBadge status={item.status} register="citizen" />
+                        <span className="font-mono text-sm font-semibold text-accent-strong">{item.trackingCode}</span>
+                      </span>
+                      <span className="line-clamp-2 text-sm font-medium text-ink" title={item.title}>
+                        {item.title}
+                      </span>
+                      <span className="text-xs text-muted">อัปเดต {formatThaiDateLong(new Date(item.updatedAt))}</span>
+                    </Link>
                   </li>
                 ))}
               </ul>
