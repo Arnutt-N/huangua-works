@@ -16,7 +16,7 @@ import { queueBookings } from '@/lib/db/schema';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { isUniqueViolation } from '@/lib/db/errors';
 import { generateId } from '@/lib/id';
-import { logAudit, type AuditAction } from '@/lib/audit';
+import { logAudit, AUDIT_ACTIONS } from '@/lib/audit';
 import { checkRateLimit } from '@/lib/upstash';
 import { clientIpFromHeaders } from '@/lib/rate-limit/client-ip';
 import { parseBody } from '@/lib/api-helpers';
@@ -28,11 +28,6 @@ import {
 } from '@/lib/validation';
 import { formatThaiDateLong } from '@/lib/thai-date';
 import { buildSlotAvailability } from '@/app/queue/slots';
-
-// § ชื่อ action สำหรับ audit — ยังไม่ได้ย้ายเข้า AUDIT_ACTIONS (closed map ใน audit.ts)
-// เพราะขอบเขตงาน branch นี้ห้ามแตะไฟล์นั้น (กัน conflict ตอนรวม) จึงส่งสตริงตรง
-// พร้อม cast; ตอนรวมให้ย้ายสองค่านี้เข้า AUDIT_ACTIONS แล้วลบ cast ทิ้ง
-const AUDIT_QUEUE_CREATE = 'queue_booking_create' as AuditAction;
 
 function thaiDate(isoDate: string): string {
   return formatThaiDateLong(new Date(`${isoDate}T00:00:00`));
@@ -127,7 +122,7 @@ export async function POST(req: NextRequest) {
 
   await logAudit(
     {
-      action: AUDIT_QUEUE_CREATE,
+      action: AUDIT_ACTIONS.QUEUE_BOOKING_CREATE,
       resource: 'queue_bookings',
       resourceId: id,
       ipAddress: ip,

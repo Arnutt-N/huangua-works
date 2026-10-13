@@ -59,6 +59,8 @@ export const AUDIT_ACTIONS = {
   RICH_MENU_PUBLISH: 'rich_menu_publish',
   MEDIA_UPLOAD: 'media_upload',
   MEDIA_DELETE: 'media_delete',
+  QUEUE_BOOKING_CREATE: 'queue_booking_create',
+  QUEUE_BOOKING_UPDATE: 'queue_booking_update',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

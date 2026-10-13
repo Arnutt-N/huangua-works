@@ -6,7 +6,7 @@ import { requireStaff } from '@/lib/auth/require-staff';
 import { getDb } from '@/lib/db';
 import { queueBookings } from '@/lib/db/schema';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
-import { logAudit, type AuditAction } from '@/lib/audit';
+import { logAudit, AUDIT_ACTIONS } from '@/lib/audit';
 import {
   updateQueueBookingFormSchema,
   validateFormData,
@@ -18,10 +18,6 @@ export interface QueueActionState {
   error: string | null;
   success?: string;
 }
-
-// § ชื่อ action สำหรับ audit — เหตุผลเดียวกับ route.ts (ห้ามแตะ audit.ts ใน branch นี้)
-// ตอนรวมให้ย้ายเข้า AUDIT_ACTIONS แล้วลบ cast ทิ้ง
-const AUDIT_QUEUE_UPDATE = 'queue_booking_update' as AuditAction;
 
 /**
  * ผังสถานะคิว (ตรวจใน action ก่อน update ทุกครั้ง):
@@ -65,7 +61,7 @@ export async function updateQueueBooking(
   await logAudit(
     {
       userId: auth.user.id,
-      action: AUDIT_QUEUE_UPDATE,
+      action: AUDIT_ACTIONS.QUEUE_BOOKING_UPDATE,
       resource: 'queue_bookings',
       resourceId: id,
       ipAddress: auth.ipAddress,
