@@ -45,6 +45,8 @@ export const RATE_LIMIT_POLICIES = {
   lineWebhookIp: { prefix: 'rate:line-webhook:ip', limit: 60, windowSeconds: 60, kind: 'public', failClosed: false },
   // กัน brute force tracking code — public แต่ข้อมูลที่คืนถอด PII แล้ว
   track: { prefix: 'rate:track', limit: 10, windowSeconds: 300, kind: 'public', failClosed: false },
+  // กันสแปมดาว — เขียนครั้งเดียวต่อเคสอยู่แล้ว (unique) limit กันยิงมั่ว
+  feedbackSubmit: { prefix: 'rate:feedback', limit: 10, windowSeconds: 300, kind: 'public', failClosed: false },
 } as const satisfies Record<string, RateLimitPolicy>;
 
 export type RateLimitPolicyName = keyof typeof RATE_LIMIT_POLICIES;
