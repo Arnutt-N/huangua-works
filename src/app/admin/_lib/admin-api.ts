@@ -236,6 +236,11 @@ export const adminApi = {
     request<OkBody>(`/api/line/admin/rich-menus/${id}/sync`, { method: 'POST' }),
   publishRichMenu: (id: string): Promise<ApiResult<OkBody>> =>
     request<OkBody>(`/api/line/admin/rich-menus/${id}/publish`, { method: 'POST' }),
+  uploadRichMenuImage: (id: string, file: File): Promise<ApiResult<OkBody>> => {
+    const form = new FormData();
+    form.append('file', file);
+    return request<OkBody>(`/api/line/admin/rich-menus/${id}/upload`, { method: 'POST', body: form });
+  },
 
   // ── Broadcasts ──
   listBroadcasts: (): Promise<ApiResult<ListOf<BroadcastItem>>> =>
