@@ -8,31 +8,26 @@ import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { users } from '@/lib/db/schema';
 import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
 import type { UserRole } from '@/lib/auth/roles';
-import { ADMIN_ROLES, CASE_SUPERVISOR_ROLES, STAFF_ROLES, SUPERADMIN_ONLY } from '@/lib/auth/roles';
-import { getTierRoles, type TierKey } from '@/lib/auth/tiers';
+import { getTierRoles, tierKeyForRoles } from '@/lib/auth/tiers';
 
 /**
- * § จุดคอขวดเดียวที่ map whitelist → tier key (เทียบ reference ตรง import เดียวกัน)
+ * § จุดคอขวดเดียวที่ map whitelist → tier key (เทียบด้วยค่า ไม่ใช่ reference —
+ * spread/สำเนา/literal เทียบเท่าเข้า matrix เหมือน const เดิม interrogate D-14)
  * call site ไม่ต้องเปลี่ยน — DB มี override ใช้ของ DB ไม่มีใช้ค่าคงที่เดิม
  * array แปลกหน้า (ไม่ใช่ 4 tier มาตรฐาน) ผ่านตรงเหมือนเดิม
  */
-const TIER_BY_REF = new Map<readonly UserRole[], TierKey>([
-  [STAFF_ROLES, 'staff'],
-  [CASE_SUPERVISOR_ROLES, 'case_supervisor'],
-  [ADMIN_ROLES, 'admin'],
-  [SUPERADMIN_ONLY, 'superadmin'],
-]);
-
 async function resolveAllowedRoles(
   allowedRoles?: readonly UserRole[],
 ): Promise<readonly UserRole[] | undefined> {
   if (!allowedRoles) return undefined;
-  const key = TIER_BY_REF.get(allowedRoles);
+  const key = tierKeyForRoles(allowedRoles);
   if (!key) return allowedRoles;
   try {
     return await getTierRoles(key);
-  } catch {
-    // § DB/Redis ล่ม = fallback เงียบ (fail-open) กันล็อกทั้งระบบ
+  } catch (err) {
+    // § DB/Redis ล่ม = fallback ค่าคงที่ (fail-open) + warn ให้เห็นใน log
+    // ไม่เงียบ (interrogate D-13) — ไม่มี PII มีแค่ tier key
+    console.error(`[auth] tier matrix unreadable (${key}), fallback compiled defaults`, err);
     return allowedRoles;
   }
 }

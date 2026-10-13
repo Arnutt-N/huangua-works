@@ -66,23 +66,33 @@ export function planDisplayActions(
   now: Date,
   currentDefaultLineId: string | null,
 ): { activate: string[]; expire: string[]; cancelDefault: boolean } {
-  const activate: string[] = [];
   const expire: string[] = [];
+  const contenders: DisplayCandidate[] = [];
   for (const m of menus) {
     if (!m.lineRichMenuId || m.syncStatus !== 'synced') continue;
     if (!m.displayStartAt && !m.displayEndAt) continue;
-    const started = m.displayStartAt ? m.displayStartAt <= now : true;
+    // § ต้องมี start ที่ถึงเวลาแล้วเท่านั้น — มีแค่ end คือตั้งเวลาลงอย่างเดียว
+    // ห้าม publish หลุด (interrogate D-6)
+    const started = m.displayStartAt ? m.displayStartAt <= now : false;
     const ended = m.displayEndAt ? m.displayEndAt <= now : false;
     if (ended && m.status === 'active') expire.push(m.id);
-    else if (started && !ended && m.status !== 'active') activate.push(m.id);
+    else if (started && !ended && m.status !== 'active') contenders.push(m);
   }
+  // § overlap ชนะตัวเดียว (start ล่าสุด, เสมอใช้ id มากสุด) — LINE มี default เดียว
+  contenders.sort((a, b) => {
+    const t = b.displayStartAt!.getTime() - a.displayStartAt!.getTime();
+    return t !== 0 ? t : b.id.localeCompare(a.id);
+  });
+  const activate = contenders.slice(0, 1).map((m) => m.id);
   const expiringLineIds = new Set(
     menus.filter((m) => expire.includes(m.id)).map((m) => m.lineRichMenuId),
   );
   return {
     activate,
     expire,
+    // § มี activate = setDefault ใหม่ทับแล้ว ห้าม cancel ตาม (interrogate B-2/C-2)
     cancelDefault:
+      activate.length === 0 &&
       expire.length > 0 &&
       currentDefaultLineId !== null &&
       expiringLineIds.has(currentDefaultLineId),
@@ -90,10 +100,18 @@ export function planDisplayActions(
 }
 
 /** cron tick แสดงเมนูตามเวลา — เรียกจาก `/api/cron/rich-menu-display` */
-export async function runDisplayTick(
-  now = new Date(),
-): Promise<{ activated: number; expired: number; error?: string }> {
+export interface DisplayTickResult {
+  activated: number;
+  expired: number;
+  failed: string[];
+  error?: string;
+}
+
+export async function runDisplayTick(now = new Date()): Promise<DisplayTickResult> {
   const db = await getDb();
+  const failed: string[] = [];
+  let activated = 0;
+  let expired = 0;
   try {
     const rows = await db
       .select({
@@ -105,31 +123,61 @@ export async function runDisplayTick(
         displayEndAt: richMenus.displayEndAt,
       })
       .from(richMenus);
+    // § อ่าน default แบบ best-effort — อ่านล้มข้ามแค่ขั้น cancel
+    // DB flip ไม่ขึ้นกับ LINE read (interrogate B-4)
+    let currentDefault: string | null = null;
+    try {
+      currentDefault = await getDefaultLineRichMenu();
+    } catch (err) {
+      console.error('[display-tick] read default failed, skip cancel only', err);
+    }
     const plan = planDisplayActions(
       rows.map((r) => ({ ...r, status: r.status as string })),
       now,
-      await getDefaultLineRichMenu(),
+      currentDefault,
     );
+    // § cancel ก่อน commit (ล้มแล้วยัง retry ได้ — DB ยัง active อยู่)
+    if (plan.cancelDefault) {
+      try {
+        await cancelDefaultLineRichMenu();
+      } catch (err) {
+        failed.push('cancel-default');
+        console.error('[display-tick] cancel default failed', err);
+      }
+    }
     for (const id of plan.activate) {
-      const row = rows.find((r) => r.id === id)!;
-      await setDefaultLineRichMenu(row.lineRichMenuId!);
-      await db
-        .update(richMenus)
-        .set({ status: 'active', updatedAt: new Date() })
-        .where(eq(richMenus.id, id));
+      try {
+        const row = rows.find((r) => r.id === id)!;
+        await setDefaultLineRichMenu(row.lineRichMenuId!);
+        await db
+          .update(richMenus)
+          .set({ status: 'active', updatedAt: new Date() })
+          .where(eq(richMenus.id, id));
+        activated += 1;
+      } catch (err) {
+        failed.push(`activate:${id}`);
+        console.error(`[display-tick] activate ${id} failed`, err);
+      }
     }
     for (const id of plan.expire) {
-      await db
-        .update(richMenus)
-        .set({ status: 'inactive', updatedAt: new Date() })
-        .where(eq(richMenus.id, id));
+      try {
+        if (plan.cancelDefault && failed.includes('cancel-default')) continue;
+        await db
+          .update(richMenus)
+          .set({ status: 'inactive', updatedAt: new Date() })
+          .where(eq(richMenus.id, id));
+        expired += 1;
+      } catch (err) {
+        failed.push(`expire:${id}`);
+        console.error(`[display-tick] expire ${id} failed`, err);
+      }
     }
-    if (plan.cancelDefault) await cancelDefaultLineRichMenu();
-    return { activated: plan.activate.length, expired: plan.expire.length };
+    return { activated, expired, failed };
   } catch (err) {
     return {
-      activated: 0,
-      expired: 0,
+      activated,
+      expired,
+      failed,
       error: err instanceof Error ? err.message : 'unknown',
     };
   }
@@ -250,9 +298,16 @@ async function resolveAliasTarget(
 export async function createMenuAlias(
   aliasId: string,
   menuId: string,
-): Promise<{ ok: boolean; error?: string }> {
-  if (!isValidAliasId(aliasId)) return { ok: false, error: 'ชื่อ alias ใช้ได้แค่ a-z 0-9 _ - ยาวไม่เกิน 50' };
+): Promise<{ ok: boolean; error?: string; code?: 'duplicate' }> {
+  if (!isValidAliasId(aliasId)) return { ok: false, error: 'ชื่อ alias ใช้ได้แค่ a-z A-Z 0-9 _ - ยาวไม่เกิน 50' };
   const db = await getDb();
+  // § เช็ค local ก่อนยิง LINE — ซ้ำตอบ 409 สะอาด ไม่สร้าง orphan (interrogate A-5)
+  const [existing] = await db
+    .select({ id: richMenuAliases.id })
+    .from(richMenuAliases)
+    .where(eq(richMenuAliases.aliasId, aliasId))
+    .limit(1);
+  if (existing) return { ok: false, error: 'ชื่อ alias นี้มีแล้ว', code: 'duplicate' };
   const target = await resolveAliasTarget(db, menuId);
   if (!target.ok) return target;
   try {
@@ -263,9 +318,10 @@ export async function createMenuAlias(
   try {
     await db.insert(richMenuAliases).values({ id: generateId(), aliasId, richMenuId: menuId });
   } catch {
-    // § LINE สร้างแล้วแต่ DB เขียนไม่ลง (เช่น alias ซ้ำ) — คืน error ให้ sync ใหม่ได้
-    // ไม่ลบฝั่ง LINE (best-effort) เพราะแถว local ไม่มีแต่ LINE มีคือ state รู้ที่มา
-    return { ok: false, error: 'บันทึก alias ในระบบไม่สำเร็จ (อาจชื่อซ้ำ)' };
+    // § ชนกันตรงนี้ (race) ลบฝั่ง LINE ชดเชยแบบ best-effort แล้วค่อย error —
+    // retry ครั้งหน้าจะเริ่มสะอาด ไม่ wedged (interrogate D-7)
+    await deleteAliasOnLine(aliasId).catch(() => {});
+    return { ok: false, error: 'บันทึก alias ในระบบไม่สำเร็จ กรุณาลองใหม่' };
   }
   return { ok: true };
 }
@@ -288,22 +344,40 @@ export async function repointMenuAlias(
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'repoint alias failed' };
   }
-  await db
-    .update(richMenuAliases)
-    .set({ richMenuId: menuId })
-    .where(eq(richMenuAliases.id, row.id));
+  try {
+    await db
+      .update(richMenuAliases)
+      .set({ richMenuId: menuId, updatedAt: new Date() })
+      .where(eq(richMenuAliases.id, row.id));
+  } catch (err) {
+    // § LINE ย้ายแล้วแต่ DB เขียนไม่ลง — คืน ok:false ให้ retry ได้ (converge เอง)
+    return { ok: false, error: err instanceof Error ? err.message : 'repoint alias failed' };
+  }
   return { ok: true };
 }
 
-export async function deleteMenuAlias(aliasId: string): Promise<{ ok: boolean; error?: string }> {
+export async function deleteMenuAlias(
+  aliasId: string,
+): Promise<{ ok: boolean; error?: string; code?: 'not_found' }> {
   const db = await getDb();
+  // § เช็คแถว local ก่อน — ไม่มีคือ 404 ไม่ audit ผี (interrogate A-6)
+  const [row] = await db
+    .select({ id: richMenuAliases.id })
+    .from(richMenuAliases)
+    .where(eq(richMenuAliases.aliasId, aliasId))
+    .limit(1);
+  if (!row) return { ok: false, error: 'ไม่พบ alias นี้ในระบบ', code: 'not_found' };
   // § ลบฝั่ง LINE ก่อน (404 = ไปแล้ว) แล้วค่อยลบแถว local — สลับกันจะเหลือขยะบน LINE
   try {
     await deleteAliasOnLine(aliasId);
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'delete alias failed' };
   }
-  await db.delete(richMenuAliases).where(eq(richMenuAliases.aliasId, aliasId));
+  try {
+    await db.delete(richMenuAliases).where(eq(richMenuAliases.id, row.id));
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'delete alias failed' };
+  }
   return { ok: true };
 }
 
