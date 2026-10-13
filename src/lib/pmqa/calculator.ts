@@ -48,6 +48,25 @@ export function isResolvedStatus(status: CaseStatus): boolean {
 }
 
 /**
+ * จัดเคสลง bucket สถานะในรอบเดียว — แทน filter 3 รอบที่ซ้ำกัน 3 จุด
+ */
+export function classifyStatusCounts(cases: Array<{ status: CaseStatus }>): {
+  resolved: number;
+  open: number;
+  rejected: number;
+} {
+  let resolved = 0;
+  let open = 0;
+  let rejected = 0;
+  for (const c of cases) {
+    if (isResolvedStatus(c.status)) resolved += 1;
+    if (OPEN_STATUSES.includes(c.status)) open += 1;
+    if (c.status === 'rejected') rejected += 1;
+  }
+  return { resolved, open, rejected };
+}
+
+/**
  * คำนวณอัตราความสำเร็จร้อยละ (ทศนิยม 1 ตำแหน่ง)
  */
 export function calculateResolutionRate(resolvedCount: number, total: number): number {
@@ -95,9 +114,8 @@ export function aggregateMonthlyBreakdown(
     });
 
     const total = monthCases.length;
-    const resolvedCount = monthCases.filter((c) => isResolvedStatus(c.status)).length;
-    const openCount = monthCases.filter((c) => OPEN_STATUSES.includes(c.status)).length;
-    const rejectedCount = monthCases.filter((c) => c.status === 'rejected').length;
+    const { resolved: resolvedCount, open: openCount, rejected: rejectedCount } =
+      classifyStatusCounts(monthCases);
 
     return {
       fiscalMonthIndex: cfg.fiscalMonthIndex,
@@ -155,9 +173,8 @@ export function aggregateCategorySummaries(
       }
     }
 
-    const resolvedCount = catCases.filter((c) => isResolvedStatus(c.status)).length;
-    const openCount = catCases.filter((c) => OPEN_STATUSES.includes(c.status)).length;
-    const rejectedCount = catCases.filter((c) => c.status === 'rejected').length;
+    const { resolved: resolvedCount, open: openCount, rejected: rejectedCount } =
+      classifyStatusCounts(catCases);
     const resolutionRate = calculateResolutionRate(resolvedCount, total);
     const percentageOfTotal =
       totalCases > 0 ? Math.round((total / totalCases) * 1000) / 10 : 0;
@@ -213,9 +230,8 @@ export function calculatePmqaReport({
     }
   }
 
-  const resolvedCount = filteredCases.filter((c) => isResolvedStatus(c.status)).length;
-  const openCount = filteredCases.filter((c) => OPEN_STATUSES.includes(c.status)).length;
-  const rejectedCount = filteredCases.filter((c) => c.status === 'rejected').length;
+  const { resolved: resolvedCount, open: openCount, rejected: rejectedCount } =
+    classifyStatusCounts(filteredCases);
   const resolutionRate = calculateResolutionRate(resolvedCount, totalCases);
 
   const categorySummaries = aggregateCategorySummaries(
