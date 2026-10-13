@@ -61,13 +61,13 @@ describe('ฟอร์มติดตามเรื่องสำหรับ�
     expect(screen.getByLabelText('เลขติดตามเรื่อง')).toHaveAttribute('aria-describedby', alert.id);
   });
 
-  it.each(['นายทดสอบ', '0812345678', '1234567890123'])('ไม่บันทึก PII ที่เผลอกรอกในช่องค้นหา: %s', async (value) => {
+  it.each(['นายทดสอบ', '0812345678', '1234567890123'])('PII ที่เผลอกรอกไม่ทับดราฟต์ดีที่เก็บไว้: %s', async (value) => {
     saveTrackDraft('HG483729156');
     render(<TrackForm />);
     const input = screen.getByLabelText('เลขติดตามเรื่อง');
     await waitFor(() => expect(input).toHaveValue('HG483729156'));
     fireEvent.change(input, { target: { value } });
-    await waitFor(() => expect(window.localStorage.getItem(TRACK_DRAFT_KEY)).toBeNull());
+    await waitFor(() => expect(JSON.parse(window.localStorage.getItem(TRACK_DRAFT_KEY)!)).toEqual({ version: 1, trackId: 'HG483729156' }));
   });
 
   it('ยังตรวจฟอร์มได้เมื่อ localStorage ใช้ไม่ได้', async () => {

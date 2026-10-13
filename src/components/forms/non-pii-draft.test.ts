@@ -52,9 +52,22 @@ describe('ดราฟต์ที่ไม่เก็บข้อมูลส�
     expect(readTrackDraft()).toEqual({ trackId });
   });
 
-  it.each(['นายทดสอบ', '0812345678', '1234567890123', 'HG483729156 นายทดสอบ', 'HG48', ''])('ไม่บันทึก input ที่อาจมี PII หรือเลขติดตามไม่ครบ: %s', (input) => {
+  it('อักขระไม่ถูกต้องหนึ่งตัวต้องไม่ลบดราฟต์ดีที่เก็บไว้', () => {
+    saveTrackDraft('HG483729156');
+    saveTrackDraft('HG48372915X');
+    expect(JSON.parse(window.localStorage.getItem(TRACK_DRAFT_KEY)!)).toEqual({ version: 1, trackId: 'HG483729156' });
+    expect(readTrackDraft()).toEqual({ trackId: 'HG483729156' });
+  });
+
+  it.each(['นายทดสอบ', '0812345678', '1234567890123', 'HG483729156 นายทดสอบ', 'HG48', ''])('input ไม่ถูกต้องต้องไม่ทับดราฟต์ดีที่เก็บไว้: %s', (input) => {
     saveTrackDraft('HG483729156');
     saveTrackDraft(input);
+    expect(JSON.parse(window.localStorage.getItem(TRACK_DRAFT_KEY)!)).toEqual({ version: 1, trackId: 'HG483729156' });
+    expect(readTrackDraft()).toEqual({ trackId: 'HG483729156' });
+  });
+
+  it('input ไม่ถูกต้องบน storage ว่างต้องไม่เขียนอะไรเลย', () => {
+    saveTrackDraft('นายทดสอบ');
     expect(window.localStorage.getItem(TRACK_DRAFT_KEY)).toBeNull();
   });
 
