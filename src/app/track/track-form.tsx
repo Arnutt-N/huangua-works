@@ -198,7 +198,8 @@ export function TrackForm({ initialId }: { initialId?: string }) {
           </div>
         </section>
       )}
-      {canRate && result && <FeedbackCard trackingCode={trackId} />}
+      {/* § key ตาม code ที่ trim แล้ว — สลับเคสค้นหาแล้วฟอร์มรีเซ็ต ไม่ค้าง state เก่า (B-4) */}
+      {canRate && result && <FeedbackCard key={trackId.trim()} trackingCode={trackId.trim()} />}
     </>
   );
 }
