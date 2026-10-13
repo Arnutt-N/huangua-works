@@ -29,13 +29,17 @@ const TIER_DEFAULTS: Record<TierKey, readonly UserRole[]> = {
   superadmin: SUPERADMIN_ONLY,
 };
 
-/** pure — DB มีแถวใช้แถว ไม่มี/ว่างใช้ default (ไม่มีทางคืนลิสต์ว่าง) */
+/**
+ * pure — DB มีแถวใช้แถว ไม่มี/ว่างใช้ default (ไม่มีทางคืนลิสต์ว่าง)
+ * § union superadmin ตอนอ่านด้วย — แถวเก่าก่อน #111 (เช่น ['head']) self-heal ได้
+ * โดยไม่ต้องรอ migrate/backfill (interrogate B-3)
+ */
 export function pickTierRoles(
   stored: string[] | undefined,
   fallback: readonly UserRole[],
 ): UserRole[] {
   if (!stored || stored.length === 0) return [...fallback];
-  return stored as UserRole[];
+  return [...new Set([...(stored as UserRole[]), 'superadmin' as UserRole])];
 }
 
 async function loadTierMap(): Promise<Record<TierKey, UserRole[]>> {
