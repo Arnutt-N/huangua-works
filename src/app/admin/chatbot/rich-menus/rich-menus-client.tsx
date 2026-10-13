@@ -17,16 +17,22 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label, Input, Textarea } from '@/components/ui/field';
 
+// § template เมนูบริการงานช่าง อบต.หัวงัว 6 ช่อง (2500×1686) — 5 ปุ่ม uri เปิด LIFF
+// + ปุ่มติดต่อเจ้าหน้าที่ (message → บอทตอบ Flex handoff)
+// แทน <LIFF_ID> ด้วยค่า LINE_LIFF_ID ก่อน Sync (ดู .env.example หัวข้อ LIFF)
+// ?category=<slug> จะ preselect หมวดใน /intake ให้อัตโนมัติ (slug ผิด → ฟอร์มว่าง)
 const DEFAULT_CONFIG = JSON.stringify({
   size: { width: 2500, height: 1686 },
   selected: true,
-  name: 'Main Menu',
+  name: 'เมนูบริการงานช่าง อบต.หัวงัว',
   chatBarText: 'เมนูหลัก',
   areas: [
-    { bounds: { x: 0, y: 0, width: 1250, height: 843 }, action: { type: 'message', text: 'แจ้งเรื่องใหม่' } },
-    { bounds: { x: 1250, y: 0, width: 1250, height: 843 }, action: { type: 'message', text: 'ติดตามเรื่อง' } },
-    { bounds: { x: 0, y: 843, width: 1250, height: 843 }, action: { type: 'message', text: 'ติดต่อเจ้าหน้าที่' } },
-    { bounds: { x: 1250, y: 843, width: 1250, height: 843 }, action: { type: 'message', text: 'คำถามที่พบบ่อย' } },
+    { bounds: { x: 0, y: 0, width: 833, height: 843 }, action: { type: 'uri', uri: 'https://liff.line.me/<LIFF_ID>/intake?category=roads-sidewalks' } },
+    { bounds: { x: 833, y: 0, width: 833, height: 843 }, action: { type: 'uri', uri: 'https://liff.line.me/<LIFF_ID>/intake?category=electricity-lighting' } },
+    { bounds: { x: 1666, y: 0, width: 834, height: 843 }, action: { type: 'uri', uri: 'https://liff.line.me/<LIFF_ID>/intake?category=water-supply' } },
+    { bounds: { x: 0, y: 843, width: 833, height: 843 }, action: { type: 'uri', uri: 'https://liff.line.me/<LIFF_ID>/intake' } },
+    { bounds: { x: 833, y: 843, width: 833, height: 843 }, action: { type: 'uri', uri: 'https://liff.line.me/<LIFF_ID>/track' } },
+    { bounds: { x: 1666, y: 843, width: 834, height: 843 }, action: { type: 'message', text: 'ติดต่อเจ้าหน้าที่' } },
   ],
 }, null, 2);
 

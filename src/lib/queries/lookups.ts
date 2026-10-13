@@ -6,6 +6,7 @@ import type { UserRole } from '../auth/roles';
 export interface OptionRow {
   id: string;
   name: string;
+  slug?: string;
 }
 
 export interface OfficerRow {
@@ -27,7 +28,7 @@ export async function getActiveDepartments(db?: Db): Promise<OptionRow[]> {
 export async function getActiveCategories(db?: Db): Promise<OptionRow[]> {
   const _db = db ?? (await getDb());
   return _db
-    .select({ id: categories.id, name: categories.name })
+    .select({ id: categories.id, name: categories.name, slug: categories.slug })
     .from(categories)
     .where(eq(categories.isActive, true))
     .orderBy(categories.name);
