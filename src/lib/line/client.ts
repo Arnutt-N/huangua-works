@@ -120,6 +120,34 @@ export async function uploadLineRichMenuImage(richMenuId: string, imageBuffer: B
   }
 }
 
+export async function getLineRichMenu(richMenuId: string): Promise<Record<string, unknown> | null> {
+  const res = await fetch(`${LINE_API_BASE}/richmenu/${richMenuId}`, {
+    headers: getHeaders(),
+    signal: AbortSignal.timeout(10_000),
+  });
+  // § id เก่าที่โดนลบบน LINE = stale — คืน null ให้ caller สร้างใหม่แทนค้าง
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new LineApiError(`/richmenu/${richMenuId}`, res.status, detail.slice(0, 500));
+  }
+  return res.json();
+}
+
+export async function deleteLineRichMenu(richMenuId: string): Promise<void> {
+  const res = await fetch(`${LINE_API_BASE}/richmenu/${richMenuId}`, {
+    method: 'DELETE',
+    headers: getHeaders(),
+    signal: AbortSignal.timeout(10_000),
+  });
+  // § ลบซ้ำ/โดนลบไปแล้ว = สำเร็จแบบ idempotent ไม่ต้อง throw
+  if (res.status === 404) return;
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new LineApiError(`/richmenu/${richMenuId}`, res.status, detail.slice(0, 500));
+  }
+}
+
 export async function setDefaultLineRichMenu(richMenuId: string): Promise<void> {
   const res = await fetch(`${LINE_API_BASE}/user/all/richmenu/${richMenuId}`, {
     method: 'POST',
