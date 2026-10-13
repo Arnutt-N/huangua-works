@@ -37,6 +37,8 @@ import {
   type UserActionState,
 } from '@/app/admin/actions/users';
 import { STAFF_ROLES, type UserRole } from '@/lib/auth/roles';
+import { updateTierRoles, type TierActionState } from '@/app/admin/actions/tiers';
+import type { TierKey } from '@/lib/auth/tiers';
 
 interface UserRow {
   id: string;
@@ -59,6 +61,7 @@ interface UsersClientProps {
   departments: DepartmentOption[];
   canResetPassword: boolean;
   currentUserId: string;
+  tierMatrix: Record<TierKey, string[]>;
 }
 
 const initial: UserActionState = { error: null };
@@ -73,6 +76,7 @@ export function UsersClient({
   departments,
   canResetPassword,
   currentUserId,
+  tierMatrix,
 }: UsersClientProps) {
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState<string | null>(null);
@@ -248,6 +252,7 @@ export function UsersClient({
           ))}
         </ul>
       </div>
+      <TierMatrixCard tierMatrix={tierMatrix} />
     </div>
   );
 }
@@ -492,5 +497,62 @@ export function UserSuccessToast({ ok }: { ok: string | null }) {
       <CheckCircle2 className="h-4 w-4 flex-none" aria-hidden="true" />
       {msg}
     </div>
+  );
+}
+
+const TIER_ROWS: { key: TierKey; label: string; locked?: boolean }[] = [
+  { key: 'staff', label: 'เจ้าหน้าที่ทั่วไป (เข้า admin)' },
+  { key: 'case_supervisor', label: 'งานเคส (เปลี่ยนหน่วยงาน)' },
+  { key: 'admin', label: 'บริหารระบบ (จัดการผู้ใช้)' },
+  { key: 'superadmin', label: 'ผู้ดูแลสูงสุด', locked: true },
+];
+
+const TIER_ROLE_OPTIONS: UserRole[] = ['officer', 'chief', 'head', 'superadmin'];
+
+/** การ์ดสมาชิก tier — head แก้ได้ทุก tier ยกเว้น superadmin (ล็อกสองชั้น) */
+function TierMatrixCard({ tierMatrix }: { tierMatrix: Record<TierKey, string[]> }) {
+  const [state, action, pending] = useActionState(updateTierRoles, { error: null } as TierActionState);
+  return (
+    <section aria-label="สิทธิ์ตาม tier" className="glass-panel rounded-xl p-6 shadow-sm">
+      <h2 className="text-xl font-semibold">สิทธิ์ตาม tier</h2>
+      <p className="mt-1 text-sm text-muted">
+        ติ๊กบทบาทที่มีสิทธิ์ในแต่ละ tier — มีผลภายใน ~1 นาทีทุก process (ว่าง = ใช้ค่าเดิม)
+      </p>
+      <form action={action} className="mt-4 space-y-4">
+        {TIER_ROWS.map((row) => (
+          <fieldset key={row.key} disabled={row.locked} className="rounded-lg border border-border/50 p-3">
+            <legend className="px-1 text-sm font-medium">
+              {row.label} {row.locked && <span className="text-xs text-muted">(ล็อก)</span>}
+            </legend>
+            <div className="flex flex-wrap gap-3">
+              {TIER_ROLE_OPTIONS.map((r) => (
+                <label key={r} className="inline-flex min-h-touch items-center gap-1.5 text-sm">
+                  <input
+                    type="checkbox"
+                    aria-label={`${row.label}: ${ROLE_LABELS_TH[r]}`}
+                    defaultChecked={tierMatrix[row.key]?.includes(r)}
+                    onChange={(e) => {
+                      const hidden = document.getElementById(`tier-${row.key}`) as HTMLInputElement | null;
+                      if (!hidden) return;
+                      const current = new Set(hidden.value ? hidden.value.split(',') : []);
+                      if (e.target.checked) current.add(r);
+                      else current.delete(r);
+                      hidden.value = [...current].join(',');
+                    }}
+                  />
+                  {ROLE_LABELS_TH[r]}
+                </label>
+              ))}
+            </div>
+            <input type="hidden" id={`tier-${row.key}`} name={`tier:${row.key}`} aria-label={`สมาชิก tier ${row.label}`} defaultValue={(tierMatrix[row.key] ?? []).join(',')} />
+          </fieldset>
+        ))}
+        {state.error && <FieldError>{state.error}</FieldError>}
+        {state.success && <p role="status" className="text-sm text-success">{state.success}</p>}
+        <Button type="submit" size="sm" disabled={pending}>
+          {pending ? 'กำลังบันทึก...' : 'บันทึกสิทธิ์'}
+        </Button>
+      </form>
+    </section>
   );
 }
