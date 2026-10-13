@@ -8,6 +8,7 @@ import {
   createLineRichMenu,
   deleteAliasOnLine,
   deleteLineRichMenu,
+  getAliasOnLine,
   getDefaultLineRichMenu,
   getLineRichMenu,
   updateAliasOnLine,
@@ -335,14 +336,28 @@ export async function createMenuAlias(
   try {
     await createAliasOnLine(aliasId, target.lineRichMenuId);
   } catch (err) {
+    // § ชน 4xx (มีอยู่บน LINE แล้ว เช่น crash ค้าง) → อ่านกลับ: เป้าตรงเขียนแถวคืน
+    // (reconcile) เป้าอื่นคือของคนอื่นแตะไม่ได้ (round-2 verdict Act On 7)
+    const remote = await getAliasOnLine(aliasId).catch(() => null);
+    if (remote?.richMenuId === target.lineRichMenuId) {
+      try {
+        await db.insert(richMenuAliases).values({ id: generateId(), aliasId, richMenuId: menuId });
+        return { ok: true };
+      } catch {
+        return { ok: false, error: 'บันทึก alias ในระบบไม่สำเร็จ กรุณาลองใหม่' };
+      }
+    }
     return { ok: false, error: err instanceof Error ? err.message : 'create alias failed' };
   }
   try {
     await db.insert(richMenuAliases).values({ id: generateId(), aliasId, richMenuId: menuId });
   } catch {
-    // § ชนกันตรงนี้ (race) ลบฝั่ง LINE ชดเชยแบบ best-effort แล้วค่อย error —
-    // retry ครั้งหน้าจะเริ่มสะอาด ไม่ wedged (interrogate D-7)
-    await deleteAliasOnLine(aliasId).catch(() => {});
+    // § ชดเชยเฉพาะเมื่อ remote เป็นของที่ call นี้สร้าง — ถ้าเป็นของ winner
+    // (ชน unique) ห้ามลบเด็ดขาด (round-2 verdict Act On 3)
+    const remote = await getAliasOnLine(aliasId).catch(() => null);
+    if (!remote || remote.richMenuId === target.lineRichMenuId) {
+      await deleteAliasOnLine(aliasId).catch(() => {});
+    }
     return { ok: false, error: 'บันทึก alias ในระบบไม่สำเร็จ กรุณาลองใหม่' };
   }
   return { ok: true };
