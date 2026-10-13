@@ -26,6 +26,7 @@ export const AUDIT_ACTIONS = {
   ADD_CASE_COMMENT: 'add_case_comment',
   CREATE_USER: 'create_user',
   UPDATE_USER_ROLE: 'update_user_role',
+  ROLE_TIER_UPDATE: 'role_tier_update',
   RESET_USER_PASSWORD: 'reset_user_password',
   PROFILE_UPDATE: 'profile_update',
   PASSWORD_CHANGE: 'password_change',

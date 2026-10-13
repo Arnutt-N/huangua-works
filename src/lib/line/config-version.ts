@@ -9,7 +9,7 @@ import { redis } from '@/lib/upstash';
  * ทุกฟังก์ชันในไฟล์นี้ไม่ throw: Redis ล่มแค่ทำให้ช้าลงเป็น TTL 60 วินาทีแบบเดิม
  */
 
-export type BotConfigScope = 'settings' | 'intents' | 'system';
+export type BotConfigScope = 'settings' | 'intents' | 'system' | 'tier_roles';
 
 // ไม่มี env Upstash (dev/test ที่ไม่ได้ยก up-redis) → ไม่เรียก Redis เลย
 // เพราะ client ที่ชี้ host stub จะ retry หลายวินาทีต่อคำสั่ง ถ่วงการตอบทุกข้อความ
