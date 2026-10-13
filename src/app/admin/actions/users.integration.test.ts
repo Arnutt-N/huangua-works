@@ -135,3 +135,13 @@ describe('users actions · สำเร็จยังทำงานเหม�
     expect(audits.map((a) => a.action)).toEqual(['deactivate_user']);
   });
 });
+
+describe('users actions · เปลี่ยนรหัส bump passwordVersion (ตัด session ค้าง)', () => {
+  test('resetPassword bump version +1', async () => {
+    const before = (await getTarget()).passwordVersion;
+    await resetPassword({ error: null }, form({ userId: targetId, newPassword: 'NewPassw0rd!' }));
+
+    expect((await getTarget()).passwordVersion).toBe(before + 1);
+    expect(mocks.redirect).toHaveBeenCalledWith('/admin/users?ok=password');
+  });
+});

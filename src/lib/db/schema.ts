@@ -93,6 +93,9 @@ export const users = pgTable(
     // § bcrypt hash — null สำหรับ citizen (ไม่มี account login) และยังไม่ได้ตั้งรหัสผ่าน
     // ใช้แทน Supabase Auth (GoTrue) หลังย้าย stack เป็น plain Postgres + Auth.js v5
     passwordHash: text('password_hash'),
+    // § ตัด session ค้างหลังเปลี่ยนรหัส — bump ทุกครั้งที่ตั้งรหัสใหม่ (admin reset / เปลี่ยนเอง / ลิงก์ reset)
+    // JWT เก็บ snapshot ตอน login; resolveStaff เทียบกับค่านี้ ไม่ตรง = เตะออก
+    passwordVersion: integer('password_version').notNull().default(1),
   },
   (table) => ({
     emailIdx: index('users_email_idx').on(table.email),

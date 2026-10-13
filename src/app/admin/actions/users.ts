@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { users } from '@/lib/db/schema';
@@ -268,10 +268,15 @@ export async function resetPassword(
     // § bcrypt อยู่นอก tx แต่ใน try เดิม เพื่อไม่ถือ connection ระหว่าง hash และคง error เดิม
     const passwordHash = await hashPassword(newPassword);
     // § เขียนข้อมูลผู้ใช้และ audit ใน tx เดียว — audit ล้มต้อง rollback ทั้งก้อน
+    // § bump passwordVersion ตัด session เดิมทั้งหมดของบัญชีนี้ (กัน session หลุดใช้ต่อ)
     await db.transaction(async (tx) => {
       await tx
         .update(users)
-        .set({ passwordHash, updatedAt: new Date() })
+        .set({
+          passwordHash,
+          passwordVersion: sql`${users.passwordVersion} + 1`,
+          updatedAt: new Date(),
+        })
         .where(eq(users.id, userId));
 
       await logAudit({

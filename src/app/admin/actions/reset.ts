@@ -1,6 +1,6 @@
 'use server';
 
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { users } from '@/lib/db/schema';
@@ -9,9 +9,9 @@ import { hashPassword } from '@/lib/password';
 import { getClientIp, getClientUserAgent } from '@/lib/auth/require-staff';
 import { enforceRateLimit } from '@/lib/rate-limit/enforce';
 import {
+  burnResetToken,
   createResetToken,
   validateResetToken,
-  consumeResetToken,
 } from '@/lib/auth/reset-token';
 import { sendMail, buildResetEmailHtml } from '@/lib/mail';
 import {
@@ -140,6 +140,15 @@ export async function requestPasswordReset(
 // 2. ยืนยันรีเซ็ตรหัสผ่าน (จากลิงก์ในอีเมล)
 // ────────────────────────────────────────────────────────────────────────────
 
+// § error ภายในสำหรับ token โดนแย่งเผาก่อน — เทียบด้วย instanceof ใน catch
+// ไม่เทียบ message string (แก้ข้อความแล้ว catch หลุด = 500 เงียบ)
+class TokenReuseError extends Error {
+  constructor() {
+    super('reset token already consumed by a concurrent request');
+    this.name = 'TokenReuseError';
+  }
+}
+
 export async function completePasswordReset(
   _prevState: ResetCompleteState,
   formData: FormData,
@@ -191,24 +200,52 @@ export async function completePasswordReset(
     return { error: 'ลิงก์รีเซ็ตไม่ถูกต้องหรือหมดอายุ กรุณาขอลิงก์ใหม่' };
   }
 
+  // § hash นอก tx (ไม่ถือ connection ระหว่าง bcrypt ~100ms) แต่เผา token +
+  // อัปเดตรหัส + audit ต้องอยู่ใน tx เดียว — กันลิงก์เดียวใช้ซ้ำแข่งกันสอง request
+  const passwordHash = await hashPassword(newPassword);
   try {
-    const passwordHash = await hashPassword(newPassword);
-    await db
-      .update(users)
-      .set({ passwordHash, updatedAt: new Date() })
-      .where(eq(users.id, user.id));
+    await db.transaction(async (tx) => {
+      // § เผา token ก่อนแบบมีเงื่อนไข usedAt IS NULL — request ที่มาที่สอง
+      // ได้ false (อีก request เผาไปก่อน) → throw TokenReuseError กลับข้อความลิงก์ใช้แล้ว
+      const burned = await burnResetToken(tokenRow.id, tx);
+      if (!burned) {
+        throw new TokenReuseError();
+      }
 
-    // § เผา token ทิ้งหลังอัปเดตรหัสผ่านสำเร็จ (single-use)
-    await consumeResetToken(tokenRow.id);
+      // § bump passwordVersion ตัด session เดิมทั้งหมดของบัญชีนี้
+      await tx
+        .update(users)
+        .set({
+          passwordHash,
+          passwordVersion: sql`${users.passwordVersion} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, user.id));
 
-    await logAudit({
-      action: AUDIT_ACTIONS.PASSWORD_RESET_SUCCESS,
-      resource: 'auth',
-      userId: user.id,
-      ipAddress: ip,
-      userAgent,
+      await logAudit(
+        {
+          action: AUDIT_ACTIONS.PASSWORD_RESET_SUCCESS,
+          resource: 'auth',
+          userId: user.id,
+          ipAddress: ip,
+          userAgent,
+        },
+        tx,
+      );
     });
   } catch (err) {
+    // § เทียบ instanceof ไม่เทียบ message string — กันแก้ข้อความ throw แล้ว catch หลุดเป็น 500
+    if (err instanceof TokenReuseError) {
+      await logAudit({
+        action: AUDIT_ACTIONS.PASSWORD_RESET_FAILURE,
+        resource: 'auth',
+        userId: user.id,
+        ipAddress: ip,
+        userAgent,
+        metadata: { reason: 'token_reuse_race' },
+      });
+      return { error: 'ลิงก์นี้ถูกใช้ไปแล้ว กรุณาขอลิงก์ใหม่' };
+    }
     console.error('[completePasswordReset] failed', err);
     return { error: 'ตั้งรหัสผ่านไม่สำเร็จ กรุณาลองใหม่' };
   }
