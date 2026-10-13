@@ -69,8 +69,9 @@ export function clearTrackDraft(): void {
 
 export function saveTrackDraft(input: string): void {
   const trackId = input.replace(/[\s-]/g, '').toUpperCase();
+  // § input ไม่ถูกต้อง = no-op — ห้ามลบดราฟต์ดีที่เก็บไว้ (เคย clear ตรงนี้
+  // ทำให้พิมพ์พลาดตัวเดียวแล้วดราฟต์หาย) ล้างด้วย clearTrackDraft เท่านั้น
   if (!trackingCodePattern.test(trackId)) {
-    clearTrackDraft();
     return;
   }
   writeDraft(TRACK_DRAFT_KEY, { version: 1, trackId });
