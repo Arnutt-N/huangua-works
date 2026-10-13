@@ -13,5 +13,6 @@ Steps verbatim จาก playbooks/feature.md:
 - [x] 5. Verify on matching surface: vitest 6/6 + tsc clean + eslint clean (แก้ a11y input 1 จุด)
 - [x] 6. Rebase into small ordered commits: 2b3d9fa (R1 เดียว + docs Phase 2)
 - [x] 7. Interrogate: skip — design ไม่ contested (mirror ของเดิม + กฎจาก jsk-app report)
-- [x] R1 DONE (`2b3d9fa`) · R2 DONE (`6ed0d1c`)
+- [x] R1 DONE (`2b3d9fa`) · R2 DONE (`6ed0d1c`) · R3 DONE (`57fb415`)
+  (test จับบั๊กจริง: jsonb ไม่รักษา key order → เทียบด้วย canonical stable())
 - [ ] 8. Opening a PR: skip รอบนี้ — เปิด PR รวมหลัง R3 (R1+R2 commit ค้างบน branch)
