@@ -11,6 +11,7 @@ import { getDb } from '@/lib/db';
 import { tierRoles } from '@/lib/db/schema';
 import {
   ADMIN_ROLES,
+  ALL_ROLES,
   CASE_SUPERVISOR_ROLES,
   STAFF_ROLES,
   SUPERADMIN_ONLY,
@@ -29,17 +30,46 @@ const TIER_DEFAULTS: Record<TierKey, readonly UserRole[]> = {
   superadmin: SUPERADMIN_ONLY,
 };
 
+/** บทบาทที่ให้ผ่านด่าน tier ได้ — ทุกตัวยกเว้น citizen (derive จาก ALL_ROLES ที่เดียว) */
+export const TIERABLE_ROLES: readonly UserRole[] = ALL_ROLES.filter(
+  (r): r is UserRole => r !== 'citizen',
+);
+
+function roleKey(r: string): string {
+  return [...r].sort().join(',');
+}
+
+const TIER_KEY_BY_VALUE = new Map<string, TierKey>(
+  TIER_KEYS.map((k) => [roleKey([...TIER_DEFAULTS[k]].sort().join(',')), k]),
+);
+
+/**
+ * pure — จับคู่ whitelist กับ tier ด้วยค่า (sort+join) ไม่ใช่ reference
+ * spread/สำเนา/literal เทียบเท่าเข้า matrix เหมือน const เดิม (interrogate D-14)
+ */
+export function tierKeyForRoles(allowedRoles: readonly string[]): TierKey | undefined {
+  return TIER_KEY_BY_VALUE.get(roleKey([...allowedRoles].sort().join(',')));
+}
+
 /**
  * pure — DB มีแถวใช้แถว ไม่มี/ว่างใช้ default (ไม่มีทางคืนลิสต์ว่าง)
  * § union superadmin ตอนอ่านด้วย — แถวเก่าก่อน #111 (เช่น ['head']) self-heal ได้
  * โดยไม่ต้องรอ migrate/backfill (interrogate B-3)
+ * § กรองขยะตอนอ่าน (typo/role ถูกลบ) — เหลือศูนย์ตัว fallback default พร้อม warn
  */
 export function pickTierRoles(
   stored: string[] | undefined,
   fallback: readonly UserRole[],
 ): UserRole[] {
   if (!stored || stored.length === 0) return [...fallback];
-  return [...new Set([...(stored as UserRole[]), 'superadmin' as UserRole])];
+  const clean = stored.filter((r): r is UserRole =>
+    (TIERABLE_ROLES as readonly string[]).includes(r),
+  );
+  if (clean.length === 0) {
+    console.error('[tiers] แถวขยะถูกทิ้งหมด ใช้ default แทน');
+    return [...fallback];
+  }
+  return [...new Set([...clean, 'superadmin' as UserRole])];
 }
 
 async function loadTierMap(): Promise<Record<TierKey, UserRole[]>> {
@@ -70,11 +100,23 @@ export async function getTierRoles(key: TierKey): Promise<UserRole[]> {
   return (await tierCache.get())[key];
 }
 
-/** บันทึก override — tier superadmin ล็อกเสมอ (test ล็อกไว้) */
-export async function setTierRoles(key: TierKey, roles: UserRole[]): Promise<{ ok: boolean; error?: string }> {
+/** ล้าง cache process นี้ทันที — เรียกหลังเขียนทุกครั้ง (กฎเดียวกับ settings) */
+export function refreshTierCache(): void {
+  tierCache.invalidate();
+}
+
+/**
+ * บันทึก override — tier superadmin ล็อกเสมอ (test ล็อกไว้)
+ * คืน roles ที่เก็บจริง (`forced`) ให้ caller เอาไป audit ต่อ (interrogate D-11)
+ */
+export async function setTierRoles(
+  key: TierKey,
+  roles: UserRole[],
+): Promise<{ ok: boolean; error?: string; stored?: UserRole[] }> {
   if (key === 'superadmin') return { ok: false, error: 'tier superadmin ล็อก แก้ไขไม่ได้' };
-  const EDITABLE: readonly string[] = ['officer', 'chief', 'head', 'superadmin'];
-  const valid = roles.filter((r): r is UserRole => EDITABLE.includes(r));
+  const valid = roles.filter((r): r is UserRole =>
+    (TIERABLE_ROLES as readonly string[]).includes(r),
+  );
   if (valid.length === 0) return { ok: false, error: 'ต้องมีบทบาทอย่างน้อย 1 บทบาท' };
   // § superadmin อยู่ในทุก tier เสมอ (กัน head ตัดสิทธิ์ superadmin แล้วล็อกทั้งระบบ)
   // ตัดซ้ำออกก่อน union กัน ['superadmin','superadmin']
@@ -84,7 +126,9 @@ export async function setTierRoles(key: TierKey, roles: UserRole[]): Promise<{ o
     .insert(tierRoles)
     .values({ tier: key, roles: forced, updatedAt: new Date() })
     .onConflictDoUpdate({ target: tierRoles.tier, set: { roles: forced, updatedAt: new Date() } });
+  // § ล้าง cache ตัวเองก่อนประกาศ (ไม่งั้น process นี้ค้าง 60 วิ — interrogate C-6)
+  refreshTierCache();
   // § ประกาศให้ทุก process เห็นภายใน ~3 วิ (กติกาเดียวกับ chat settings)
   await bumpConfigVersion('tier_roles');
-  return { ok: true };
+  return { ok: true, stored: forced };
 }
