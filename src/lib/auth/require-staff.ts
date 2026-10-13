@@ -34,6 +34,7 @@ type StaffDenialReason =
   | 'no_staff_record'
   | 'citizen_role'
   | 'inactive'
+  | 'stale_credentials'
   | 'insufficient_role';
 
 type StaffResolution =
@@ -75,6 +76,22 @@ async function resolveStaff(allowedRoles?: readonly UserRole[]): Promise<StaffRe
       metadata: { reason },
     });
     return { ok: false, reason };
+  }
+
+  // § ตัด session ค้างหลังเปลี่ยนรหัส — JWT เก็บ passwordVersion ตอน login
+  // ไม่ตรงกับ DB = เปลี่ยนรหัสมาแล้วหลัง session นี้ออก → เตะออกให้ login ใหม่
+  // (session เก่าก่อน migration 0018 ไม่มี field นี้ → เทียบเป็น 1 = ค่า default)
+  const sessionVersion = session.user.passwordVersion ?? 1;
+  if (sessionVersion !== staffUser.passwordVersion) {
+    await logAudit({
+      action: AUDIT_ACTIONS.ACCESS_DENIED,
+      resource: 'auth',
+      userId: staffUser.id,
+      ipAddress,
+      userAgent,
+      metadata: { reason: 'stale_credentials' },
+    });
+    return { ok: false, reason: 'stale_credentials' };
   }
 
   // role whitelist check (optional)

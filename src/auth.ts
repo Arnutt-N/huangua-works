@@ -34,15 +34,21 @@ type AuthToken = {
   userId?: string;
   role?: UserRole;
   expiresAt?: number;
+  // § snapshot ของ users.password_version ตอน login — resolveStaff เทียบกับ DB
+  // ไม่ตรง = เปลี่ยนรหัสมาแล้วหลัง login → session เดิมใช้ต่อไม่ได้
+  passwordVersion?: number;
 };
 
-// § augments session.user ด้วย userId + role — ใช้แทนการ lookup DB ทุก request
-// (DB re-check ที่แท้จริงยังทำใน src/app/admin/page.tsx เพื่อ defense-in-depth)
+// § augments session.user ด้วย userId + role + passwordVersion — ใช้แทนการ lookup DB ทุก request
+// (DB re-check ที่แท้จริงยังทำใน resolveStaff เพื่อ defense-in-depth)
+// § passwordVersion เป็น optional — session เก่าที่ออกก่อน migration 0018 ไม่มี field นี้
+// resolveStaff เทียบเป็น 1 (ค่า default ของคอลัมน์) จึงไม่เตะ session เก่าที่ยังไม่เปลี่ยนรหัส
 declare module 'next-auth' {
   interface Session {
     user: {
       userId: string;
       role: UserRole;
+      passwordVersion?: number;
     } & DefaultSession['user'];
   }
 }
@@ -87,10 +93,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const remember = credentials?.remember === 'on' || credentials?.remember === 'true';
 
         // § คืนเฉพาะข้อมูลจำเป็น ไม่ส่ง passwordHash ไปฝั่ง JWT
+        // § passwordVersion = snapshot ตัด session ค้างหลังเปลี่ยนรหัส
         return {
           id: user.id,
           email: user.email,
           role: user.role,
+          passwordVersion: user.passwordVersion,
           remember,
         };
       },
@@ -105,10 +113,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       if (user) {
         // user มาจาก authorize() return (มีแค่ตอน sign-in ครั้งแรกเท่านั้น)
-        // authorize คืน plain object { id, email, role, remember } — cast เพราะ DefaultUser ไม่มี field เหล่านี้
-        const u = user as { id: string; role: UserRole; remember?: boolean };
+        // authorize คืน plain object { id, email, role, passwordVersion, remember } — cast เพราะ DefaultUser ไม่มี field เหล่านี้
+        const u = user as { id: string; role: UserRole; passwordVersion?: number; remember?: boolean };
         t.userId = u.id;
         t.role = u.role;
+        t.passwordVersion = u.passwordVersion ?? 1;
         // § อายุ session จริง (ไม่ใช่ cookie maxAge): "จดจำฉัน" = 30 วัน, ไม่จำ = 1 ชั่วโมง
         // ตั้งครั้งเดียวตอน sign-in — ไม่ slide ต่ออายุตาม activity (predictable + ปลอดภัย)
         const ttlSeconds = u.remember ? 60 * 60 * 24 * 30 : 60 * 60;
@@ -125,11 +134,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       return token;
     },
-    // § session รันทุกครั้งที่อ่าน session ฝั่ง server (auth()) — expose userId+role จาก JWT
+    // § session รันทุกครั้งที่อ่าน session ฝั่ง server (auth()) — expose userId+role+passwordVersion จาก JWT
     session({ session, token }) {
       const t = token as AuthToken;
       if (t.userId) session.user.userId = t.userId;
       if (t.role) session.user.role = t.role;
+      if (t.passwordVersion !== undefined) session.user.passwordVersion = t.passwordVersion;
       return session;
     },
   },

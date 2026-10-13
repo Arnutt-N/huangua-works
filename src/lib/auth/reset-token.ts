@@ -1,8 +1,8 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { and, eq, isNull } from 'drizzle-orm';
-import { getDb } from '@/lib/db';
+import { getDb, type DbOrTx } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
-import { passwordResetTokens } from '@/lib/db/schema';
+import { passwordResetTokens, users } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 
 /**
@@ -82,10 +82,27 @@ export async function validateResetToken(token: string) {
 }
 
 /** Mark a token as used (call after successful password update). */
-export async function consumeResetToken(id: string): Promise<void> {
-  const db = await getDb();
-  await db
+export async function consumeResetToken(id: string, db?: DbOrTx): Promise<void> {
+  const _db = db ?? (await getDb());
+  await _db
     .update(passwordResetTokens)
     .set({ usedAt: new Date() })
     .where(eq(passwordResetTokens.id, id));
+}
+
+/**
+ * เผา token แบบ atomic — UPDATE เฉพาะแถวที่ยังไม่ใช้ (usedAt IS NULL)
+ * คืน true ถ้าเผาสำเร็จ (แถวนี้ยังไม่ถูกใช้) / false ถ้ามีคนใช้ไปก่อนแล้ว
+ *
+ * § กัน token ใช้ซ้ำแข่งกัน — เดิม validate (SELECT) กับ consume (UPDATE) แยกกัน
+ * สอง request พร้อมกันผ่าน validate ทั้งคู่ก่อนใครจะเผา → เปลี่ยนรหัสได้สองครั้ง
+ * ด้วยลิงก์เดียว รูปนี้ทำ read+burn ใน statement เดียว ฐานข้อมูลตัดสินให้รายเดียว
+ */
+export async function burnResetToken(id: string, db: DbOrTx): Promise<boolean> {
+  const rows = await db
+    .update(passwordResetTokens)
+    .set({ usedAt: new Date() })
+    .where(and(eq(passwordResetTokens.id, id), isNull(passwordResetTokens.usedAt)))
+    .returning({ id: passwordResetTokens.id });
+  return rows.length > 0;
 }
