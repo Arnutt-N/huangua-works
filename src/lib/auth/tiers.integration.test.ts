@@ -35,6 +35,14 @@ describe('tier matrix (DB)', () => {
     expect(await getTierRoles('superadmin')).toEqual(['superadmin']);
   });
 
+  test('ตัด superadmin ออกไม่ได้ — เขียนแล้วต้องยังมี superadmin อยู่เสมอ', async () => {
+    expect((await setTierRoles('admin', ['head'])).ok).toBe(true);
+    // § อ่านแถว DB ตรง (ไม่ผ่าน cache — ไม่มี Redis ใน test version bump มองไม่เห็น)
+    const db = await getDb();
+    const [row] = await db.select().from(tierRoles).where(eq(tierRoles.tier, 'admin'));
+    expect([...row!.roles].sort()).toEqual(['head', 'superadmin']);
+  });
+
   test('roles ว่าง → ปฏิเสธ ไม่ล็อกระบบ', async () => {
     const res = await setTierRoles('admin', []);
     expect(res.ok).toBe(false);
