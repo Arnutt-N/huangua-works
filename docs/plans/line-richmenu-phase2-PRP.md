@@ -33,6 +33,11 @@
 
 ### R2 — เมนู 6 ช่อง LIFF (ต้องมี R1 ก่อนเพราะ test ครบวงจรต้องอัปรูปได้)
 
+DONE commit `6ed0d1c` — deviation: slug มาจากการขยาย `getActiveCategories`
+(+`slug` ใน select + `OptionRow.slug?`, additive ฝั่ง reports ไม่กระทบ) แทน query แยก;
+resolver เป็น pure `resolveInitialCategoryId` + test 5 เคส (ไม่มี .test.tsx ใน repo
+จึงไม่ render component — glue page→prop ตรวจด้วย tsc)
+
 ไฟล์:
 
 - แก้ `.env.example` — เพิ่ม `NEXT_PUBLIC_LIFF_ID=` + comment (build-time env,
