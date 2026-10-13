@@ -95,6 +95,31 @@ describe('menu aliases', () => {
     expect(line.updated).toEqual([{ aliasId: 'it-move', menuId: 'line-b2' }]);
   });
 
+  test('ชื่อซ้ำในระบบ → ปฏิเสธก่อนยิง LINE (local-first)', async () => {
+    const menuId = await seedMenu('line-d1');
+    expect((await createMenuAlias('it-dup', menuId)).ok).toBe(true);
+    const res = await createMenuAlias('it-dup', menuId);
+    expect(res.ok).toBe(false);
+    expect(line.created).toHaveLength(1);
+  });
+
+  test('ย้ายเป้า → updatedAt ขยับ', async () => {
+    const m1 = await seedMenu('line-e1');
+    const m2 = await seedMenu('line-e2');
+    expect((await createMenuAlias('it-ts', m1)).ok).toBe(true);
+    const db = await getDb();
+    const [before] = await db.select().from(richMenuAliases).where(eq(richMenuAliases.aliasId, 'it-ts'));
+    await new Promise((r) => setTimeout(r, 15));
+    expect((await repointMenuAlias('it-ts', m2)).ok).toBe(true);
+    const [after] = await db.select().from(richMenuAliases).where(eq(richMenuAliases.aliasId, 'it-ts'));
+    expect(after!.updatedAt.getTime()).toBeGreaterThan(before!.updatedAt.getTime());
+  });
+
+  test('ลบของไม่มี → ok:false (ไม่มี audit ผี)', async () => {
+    const res = await deleteMenuAlias('it-ghost');
+    expect(res.ok).toBe(false);
+  });
+
   test('ลบ → ลบ LINE ก่อนแล้วค่อยลบแถว', async () => {
     const menuId = await seedMenu('line-c1');
     expect((await createMenuAlias('it-del', menuId)).ok).toBe(true);

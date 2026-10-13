@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
 
 const dbStub = vi.hoisted(() => ({
-  mode: 'ok' as 'ok' | 'unique' | 'broken',
+  mode: 'ok' as 'unique' | 'broken',
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -9,10 +9,7 @@ vi.mock('@/lib/db', () => ({
     select: () => ({
       from: () => ({
         where: () => ({
-          limit: () => {
-            if (dbStub.mode === 'broken-select') throw new Error('conn reset');
-            return [{ id: 'c1', status: 'closed' }];
-          },
+          limit: () => [{ id: 'c1', status: 'closed' }],
         }),
       }),
     }),

@@ -4,7 +4,7 @@ import { parseBody } from '@/lib/api-helpers';
 import { requireStaffApi } from '@/lib/auth/require-staff';
 import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit';
-import { createMenuAlias, listMenuAliases } from '@/lib/line/rich-menu-service';
+import { createMenuAlias, isValidAliasId, listMenuAliases } from '@/lib/line/rich-menu-service';
 
 export const runtime = 'nodejs';
 
@@ -26,8 +26,18 @@ export async function POST(request: Request) {
   const result = await parseBody(createSchema, request);
   if (!result.ok) return result.response;
 
+  // § pattern เดียวกับ service — boundary ตรวจก่อน ไม่พึ่ง service อย่างเดียว
+  if (!isValidAliasId(result.data.aliasId)) {
+    return NextResponse.json({ error: 'ชื่อ alias ใช้ได้แค่ a-z A-Z 0-9 _ - ยาวไม่เกิน 50' }, { status: 400 });
+  }
+
   const created = await createMenuAlias(result.data.aliasId, result.data.menuId);
-  if (!created.ok) return NextResponse.json({ error: created.error }, { status: 422 });
+  if (!created.ok) {
+    return NextResponse.json(
+      { error: created.error },
+      { status: created.code === 'duplicate' ? 409 : 422 },
+    );
+  }
 
   await logAudit({
     userId: authz.ctx.user.id,

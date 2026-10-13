@@ -298,9 +298,16 @@ async function resolveAliasTarget(
 export async function createMenuAlias(
   aliasId: string,
   menuId: string,
-): Promise<{ ok: boolean; error?: string }> {
-  if (!isValidAliasId(aliasId)) return { ok: false, error: 'ชื่อ alias ใช้ได้แค่ a-z 0-9 _ - ยาวไม่เกิน 50' };
+): Promise<{ ok: boolean; error?: string; code?: 'duplicate' }> {
+  if (!isValidAliasId(aliasId)) return { ok: false, error: 'ชื่อ alias ใช้ได้แค่ a-z A-Z 0-9 _ - ยาวไม่เกิน 50' };
   const db = await getDb();
+  // § เช็ค local ก่อนยิง LINE — ซ้ำตอบ 409 สะอาด ไม่สร้าง orphan (interrogate A-5)
+  const [existing] = await db
+    .select({ id: richMenuAliases.id })
+    .from(richMenuAliases)
+    .where(eq(richMenuAliases.aliasId, aliasId))
+    .limit(1);
+  if (existing) return { ok: false, error: 'ชื่อ alias นี้มีแล้ว', code: 'duplicate' };
   const target = await resolveAliasTarget(db, menuId);
   if (!target.ok) return target;
   try {
@@ -311,9 +318,10 @@ export async function createMenuAlias(
   try {
     await db.insert(richMenuAliases).values({ id: generateId(), aliasId, richMenuId: menuId });
   } catch {
-    // § LINE สร้างแล้วแต่ DB เขียนไม่ลง (เช่น alias ซ้ำ) — คืน error ให้ sync ใหม่ได้
-    // ไม่ลบฝั่ง LINE (best-effort) เพราะแถว local ไม่มีแต่ LINE มีคือ state รู้ที่มา
-    return { ok: false, error: 'บันทึก alias ในระบบไม่สำเร็จ (อาจชื่อซ้ำ)' };
+    // § ชนกันตรงนี้ (race) ลบฝั่ง LINE ชดเชยแบบ best-effort แล้วค่อย error —
+    // retry ครั้งหน้าจะเริ่มสะอาด ไม่ wedged (interrogate D-7)
+    await deleteAliasOnLine(aliasId).catch(() => {});
+    return { ok: false, error: 'บันทึก alias ในระบบไม่สำเร็จ กรุณาลองใหม่' };
   }
   return { ok: true };
 }
@@ -336,22 +344,40 @@ export async function repointMenuAlias(
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'repoint alias failed' };
   }
-  await db
-    .update(richMenuAliases)
-    .set({ richMenuId: menuId })
-    .where(eq(richMenuAliases.id, row.id));
+  try {
+    await db
+      .update(richMenuAliases)
+      .set({ richMenuId: menuId, updatedAt: new Date() })
+      .where(eq(richMenuAliases.id, row.id));
+  } catch (err) {
+    // § LINE ย้ายแล้วแต่ DB เขียนไม่ลง — คืน ok:false ให้ retry ได้ (converge เอง)
+    return { ok: false, error: err instanceof Error ? err.message : 'repoint alias failed' };
+  }
   return { ok: true };
 }
 
-export async function deleteMenuAlias(aliasId: string): Promise<{ ok: boolean; error?: string }> {
+export async function deleteMenuAlias(
+  aliasId: string,
+): Promise<{ ok: boolean; error?: string; code?: 'not_found' }> {
   const db = await getDb();
+  // § เช็คแถว local ก่อน — ไม่มีคือ 404 ไม่ audit ผี (interrogate A-6)
+  const [row] = await db
+    .select({ id: richMenuAliases.id })
+    .from(richMenuAliases)
+    .where(eq(richMenuAliases.aliasId, aliasId))
+    .limit(1);
+  if (!row) return { ok: false, error: 'ไม่พบ alias นี้ในระบบ', code: 'not_found' };
   // § ลบฝั่ง LINE ก่อน (404 = ไปแล้ว) แล้วค่อยลบแถว local — สลับกันจะเหลือขยะบน LINE
   try {
     await deleteAliasOnLine(aliasId);
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'delete alias failed' };
   }
-  await db.delete(richMenuAliases).where(eq(richMenuAliases.aliasId, aliasId));
+  try {
+    await db.delete(richMenuAliases).where(eq(richMenuAliases.id, row.id));
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'delete alias failed' };
+  }
   return { ok: true };
 }
 
