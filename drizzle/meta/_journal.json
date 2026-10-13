@@ -148,6 +148,13 @@
       "when": 1791889434710,
       "tag": "0020_acoustic_nightcrawler",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1791893760470,
+      "tag": "0021_sudden_emma_frost",
+      "breakpoints": true
     }
   ]
 }

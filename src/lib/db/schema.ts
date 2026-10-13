@@ -501,6 +501,26 @@ export const consentRecords = pgTable(
   })
 );
 
+export const caseFeedback = pgTable(
+  'case_feedback',
+  {
+    id: text('id').primaryKey(),
+    createdAt: timestamp('created_at', { mode: 'date' })
+      .notNull()
+      .defaultNow(),
+    // § เคสละ 1 ครั้ง (unique) — ตอบแล้วแก้ไม่ได้ ให้แล้วให้เลย
+    caseId: text('case_id')
+      .notNull()
+      .unique()
+      .references(() => cases.id, { onDelete: 'cascade' }),
+    rating: integer('rating').notNull(), // 1-5 (validate ที่ service)
+    comment: text('comment'),
+  },
+  (table) => ({
+    caseIdx: index('case_feedback_case_id_idx').on(table.caseId),
+  })
+);
+
 // ────────────────────────────────────────────────────────────────────────────
 // § Deduplication Hashes (ป้องกันซ้ำซ้อน: HMAC-SHA256 ของ CID+title+description)
 // ────────────────────────────────────────────────────────────────────────────
