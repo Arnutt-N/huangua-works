@@ -66,6 +66,32 @@ describe('planDisplayActions', () => {
     expect(r.activate).toEqual([]);
   });
 
+  test('election ข้าม incumbent — active ใหม่กว่าชนะ ไม่ activate ซ้ำ', () => {
+    const r = planDisplayActions(
+      [
+        cand({ id: 'new', status: 'active', displayStartAt: PAST }),
+        cand({ id: 'old', lineRichMenuId: 'line-old', displayStartAt: new Date('2026-10-13T10:00:00Z') }),
+      ],
+      T0,
+      'line-1',
+    );
+    expect(r.activate).toEqual([]);
+    expect(r.demote).toEqual([]);
+  });
+
+  test('demote ตัวแพ้ election (active เก่ากว่า)', () => {
+    const r = planDisplayActions(
+      [
+        cand({ id: 'old', status: 'active', lineRichMenuId: 'line-old', displayStartAt: new Date('2026-10-13T10:00:00Z') }),
+        cand({ id: 'new', lineRichMenuId: 'line-2', displayStartAt: PAST }),
+      ],
+      T0,
+      'line-old',
+    );
+    expect(r.activate).toEqual(['new']);
+    expect(r.demote).toEqual(['old']);
+  });
+
   test('มีแค่ end (ไม่มี start) → ไม่ activate (กัน publish หลุด)', () => {
     const r = planDisplayActions([cand({ displayEndAt: FUTURE })], T0, null);
     expect(r.activate).toEqual([]);

@@ -65,9 +65,9 @@ export function planDisplayActions(
   menus: DisplayCandidate[],
   now: Date,
   currentDefaultLineId: string | null,
-): { activate: string[]; expire: string[]; cancelDefault: boolean } {
+): { activate: string[]; demote: string[]; expire: string[]; cancelDefault: boolean } {
   const expire: string[] = [];
-  const contenders: DisplayCandidate[] = [];
+  const live: DisplayCandidate[] = [];
   for (const m of menus) {
     if (!m.lineRichMenuId || m.syncStatus !== 'synced') continue;
     if (!m.displayStartAt && !m.displayEndAt) continue;
@@ -76,19 +76,23 @@ export function planDisplayActions(
     const started = m.displayStartAt ? m.displayStartAt <= now : false;
     const ended = m.displayEndAt ? m.displayEndAt <= now : false;
     if (ended && m.status === 'active') expire.push(m.id);
-    else if (started && !ended && m.status !== 'active') contenders.push(m);
+    else if (started && !ended) live.push(m);
   }
-  // § overlap ชนะตัวเดียว (start ล่าสุด, เสมอใช้ id มากสุด) — LINE มี default เดียว
-  contenders.sort((a, b) => {
+  // § election ข้าม active ∪ contenders (start ล่าสุดชนะ, เสมอ id มากสุด) —
+  // LINE มี default เดียว ตัวแพ้โดน demote ใน tick เดียวกัน (round-2 verdict)
+  live.sort((a, b) => {
     const t = b.displayStartAt!.getTime() - a.displayStartAt!.getTime();
     return t !== 0 ? t : b.id.localeCompare(a.id);
   });
-  const activate = contenders.slice(0, 1).map((m) => m.id);
+  const winner = live[0];
+  const activate = winner && winner.status !== 'active' ? [winner.id] : [];
+  const demote = live.filter((m) => m !== winner && m.status === 'active').map((m) => m.id);
   const expiringLineIds = new Set(
     menus.filter((m) => expire.includes(m.id)).map((m) => m.lineRichMenuId),
   );
   return {
     activate,
+    demote,
     expire,
     // § มี activate = setDefault ใหม่ทับแล้ว ห้าม cancel ตาม (interrogate B-2/C-2)
     cancelDefault:
@@ -103,6 +107,7 @@ export function planDisplayActions(
 export interface DisplayTickResult {
   activated: number;
   expired: number;
+  demoted: number;
   failed: string[];
   error?: string;
 }
@@ -112,6 +117,7 @@ export async function runDisplayTick(now = new Date()): Promise<DisplayTickResul
   const failed: string[] = [];
   let activated = 0;
   let expired = 0;
+  let demoted = 0;
   try {
     const rows = await db
       .select({
@@ -123,13 +129,15 @@ export async function runDisplayTick(now = new Date()): Promise<DisplayTickResul
         displayEndAt: richMenus.displayEndAt,
       })
       .from(richMenus);
-    // § อ่าน default แบบ best-effort — อ่านล้มข้ามแค่ขั้น cancel
-    // DB flip ไม่ขึ้นกับ LINE read (interrogate B-4)
+    // § อ่าน default ล้ม = ไม่รู้เจ้าของ — ข้าม expire ทั้งหมด (defer รอบหน้า)
+    // ไม่งั้น flip ไป inactive แล้ว cancel ไม่ได้อีกเลย (round-2 verdict Act On 1)
     let currentDefault: string | null = null;
+    let readFailed = false;
     try {
       currentDefault = await getDefaultLineRichMenu();
     } catch (err) {
-      console.error('[display-tick] read default failed, skip cancel only', err);
+      readFailed = true;
+      console.error('[display-tick] read default failed, defer expire', err);
     }
     const plan = planDisplayActions(
       rows.map((r) => ({ ...r, status: r.status as string })),
@@ -159,8 +167,21 @@ export async function runDisplayTick(now = new Date()): Promise<DisplayTickResul
         console.error(`[display-tick] activate ${id} failed`, err);
       }
     }
+    for (const id of plan.demote) {
+      try {
+        await db
+          .update(richMenus)
+          .set({ status: 'inactive', updatedAt: new Date() })
+          .where(eq(richMenus.id, id));
+        demoted += 1;
+      } catch (err) {
+        failed.push(`demote:${id}`);
+        console.error(`[display-tick] demote ${id} failed`, err);
+      }
+    }
     for (const id of plan.expire) {
       try {
+        if (readFailed) continue;
         if (plan.cancelDefault && failed.includes('cancel-default')) continue;
         await db
           .update(richMenus)
@@ -172,11 +193,12 @@ export async function runDisplayTick(now = new Date()): Promise<DisplayTickResul
         console.error(`[display-tick] expire ${id} failed`, err);
       }
     }
-    return { activated, expired, failed };
+    return { activated, expired, demoted, failed };
   } catch (err) {
     return {
       activated,
       expired,
+      demoted,
       failed,
       error: err instanceof Error ? err.message : 'unknown',
     };
