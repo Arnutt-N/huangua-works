@@ -1,3 +1,4 @@
+import { NextRequest } from 'next/server';
 import { describe, expect, test, vi } from 'vitest';
 
 vi.mock('@/lib/line/rich-menu-service', () => ({
@@ -6,8 +7,8 @@ vi.mock('@/lib/line/rich-menu-service', () => ({
 
 import { GET } from './route';
 
-function cronRequest(secret?: string): Request {
-  return new Request('http://localhost:3000/api/cron/rich-menu-display', {
+function cronRequest(secret?: string): NextRequest {
+  return new NextRequest('http://localhost:3000/api/cron/rich-menu-display', {
     headers: secret ? { authorization: `Bearer ${secret}` } : {},
   });
 }

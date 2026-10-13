@@ -89,6 +89,12 @@ export interface RichMenuInput {
   displayEndAt?: string;
 }
 
+export interface RichMenuAliasItem {
+  aliasId: string;
+  richMenuId: string;
+  menuName: string | null;
+}
+
 export interface BroadcastItem {
   id: string;
   content: { type: string; text?: string }[];
@@ -240,6 +246,14 @@ export const adminApi = {
     request<OkBody>(`/api/line/admin/rich-menus/${id}/sync`, { method: 'POST' }),
   publishRichMenu: (id: string): Promise<ApiResult<OkBody>> =>
     request<OkBody>(`/api/line/admin/rich-menus/${id}/publish`, { method: 'POST' }),
+  listMenuAliases: (): Promise<ApiResult<ListOf<RichMenuAliasItem>>> =>
+    request<ListOf<RichMenuAliasItem>>('/api/line/admin/rich-menus/aliases'),
+  createMenuAlias: (aliasId: string, menuId: string): Promise<ApiResult<OkBody>> =>
+    request<OkBody>('/api/line/admin/rich-menus/aliases', withBody('POST', { aliasId, menuId })),
+  repointMenuAlias: (aliasId: string, menuId: string): Promise<ApiResult<OkBody>> =>
+    request<OkBody>(`/api/line/admin/rich-menus/aliases/${aliasId}`, withBody('PUT', { menuId })),
+  deleteMenuAlias: (aliasId: string): Promise<ApiResult<OkBody>> =>
+    request<OkBody>(`/api/line/admin/rich-menus/aliases/${aliasId}`, { method: 'DELETE' }),
   uploadRichMenuImage: (id: string, file: File): Promise<ApiResult<OkBody>> => {
     const form = new FormData();
     form.append('file', file);

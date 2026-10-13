@@ -106,6 +106,39 @@ export function RichMenusClient() {
     setUploadingId(null);
   }
 
+  const [aliasId, setAliasId] = useState('');
+  const [aliasTarget, setAliasTarget] = useState('');
+  const aliasesRes = useResource({ load: adminApi.listMenuAliases });
+  const aliases = aliasesRes.data?.items ?? [];
+  const reloadAliases = aliasesRes.reload;
+  const syncedMenus = items.filter((m) => m.lineRichMenuId && m.syncStatus === 'synced');
+
+  async function handleCreateAlias() {
+    if (!aliasId.trim() || !aliasTarget) {
+      notify('error', 'กรอกชื่อ alias และเลือกเมนูเป้าหมาย');
+      return;
+    }
+    const ok = await mutate(() => adminApi.createMenuAlias(aliasId.trim(), aliasTarget), 'สร้าง alias สำเร็จ');
+    if (ok) {
+      setAliasId('');
+      await reloadAliases();
+    }
+  }
+
+  async function handleRepoint(alias: string, menuId: string) {
+    if (!menuId) return;
+    if (await mutate(() => adminApi.repointMenuAlias(alias, menuId), `ย้าย alias ${alias} แล้ว`)) {
+      await reloadAliases();
+    }
+  }
+
+  async function handleDeleteAlias(alias: string) {
+    if (!confirm(`ลบ alias "${alias}" บน LINE ด้วย?`)) return;
+    if (await mutate(() => adminApi.deleteMenuAlias(alias), 'ลบ alias สำเร็จ')) {
+      await reloadAliases();
+    }
+  }
+
   async function handlePublish(item: RichMenuItem) {
     if (!confirm(`Publish "${item.name}" ให้ผู้ใช้ LINE ทุกคน?`)) return;
     // server คืน 422 { error } เมื่อ LINE ปฏิเสธ — mutate เอาข้อความนั้นมาแจ้ง
@@ -180,6 +213,58 @@ export function RichMenusClient() {
             ))}
           </div>
         )}
+      </AdminCard>
+
+      <AdminCard>
+        <AdminCardTitle icon={<LayoutGrid className="h-4 w-4" />}>
+          Aliases ({aliases.length}) — สลับ tab ด้วย richmenuswitch
+        </AdminCardTitle>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Input
+            aria-label="ชื่อ alias"
+            value={aliasId}
+            onChange={(e) => setAliasId(e.target.value)}
+            placeholder="เช่น main-menu (a-z 0-9 _ -)"
+            className="flex-1"
+          />
+          <select
+            aria-label="เมนูเป้าหมาย"
+            value={aliasTarget}
+            onChange={(e) => setAliasTarget(e.target.value)}
+            className="min-h-touch rounded-lg border border-border/50 bg-surface px-3 text-sm"
+          >
+            <option value="">เลือกเมนูที่ sync แล้ว</option>
+            {syncedMenus.map((m) => (
+              <option key={m.id} value={m.id}>{m.name}</option>
+            ))}
+          </select>
+          <Button onClick={handleCreateAlias} className="min-h-touch gap-1.5"><Plus className="h-4 w-4" /> สร้าง alias</Button>
+        </div>
+        <div className="mt-3 space-y-2">
+          {aliases.map((a) => (
+            <div key={a.aliasId} className="flex flex-col gap-2 rounded-lg border border-border/50 p-3 sm:flex-row sm:items-center">
+              <code className="font-mono text-sm font-medium text-ink">{a.aliasId}</code>
+              <span className="text-xs text-muted">→ {a.menuName ?? '(เมนูถูกลบ?)'}</span>
+              <div className="flex gap-1 sm:ml-auto">
+                <select
+                  aria-label={`ย้ายเป้า ${a.aliasId}`}
+                  defaultValue=""
+                  onChange={(e) => handleRepoint(a.aliasId, e.target.value)}
+                  className="min-h-touch rounded-lg border border-border/50 bg-surface px-2 text-xs"
+                >
+                  <option value="">ย้ายเป้า…</option>
+                  {syncedMenus.map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+                <Button variant="outline" onClick={() => handleDeleteAlias(a.aliasId)} className="min-h-touch text-xs">ลบ</Button>
+              </div>
+            </div>
+          ))}
+          {aliases.length === 0 && (
+            <p className="py-4 text-center text-sm text-muted">ยังไม่มี alias — ปุ่ม richmenuswitch ในเมนูอ้างชื่อนี้เพื่อสลับ tab</p>
+          )}
+        </div>
       </AdminCard>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
