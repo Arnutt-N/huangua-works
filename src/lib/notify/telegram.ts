@@ -1,3 +1,4 @@
+import { postJson } from './sender';
 import type { NotifyChannelResult } from './types';
 
 /**
@@ -9,7 +10,6 @@ import type { NotifyChannelResult } from './types';
  */
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org';
-const SEND_TIMEOUT_MS = 5_000;
 /** Telegram รับข้อความสูงสุด 4096 ตัวอักษร */
 const MAX_TEXT_LENGTH = 4_000;
 
@@ -18,19 +18,8 @@ export async function sendTelegram(text: string): Promise<NotifyChannelResult> {
   const chatId = process.env.TELEGRAM_CHAT_ID;
   if (!token || !chatId) return { status: 'skipped' };
 
-  try {
-    const res = await fetch(`${TELEGRAM_API_BASE}/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text: text.slice(0, MAX_TEXT_LENGTH) }),
-      signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
-    });
-    if (!res.ok) {
-      const detail = await res.text().catch(() => '');
-      return { status: 'failed', error: `HTTP ${res.status}: ${detail.slice(0, 200)}` };
-    }
-    return { status: 'sent' };
-  } catch (error) {
-    return { status: 'failed', error: error instanceof Error ? error.message : String(error) };
-  }
+  return postJson(`${TELEGRAM_API_BASE}/bot${token}/sendMessage`, {
+    chat_id: chatId,
+    text: text.slice(0, MAX_TEXT_LENGTH),
+  });
 }
