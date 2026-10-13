@@ -78,6 +78,8 @@ export const AUDIT_ACTIONS = {
   RICH_MENU_PUBLISH: 'rich_menu_publish',
   RICH_MENU_IMAGE_UPLOAD: 'rich_menu_image_upload',
   RICH_MENU_ALIAS_UPDATE: 'rich_menu_alias_update',
+  RICH_MENU_UPDATE: 'rich_menu_update',
+  RICH_MENU_DELETE: 'rich_menu_delete',
   MEDIA_UPLOAD: 'media_upload',
   MEDIA_DELETE: 'media_delete',
   IMPORT_CASE: 'import_case',
