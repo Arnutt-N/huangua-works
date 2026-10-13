@@ -72,11 +72,14 @@ export async function setTierRoles(key: TierKey, roles: UserRole[]): Promise<{ o
   const EDITABLE: readonly string[] = ['officer', 'chief', 'head', 'superadmin'];
   const valid = roles.filter((r): r is UserRole => EDITABLE.includes(r));
   if (valid.length === 0) return { ok: false, error: 'ต้องมีบทบาทอย่างน้อย 1 บทบาท' };
+  // § superadmin อยู่ในทุก tier เสมอ (กัน head ตัดสิทธิ์ superadmin แล้วล็อกทั้งระบบ)
+  // ตัดซ้ำออกก่อน union กัน ['superadmin','superadmin']
+  const forced = [...new Set([...valid, 'superadmin' as UserRole])];
   const db = await getDb();
   await db
     .insert(tierRoles)
-    .values({ tier: key, roles: valid, updatedAt: new Date() })
-    .onConflictDoUpdate({ target: tierRoles.tier, set: { roles: valid, updatedAt: new Date() } });
+    .values({ tier: key, roles: forced, updatedAt: new Date() })
+    .onConflictDoUpdate({ target: tierRoles.tier, set: { roles: forced, updatedAt: new Date() } });
   // § ประกาศให้ทุก process เห็นภายใน ~3 วิ (กติกาเดียวกับ chat settings)
   await bumpConfigVersion('tier_roles');
   return { ok: true };
