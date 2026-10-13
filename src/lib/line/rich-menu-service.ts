@@ -2,8 +2,10 @@ import { eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { richMenus } from '@/lib/db/schema';
 import {
+  cancelDefaultLineRichMenu,
   createLineRichMenu,
   deleteLineRichMenu,
+  getDefaultLineRichMenu,
   getLineRichMenu,
   uploadLineRichMenuImage,
   setDefaultLineRichMenu,
@@ -38,6 +40,95 @@ function stable(value: unknown): string {
 export function isRichMenuDrift(localConfig: unknown, lineMenu: unknown): boolean {
   if (!lineMenu) return true;
   return stable(projectConfig(localConfig)) !== stable(projectConfig(lineMenu));
+}
+
+export interface DisplayCandidate {
+  id: string;
+  lineRichMenuId: string | null;
+  status: string;
+  syncStatus: string;
+  displayStartAt: Date | null;
+  displayEndAt: Date | null;
+}
+
+/**
+ * § ตัดสินล้วนๆ ไม่แตะ I/O — cron route/test เรียกตัวนี้ก่อนค่อยลงมือ
+ * กฎ: มี schedule + synced + ถึงเวลาเริ่ม → activate; หมดเวลา + active → expire;
+ * ยกเลิก default บน LINE เฉพาะเมื่อเมนูหมดอายุยังเป็นเจ้าของ (AC4 แบบ jsk-app)
+ * ไม่ทับ default ที่คนตั้งมือทีหลัง
+ */
+export function planDisplayActions(
+  menus: DisplayCandidate[],
+  now: Date,
+  currentDefaultLineId: string | null,
+): { activate: string[]; expire: string[]; cancelDefault: boolean } {
+  const activate: string[] = [];
+  const expire: string[] = [];
+  for (const m of menus) {
+    if (!m.lineRichMenuId || m.syncStatus !== 'synced') continue;
+    if (!m.displayStartAt && !m.displayEndAt) continue;
+    const started = m.displayStartAt ? m.displayStartAt <= now : true;
+    const ended = m.displayEndAt ? m.displayEndAt <= now : false;
+    if (ended && m.status === 'active') expire.push(m.id);
+    else if (started && !ended && m.status !== 'active') activate.push(m.id);
+  }
+  const expiringLineIds = new Set(
+    menus.filter((m) => expire.includes(m.id)).map((m) => m.lineRichMenuId),
+  );
+  return {
+    activate,
+    expire,
+    cancelDefault:
+      expire.length > 0 &&
+      currentDefaultLineId !== null &&
+      expiringLineIds.has(currentDefaultLineId),
+  };
+}
+
+/** cron tick แสดงเมนูตามเวลา — เรียกจาก `/api/cron/rich-menu-display` */
+export async function runDisplayTick(
+  now = new Date(),
+): Promise<{ activated: number; expired: number; error?: string }> {
+  const db = await getDb();
+  try {
+    const rows = await db
+      .select({
+        id: richMenus.id,
+        lineRichMenuId: richMenus.lineRichMenuId,
+        status: richMenus.status,
+        syncStatus: richMenus.syncStatus,
+        displayStartAt: richMenus.displayStartAt,
+        displayEndAt: richMenus.displayEndAt,
+      })
+      .from(richMenus);
+    const plan = planDisplayActions(
+      rows.map((r) => ({ ...r, status: r.status as string })),
+      now,
+      await getDefaultLineRichMenu(),
+    );
+    for (const id of plan.activate) {
+      const row = rows.find((r) => r.id === id)!;
+      await setDefaultLineRichMenu(row.lineRichMenuId!);
+      await db
+        .update(richMenus)
+        .set({ status: 'active', updatedAt: new Date() })
+        .where(eq(richMenus.id, id));
+    }
+    for (const id of plan.expire) {
+      await db
+        .update(richMenus)
+        .set({ status: 'inactive', updatedAt: new Date() })
+        .where(eq(richMenus.id, id));
+    }
+    if (plan.cancelDefault) await cancelDefaultLineRichMenu();
+    return { activated: plan.activate.length, expired: plan.expire.length };
+  } catch (err) {
+    return {
+      activated: 0,
+      expired: 0,
+      error: err instanceof Error ? err.message : 'unknown',
+    };
+  }
 }
 
 export async function syncRichMenu(

@@ -148,6 +148,34 @@ export async function deleteLineRichMenu(richMenuId: string): Promise<void> {
   }
 }
 
+export async function getDefaultLineRichMenu(): Promise<string | null> {
+  const res = await fetch(`${LINE_API_BASE}/user/all/richmenu`, {
+    headers: getHeaders(),
+    signal: AbortSignal.timeout(10_000),
+  });
+  // § ไม่มี default = 404 — ไม่ใช่ error
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new LineApiError('/user/all/richmenu', res.status, detail.slice(0, 500));
+  }
+  const data = await res.json();
+  return typeof data?.richMenuId === 'string' ? data.richMenuId : null;
+}
+
+export async function cancelDefaultLineRichMenu(): Promise<void> {
+  const res = await fetch(`${LINE_API_BASE}/user/all/richmenu`, {
+    method: 'DELETE',
+    headers: getHeaders(),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (res.status === 404) return;
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new LineApiError('/user/all/richmenu', res.status, detail.slice(0, 500));
+  }
+}
+
 export async function setDefaultLineRichMenu(richMenuId: string): Promise<void> {
   const res = await fetch(`${LINE_API_BASE}/user/all/richmenu/${richMenuId}`, {
     method: 'POST',
