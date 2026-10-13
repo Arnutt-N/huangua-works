@@ -252,7 +252,8 @@ export function UsersClient({
           ))}
         </ul>
       </div>
-      <TierMatrixCard tierMatrix={tierMatrix} />
+      {/* § key ตามข้อมูลใหม่ — save แล้วฟอร์มรีเซ็ต ไม่ทับของใหม่เงียบ (round-2 verdict) */}
+      <TierMatrixCard key={JSON.stringify(tierMatrix)} tierMatrix={tierMatrix} />
     </div>
   );
 }
