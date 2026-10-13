@@ -21,9 +21,15 @@ export const dynamic = 'force-dynamic';
  * เชื่อม POST /api/cases/submit จริง (rate-limit + dedup + CID validate ทำงานแล้วจาก T-2/T-7)
  */
 
-export default async function IntakePage() {
+export default async function IntakePage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ category?: string }>;
+}) {
   const db = await getDb();
   const categories = await getActiveCategories(db);
+  // § rich menu ส่ง ?category=<slug> มา (เช่น ปุ่มถนน) — ไม่ตรงคืน '' ฟอร์มว่างเหมือนเดิม
+  const initialCategorySlug = (await searchParams)?.category;
 
   return (
     <div className="min-h-dvh bg-surface text-ink">
@@ -47,7 +53,7 @@ export default async function IntakePage() {
           {/* LiffProvider — ครอบแค่หน้าที่เป็น LIFF endpoint ไม่ครอบ root layout
               เพื่อไม่ให้หน้าอื่นแบก SDK script โดยไม่จำเป็น (ไม่มี LIFF ID = disabled) */}
           <LiffProvider>
-            <IntakeForm categories={categories} />
+            <IntakeForm categories={categories} initialCategorySlug={initialCategorySlug} />
           </LiffProvider>
         </div>
       </main>

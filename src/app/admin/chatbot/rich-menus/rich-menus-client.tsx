@@ -4,7 +4,8 @@ import { useState } from 'react';
 import type { RichMenuItem } from '@/app/admin/_lib/admin-api';
 import { adminApi } from '@/app/admin/_lib/admin-api';
 import { useResource } from '@/app/admin/_lib/use-resource';
-import { Plus, RefreshCw, Globe, LayoutGrid } from 'lucide-react';
+import { useRef } from 'react';
+import { Plus, RefreshCw, Globe, ImageUp, LayoutGrid } from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import {
   Dialog,
@@ -16,16 +17,22 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label, Input, Textarea } from '@/components/ui/field';
 
+// § template เมนูบริการงานช่าง อบต.หัวงัว 6 ช่อง (2500×1686) — 5 ปุ่ม uri เปิด LIFF
+// + ปุ่มติดต่อเจ้าหน้าที่ (message → บอทตอบ Flex handoff)
+// แทน <LIFF_ID> ด้วยค่า LINE_LIFF_ID ก่อน Sync (ดู .env.example หัวข้อ LIFF)
+// ?category=<slug> จะ preselect หมวดใน /intake ให้อัตโนมัติ (slug ผิด → ฟอร์มว่าง)
 const DEFAULT_CONFIG = JSON.stringify({
   size: { width: 2500, height: 1686 },
   selected: true,
-  name: 'Main Menu',
+  name: 'เมนูบริการงานช่าง อบต.หัวงัว',
   chatBarText: 'เมนูหลัก',
   areas: [
-    { bounds: { x: 0, y: 0, width: 1250, height: 843 }, action: { type: 'message', text: 'แจ้งเรื่องใหม่' } },
-    { bounds: { x: 1250, y: 0, width: 1250, height: 843 }, action: { type: 'message', text: 'ติดตามเรื่อง' } },
-    { bounds: { x: 0, y: 843, width: 1250, height: 843 }, action: { type: 'message', text: 'ติดต่อเจ้าหน้าที่' } },
-    { bounds: { x: 1250, y: 843, width: 1250, height: 843 }, action: { type: 'message', text: 'คำถามที่พบบ่อย' } },
+    { bounds: { x: 0, y: 0, width: 833, height: 843 }, action: { type: 'uri', uri: 'https://liff.line.me/<LIFF_ID>/intake?category=roads-sidewalks' } },
+    { bounds: { x: 833, y: 0, width: 833, height: 843 }, action: { type: 'uri', uri: 'https://liff.line.me/<LIFF_ID>/intake?category=electricity-lighting' } },
+    { bounds: { x: 1666, y: 0, width: 834, height: 843 }, action: { type: 'uri', uri: 'https://liff.line.me/<LIFF_ID>/intake?category=water-supply' } },
+    { bounds: { x: 0, y: 843, width: 833, height: 843 }, action: { type: 'uri', uri: 'https://liff.line.me/<LIFF_ID>/intake' } },
+    { bounds: { x: 833, y: 843, width: 833, height: 843 }, action: { type: 'uri', uri: 'https://liff.line.me/<LIFF_ID>/track' } },
+    { bounds: { x: 1666, y: 843, width: 834, height: 843 }, action: { type: 'message', text: 'ติดต่อเจ้าหน้าที่' } },
   ],
 }, null, 2);
 
@@ -35,6 +42,9 @@ export function RichMenusClient() {
   const [chatBarText, setChatBarText] = useState('เมนูหลัก');
   const [configJson, setConfigJson] = useState(DEFAULT_CONFIG);
   const [saving, setSaving] = useState(false);
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const uploadTargetRef = useRef<RichMenuItem | null>(null);
 
   const { data, loading, feedback, notify, mutate } = useResource({
     load: adminApi.listRichMenus,
@@ -70,6 +80,21 @@ export function RichMenusClient() {
     await mutate(() => adminApi.syncRichMenu(item.id), 'Sync สำเร็จ');
   }
 
+  function pickImage(item: RichMenuItem) {
+    uploadTargetRef.current = item;
+    fileRef.current?.click();
+  }
+
+  async function handleImagePicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const item = uploadTargetRef.current;
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!item || !file) return;
+    setUploadingId(item.id);
+    await mutate(() => adminApi.uploadRichMenuImage(item.id, file), 'อัปรูพสำเร็จ — รูปขึ้น LINE แล้ว');
+    setUploadingId(null);
+  }
+
   async function handlePublish(item: RichMenuItem) {
     if (!confirm(`Publish "${item.name}" ให้ผู้ใช้ LINE ทุกคน?`)) return;
     // server คืน 422 { error } เมื่อ LINE ปฏิเสธ — mutate เอาข้อความนั้นมาแจ้ง
@@ -84,6 +109,14 @@ export function RichMenusClient() {
         </div>
       )}
 
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/png,image/jpeg"
+        aria-label="เลือกไฟล์รูปเมนู"
+        className="hidden"
+        onChange={handleImagePicked}
+      />
       <AdminCard>
         <AdminCardTitle
           icon={<LayoutGrid className="h-4 w-4" />}
@@ -113,6 +146,15 @@ export function RichMenusClient() {
                 <div className="flex gap-1">
                   <Button variant="outline" onClick={() => handleSync(item)} className="min-h-touch gap-1 text-xs">
                     <RefreshCw className="h-3.5 w-3.5" /> Sync
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => pickImage(item)}
+                    disabled={!item.lineRichMenuId || uploadingId === item.id}
+                    title={item.lineRichMenuId ? 'อัปรูปเมนู (PNG/JPEG ไม่เกิน 1MB)' : 'ต้อง Sync ก่อนอัปโหลดรูป'}
+                    className="min-h-touch gap-1 text-xs"
+                  >
+                    <ImageUp className="h-3.5 w-3.5" /> {uploadingId === item.id ? 'กำลังอัป...' : 'อัปรูป'}
                   </Button>
                   <Button variant="outline" onClick={() => handlePublish(item)} className="min-h-touch gap-1 text-xs" disabled={!item.lineRichMenuId}>
                     <Globe className="h-3.5 w-3.5" /> Publish

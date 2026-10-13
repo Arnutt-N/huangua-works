@@ -27,6 +27,16 @@ import { useLiff } from '../../components/liff/liff-provider';
 export interface IntakeCategory {
   id: string;
   name: string;
+  slug?: string;
+}
+
+/**
+ * § ปุ่ม rich menu ส่ง `?category=<slug>` มา — match กับหมวดที่ active เท่านั้น
+ * (page ส่งมาเฉพาะหมวด active อยู่แล้ว) ไม่ตรงคืน '' ฟอร์มว่างเหมือนเดิม ไม่ throw
+ */
+export function resolveInitialCategoryId(categories: IntakeCategory[], slug?: string): string {
+  if (!slug) return '';
+  return categories.find((c) => c.slug === slug)?.id ?? '';
 }
 
 interface GeoOption {
@@ -113,8 +123,17 @@ function SectionHeading({ icon: Icon, children }: { icon: typeof User; children:
   );
 }
 
-export function IntakeForm({ categories }: { categories: IntakeCategory[] }) {
-  const [form, setForm] = useState<FormState>(initialForm);
+export function IntakeForm({
+  categories,
+  initialCategorySlug,
+}: {
+  categories: IntakeCategory[];
+  initialCategorySlug?: string;
+}) {
+  const [form, setForm] = useState<FormState>(() => ({
+    ...initialForm,
+    categoryId: resolveInitialCategoryId(categories, initialCategorySlug),
+  }));
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
