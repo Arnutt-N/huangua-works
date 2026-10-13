@@ -9,6 +9,7 @@ import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
 import { hashPassword, verifyPassword } from '@/lib/password';
 import { requireStaff } from '@/lib/auth/require-staff';
 import { enforceRateLimit } from '@/lib/rate-limit/enforce';
+import { formatReset } from '@/lib/rate-limit/format-reset';
 import {
   changeOwnPasswordFormSchema,
   updateProfileFormSchema,
@@ -90,7 +91,7 @@ export async function changeOwnPassword(
   // ถ้าใครขโมย session ไปแล้ว ใช้ failOpen:false เหมือน path login ด้วยเหตุผลเดียวกัน
   const limit = await enforceRateLimit('changePassword', actor.id);
   if (!limit.allowed) {
-    return { error: `เปลี่ยนรหัสผ่านถี่เกินไป กรุณารอ ${limit.reset} วินาที` };
+    return { error: `เปลี่ยนรหัสผ่านถี่เกินไป กรุณารอ ${formatReset(limit.reset)}` };
   }
 
   const db = await getDb();

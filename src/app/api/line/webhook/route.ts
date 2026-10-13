@@ -3,6 +3,7 @@ import { verifyLineSignature } from '@/lib/line/signature';
 import { handleEvent } from '@/lib/line/bot/engine';
 import { redis } from '@/lib/upstash';
 import { enforceRateLimit } from '@/lib/rate-limit/enforce';
+import { formatReset } from '@/lib/rate-limit/format-reset';
 import { clientIpFromHeaders } from '@/lib/rate-limit/client-ip';
 import type { LineWebhookEvent, LineWebhookRequestBody } from '@/lib/line/types';
 
@@ -47,7 +48,7 @@ export async function POST(request: Request) {
   const rateLimit = await enforceRateLimit('lineWebhookIp', clientIpFromHeaders(request.headers));
   if (!rateLimit.allowed) {
     return NextResponse.json(
-      { message: `ส่งคำขอถี่เกินไป กรุณารอ ${rateLimit.reset} วินาที` },
+      { message: `ส่งคำขอถี่เกินไป กรุณารอ ${formatReset(rateLimit.reset)}` },
       { status: 429, headers: { 'Retry-After': String(rateLimit.reset) } },
     );
   }

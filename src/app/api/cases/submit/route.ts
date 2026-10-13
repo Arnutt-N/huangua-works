@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isValidCid } from '@/lib/cid-checksum';
 import { enforceRateLimit } from '@/lib/rate-limit/enforce';
+import { formatReset } from '@/lib/rate-limit/format-reset';
 import { clientIpFromHeaders } from '@/lib/rate-limit/client-ip';
 import { submitCaseSchema, submitCaseLineSchema, validateOrError } from '@/lib/validation';
 import { isSpamSubmission } from '@/lib/anti-spam';
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
 
   if (!rateLimit.allowed) {
     return NextResponse.json(
-      { error: 'ส่งเรื่องถี่เกินไป กรุณารอ ' + rateLimit.reset + ' วินาที' },
+      { error: 'ส่งเรื่องถี่เกินไป กรุณารอ ' + formatReset(rateLimit.reset) },
       { status: 429 }
     );
   }

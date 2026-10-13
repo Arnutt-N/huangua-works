@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { enforceRateLimit } from '@/lib/rate-limit/enforce';
+import { formatReset } from '@/lib/rate-limit/format-reset';
 import { clientIpFromHeaders } from '@/lib/rate-limit/client-ip';
 import { parseBody } from '@/lib/api-helpers';
 import { liffSessionSchema } from '@/lib/validation';
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
   const rateLimit = await enforceRateLimit('liffSession', ip);
   if (!rateLimit.allowed) {
     return NextResponse.json(
-      { error: `พยายามบ่อยเกินไป กรุณารอ ${rateLimit.reset} วินาที` },
+      { error: `พยายามบ่อยเกินไป กรุณารอ ${formatReset(rateLimit.reset)}` },
       { status: 429 },
     );
   }

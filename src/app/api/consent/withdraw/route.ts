@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { enforceRateLimit } from '@/lib/rate-limit/enforce';
+import { formatReset } from '@/lib/rate-limit/format-reset';
 import { clientIpFromHeaders } from '@/lib/rate-limit/client-ip';
 import { withdrawCaseConsent, type OwnershipProof } from '@/lib/cases/citizen-access';
 import { consentWithdrawSchema, consentWithdrawLineSchema, validateOrError } from '@/lib/validation';
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
   const rateLimit = await enforceRateLimit('consentWithdraw', ip);
   if (!rateLimit.allowed) {
     return NextResponse.json(
-      { error: 'ส่งคำขอถี่เกินไป กรุณารอ ' + rateLimit.reset + ' วินาที' },
+      { error: 'ส่งคำขอถี่เกินไป กรุณารอ ' + formatReset(rateLimit.reset) },
       { status: 429 },
     );
   }

@@ -8,6 +8,7 @@ import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
 import { hashPassword } from '@/lib/password';
 import { getClientIp, getClientUserAgent } from '@/lib/auth/require-staff';
 import { enforceRateLimit } from '@/lib/rate-limit/enforce';
+import { formatReset } from '@/lib/rate-limit/format-reset';
 import {
   burnResetToken,
   createResetToken,
@@ -72,7 +73,7 @@ export async function requestPasswordReset(
   ]);
   if (!ipLimit.allowed || !emailLimit.allowed) {
     const reset = Math.max(ipLimit.reset, emailLimit.reset);
-    return { error: `ส่งคำขอถี่เกินไป กรุณารอ ${reset} วินาที` };
+    return { error: `ส่งคำขอถี่เกินไป กรุณารอ ${formatReset(reset)}` };
   }
 
   const db = await getDb();
@@ -163,7 +164,7 @@ export async function completePasswordReset(
   // § จำกัดการลอง token — แม้ token 256-bit จะเดาไม่ได้ แต่กันการยิง request รัวๆ
   const limit = await enforceRateLimit('pwResetComplete', ip);
   if (!limit.allowed) {
-    return { error: `ส่งคำขอถี่เกินไป กรุณารอ ${limit.reset} วินาที` };
+    return { error: `ส่งคำขอถี่เกินไป กรุณารอ ${formatReset(limit.reset)}` };
   }
 
   const tokenRow = await validateResetToken(token);
