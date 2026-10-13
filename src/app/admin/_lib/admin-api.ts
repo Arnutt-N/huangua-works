@@ -76,6 +76,8 @@ export interface RichMenuItem {
   status: string;
   syncStatus: string;
   lastSyncError: string | null;
+  displayStartAt: string | null;
+  displayEndAt: string | null;
   createdAt: string;
 }
 
@@ -83,6 +85,8 @@ export interface RichMenuInput {
   name: string;
   chatBarText: string;
   config: unknown;
+  displayStartAt?: string;
+  displayEndAt?: string;
 }
 
 export interface BroadcastItem {

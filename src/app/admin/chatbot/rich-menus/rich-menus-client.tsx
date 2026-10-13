@@ -40,6 +40,8 @@ export function RichMenusClient() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [name, setName] = useState('');
   const [chatBarText, setChatBarText] = useState('เมนูหลัก');
+  const [displayStart, setDisplayStart] = useState('');
+  const [displayEnd, setDisplayEnd] = useState('');
   const [configJson, setConfigJson] = useState(DEFAULT_CONFIG);
   const [saving, setSaving] = useState(false);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
@@ -66,13 +68,22 @@ export function RichMenusClient() {
 
     setSaving(true);
     const ok = await mutate(
-      () => adminApi.createRichMenu({ name: name.trim(), chatBarText, config }),
+      () =>
+        adminApi.createRichMenu({
+          name: name.trim(),
+          chatBarText,
+          config,
+          ...(displayStart ? { displayStartAt: new Date(displayStart).toISOString() } : {}),
+          ...(displayEnd ? { displayEndAt: new Date(displayEnd).toISOString() } : {}),
+        }),
       'สร้าง Rich Menu สำเร็จ',
     );
     setSaving(false);
     if (ok) {
       setDialogOpen(false);
       setName('');
+      setDisplayStart('');
+      setDisplayEnd('');
     }
   }
 
@@ -143,6 +154,11 @@ export function RichMenusClient() {
                 <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${item.status === 'active' ? 'bg-success/10 text-success' : 'bg-muted/10 text-muted'}`}>
                   {item.status === 'active' ? 'ใช้งาน' : item.status}
                 </span>
+                {(item.displayStartAt || item.displayEndAt) && (
+                  <span className="rounded-full bg-muted/10 px-2 py-0.5 text-xs font-medium text-muted" title="cron แสดง/ปลดเมนูตามเวลานี้อัตโนมัติ">
+                    ⏰ ตามเวลา
+                  </span>
+                )}
                 <div className="flex gap-1">
                   <Button variant="outline" onClick={() => handleSync(item)} className="min-h-touch gap-1 text-xs">
                     <RefreshCw className="h-3.5 w-3.5" /> Sync
@@ -179,6 +195,16 @@ export function RichMenusClient() {
             <div>
               <Label htmlFor="rm-bar">Chat Bar Text</Label>
               <Input id="rm-bar" value={chatBarText} onChange={(e) => setChatBarText(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="rm-start">เริ่มแสดง (ไม่บังคับ)</Label>
+                <Input id="rm-start" type="datetime-local" value={displayStart} onChange={(e) => setDisplayStart(e.target.value)} />
+              </div>
+              <div>
+                <Label htmlFor="rm-end">สิ้นสุด (ไม่บังคับ)</Label>
+                <Input id="rm-end" type="datetime-local" value={displayEnd} onChange={(e) => setDisplayEnd(e.target.value)} />
+              </div>
             </div>
             <div>
               <Label htmlFor="rm-config">Config (LINE Rich Menu JSON)</Label>
