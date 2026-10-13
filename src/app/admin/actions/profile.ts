@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { users } from '@/lib/db/schema';
@@ -122,9 +122,15 @@ export async function changeOwnPassword(
 
   try {
     const passwordHash = await hashPassword(newPassword);
+    // § bump passwordVersion ตัด session อื่นของบัญชีนี้ (session ปัจจุบันก็โดนด้วย
+    // resolveStaff จะเตะใน request ถัดไป — ผู้ใช้ login ใหม่ด้วยรหัสใหม่ตามข้อความ success)
     await db
       .update(users)
-      .set({ passwordHash, updatedAt: new Date() })
+      .set({
+        passwordHash,
+        passwordVersion: sql`${users.passwordVersion} + 1`,
+        updatedAt: new Date(),
+      })
       .where(eq(users.id, actor.id));
 
     await logAudit({
