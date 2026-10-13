@@ -66,23 +66,33 @@ export function planDisplayActions(
   now: Date,
   currentDefaultLineId: string | null,
 ): { activate: string[]; expire: string[]; cancelDefault: boolean } {
-  const activate: string[] = [];
   const expire: string[] = [];
+  const contenders: DisplayCandidate[] = [];
   for (const m of menus) {
     if (!m.lineRichMenuId || m.syncStatus !== 'synced') continue;
     if (!m.displayStartAt && !m.displayEndAt) continue;
-    const started = m.displayStartAt ? m.displayStartAt <= now : true;
+    // § ต้องมี start ที่ถึงเวลาแล้วเท่านั้น — มีแค่ end คือตั้งเวลาลงอย่างเดียว
+    // ห้าม publish หลุด (interrogate D-6)
+    const started = m.displayStartAt ? m.displayStartAt <= now : false;
     const ended = m.displayEndAt ? m.displayEndAt <= now : false;
     if (ended && m.status === 'active') expire.push(m.id);
-    else if (started && !ended && m.status !== 'active') activate.push(m.id);
+    else if (started && !ended && m.status !== 'active') contenders.push(m);
   }
+  // § overlap ชนะตัวเดียว (start ล่าสุด, เสมอใช้ id มากสุด) — LINE มี default เดียว
+  contenders.sort((a, b) => {
+    const t = b.displayStartAt!.getTime() - a.displayStartAt!.getTime();
+    return t !== 0 ? t : b.id.localeCompare(a.id);
+  });
+  const activate = contenders.slice(0, 1).map((m) => m.id);
   const expiringLineIds = new Set(
     menus.filter((m) => expire.includes(m.id)).map((m) => m.lineRichMenuId),
   );
   return {
     activate,
     expire,
+    // § มี activate = setDefault ใหม่ทับแล้ว ห้าม cancel ตาม (interrogate B-2/C-2)
     cancelDefault:
+      activate.length === 0 &&
       expire.length > 0 &&
       currentDefaultLineId !== null &&
       expiringLineIds.has(currentDefaultLineId),
@@ -90,10 +100,18 @@ export function planDisplayActions(
 }
 
 /** cron tick แสดงเมนูตามเวลา — เรียกจาก `/api/cron/rich-menu-display` */
-export async function runDisplayTick(
-  now = new Date(),
-): Promise<{ activated: number; expired: number; error?: string }> {
+export interface DisplayTickResult {
+  activated: number;
+  expired: number;
+  failed: string[];
+  error?: string;
+}
+
+export async function runDisplayTick(now = new Date()): Promise<DisplayTickResult> {
   const db = await getDb();
+  const failed: string[] = [];
+  let activated = 0;
+  let expired = 0;
   try {
     const rows = await db
       .select({
@@ -105,31 +123,61 @@ export async function runDisplayTick(
         displayEndAt: richMenus.displayEndAt,
       })
       .from(richMenus);
+    // § อ่าน default แบบ best-effort — อ่านล้มข้ามแค่ขั้น cancel
+    // DB flip ไม่ขึ้นกับ LINE read (interrogate B-4)
+    let currentDefault: string | null = null;
+    try {
+      currentDefault = await getDefaultLineRichMenu();
+    } catch (err) {
+      console.error('[display-tick] read default failed, skip cancel only', err);
+    }
     const plan = planDisplayActions(
       rows.map((r) => ({ ...r, status: r.status as string })),
       now,
-      await getDefaultLineRichMenu(),
+      currentDefault,
     );
+    // § cancel ก่อน commit (ล้มแล้วยัง retry ได้ — DB ยัง active อยู่)
+    if (plan.cancelDefault) {
+      try {
+        await cancelDefaultLineRichMenu();
+      } catch (err) {
+        failed.push('cancel-default');
+        console.error('[display-tick] cancel default failed', err);
+      }
+    }
     for (const id of plan.activate) {
-      const row = rows.find((r) => r.id === id)!;
-      await setDefaultLineRichMenu(row.lineRichMenuId!);
-      await db
-        .update(richMenus)
-        .set({ status: 'active', updatedAt: new Date() })
-        .where(eq(richMenus.id, id));
+      try {
+        const row = rows.find((r) => r.id === id)!;
+        await setDefaultLineRichMenu(row.lineRichMenuId!);
+        await db
+          .update(richMenus)
+          .set({ status: 'active', updatedAt: new Date() })
+          .where(eq(richMenus.id, id));
+        activated += 1;
+      } catch (err) {
+        failed.push(`activate:${id}`);
+        console.error(`[display-tick] activate ${id} failed`, err);
+      }
     }
     for (const id of plan.expire) {
-      await db
-        .update(richMenus)
-        .set({ status: 'inactive', updatedAt: new Date() })
-        .where(eq(richMenus.id, id));
+      try {
+        if (plan.cancelDefault && failed.includes('cancel-default')) continue;
+        await db
+          .update(richMenus)
+          .set({ status: 'inactive', updatedAt: new Date() })
+          .where(eq(richMenus.id, id));
+        expired += 1;
+      } catch (err) {
+        failed.push(`expire:${id}`);
+        console.error(`[display-tick] expire ${id} failed`, err);
+      }
     }
-    if (plan.cancelDefault) await cancelDefaultLineRichMenu();
-    return { activated: plan.activate.length, expired: plan.expire.length };
+    return { activated, expired, failed };
   } catch (err) {
     return {
-      activated: 0,
-      expired: 0,
+      activated,
+      expired,
+      failed,
       error: err instanceof Error ? err.message : 'unknown',
     };
   }

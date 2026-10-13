@@ -15,7 +15,10 @@ export async function GET(req: NextRequest) {
   const result = await runDisplayTick();
   if (result.error) {
     console.error('[cron/rich-menu-display]', result.error);
-    return NextResponse.json({ ok: false, error: result.error }, { status: 502 });
+    return NextResponse.json(
+      { ok: false, error: result.error, activated: result.activated, expired: result.expired, failed: result.failed },
+      { status: 502 },
+    );
   }
-  return NextResponse.json({ ok: true, activated: result.activated, expired: result.expired });
+  return NextResponse.json({ ok: true, activated: result.activated, expired: result.expired, failed: result.failed });
 }
