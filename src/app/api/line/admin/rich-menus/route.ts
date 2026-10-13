@@ -14,6 +14,8 @@ export const runtime = 'nodejs';
 const createSchema = z.object({
   name: z.string().min(1).max(100),
   chatBarText: z.string().min(1).max(20).default('เมนู'),
+  displayStartAt: z.string().datetime({ offset: true }).optional(),
+  displayEndAt: z.string().datetime({ offset: true }).optional(),
   config: z.object({
     size: z.object({ width: z.number(), height: z.number() }),
     selected: z.boolean().default(true),
@@ -45,11 +47,18 @@ export async function POST(request: Request) {
   const db = await getDb();
   const id = generateId();
 
+  const { displayStartAt, displayEndAt } = result.data;
+  if (displayStartAt && displayEndAt && displayEndAt <= displayStartAt) {
+    return NextResponse.json({ error: 'วันสิ้นสุดต้องหลังวันเริ่มแสดง' }, { status: 400 });
+  }
+
   await db.insert(richMenus).values({
     id,
     name: result.data.name,
     chatBarText: result.data.chatBarText,
     config: result.data.config,
+    displayStartAt: displayStartAt ? new Date(displayStartAt) : null,
+    displayEndAt: displayEndAt ? new Date(displayEndAt) : null,
     createdBy: authz.ctx.user.id,
   });
 

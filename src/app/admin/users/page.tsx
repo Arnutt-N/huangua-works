@@ -5,6 +5,7 @@ import { users, departments } from '@/lib/db/schema';
 import { requireStaff } from '@/lib/auth/require-staff';
 import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { getActiveDepartments } from '@/lib/queries/lookups';
+import { getTierMatrix } from '@/app/admin/actions/tiers';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { UsersClient, UserSuccessToast } from './users-client';
 
@@ -43,6 +44,7 @@ export default async function UsersPage({
     .orderBy(asc(users.fullName));
 
   const deptOptions = await getActiveDepartments(db);
+  const tierMatrix = await getTierMatrix();
 
   return (
     <AdminShell user={staffUser} active="users" title="จัดการผู้ใช้">
@@ -60,6 +62,7 @@ export default async function UsersPage({
           departments={deptOptions}
           canResetPassword={staffUser.role === 'superadmin'}
           currentUserId={staffUser.id}
+          tierMatrix={tierMatrix}
         />
       </div>
     </AdminShell>

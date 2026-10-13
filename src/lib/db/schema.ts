@@ -501,6 +501,26 @@ export const consentRecords = pgTable(
   })
 );
 
+export const caseFeedback = pgTable(
+  'case_feedback',
+  {
+    id: text('id').primaryKey(),
+    createdAt: timestamp('created_at', { mode: 'date' })
+      .notNull()
+      .defaultNow(),
+    // § เคสละ 1 ครั้ง (unique) — ตอบแล้วแก้ไม่ได้ ให้แล้วให้เลย
+    caseId: text('case_id')
+      .notNull()
+      .unique()
+      .references(() => cases.id, { onDelete: 'cascade' }),
+    rating: integer('rating').notNull(), // 1-5 (validate ที่ service)
+    comment: text('comment'),
+  },
+  (table) => ({
+    caseIdx: index('case_feedback_case_id_idx').on(table.caseId),
+  })
+);
+
 // ────────────────────────────────────────────────────────────────────────────
 // § Deduplication Hashes (ป้องกันซ้ำซ้อน: HMAC-SHA256 ของ CID+title+description)
 // ────────────────────────────────────────────────────────────────────────────
@@ -962,12 +982,34 @@ export const richMenus = pgTable(
     syncStatus: text('sync_status').notNull().default('pending'),
     lastSyncError: text('last_sync_error'),
     createdBy: text('created_by'),
+    // § แสดงเมนูตามเวลา (J1) — null คู่ = manual (พฤติกรรมเดิม) มีค่าคือให้ cron tick จัดการ
+    displayStartAt: timestamp('display_start_at', { mode: 'date' }),
+    displayEndAt: timestamp('display_end_at', { mode: 'date' }),
   },
   (table) => ({
     statusIdx: index('rich_menus_status_idx').on(table.status),
     lineRichMenuIdIdx: uniqueIndex('rich_menus_line_rich_menu_id_idx')
       .on(table.lineRichMenuId)
       .where(sql`line_rich_menu_id IS NOT NULL`),
+  })
+);
+
+export const richMenuAliases = pgTable(
+  'rich_menu_aliases',
+  {
+    id: text('id').primaryKey(),
+    // § alias_id เปลี่ยนเป้าได้อย่างเดียว (LINE PUT) ชื่อเอง immutable — validate
+    // pattern ที่ service (`isValidAliasId`) ไม่ใช่ที่ schema
+    aliasId: text('alias_id').notNull().unique(),
+    // § RESTRICT: เมนูที่ alias ผูกอยู่ลบไม่ได้ก่อนลบ alias (กันเมนูลอย)
+    richMenuId: text('rich_menu_id')
+      .notNull()
+      .references(() => richMenus.id, { onDelete: 'restrict' }),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => ({
+    aliasMenuIdx: index('rich_menu_aliases_menu_idx').on(table.richMenuId),
   })
 );
 
@@ -989,3 +1031,11 @@ export const mediaFiles = pgTable(
     uploadedByIdx: index('media_files_uploaded_by_idx').on(table.uploadedBy),
   })
 );
+
+export const tierRoles = pgTable('tier_roles', {
+  // § tier คือ 1 ใน 4 คีย์คงที่ (staff/case_supervisor/admin/superadmin) — ไม่ใช่บทบาทใหม่
+  // สร้างบทบาทใหม่ยังต้องแก้ pgEnum (deploy) ข้อจำกัดนี้บันทึกใน PRD Phase 3
+  tier: text('tier').primaryKey(),
+  roles: text('roles').array().notNull(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+});

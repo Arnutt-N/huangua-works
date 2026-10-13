@@ -93,6 +93,7 @@ export function TrackForm({ initialId }: { initialId?: string }) {
   }
 
   const timeline = result ? buildTimeline(result) : [];
+  const canRate = !!result && (result.case.status === 'done' || result.case.status === 'closed');
 
   return (
     <>
@@ -197,6 +198,96 @@ export function TrackForm({ initialId }: { initialId?: string }) {
           </div>
         </section>
       )}
+      {canRate && result && <FeedbackCard trackingCode={trackId} />}
     </>
+  );
+}
+
+/** ให้ดาวหลังเรื่องเสร็จ/ปิด — เคสละครั้ง ตอบหรือไม่ตอบก็ได้ (ไม่ขวางอะไร) */
+function FeedbackCard({ trackingCode }: { trackingCode: string }) {
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [state, setState] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
+  const [message, setMessage] = useState('');
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (rating < 1) {
+      setState('error');
+      setMessage('กรุณาเลือกดาวก่อนส่ง');
+      return;
+    }
+    setState('sending');
+    try {
+      const res = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ trackingCode, rating, comment: comment.trim() || undefined }),
+      });
+      const body = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setState('error');
+        setMessage(body.error ?? 'ส่งไม่สำเร็จ');
+        return;
+      }
+      setState('done');
+    } catch {
+      setState('error');
+      setMessage('ส่งไม่สำเร็จ กรุณาลองใหม่');
+    }
+  }
+
+  if (state === 'done') {
+    return (
+      <p role="status" className="glass-panel mt-8 rounded-xl p-6 text-center font-medium text-success-ink shadow-sm">
+        ขอบคุณสำหรับคะแนนครับ
+      </p>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="glass-panel mt-8 rounded-xl p-6 shadow-sm sm:p-8">
+      <fieldset>
+        <legend className="text-xl font-semibold">ให้คะแนนการบริการ</legend>
+        <div role="radiogroup" aria-label="คะแนน 1 ถึง 5 ดาว" className="mt-3 flex gap-2">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <label
+              key={n}
+              className={cn(
+                'flex min-h-touch min-w-touch cursor-pointer items-center justify-center rounded-lg border text-lg font-bold',
+                rating >= n ? 'border-accent-strong bg-accent-100 text-accent-strong' : 'border-border text-muted',
+              )}
+            >
+              <input
+                type="radio"
+                name="rating"
+                value={n}
+                checked={rating === n}
+                onChange={() => setRating(n)}
+                className="sr-only"
+                aria-label={`${n} ดาว`}
+              />
+              ★
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <div className="mt-4">
+        <Label htmlFor="fb-comment">ข้อเสนอแนะ (ไม่บังคับ)</Label>
+        <Input
+          id="fb-comment"
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          placeholder="เล่าเพิ่มเติมได้ที่นี่"
+          maxLength={500}
+        />
+      </div>
+      {state === 'error' && (
+        <p role="alert" className="mt-3 text-sm font-semibold text-danger-ink">{message}</p>
+      )}
+      <Button type="submit" className="mt-4 h-11 px-7" disabled={state === 'sending'}>
+        {state === 'sending' ? 'กำลังส่ง...' : 'ส่งคะแนน'}
+      </Button>
+    </form>
   );
 }

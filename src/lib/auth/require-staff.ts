@@ -8,6 +8,34 @@ import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { users } from '@/lib/db/schema';
 import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
 import type { UserRole } from '@/lib/auth/roles';
+import { ADMIN_ROLES, CASE_SUPERVISOR_ROLES, STAFF_ROLES, SUPERADMIN_ONLY } from '@/lib/auth/roles';
+import { getTierRoles, type TierKey } from '@/lib/auth/tiers';
+
+/**
+ * § จุดคอขวดเดียวที่ map whitelist → tier key (เทียบ reference ตรง import เดียวกัน)
+ * call site ไม่ต้องเปลี่ยน — DB มี override ใช้ของ DB ไม่มีใช้ค่าคงที่เดิม
+ * array แปลกหน้า (ไม่ใช่ 4 tier มาตรฐาน) ผ่านตรงเหมือนเดิม
+ */
+const TIER_BY_REF = new Map<readonly UserRole[], TierKey>([
+  [STAFF_ROLES, 'staff'],
+  [CASE_SUPERVISOR_ROLES, 'case_supervisor'],
+  [ADMIN_ROLES, 'admin'],
+  [SUPERADMIN_ONLY, 'superadmin'],
+]);
+
+async function resolveAllowedRoles(
+  allowedRoles?: readonly UserRole[],
+): Promise<readonly UserRole[] | undefined> {
+  if (!allowedRoles) return undefined;
+  const key = TIER_BY_REF.get(allowedRoles);
+  if (!key) return allowedRoles;
+  try {
+    return await getTierRoles(key);
+  } catch {
+    // § DB/Redis ล่ม = fallback เงียบ (fail-open) กันล็อกทั้งระบบ
+    return allowedRoles;
+  }
+}
 import { clientIpFromHeaders } from '@/lib/rate-limit/client-ip';
 
 /**
@@ -78,9 +106,8 @@ async function resolveStaff(allowedRoles?: readonly UserRole[]): Promise<StaffRe
     return { ok: false, reason };
   }
 
-  // § ตัด session ค้างหลังเปลี่ยนรหัส — JWT เก็บ passwordVersion ตอน login
-  // ไม่ตรงกับ DB = เปลี่ยนรหัสมาแล้วหลัง session นี้ออก → เตะออกให้ login ใหม่
-  // (session เก่าก่อน migration 0018 ไม่มี field นี้ → เทียบเป็น 1 = ค่า default)
+  // § ตัด session ค้างหลังเปลี่ยนรหัส (#108) — เช็คก่อน tier เสมอ: session เน่า
+  // ไม่มีสิทธิ์อะไรทั้งนั้น ไม่ต้องเสียค่า resolve matrix
   const sessionVersion = session.user.passwordVersion ?? 1;
   if (sessionVersion !== staffUser.passwordVersion) {
     await logAudit({
@@ -94,8 +121,9 @@ async function resolveStaff(allowedRoles?: readonly UserRole[]): Promise<StaffRe
     return { ok: false, reason: 'stale_credentials' };
   }
 
-  // role whitelist check (optional)
-  if (allowedRoles && !allowedRoles.includes(staffUser.role)) {
+  // role whitelist check (optional) — ผ่าน tier matrix ก่อนเสมอ
+  const effectiveRoles = await resolveAllowedRoles(allowedRoles);
+  if (effectiveRoles && !effectiveRoles.includes(staffUser.role)) {
     await logAudit({
       action: AUDIT_ACTIONS.ACCESS_DENIED,
       resource: 'auth',
@@ -105,7 +133,7 @@ async function resolveStaff(allowedRoles?: readonly UserRole[]): Promise<StaffRe
       metadata: {
         reason: 'insufficient_role',
         role: staffUser.role,
-        required: allowedRoles,
+        required: effectiveRoles,
       },
     });
     return { ok: false, reason: 'insufficient_role' };

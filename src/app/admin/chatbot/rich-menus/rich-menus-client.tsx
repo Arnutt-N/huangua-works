@@ -40,6 +40,8 @@ export function RichMenusClient() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [name, setName] = useState('');
   const [chatBarText, setChatBarText] = useState('เมนูหลัก');
+  const [displayStart, setDisplayStart] = useState('');
+  const [displayEnd, setDisplayEnd] = useState('');
   const [configJson, setConfigJson] = useState(DEFAULT_CONFIG);
   const [saving, setSaving] = useState(false);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
@@ -66,13 +68,22 @@ export function RichMenusClient() {
 
     setSaving(true);
     const ok = await mutate(
-      () => adminApi.createRichMenu({ name: name.trim(), chatBarText, config }),
+      () =>
+        adminApi.createRichMenu({
+          name: name.trim(),
+          chatBarText,
+          config,
+          ...(displayStart ? { displayStartAt: new Date(displayStart).toISOString() } : {}),
+          ...(displayEnd ? { displayEndAt: new Date(displayEnd).toISOString() } : {}),
+        }),
       'สร้าง Rich Menu สำเร็จ',
     );
     setSaving(false);
     if (ok) {
       setDialogOpen(false);
       setName('');
+      setDisplayStart('');
+      setDisplayEnd('');
     }
   }
 
@@ -93,6 +104,39 @@ export function RichMenusClient() {
     setUploadingId(item.id);
     await mutate(() => adminApi.uploadRichMenuImage(item.id, file), 'อัปรูพสำเร็จ — รูปขึ้น LINE แล้ว');
     setUploadingId(null);
+  }
+
+  const [aliasId, setAliasId] = useState('');
+  const [aliasTarget, setAliasTarget] = useState('');
+  const aliasesRes = useResource({ load: adminApi.listMenuAliases });
+  const aliases = aliasesRes.data?.items ?? [];
+  const reloadAliases = aliasesRes.reload;
+  const syncedMenus = items.filter((m) => m.lineRichMenuId && m.syncStatus === 'synced');
+
+  async function handleCreateAlias() {
+    if (!aliasId.trim() || !aliasTarget) {
+      notify('error', 'กรอกชื่อ alias และเลือกเมนูเป้าหมาย');
+      return;
+    }
+    const ok = await mutate(() => adminApi.createMenuAlias(aliasId.trim(), aliasTarget), 'สร้าง alias สำเร็จ');
+    if (ok) {
+      setAliasId('');
+      await reloadAliases();
+    }
+  }
+
+  async function handleRepoint(alias: string, menuId: string) {
+    if (!menuId) return;
+    if (await mutate(() => adminApi.repointMenuAlias(alias, menuId), `ย้าย alias ${alias} แล้ว`)) {
+      await reloadAliases();
+    }
+  }
+
+  async function handleDeleteAlias(alias: string) {
+    if (!confirm(`ลบ alias "${alias}" บน LINE ด้วย?`)) return;
+    if (await mutate(() => adminApi.deleteMenuAlias(alias), 'ลบ alias สำเร็จ')) {
+      await reloadAliases();
+    }
   }
 
   async function handlePublish(item: RichMenuItem) {
@@ -143,6 +187,11 @@ export function RichMenusClient() {
                 <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${item.status === 'active' ? 'bg-success/10 text-success' : 'bg-muted/10 text-muted'}`}>
                   {item.status === 'active' ? 'ใช้งาน' : item.status}
                 </span>
+                {(item.displayStartAt || item.displayEndAt) && (
+                  <span className="rounded-full bg-muted/10 px-2 py-0.5 text-xs font-medium text-muted" title="cron แสดง/ปลดเมนูตามเวลานี้อัตโนมัติ">
+                    ⏰ ตามเวลา
+                  </span>
+                )}
                 <div className="flex gap-1">
                   <Button variant="outline" onClick={() => handleSync(item)} className="min-h-touch gap-1 text-xs">
                     <RefreshCw className="h-3.5 w-3.5" /> Sync
@@ -166,6 +215,58 @@ export function RichMenusClient() {
         )}
       </AdminCard>
 
+      <AdminCard>
+        <AdminCardTitle icon={<LayoutGrid className="h-4 w-4" />}>
+          Aliases ({aliases.length}) — สลับ tab ด้วย richmenuswitch
+        </AdminCardTitle>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Input
+            aria-label="ชื่อ alias"
+            value={aliasId}
+            onChange={(e) => setAliasId(e.target.value)}
+            placeholder="เช่น main-menu (a-z 0-9 _ -)"
+            className="flex-1"
+          />
+          <select
+            aria-label="เมนูเป้าหมาย"
+            value={aliasTarget}
+            onChange={(e) => setAliasTarget(e.target.value)}
+            className="min-h-touch rounded-lg border border-border/50 bg-surface px-3 text-sm"
+          >
+            <option value="">เลือกเมนูที่ sync แล้ว</option>
+            {syncedMenus.map((m) => (
+              <option key={m.id} value={m.id}>{m.name}</option>
+            ))}
+          </select>
+          <Button onClick={handleCreateAlias} className="min-h-touch gap-1.5"><Plus className="h-4 w-4" /> สร้าง alias</Button>
+        </div>
+        <div className="mt-3 space-y-2">
+          {aliases.map((a) => (
+            <div key={a.aliasId} className="flex flex-col gap-2 rounded-lg border border-border/50 p-3 sm:flex-row sm:items-center">
+              <code className="font-mono text-sm font-medium text-ink">{a.aliasId}</code>
+              <span className="text-xs text-muted">→ {a.menuName ?? '(เมนูถูกลบ?)'}</span>
+              <div className="flex gap-1 sm:ml-auto">
+                <select
+                  aria-label={`ย้ายเป้า ${a.aliasId}`}
+                  defaultValue=""
+                  onChange={(e) => handleRepoint(a.aliasId, e.target.value)}
+                  className="min-h-touch rounded-lg border border-border/50 bg-surface px-2 text-xs"
+                >
+                  <option value="">ย้ายเป้า…</option>
+                  {syncedMenus.map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+                <Button variant="outline" onClick={() => handleDeleteAlias(a.aliasId)} className="min-h-touch text-xs">ลบ</Button>
+              </div>
+            </div>
+          ))}
+          {aliases.length === 0 && (
+            <p className="py-4 text-center text-sm text-muted">ยังไม่มี alias — ปุ่ม richmenuswitch ในเมนูอ้างชื่อนี้เพื่อสลับ tab</p>
+          )}
+        </div>
+      </AdminCard>
+
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -179,6 +280,16 @@ export function RichMenusClient() {
             <div>
               <Label htmlFor="rm-bar">Chat Bar Text</Label>
               <Input id="rm-bar" value={chatBarText} onChange={(e) => setChatBarText(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="rm-start">เริ่มแสดง (ไม่บังคับ)</Label>
+                <Input id="rm-start" type="datetime-local" value={displayStart} onChange={(e) => setDisplayStart(e.target.value)} />
+              </div>
+              <div>
+                <Label htmlFor="rm-end">สิ้นสุด (ไม่บังคับ)</Label>
+                <Input id="rm-end" type="datetime-local" value={displayEnd} onChange={(e) => setDisplayEnd(e.target.value)} />
+              </div>
             </div>
             <div>
               <Label htmlFor="rm-config">Config (LINE Rich Menu JSON)</Label>
