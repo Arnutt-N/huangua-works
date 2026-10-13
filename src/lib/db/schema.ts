@@ -1011,3 +1011,11 @@ export const mediaFiles = pgTable(
     uploadedByIdx: index('media_files_uploaded_by_idx').on(table.uploadedBy),
   })
 );
+
+export const tierRoles = pgTable('tier_roles', {
+  // § tier คือ 1 ใน 4 คีย์คงที่ (staff/case_supervisor/admin/superadmin) — ไม่ใช่บทบาทใหม่
+  // สร้างบทบาทใหม่ยังต้องแก้ pgEnum (deploy) ข้อจำกัดนี้บันทึกใน PRD Phase 3
+  tier: text('tier').primaryKey(),
+  roles: text('roles').array().notNull(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+});
