@@ -962,6 +962,9 @@ export const richMenus = pgTable(
     syncStatus: text('sync_status').notNull().default('pending'),
     lastSyncError: text('last_sync_error'),
     createdBy: text('created_by'),
+    // § แสดงเมนูตามเวลา (J1) — null คู่ = manual (พฤติกรรมเดิม) มีค่าคือให้ cron tick จัดการ
+    displayStartAt: timestamp('display_start_at', { mode: 'date' }),
+    displayEndAt: timestamp('display_end_at', { mode: 'date' }),
   },
   (table) => ({
     statusIdx: index('rich_menus_status_idx').on(table.status),
