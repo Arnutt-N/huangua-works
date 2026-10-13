@@ -1,12 +1,16 @@
 import { eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
-import { richMenus } from '@/lib/db/schema';
+import { richMenuAliases, richMenus } from '@/lib/db/schema';
+import { generateId } from '@/lib/id';
 import {
   cancelDefaultLineRichMenu,
+  createAliasOnLine,
   createLineRichMenu,
+  deleteAliasOnLine,
   deleteLineRichMenu,
   getDefaultLineRichMenu,
   getLineRichMenu,
+  updateAliasOnLine,
   uploadLineRichMenuImage,
   setDefaultLineRichMenu,
 } from './client';
@@ -219,4 +223,101 @@ export async function publishRichMenu(id: string): Promise<{ ok: boolean; error?
 
   await db.update(richMenus).set({ status: 'active', updatedAt: new Date() }).where(eq(richMenus.id, id));
   return { ok: true };
+}
+
+// ─── alias (สลับ tab ด้วย richmenuswitch) ────────────────────────────────
+
+/** pattern เดียวกับ LINE console: a-z A-Z 0-9 _ - ยาวไม่เกิน 50 */
+export function isValidAliasId(aliasId: string): boolean {
+  return /^[a-zA-Z0-9_-]{1,50}$/.test(aliasId);
+}
+
+async function resolveAliasTarget(
+  db: Awaited<ReturnType<typeof getDb>>,
+  menuId: string,
+): Promise<{ ok: true; lineRichMenuId: string } | { ok: false; error: string }> {
+  const [menu] = await db
+    .select({ lineRichMenuId: richMenus.lineRichMenuId, syncStatus: richMenus.syncStatus })
+    .from(richMenus)
+    .where(eq(richMenus.id, menuId))
+    .limit(1);
+  // § เป้าต้อง sync แล้ว — alias ชี้เมนูที่ LINE ไม่มีคือเมนูตาย
+  if (!menu?.lineRichMenuId) return { ok: false, error: 'เมนูเป้าหมายต้อง sync ก่อน' };
+  if (menu.syncStatus !== 'synced') return { ok: false, error: 'เมนูเป้าหมายยัง sync ไม่สำเร็จ' };
+  return { ok: true, lineRichMenuId: menu.lineRichMenuId };
+}
+
+export async function createMenuAlias(
+  aliasId: string,
+  menuId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!isValidAliasId(aliasId)) return { ok: false, error: 'ชื่อ alias ใช้ได้แค่ a-z 0-9 _ - ยาวไม่เกิน 50' };
+  const db = await getDb();
+  const target = await resolveAliasTarget(db, menuId);
+  if (!target.ok) return target;
+  try {
+    await createAliasOnLine(aliasId, target.lineRichMenuId);
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'create alias failed' };
+  }
+  try {
+    await db.insert(richMenuAliases).values({ id: generateId(), aliasId, richMenuId: menuId });
+  } catch {
+    // § LINE สร้างแล้วแต่ DB เขียนไม่ลง (เช่น alias ซ้ำ) — คืน error ให้ sync ใหม่ได้
+    // ไม่ลบฝั่ง LINE (best-effort) เพราะแถว local ไม่มีแต่ LINE มีคือ state รู้ที่มา
+    return { ok: false, error: 'บันทึก alias ในระบบไม่สำเร็จ (อาจชื่อซ้ำ)' };
+  }
+  return { ok: true };
+}
+
+export async function repointMenuAlias(
+  aliasId: string,
+  menuId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const db = await getDb();
+  const [row] = await db
+    .select({ id: richMenuAliases.id })
+    .from(richMenuAliases)
+    .where(eq(richMenuAliases.aliasId, aliasId))
+    .limit(1);
+  if (!row) return { ok: false, error: 'ไม่พบ alias นี้ในระบบ' };
+  const target = await resolveAliasTarget(db, menuId);
+  if (!target.ok) return target;
+  try {
+    await updateAliasOnLine(aliasId, target.lineRichMenuId);
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'repoint alias failed' };
+  }
+  await db
+    .update(richMenuAliases)
+    .set({ richMenuId: menuId })
+    .where(eq(richMenuAliases.id, row.id));
+  return { ok: true };
+}
+
+export async function deleteMenuAlias(aliasId: string): Promise<{ ok: boolean; error?: string }> {
+  const db = await getDb();
+  // § ลบฝั่ง LINE ก่อน (404 = ไปแล้ว) แล้วค่อยลบแถว local — สลับกันจะเหลือขยะบน LINE
+  try {
+    await deleteAliasOnLine(aliasId);
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'delete alias failed' };
+  }
+  await db.delete(richMenuAliases).where(eq(richMenuAliases.aliasId, aliasId));
+  return { ok: true };
+}
+
+export async function listMenuAliases(): Promise<
+  Array<{ aliasId: string; richMenuId: string; menuName: string | null }>
+> {
+  const db = await getDb();
+  const rows = await db
+    .select({
+      aliasId: richMenuAliases.aliasId,
+      richMenuId: richMenuAliases.richMenuId,
+      menuName: richMenus.name,
+    })
+    .from(richMenuAliases)
+    .leftJoin(richMenus, eq(richMenus.id, richMenuAliases.richMenuId));
+  return rows;
 }
