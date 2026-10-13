@@ -335,11 +335,11 @@ Vercel คือบริการที่ **ทำให้เว็บออ�
 1. กลับไปที่เว็บ **Supabase** → เปิด project ของคุณ
 2. ไปที่เมนู **SQL Editor** (แถบซ้าย)
 3. คลิก **New query**
-4. เปิดไฟล์ `drizzle/0000_pale_luckman.sql` จากโฟลเดอร์โปรเจกต์ (ใช้ Notepad/VS Code เปิดได้)
-5. คัดลอกเนื้อหาทั้งหมด → วางในช่อง SQL Editor ของ Supabase
-6. คลิกปุ่ม **Run** (รัน) ด้านล่าง
-7. ถ้ามีไฟล์ `drizzle/0001_friendly_gideon.sql` ก็เปิดและรันต่อด้วยวิธีเดียวกัน
-8. ✅ เสร็จแล้วจะขึ้น "Success. No rows returned"
+4. replay ไฟล์ migration รวม 20 ไฟล์ (`drizzle/0000` ถึง `drizzle/0019`) ตามลำดับชื่อไฟล์ ทีละไฟล์ query เดียว ห้ามรวมหลายไฟล์ใน query เดียว
+   - รายชื่อจริงดูใน `drizzle/meta/_journal.json` (source of truth)
+5. วิธีรันแต่ละไฟล์: เปิดไฟล์จากโฟลเดอร์โปรเจกต์ด้วย Notepad/VS Code → คัดลอกเนื้อหาทั้งหมด → วางในช่อง SQL Editor → คลิกปุ่ม **Run** ด้านล่าง
+6. ถ้ารัน `0000` + `0001` แล้ว เริ่มต่อที่ `0002` ได้เลย ห้ามรัน `0000` ซ้ำ
+7. ✅ รันครบ 20 ไฟล์จะขึ้น "Success. No rows returned" ทุกไฟล์
 
 > 💡 **วิธี B — สำหรับผู้ที่มี Node.js** (ทางเลือก):
 > ```bash
@@ -553,7 +553,7 @@ pnpm db:studio            # เปิดเครื่องมือดู/แ
 
 - [ ] Deploy สำเร็จ (ขึ้น Congratulations ใน Vercel)
 - [ ] ตั้ง `AUTH_URL` เป็นลิงก์เว็บจริงแล้ว และ Redeploy แล้ว
-- [ ] รัน SQL สร้างตารางใน Supabase แล้ว (`drizzle/0000_pale_luckman.sql` และอื่น ๆ ที่มี)
+- [ ] replay migration `drizzle/0000` ถึง `drizzle/0019` รวม 20 ไฟล์ตามลำดับชื่อไฟล์ใน Supabase แล้ว (ดูรายชื่อจริงใน `drizzle/meta/_journal.json`)
 - [ ] สร้างบัญชีเจ้าหน้าที่ superadmin อย่างน้อย 1 บัญชี
 - [ ] ทดสอบส่งเรื่องร้องเรียนผ่านหน้าประชาชน สำเร็จ
 - [ ] ทดสอบล็อกอินเข้า `/admin` เห็นเคสที่ส่ง สำเร็จ
