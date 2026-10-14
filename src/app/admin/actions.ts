@@ -9,6 +9,7 @@ import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { users } from '@/lib/db/schema';
 import { enforceRateLimit } from '@/lib/rate-limit/enforce';
+import { formatReset } from '@/lib/rate-limit/format-reset';
 import { getClientIp } from '@/lib/auth/require-staff';
 
 export interface LoginState {
@@ -44,7 +45,7 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
   ]);
   if (!ipRateLimit.allowed || !emailRateLimit.allowed) {
     const reset = Math.max(ipRateLimit.reset, emailRateLimit.reset);
-    return { error: `เข้าสู่ระบบถี่เกินไป กรุณารอ ${reset} วินาที` };
+    return { error: `เข้าสู่ระบบถี่เกินไป กรุณารอ ${formatReset(reset)}` };
   }
 
   // § ยืนยันรหัสผ่านก่อน (ผ่าน Auth.js Credentials authorize callback → bcrypt.compare)

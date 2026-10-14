@@ -14,6 +14,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { enforceRateLimit } from '@/lib/rate-limit/enforce';
+import { formatReset } from '@/lib/rate-limit/format-reset';
 import { clientIpFromHeaders } from '@/lib/rate-limit/client-ip';
 import { findTrackableCase } from '@/lib/cases/citizen-access';
 
@@ -31,7 +32,7 @@ export async function GET(
   const rateLimit = await enforceRateLimit('track', ip);
   if (!rateLimit.allowed) {
     return NextResponse.json(
-      { error: 'ค้นหาถี่เกินไป กรุณารอ ' + rateLimit.reset + ' วินาที' },
+      { error: 'ค้นหาถี่เกินไป กรุณารอ ' + formatReset(rateLimit.reset) },
       { status: 429 }
     );
   }
