@@ -36,7 +36,7 @@ import {
   resetPassword,
   type UserActionState,
 } from '@/app/admin/actions/users';
-import { STAFF_ROLES, type UserRole } from '@/lib/auth/roles';
+import { ALL_ROLES, STAFF_ROLES, type UserRole } from '@/lib/auth/roles';
 import { updateTierRoles, type TierActionState } from '@/app/admin/actions/tiers';
 import type { TierKey } from '@/lib/auth/tiers';
 
@@ -252,7 +252,8 @@ export function UsersClient({
           ))}
         </ul>
       </div>
-      <TierMatrixCard tierMatrix={tierMatrix} />
+      {/* § key ตามข้อมูลใหม่ — save แล้วฟอร์มรีเซ็ต ไม่ทับของใหม่เงียบ (round-2 verdict) */}
+      <TierMatrixCard key={JSON.stringify(tierMatrix)} tierMatrix={tierMatrix} />
     </div>
   );
 }
@@ -507,16 +508,23 @@ const TIER_ROWS: { key: TierKey; label: string; locked?: boolean }[] = [
   { key: 'superadmin', label: 'ผู้ดูแลสูงสุด', locked: true },
 ];
 
-const TIER_ROLE_OPTIONS: UserRole[] = ['officer', 'chief', 'head', 'superadmin'];
+// § derive จาก ALL_ROLES ที่เดียว (ไม่ hardcode ซ้ำ — interrogate A-10)
+const TIER_ROLE_OPTIONS: UserRole[] = ALL_ROLES.filter((r): r is UserRole => r !== 'citizen');
 
-/** การ์ดสมาชิก tier — head แก้ได้ทุก tier ยกเว้น superadmin (ล็อกสองชั้น) */
+/**
+ * การ์ดสมาชิก tier — head แก้ได้ทุก tier ยกเว้น superadmin (ล็อกสองชั้น)
+ * § controlled checkboxes + key รีเซ็ตเมื่อข้อมูลใหม่มา (ไม่จับ DOM ตรง — interrogate B-16)
+ * § superadmin ติ๊กค้าง disabled พร้อมป้ายบังคับ (ไม่หลอกว่าเอาออกได้ — interrogate D-11)
+ */
 function TierMatrixCard({ tierMatrix }: { tierMatrix: Record<TierKey, string[]> }) {
   const [state, action, pending] = useActionState(updateTierRoles, { error: null } as TierActionState);
+  const [checks, setChecks] = useState<Record<string, string[]>>(() => tierMatrix);
   return (
     <section aria-label="สิทธิ์ตาม tier" className="glass-panel rounded-xl p-6 shadow-sm">
       <h2 className="text-xl font-semibold">สิทธิ์ตาม tier</h2>
       <p className="mt-1 text-sm text-muted">
-        ติ๊กบทบาทที่มีสิทธิ์ในแต่ละ tier — มีผลภายใน ~1 นาทีทุก process (ว่าง = ใช้ค่าเดิม)
+        ติ๊กบทบาทที่มีสิทธิ์ในแต่ละ tier — มีผลภายใน ~1 นาทีทุก process
+        (เอาติ๊กออกหมด = บันทึกไม่ได้, superadmin อยู่ทุก tier เสมอ)
       </p>
       <form action={action} className="mt-4 space-y-4">
         {TIER_ROWS.map((row) => (
@@ -525,26 +533,30 @@ function TierMatrixCard({ tierMatrix }: { tierMatrix: Record<TierKey, string[]> 
               {row.label} {row.locked && <span className="text-xs text-muted">(ล็อก)</span>}
             </legend>
             <div className="flex flex-wrap gap-3">
-              {TIER_ROLE_OPTIONS.map((r) => (
-                <label key={r} className="inline-flex min-h-touch items-center gap-1.5 text-sm">
-                  <input
-                    type="checkbox"
-                    aria-label={`${row.label}: ${ROLE_LABELS_TH[r]}`}
-                    defaultChecked={tierMatrix[row.key]?.includes(r)}
-                    onChange={(e) => {
-                      const hidden = document.getElementById(`tier-${row.key}`) as HTMLInputElement | null;
-                      if (!hidden) return;
-                      const current = new Set(hidden.value ? hidden.value.split(',') : []);
-                      if (e.target.checked) current.add(r);
-                      else current.delete(r);
-                      hidden.value = [...current].join(',');
-                    }}
-                  />
-                  {ROLE_LABELS_TH[r]}
-                </label>
-              ))}
+              {TIER_ROLE_OPTIONS.map((r) => {
+                const forced = r === 'superadmin' && !row.locked;
+                const checked = forced || (checks[row.key] ?? []).includes(r);
+                return (
+                  <label key={r} className="inline-flex min-h-touch items-center gap-1.5 text-sm">
+                    <input
+                      type="checkbox"
+                      aria-label={`${row.label}: ${ROLE_LABELS_TH[r]}${forced ? ' (บังคับ)' : ''}`}
+                      checked={checked}
+                      disabled={forced || row.locked}
+                      onChange={(e) => {
+                        const current = new Set(checks[row.key] ?? []);
+                        if (e.target.checked) current.add(r);
+                        else current.delete(r);
+                        setChecks((prev) => ({ ...prev, [row.key]: [...current] }));
+                      }}
+                    />
+                    {ROLE_LABELS_TH[r]}
+                    {forced && <span className="text-xs text-muted">(บังคับ)</span>}
+                  </label>
+                );
+              })}
             </div>
-            <input type="hidden" id={`tier-${row.key}`} name={`tier:${row.key}`} aria-label={`สมาชิก tier ${row.label}`} defaultValue={(tierMatrix[row.key] ?? []).join(',')} />
+            <input type="hidden" name={`tier:${row.key}`} aria-label={`สมาชิก tier ${row.label}`} value={(checks[row.key] ?? []).join(',')} readOnly />
           </fieldset>
         ))}
         {state.error && <FieldError>{state.error}</FieldError>}

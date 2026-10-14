@@ -9,6 +9,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { parseBody } from '@/lib/api-helpers';
 import { enforceRateLimit } from '@/lib/rate-limit/enforce';
+import { formatReset } from '@/lib/rate-limit/format-reset';
 import { clientIpFromHeaders } from '@/lib/rate-limit/client-ip';
 import { submitFeedback } from '@/lib/cases/feedback';
 
@@ -25,6 +26,7 @@ const STATUS_BY_CODE = {
   not_found: 404,
   wrong_status: 422,
   duplicate: 409,
+  server_error: 500,
 } as const;
 
 export async function POST(request: Request) {
@@ -32,7 +34,7 @@ export async function POST(request: Request) {
   const rateLimit = await enforceRateLimit('feedbackSubmit', ip);
   if (!rateLimit.allowed) {
     return NextResponse.json(
-      { error: 'ส่งถี่เกินไป กรุณารอ ' + rateLimit.reset + ' วินาที' },
+      { error: 'ส่งถี่เกินไป กรุณารอ ' + formatReset(rateLimit.reset) },
       { status: 429 },
     );
   }

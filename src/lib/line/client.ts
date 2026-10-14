@@ -189,9 +189,23 @@ export async function createAliasOnLine(aliasId: string, lineRichMenuId: string)
   }
 }
 
+export async function getAliasOnLine(aliasId: string): Promise<{ richMenuId: string } | null> {
+  const res = await fetch(`${LINE_API_BASE}/richmenu/alias/${encodeURIComponent(aliasId)}`, {
+    headers: getHeaders(),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new LineApiError(`/richmenu/alias/${aliasId}`, res.status, detail.slice(0, 500));
+  }
+  const data = await res.json();
+  return typeof data?.richMenuId === 'string' ? { richMenuId: data.richMenuId } : null;
+}
+
 export async function updateAliasOnLine(aliasId: string, lineRichMenuId: string): Promise<void> {
   // § POST สร้างใหม่อย่างเดียว (มีแล้วได้ 4xx) ย้ายเป้าต้อง PUT — ชื่อ alias เปลี่ยนไม่ได้
-  const res = await fetch(`${LINE_API_BASE}/richmenu/alias/${aliasId}`, {
+  const res = await fetch(`${LINE_API_BASE}/richmenu/alias/${encodeURIComponent(aliasId)}`, {
     method: 'PUT',
     headers: getHeaders(),
     body: JSON.stringify({ richMenuId: lineRichMenuId }),
@@ -204,7 +218,7 @@ export async function updateAliasOnLine(aliasId: string, lineRichMenuId: string)
 }
 
 export async function deleteAliasOnLine(aliasId: string): Promise<void> {
-  const res = await fetch(`${LINE_API_BASE}/richmenu/alias/${aliasId}`, {
+  const res = await fetch(`${LINE_API_BASE}/richmenu/alias/${encodeURIComponent(aliasId)}`, {
     method: 'DELETE',
     headers: getHeaders(),
     signal: AbortSignal.timeout(10_000),

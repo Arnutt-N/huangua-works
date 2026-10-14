@@ -9,8 +9,20 @@ import { isValidCid } from '@/lib/cid-checksum';
 import { enforceRateLimit } from '@/lib/rate-limit/enforce';
 import { clientIpFromHeaders } from '@/lib/rate-limit/client-ip';
 import { submitCaseSchema, submitCaseLineSchema, validateOrError } from '@/lib/validation';
+import { isSpamSubmission } from '@/lib/anti-spam';
 import { createCase } from '@/lib/cases/intake';
 import { LIFF_SESSION_COOKIE, readLiffSessionValue } from '@/lib/liff/session';
+
+// § ใช้ได้เฉพาะตอนปฏิเสธเพราะสัญญาณกันสแปมเท่านั้น — ไม่อนุญาตให้ error ละเอียด
+// อธิบายว่าโดนจับเพราะอะไร เพราะบอทจะเอาไปปรับตัว (ดู src/lib/anti-spam.ts)
+// § ผิดพลาดในการกรอกของผู้ใช้จริงต้องตอบเหมือนเดิม — คืนข้อความที่ระบุฟิลด์ได้
+// เพราะผู้ใช้แก้ไขตามได้ แต่บอทไม่สนแก้ และการรวมของคนละงานก็ลืมความต่างนี้ไป
+function spamRejectionResponse() {
+  return NextResponse.json(
+    { error: 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบแล้วลองใหม่' },
+    { status: 400 },
+  );
+}
 
 export async function POST(req: NextRequest) {
   const ip = clientIpFromHeaders(req.headers);
@@ -34,7 +46,25 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    return spamRejectionResponse();
+  }
+
+  // § กันสแปม (honeypot + จับเวลากรอก) — ตรวจก่อน validate เพื่อตัดบอททิ้งเร็ว
+  // error ต้อง generic เช่นกัน ห้ามบอกว่าโดนจับว่าเป็นบอท (ดู src/lib/anti-spam.ts)
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+    return spamRejectionResponse();
+  }
+  const raw = body as { websiteUrl?: unknown; formStartedAt?: unknown };
+  if (
+    isSpamSubmission(
+      {
+        websiteUrl: typeof raw.websiteUrl === 'string' ? raw.websiteUrl : undefined,
+        formStartedAt: typeof raw.formStartedAt === 'number' ? raw.formStartedAt : undefined,
+      },
+      Date.now(),
+    )
+  ) {
+    return spamRejectionResponse();
   }
 
   if (liffSession) {

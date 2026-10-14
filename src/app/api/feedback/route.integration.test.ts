@@ -15,7 +15,8 @@ const createdIds: string[] = [];
 async function seedCase(status: 'closed' | 'in_progress' = 'closed') {
   const db = await getDb();
   const id = generateId();
-  const trackingCode = `HG${Date.now().toString().slice(-6)}${id.slice(0, 2).toUpperCase()}`;
+  // § shape ต้องตรง canonical contract `^(HN|HG)\d{9}$` ไม่งั้น normalize ปัดทิ้ง (B-1)
+  const trackingCode = `HG${Date.now().toString().slice(-9).padStart(9, '0')}`;
   await db.insert(cases).values({
     id,
     status,
@@ -75,5 +76,12 @@ describe('POST /api/feedback', () => {
   test('เลขติดตามไม่มี → 404', async () => {
     const res = await POST(postRequest({ trackingCode: 'HGXXXXXX', rating: 5 }));
     expect(res.status).toBe(404);
+  });
+
+  test('code ตัวเล็กมีช่องว่าง → normalize แล้ว 201', async () => {
+    const { trackingCode } = await seedCase('closed');
+    const messy = trackingCode.toLowerCase().replace(/^(..)(....)/, '$1 $2-');
+    const res = await POST(postRequest({ trackingCode: messy, rating: 4 }));
+    expect(res.status).toBe(201);
   });
 });

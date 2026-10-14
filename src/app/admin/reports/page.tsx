@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import { AlertTriangle, Clock, ChevronRight, MapPin, Inbox } from 'lucide-react';
 import type { Metadata } from 'next';
-import { and, desc, eq, ilike, or, count } from 'drizzle-orm';
+import { and, desc, eq, ilike, or, count, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
-import { cases, categories, users } from '@/lib/db/schema';
+import { cases, caseFeedback, categories, users } from '@/lib/db/schema';
 import { requireStaff } from '@/lib/auth/require-staff';
 import { getActiveCategories } from '@/lib/queries/lookups';
 import { AdminShell } from '@/components/admin/admin-shell';
@@ -123,10 +123,19 @@ export default async function CaseManagementPage({
 
   // § สรุปยอด — นับจาก total queue ของหน้านี้เท่านั้น (ไม่ใช่ทั้งระบบ)
   // ถ้า filter active จะสรุปเฉพาะที่ filter แล้ว — สื่อสารใน label
+  // § CSAT reader ขั้นต่ำ (interrogate: เก็บแล้วต้องมีคนอ่าน) — ค่าเฉลี่ยรวมทั้งระบบ
+  const [fb] = await db
+    .select({
+      avg: sql<number | null>`avg(${caseFeedback.rating})`,
+      count: count(),
+    })
+    .from(caseFeedback);
   const summary = {
     received: queue.filter((c) => c.status === 'received').length,
     open: queue.filter((c) => OPEN_STATUSES.includes(c.status)).length,
     overSla: queue.filter((c) => c.overSla).length,
+    feedbackAvg: fb?.avg === null || fb?.avg === undefined ? null : Number(fb.avg).toFixed(1),
+    feedbackCount: fb?.count ?? 0,
   };
   const isFiltered = !!(statusFilter || priorityFilter || categoryFilter || q);
 
@@ -152,6 +161,12 @@ export default async function CaseManagementPage({
             <span className="inline-flex items-center gap-1 font-semibold text-danger-ink">
               <AlertTriangle className="h-4 w-4" aria-hidden="true" />
               เลย SLA <strong>{summary.overSla}</strong>
+            </span>
+          )}
+          {summary.feedbackAvg !== null && (
+            <span>
+              คะแนนเฉลี่ย <strong className="text-ink">★ {summary.feedbackAvg}</strong>{' '}
+              ({summary.feedbackCount} ครั้ง)
             </span>
           )}
           <span className="ml-auto text-xs">

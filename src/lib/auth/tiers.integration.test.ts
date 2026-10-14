@@ -43,6 +43,12 @@ describe('tier matrix (DB)', () => {
     expect([...row!.roles].sort()).toEqual(['head', 'superadmin']);
   });
 
+  test('แถวเก่าก่อน #111 (ไม่มี superadmin) → อ่านแล้วยังมี superadmin (self-heal)', async () => {
+    const db = await getDb();
+    await db.insert(tierRoles).values({ tier: 'admin', roles: ['head'] });
+    expect(await getTierRoles('admin')).toEqual(['head', 'superadmin']);
+  });
+
   test('roles ว่าง → ปฏิเสธ ไม่ล็อกระบบ', async () => {
     const res = await setTierRoles('admin', []);
     expect(res.ok).toBe(false);
