@@ -335,11 +335,26 @@ Vercel คือบริการที่ **ทำให้เว็บออ�
 1. กลับไปที่เว็บ **Supabase** → เปิด project ของคุณ
 2. ไปที่เมนู **SQL Editor** (แถบซ้าย)
 3. คลิก **New query**
-4. replay ไฟล์ migration รวม 20 ไฟล์ (`drizzle/0000` ถึง `drizzle/0019`) ตามลำดับชื่อไฟล์ ทีละไฟล์ query เดียว ห้ามรวมหลายไฟล์ใน query เดียว
-   - รายชื่อจริงดูใน `drizzle/meta/_journal.json` (source of truth)
+4. replay ไฟล์ migration **ทุกไฟล์ตาม `drizzle/meta/_journal.json`** (source of truth — นับไฟล์จริงจาก journal ตอนทำ อย่ายึดตัวเลขใน docs เพราะ migration เพิ่มได้ทุก PR) ตามลำดับ `idx`/`tag` ใน journal ทีละไฟล์ query เดียว แยกไฟล์เพื่อให้เจอไฟล์พังทันที รวมหลายไฟล์ใน query เดียวหาตัวพังไม่เจอ
 5. วิธีรันแต่ละไฟล์: เปิดไฟล์จากโฟลเดอร์โปรเจกต์ด้วย Notepad/VS Code → คัดลอกเนื้อหาทั้งหมด → วางในช่อง SQL Editor → คลิกปุ่ม **Run** ด้านล่าง
-6. ถ้ารัน `0000` + `0001` แล้ว เริ่มต่อที่ `0002` ได้เลย ห้ามรัน `0000` ซ้ำ
-7. ✅ รันครบ 20 ไฟล์จะขึ้น "Success. No rows returned" ทุกไฟล์
+6. **กรณีรันค้างไว้แล้ว (resume)**: เช็ค state prod ก่อนว่าถึงไฟล์ไหนแล้ว แล้วรันต่อจากไฟล์ถัดไป ห้ามรันไฟล์เดิมซ้ำ (SQL ไม่มี `IF NOT EXISTS` — รันซ้ำ error)
+   ```sql
+   -- ดูว่า users มีคอลัมน์ password_version หรือยัง (migration 0018)
+   SELECT column_name FROM information_schema.columns
+   WHERE table_name = 'users' AND column_name = 'password_version';
+   -- มีแถว = รัน 0018 แล้ว ข้ามไปไฟล์ถัดไป / ไม่มีแถว = ยังไม่รัน รัน 0018
+   -- ดูว่ามีตาราง tier_roles หรือยัง (migration 0019)
+   SELECT tablename FROM pg_tables WHERE tablename = 'tier_roles';
+   ```
+7. ✅ รันครบทุกไฟล์ใน journal จะขึ้น "Success. No rows returned" ทุกไฟล์ — แต่นั่นยังไม่พิสูจน์ว่า schema ครบ ต้องทำ post-check ข้างล่างต่อ
+8. **post-check หลัง replay ทุกครั้ง** (รันใน SQL Editor):
+   ```sql
+   -- ต้องได้ 1 แถวทั้งคู่ ไม่งั้น migration ขาด
+   SELECT column_name FROM information_schema.columns
+   WHERE table_name = 'users' AND column_name = 'password_version';
+   SELECT tablename FROM pg_tables WHERE tablename IN ('tier_roles', 'queue_bookings');
+   ```
+   แล้วลองล็อกอิน `/admin` จริง — เข้าได้ = schema ครบ เข้าไม่ได้ = กลับไปดูไฟล์ที่ข้าม
 
 > 💡 **วิธี B — สำหรับผู้ที่มี Node.js** (ทางเลือก):
 > ```bash
@@ -377,7 +392,14 @@ VALUES (
 
 > ⚠️ **สำคัญ**: ค่า `password_hash` ด้านบนเป็น dummy — ต้องแทนด้วย bcrypt hash จริง ของรหัสผ่านที่คุณตั้ง
 >
-> **วิธีสร้าง bcrypt hash**: เปิดเว็บ **https://bcrypt-generator.com** → ใส่รหัสผ่านที่ต้องการ → คลิก Hash → คัดลอกผลลัพธ์ (จะขึ้นต้นด้วย `$2a$10$...`)
+> **วิธีสร้าง bcrypt hash (บนเครื่องตัวเองเท่านั้น — ห้ามเอารหัสผ่านไปกรอกเว็บนอก)**:
+> ```bash
+> # ในโฟลเดอร์โปรเจกต์ (มี bcryptjs ใน dependencies อยู่แล้ว)
+> node -e "require('bcryptjs').hash('รหัสผ่านของคุณ', 10).then(console.log)"
+> ```
+> คัดลอกเฉพาะ hash ที่ได้ (ขึ้นต้น `$2a$10$...` ยาว ~60 ตัวอักษร) ไปแทนที่ใน SQL หลังเสร็จลบรหัสผ่านออกจาก terminal history/clipboard
+>
+> **ก่อนกด Run เช็ค 2 ข้อ**: (1) ไม่มีคำว่า `REPLACE_` หลงเหลือ (ลืมแทน = INSERT ผ่านแต่ล็อกอินไม่เคยได้) (2) hash ขึ้นต้น `$2a$`/`$2b$` และยาว ~60 ตัวอักษร
 
 2. แก้ค่าในโค้ดให้เป็นของคุณ (อีเมล, ชื่อ, password_hash)
 3. คลิก **Run**
@@ -553,7 +575,7 @@ pnpm db:studio            # เปิดเครื่องมือดู/แ
 
 - [ ] Deploy สำเร็จ (ขึ้น Congratulations ใน Vercel)
 - [ ] ตั้ง `AUTH_URL` เป็นลิงก์เว็บจริงแล้ว และ Redeploy แล้ว
-- [ ] replay migration `drizzle/0000` ถึง `drizzle/0019` รวม 20 ไฟล์ตามลำดับชื่อไฟล์ใน Supabase แล้ว (ดูรายชื่อจริงใน `drizzle/meta/_journal.json`)
+- [ ] replay migration ทุกไฟล์ตาม `drizzle/meta/_journal.json` (นับไฟล์จริงจาก journal ตอนทำ) ตามลำดับ `idx` ใน Supabase แล้ว + post-check `password_version`/`tier_roles` ผ่าน + ล็อกอิน `/admin` ได้
 - [ ] สร้างบัญชีเจ้าหน้าที่ superadmin อย่างน้อย 1 บัญชี
 - [ ] ทดสอบส่งเรื่องร้องเรียนผ่านหน้าประชาชน สำเร็จ
 - [ ] ทดสอบล็อกอินเข้า `/admin` เห็นเคสที่ส่ง สำเร็จ
