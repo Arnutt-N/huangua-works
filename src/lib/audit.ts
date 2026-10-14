@@ -83,6 +83,8 @@ export const AUDIT_ACTIONS = {
   MEDIA_UPLOAD: 'media_upload',
   MEDIA_DELETE: 'media_delete',
   IMPORT_CASE: 'import_case',
+  QUEUE_BOOKING_CREATE: 'queue_booking_create',
+  QUEUE_BOOKING_UPDATE: 'queue_booking_update',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

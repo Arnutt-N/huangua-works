@@ -155,6 +155,13 @@
       "when": 1791913156179,
       "tag": "0021_feedback_rating_check",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1791485406301,
+      "tag": "0022_queue_bookings",
+      "breakpoints": true
     }
   ]
 }
