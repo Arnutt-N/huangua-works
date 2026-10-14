@@ -519,6 +519,7 @@ export const responsibleFormSchema = z.object({
   raw: z.string().trim().min(1, 'กรุณากรอกค่าดิบ').max(200, 'ค่าดิบยาวเกิน 200 ตัวอักษร'),
   departmentId: uuidSchema,
   assignedTo: z.string().optional().or(z.literal('')),
+});
 // § จองคิวนัดช่าง (P2-03) — POST/GET /api/queue + server action ฝั่งเจ้าหน้าที่
 // ────────────────────────────────────────────────────────────────────────────
 
