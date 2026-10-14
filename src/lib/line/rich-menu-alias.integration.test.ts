@@ -8,6 +8,8 @@ const line = vi.hoisted(() => ({
   created: [] as Array<{ aliasId: string; menuId: string }>,
   updated: [] as Array<{ aliasId: string; menuId: string }>,
   deleted: [] as string[],
+  remote: new Map<string, string>(),
+  failInsert: false,
 }));
 
 vi.mock('@/lib/line/client', () => ({
@@ -18,13 +20,24 @@ vi.mock('@/lib/line/client', () => ({
   setDefaultLineRichMenu: vi.fn(async () => {}),
   cancelDefaultLineRichMenu: vi.fn(async () => {}),
   uploadLineRichMenuImage: vi.fn(async () => {}),
+  getAliasOnLine: vi.fn(async (aliasId: string) => {
+    const menuId = line.remote.get(aliasId);
+    return menuId ? { richMenuId: menuId } : null;
+  }),
   createAliasOnLine: vi.fn(async (aliasId: string, menuId: string) => {
+    if (line.remote.has(aliasId)) {
+      const err = new Error('LINE API /richmenu/alias failed (400): alias exists');
+      (err as { status?: number }).status = 400;
+      throw err;
+    }
+    line.remote.set(aliasId, menuId);
     line.created.push({ aliasId, menuId });
   }),
   updateAliasOnLine: vi.fn(async (aliasId: string, menuId: string) => {
     line.updated.push({ aliasId, menuId });
   }),
   deleteAliasOnLine: vi.fn(async (aliasId: string) => {
+    line.remote.delete(aliasId);
     line.deleted.push(aliasId);
   }),
 }));
@@ -52,6 +65,7 @@ beforeEach(async () => {
   line.created = [];
   line.updated = [];
   line.deleted = [];
+  line.remote.clear();
   const db = await getDb();
   await db.execute(sql`DELETE FROM rich_menu_aliases WHERE alias_id LIKE 'it-%'`);
   await db.execute(sql`DELETE FROM rich_menus WHERE name LIKE 'it-alias-%'`);
@@ -113,6 +127,25 @@ describe('menu aliases', () => {
     expect((await repointMenuAlias('it-ts', m2)).ok).toBe(true);
     const [after] = await db.select().from(richMenuAliases).where(eq(richMenuAliases.aliasId, 'it-ts'));
     expect(after!.updatedAt.getTime()).toBeGreaterThan(before!.updatedAt.getTime());
+  });
+
+  test('ชน 4xx เป้าตรง (crash ค้าง) → reconcile เขียนแถวคืน + ok', async () => {
+    const menuId = await seedMenu('line-r1');
+    line.remote.set('it-rec', 'line-r1');
+    const res = await createMenuAlias('it-rec', menuId);
+    expect(res.ok).toBe(true);
+    const db = await getDb();
+    const rows = await db.select().from(richMenuAliases).where(eq(richMenuAliases.aliasId, 'it-rec'));
+    expect(rows).toHaveLength(1);
+  });
+
+  test('ชน 4xx เป้าเป็นของคนอื่น → ไม่ลบของเขา + error', async () => {
+    const menuId = await seedMenu('line-r2');
+    line.remote.set('it-race', 'line-other');
+    const res = await createMenuAlias('it-race', menuId);
+    expect(res.ok).toBe(false);
+    expect(line.deleted).not.toContain('it-race');
+    expect(line.remote.get('it-race')).toBe('line-other');
   });
 
   test('ลบของไม่มี → ok:false (ไม่มี audit ผี)', async () => {

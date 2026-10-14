@@ -18,6 +18,15 @@ vi.mock('@/lib/audit', async (importOriginal) => {
   return { ...mod, logAudit: vi.fn(async () => {}) };
 });
 
+const lineMock = vi.hoisted(() => ({ defaultId: null as string | null, deleted: [] as string[] }));
+
+vi.mock('@/lib/line/client', () => ({
+  getDefaultLineRichMenu: vi.fn(async () => lineMock.defaultId),
+  deleteLineRichMenu: vi.fn(async (id: string) => {
+    lineMock.deleted.push(id);
+  }),
+}));
+
 import { DELETE, PATCH } from './route';
 
 const menuIds: string[] = [];
@@ -46,6 +55,8 @@ function req(method: string, body?: unknown): Request {
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
 
 beforeEach(async () => {
+  lineMock.defaultId = null;
+  lineMock.deleted = [];
   const db = await getDb();
   await db.execute(sql`DELETE FROM rich_menu_aliases WHERE alias_id LIKE 'it-%'`);
   await db.execute(sql`DELETE FROM rich_menus WHERE name LIKE 'it-menu-%'`);
@@ -94,6 +105,34 @@ describe('PATCH/DELETE rich-menus/[id]', () => {
     await db.insert(richMenuAliases).values({ id: generateId(), aliasId: 'it-block', richMenuId: id });
     const res = await DELETE(req('DELETE'), params(id));
     expect(res.status).toBe(409);
+  });
+
+  test('PATCH ข้างเดียวกลับหัวกับของเก่า → 400', async () => {
+    const id = await seedMenu();
+    const db = await getDb();
+    await db
+      .update(richMenus)
+      .set({ displayStartAt: new Date('2026-11-15T00:00:00Z') })
+      .where(eq(richMenus.id, id));
+    const res = await PATCH(req('PATCH', { displayEndAt: '2026-11-01T00:00:00Z' }), params(id));
+    expect(res.status).toBe(400);
+  });
+
+  test('PATCH ว่าง {} → 400', async () => {
+    const id = await seedMenu();
+    const res = await PATCH(req('PATCH', {}), params(id));
+    expect(res.status).toBe(400);
+  });
+
+  test('DELETE เมนูที่เป็น default สด → 409', async () => {
+    const db = await getDb();
+    const id = await seedMenu();
+    await db.update(richMenus).set({ lineRichMenuId: 'line-live', status: 'active' }).where(eq(richMenus.id, id));
+    lineMock.defaultId = 'line-live';
+    const res = await DELETE(req('DELETE'), params(id));
+    expect(res.status).toBe(409);
+    const rows = await db.select().from(richMenus).where(eq(richMenus.id, id));
+    expect(rows).toHaveLength(1);
   });
 
   test('DELETE ไม่มี alias → 200 แถวหาย', async () => {
