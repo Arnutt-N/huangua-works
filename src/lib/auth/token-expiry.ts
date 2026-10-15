@@ -7,5 +7,6 @@
  * check ไว้ทั้ง auth.ts และ auth.config.ts)
  */
 export function isTokenExpired(expiresAt: number | undefined): boolean {
-  return expiresAt !== undefined && expiresAt < Math.floor(Date.now() / 1000);
+  // § <= ไม่ใช่ <: หมดอายุตรงวินาทีพอดีถือว่าหมด — กันเหลื่อม 1 วิลอด gate
+  return expiresAt !== undefined && expiresAt <= Math.floor(Date.now() / 1000);
 }

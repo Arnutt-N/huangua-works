@@ -47,7 +47,9 @@ function ensureRedisSubscriber() {
     emitter.emit('sse', event as SseEvent);
   });
   sub.on('error', (error) => {
+    // § subscriber หลุด = process นี้พลาด cross-process event เงียบ — เปิดทางต่อใหม่
     console.warn('[sse-broadcaster] redis subscriber error', error);
+    subscriberStarted = false;
   });
 }
 

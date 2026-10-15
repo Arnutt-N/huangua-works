@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { generateCidHash, generateDedupHash, verifyDedupHash } from './cid-hmac';
+import { generateCidHash, generateDedupHash, normalizeDedupPayload, verifyDedupHash } from './cid-hmac';
 
 describe('generateCidHash', () => {
   test('produces a 16-char lowercase hex string (truncated HMAC)', () => {
@@ -58,6 +58,18 @@ describe('generateDedupHash', () => {
     const a = generateDedupHash('1101200563040', 'title', 'description one');
     const b = generateDedupHash('1101200563040', 'title', 'description two');
     expect(a).not.toBe(b);
+  });
+
+  test('collapses inner whitespace — ช่องว่างกลางหลบ dedup ไม่ได้', () => {
+    const a = generateDedupHash('1101200563040', 'ถนน  ชำรุด', 'มีหลุม\nบ่อ');
+    const b = generateDedupHash('1101200563040', 'ถนน ชำรุด', 'มีหลุม บ่อ');
+    expect(a).toBe(b);
+  });
+});
+
+describe('normalizeDedupPayload', () => {
+  test('lowercases + ยุบ whitespace + trim', () => {
+    expect(normalizeDedupPayload('CID', '  ถนน\n\nชำรุด  ', 'A  B')).toBe('cid|ถนน ชำรุด|a b');
   });
 });
 

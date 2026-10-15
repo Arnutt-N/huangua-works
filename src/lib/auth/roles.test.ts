@@ -6,6 +6,7 @@ import {
   STAFF_ROLES,
   SUPERADMIN_ONLY,
   canGrantRole,
+  isLoginEligible,
   type UserRole,
 } from './roles';
 
@@ -76,5 +77,20 @@ describe('auth · canGrantRole', () => {
   it('is not fooled by a role string outside the union', () => {
     expect(canGrantRole('officer' as UserRole, 'superadmin')).toBe(false);
     expect(canGrantRole('citizen' as UserRole, 'superadmin')).toBe(false);
+  });
+});
+
+describe('auth · isLoginEligible', () => {
+  // § ด่านออก JWT ใน authorize() — citizen + บัญชีระงับไม่ได้ session แม้รหัสถูก
+  it.each([...STAFF_ROLES])('lets active %s log in', (role) => {
+    expect(isLoginEligible(role, true)).toBe(true);
+  });
+
+  it('blocks citizen even when active', () => {
+    expect(isLoginEligible('citizen', true)).toBe(false);
+  });
+
+  it.each([...STAFF_ROLES])('blocks inactive %s', (role) => {
+    expect(isLoginEligible(role, false)).toBe(false);
   });
 });

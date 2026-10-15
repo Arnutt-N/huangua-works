@@ -40,3 +40,12 @@ export const SUPERADMIN_ONLY: readonly UserRole[] = ['superadmin'];
 export function canGrantRole(actorRole: UserRole, targetRole: UserRole): boolean {
   return targetRole !== 'superadmin' || actorRole === 'superadmin';
 }
+
+/**
+ * § ด่านออก session — authorize() ใช้หลัง bcrypt ผ่านแล้ว (timing คงเดิม)
+ * citizen + บัญชีระงับ (isActive=false) ไม่ได้ JWT แม้รหัสถูก — กันยิง
+ * /api/auth/callback/credentials ตรงเลี่ยง login action แล้วถือ session ผ่าน proxy
+ */
+export function isLoginEligible(role: UserRole, isActive: boolean): boolean {
+  return role !== 'citizen' && isActive;
+}

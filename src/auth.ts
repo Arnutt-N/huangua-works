@@ -25,6 +25,7 @@ import { users } from '@/lib/db/schema';
 
 // § type ของ role ที่ใช้ใน session/JWT — single source of truth ใน lib/auth/roles.ts
 import type { UserRole } from '@/lib/auth/roles';
+import { isLoginEligible } from '@/lib/auth/roles';
 
 // § shape ของข้อมูลที่ authorize() คืน (ฝังลง JWT ใน jwt callback)
 // แยกเป็น type ตรงๆ แทนการ augment @auth/core/jwt ซึ่ง resolve ยากใน pnpm strict layout
@@ -52,6 +53,10 @@ declare module 'next-auth' {
     } & DefaultSession['user'];
   }
 }
+
+// § DUMMY_HASH module-scope — bcrypt จริงของ random password ที่ไม่มีใครรู้
+// สร้างครั้งเดียว ไม่ใช่ทุก request (กัน timing oracle: compare รันเต็ม cost เสมอ)
+const DUMMY_HASH = '$2a$10$JbkZT1hKzXmNDkD92B.F3OOPQG9RWfw6ZeWeL/WUvSyENYkMlnB56';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -82,11 +87,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // กัน timing oracle: bcrypt.compare รันเสมอแม้ user ไม่มีอยู่จริง ด้วย DUMMY_HASH ปลอม
         // (ผลลัพธ์ compare จะเป็น false แต่ใช้เวลาเท่ากับ verify จริง ~100ms → attacker แยก email
         // จาก timing ไม่ได้) — เพิ่มเติมด้วย per-email rate-limit ใน actions.ts
-        // DUMMY_HASH เป็น bcrypt จริงของ random password ที่ไม่มีใครรู้ ใช้ ensure compare รันเต็ม cost
-        const DUMMY_HASH = '$2a$10$JbkZT1hKzXmNDkD92B.F3OOPQG9RWfw6ZeWeL/WUvSyENYkMlnB56';
         const hash = user?.passwordHash ?? DUMMY_HASH;
         const ok = await bcrypt.compare(password, hash);
         if (!user || !user.passwordHash || !ok) return null;
+
+        // § บล็อก citizen + บัญชีระงับตั้งแต่ขั้นออก JWT (หลัง bcrypt — timing คงเดิม)
+        // เดิมออก session ให้ทุกรหัสถูก แล้วพึ่ง login action เตะทีหลัง — ยิง callback
+        // ตรงเลี่ยง action ได้ JWT ผ่าน proxy gate (authorized เช็คแค่ isLoggedIn)
+        if (!isLoginEligible(user.role, user.isActive)) return null;
 
         // § remember ฟอร์มส่งมาเป็น string ('on' เมื่อติ๊ก) — แปลงเป็น boolean
         // ส่งต่อให้ jwt callback กำหนดอายุ session (1h vs 30d)

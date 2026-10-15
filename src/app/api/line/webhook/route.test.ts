@@ -84,6 +84,29 @@ describe('POST /api/line/webhook · rate limit', () => {
     expect(res.status).toBe(401);
     expect(mockEnforce).not.toHaveBeenCalled();
   });
+
+  it('JSON แตก → 400 ไม่ใช่ 500 (กัน LINE redeliver วน)', async () => {
+    mockEnforce.mockResolvedValue({ allowed: true, remaining: 59, reset: 60 });
+    const bad = new Request('http://localhost/api/line/webhook', {
+      method: 'POST',
+      headers: { 'x-forwarded-for': '203.0.113.5' },
+      body: 'not-json{{{',
+    });
+
+    const res = await POST(bad);
+
+    expect(res.status).toBe(400);
+    expect(mockHandle).not.toHaveBeenCalled();
+  });
+
+  it('payload ไม่มี events array → 400', async () => {
+    mockEnforce.mockResolvedValue({ allowed: true, remaining: 59, reset: 60 });
+
+    const res = await POST(webhookRequest({ destination: 'U1' }));
+
+    expect(res.status).toBe(400);
+    expect(mockHandle).not.toHaveBeenCalled();
+  });
 });
 
 describe('POST /api/line/webhook · dedup', () => {
