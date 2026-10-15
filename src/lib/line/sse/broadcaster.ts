@@ -3,7 +3,8 @@ import { randomUUID } from 'crypto';
 import { redis } from '@/lib/upstash';
 
 const emitter = new EventEmitter();
-emitter.setMaxListeners(100);
+// § ไม่ setMaxListeners — ค่า default (10) คือสัญญาณเตือน listener รั่ว
+// SSE route cleanup ครบแล้ว (cancel → unsubscribe) ถ้า warn ดัง = มีจุดรั่วจริง อย่ากลบ
 
 export interface SseEvent {
   type: 'new_message' | 'conversation_update' | 'mode_change';
