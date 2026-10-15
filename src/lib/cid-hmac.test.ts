@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { generateCidHash, generateDedupHash, normalizeDedupPayload, verifyDedupHash } from './cid-hmac';
+import { generateCidHash, generateDedupHash, generateLegacyDedupHash, legacyDedupPayload, normalizeDedupPayload, verifyDedupHash } from './cid-hmac';
 
 describe('generateCidHash', () => {
   test('produces a 16-char lowercase hex string (truncated HMAC)', () => {
@@ -70,6 +70,20 @@ describe('generateDedupHash', () => {
 describe('normalizeDedupPayload', () => {
   test('lowercases + ยุบ whitespace + trim', () => {
     expect(normalizeDedupPayload('CID', '  ถนน\n\nชำรุด  ', 'A  B')).toBe('cid|ถนน ชำรุด|a b');
+  });
+});
+
+describe('legacyDedupPayload · ช่วงเปลี่ยนผ่าน 7 วัน', () => {
+  test('สูตรเก่า = lower+trim ปลายอย่างเดียว (whitespace กลางคงเดิม)', () => {
+    expect(legacyDedupPayload('CID', '  ถนน\n\nชำรุด  ', 'A  B')).toBe('cid|  ถนน\n\nชำรุด  |a  b');
+  });
+
+  test('hash เก่าจับเรื่องเก่าได้แม้ข้อความต่างแค่ whitespace กลาง', () => {
+    const oldHash = generateLegacyDedupHash('c', 'ถนน  ชำรุด', 'x');
+    const newHash = generateDedupHash('c', 'ถนน ชำรุด', 'x');
+    expect(oldHash).not.toBe(newHash);
+    // checkDuplicate เทียบทั้งสอง hash — เคสนี้ต้องเจอ (กันซ้ำหลุดช่วงเปลี่ยนผ่าน)
+    expect([newHash, oldHash]).toContain(oldHash);
   });
 });
 

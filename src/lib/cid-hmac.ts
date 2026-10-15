@@ -72,6 +72,20 @@ export function normalizeDedupPayload(cid: string, title: string, description: s
 }
 
 /**
+ * § normalize รุ่นเก่า (lower+trim ปลายอย่างเดียว) — เก็บไว้เทียบ hash เก่าใน DB
+ * ช่วงเปลี่ยนผ่าน 7 วัน (เท่า DEDUP_WINDOW_DAYS) กันเรื่องซ้ำหลุดตอน hash เปลี่ยนรูป
+ */
+export function legacyDedupPayload(cid: string, title: string, description: string): string {
+  return `${cid}|${title}|${description}`.toLowerCase().trim();
+}
+
+/** hash ด้วยสูตรเก่า — ใช้แค่ตอนอ่านเทียบ ไม่ใช้ตอนเขียน */
+export function generateLegacyDedupHash(cid: string, title: string, description: string): string {
+  assertKeyUsable();
+  return createHmac('sha256', currentHmacKey()).update(legacyDedupPayload(cid, title, description), 'utf8').digest('hex');
+}
+
+/**
  * สร้าง HMAC hash สำหรับ deduplication
  */
 export function generateDedupHash(
