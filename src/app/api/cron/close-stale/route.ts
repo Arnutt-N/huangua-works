@@ -11,6 +11,8 @@ import { requireCron } from '@/lib/cron-auth';
 import { eq, and, lt } from 'drizzle-orm';
 
 const STALE_DAYS = 7;
+// § จำกัดรอบละ 100 — backlog ใหญ่ select ทั้งหมดแล้ววนทีละเคส lambda timeout ปิดครึ่งค้าง
+const CLOSE_STALE_BATCH_LIMIT = 100;
 
 export async function GET(req: NextRequest) {
   const auth = requireCron(req);
@@ -24,7 +26,8 @@ export async function GET(req: NextRequest) {
     .from(cases)
     // § ข้ามเรื่องนำเข้าย้อนหลัง — updatedAt ของแถว historical คือวันที่รับเรื่องจริง
     // จึงเก่ากว่า threshold เสมอ ถ้าไม่ข้ามจะถูกปิดอัตโนมัติทั้งหมดตั้งแต่ cron รอบแรก
-    .where(and(eq(cases.status, 'done'), eq(cases.isHistorical, false), lt(cases.updatedAt, staleThreshold)));
+    .where(and(eq(cases.status, 'done'), eq(cases.isHistorical, false), lt(cases.updatedAt, staleThreshold)))
+    .limit(CLOSE_STALE_BATCH_LIMIT);
 
   let closedCount = 0;
   const failures: string[] = [];
@@ -53,6 +56,7 @@ export async function GET(req: NextRequest) {
     success: failures.length === 0,
     closedCount,
     failedCount: failures.length,
+    truncated: staleCases.length >= CLOSE_STALE_BATCH_LIMIT,
     message: `ปิดเรื่องอัตโนมัติ ${closedCount} รายการ`,
   });
 }

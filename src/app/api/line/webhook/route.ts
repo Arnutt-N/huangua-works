@@ -53,7 +53,16 @@ export async function POST(request: Request) {
     );
   }
 
-  const parsed: LineWebhookRequestBody = JSON.parse(body);
+  // § JSON แตก = คืน 400 ไม่ใช่ 500 — 500 ทำให้ LINE redeliver ทั้ง batch วน
+  let parsed: LineWebhookRequestBody;
+  try {
+    parsed = JSON.parse(body) as LineWebhookRequestBody;
+  } catch {
+    return NextResponse.json({ message: 'Invalid JSON body' }, { status: 400 });
+  }
+  if (!parsed || !Array.isArray(parsed.events)) {
+    return NextResponse.json({ message: 'Invalid webhook payload' }, { status: 400 });
+  }
 
   await Promise.all(
     parsed.events.map(async (event) => {

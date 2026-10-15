@@ -111,12 +111,20 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
 
   const issuedTrackingCode = trackingCode;
 
+  // § ไม่มี identity = input ผิด (เว็บไม่มี cid / line ไม่มี lineUserId) — return internal
+  // ไม่ throw: throw ใน tx ทำให้ abort + caller ได้ 500 ไม่มี audit
+  const preIdentity = citizenIdentityOf(input);
+  if (!preIdentity) {
+    return { ok: false, error: 'ไม่สามารถสร้างผู้ใช้งานได้', errorCode: 'internal' };
+  }
+
   // § การเขียนผู้แจ้ง/link/consent/เรื่อง/dedup/audit ต้อง commit หรือ rollback พร้อมกัน
   // ระบุตัวตนด้วย resolveCitizen ใน tx นี้ (ลบ resolveSubmitter แล้ว — ดู citizen-access)
   const result = await db.transaction(async (tx): Promise<CaseIntakeResult> => {
     const identity = citizenIdentityOf(input);
     if (!identity) {
-      throw new Error('ไม่สามารถสร้างผู้ใช้งานได้');
+      // § กันไว้ชั้นในเผื่อ input เปลี่ยนกลางคัน — ไม่ควรเกิด (เช็ค pre-tx แล้ว)
+      return { ok: false, error: 'ไม่สามารถสร้างผู้ใช้งานได้', errorCode: 'internal' };
     }
     const submitterId = await resolveCitizen(identity, tx);
 
@@ -151,8 +159,8 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
         fiscalYear,
         source: input.channel,
         ...(input.origin === 'liff' ? { origin: 'liff' } : {}),
-        ipAddress: input.ipAddress,
-        userAgent: input.userAgent,
+        // § ไม่เก็บ ipAddress/userAgent ที่นี่ — IP อยู่ใน auditLogs (มี retention ลบตาม
+        // cleanup-audit-logs) ส่วน cases.metadata ไม่มีลบ เก็บถาวรขัด PDPA retention
       }),
       trackingCode: issuedTrackingCode,
     });

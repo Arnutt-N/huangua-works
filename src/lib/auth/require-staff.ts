@@ -25,9 +25,9 @@ async function resolveAllowedRoles(
   try {
     return await getTierRoles(key);
   } catch (err) {
-    // § DB/Redis ล่ม = fallback ค่าคงที่ (fail-open) + warn ให้เห็นใน log
-    // ไม่เงียบ (interrogate D-13) — ไม่มี PII มีแค่ tier key
-    console.error(`[auth] tier matrix unreadable (${key}), fallback compiled defaults`, err);
+    // § DB/Redis ล่ม = fail-closed ใช้ whitelist ที่ caller ส่งมา (แคบสุดเท่าที่มี)
+    // ไม่ fallback ค่าคงที่กว้างกว่า override ที่แอดมินตั้งแคบไว้ — กันสิทธิ์ขยายเงียบช่วง outage
+    console.error(`[auth] tier matrix unreadable (${key}), fail-closed to caller whitelist`, err);
     return allowedRoles;
   }
 }

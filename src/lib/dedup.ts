@@ -7,8 +7,8 @@ import { getDb, type DbOrTx } from './db';
 import { firstOrUndefined } from './db/query-helpers';
 import { dedupHashes } from './db/schema';
 import { generateId } from './id';
-import { generateDedupHash } from './cid-hmac';
-import { eq, and, gt, lte } from 'drizzle-orm';
+import { generateDedupHash, generateLegacyDedupHash } from './cid-hmac';
+import { eq, and, gt, inArray, lte } from 'drizzle-orm';
 
 const DEDUP_WINDOW_DAYS = 7;
 
@@ -22,14 +22,18 @@ export async function checkDuplicate(
   db?: DbOrTx,
 ): Promise<{ isDuplicate: boolean; caseId?: string }> {
   const _db = db ?? await getDb();
-  const hash = generateDedupHash(cid, title, description);
+  // § เทียบทั้ง hash ใหม่ + hash เก่า (สูตร normalize เก่า) — เรื่องที่บันทึกก่อน deploy
+  // ยังจับซ้ำได้ตลอด 7 วัน window หลังนั้นแถวเก่าหมดอายุเอง
+  const hashes = [generateDedupHash(cid, title, description)];
+  const legacy = generateLegacyDedupHash(cid, title, description);
+  if (legacy !== hashes[0]) hashes.push(legacy);
   const now = Date.now();
 
   const existing = await firstOrUndefined(
     _db
       .select()
       .from(dedupHashes)
-      .where(and(eq(dedupHashes.hash, hash), gt(dedupHashes.expiresAt, new Date(now))))
+      .where(and(inArray(dedupHashes.hash, hashes), gt(dedupHashes.expiresAt, new Date(now))))
       .limit(1)
   );
 
