@@ -85,7 +85,7 @@ describe('POST /api/line/webhook · rate limit', () => {
     expect(mockEnforce).not.toHaveBeenCalled();
   });
 
-  it('JSON แตก → 400 ไม่ใช่ 500 (กัน LINE redeliver วน)', async () => {
+  it('JSON แตก → 400 (request ผิดรูป ไม่หลุดเป็น 500)', async () => {
     mockEnforce.mockResolvedValue({ allowed: true, remaining: 59, reset: 60 });
     const bad = new Request('http://localhost/api/line/webhook', {
       method: 'POST',
@@ -96,6 +96,36 @@ describe('POST /api/line/webhook · rate limit', () => {
     const res = await POST(bad);
 
     expect(res.status).toBe(400);
+    expect(mockHandle).not.toHaveBeenCalled();
+  });
+
+  it.each(['null', JSON.stringify({ events: 'x' })])('body %s → 400 (regression)', async (raw) => {
+    mockEnforce.mockResolvedValue({ allowed: true, remaining: 59, reset: 60 });
+    const res = await POST(
+      new Request('http://localhost/api/line/webhook', { method: 'POST', headers: { 'x-forwarded-for': '203.0.113.5' }, body: raw }),
+    );
+    expect(res.status).toBe(400);
+    expect(mockHandle).not.toHaveBeenCalled();
+  });
+
+  it('event null ปนใน batch → ข้ามตัวนั้น ตัวอื่นยังประมวลผล (200)', async () => {
+    mockEnforce.mockResolvedValue({ allowed: true, remaining: 59, reset: 60 });
+    const follow = { type: 'follow', webhookEventId: 'w-mixed-ok' };
+
+    const res = await POST(webhookRequest({ destination: 'U1', events: [null, follow] }));
+
+    expect(res.status).toBe(200);
+    expect(mockHandle).toHaveBeenCalledTimes(1);
+    expect(mockHandle).toHaveBeenCalledWith(follow);
+  });
+
+  it('message event ไม่มี .message → 200 ไม่ลามทั้ง batch', async () => {
+    mockEnforce.mockResolvedValue({ allowed: true, remaining: 59, reset: 60 });
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const res = await POST(webhookRequest({ destination: 'U1', events: [{ type: 'message', webhookEventId: 'w-no-msg' }] }));
+
+    expect(res.status).toBe(200);
     expect(mockHandle).not.toHaveBeenCalled();
   });
 

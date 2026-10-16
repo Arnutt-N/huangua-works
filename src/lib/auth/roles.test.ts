@@ -7,6 +7,7 @@ import {
   SUPERADMIN_ONLY,
   canGrantRole,
   isLoginEligible,
+  loginDenialReason,
   type UserRole,
 } from './roles';
 
@@ -92,5 +93,24 @@ describe('auth · isLoginEligible', () => {
 
   it.each([...STAFF_ROLES])('blocks inactive %s', (role) => {
     expect(isLoginEligible(role, false)).toBe(false);
+  });
+
+  it('blocks citizen that is also inactive', () => {
+    expect(isLoginEligible('citizen', false)).toBe(false);
+  });
+});
+
+describe('auth · loginDenialReason', () => {
+  // § เหตุผลเดียวกับที่ authorize / login action / resolveStaff ลง audit
+  it.each([...STAFF_ROLES])('active %s → null (เข้าได้)', (role) => {
+    expect(loginDenialReason(role, true)).toBeNull();
+  });
+
+  it.each([...STAFF_ROLES])('inactive %s → inactive', (role) => {
+    expect(loginDenialReason(role, false)).toBe('inactive');
+  });
+
+  it.each([true, false])('citizen (isActive=%s) → citizen_role (citizen มาก่อน inactive)', (isActive) => {
+    expect(loginDenialReason('citizen', isActive)).toBe('citizen_role');
   });
 });

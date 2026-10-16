@@ -1,31 +1,22 @@
 import NextAuth, { type DefaultSession } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
-import { eq } from 'drizzle-orm';
-import bcrypt from 'bcryptjs';
 
 import { authConfig } from '@/auth.config';
 import { isTokenExpired } from '@/lib/auth/token-expiry';
-import { getDb } from '@/lib/db';
-import { firstOrUndefined } from '@/lib/db/query-helpers';
-import { users } from '@/lib/db/schema';
+import { authorizeCredentials } from '@/lib/auth/authorize-credentials';
 
 /**
  * Auth.js v5 — staff login (Node runtime)
  *
  * Credentials provider + JWT session strategy (ดูเหตุผลใน src/auth.config.ts).
- * authorize() ทำหน้าที่เดียวกับ Supabase signInWithPassword เดิม:
- *   1. ค้น user ด้วย email (case-insensitive ผ่าน normalized input)
- *   2. verify bcrypt hash ใน users.password_hash
- *   3. คืน { id, email, role } ฝังลง JWT ผ่าน jwt callback
+ * ตัว authorize() อยู่ที่ src/lib/auth/authorize-credentials.ts (ค้น user → bcrypt → eligibility)
  *
- * § authorize() ไม่ทำ role/isActive check — เหมือนเดิม (เดิมทำใน actions.ts หลัง signIn)
- * เพราะต้องการ error message เจาะจง (เช่น "บัญชีถูกระงับ") และไม่เป็น enumeration oracle
- * (ตรวจ role/isActive หลังยืนยันรหัสผ่านผ่านแล้ว จึงไม่เปิดให้เดา email จาก error ที่ต่างกัน)
+ * § authorize() ปฏิเสธ citizen/บัญชีระงับหลัง bcrypt ผ่าน โดย throw IneligibleAccountSignin —
+ * ไม่ออก JWT ให้ แต่ login action ยังแสดงข้อความเจาะจงได้ (ไม่ใช่ oracle: รหัสถูกแล้ว)
  */
 
 // § type ของ role ที่ใช้ใน session/JWT — single source of truth ใน lib/auth/roles.ts
 import type { UserRole } from '@/lib/auth/roles';
-import { isLoginEligible } from '@/lib/auth/roles';
 
 // § shape ของข้อมูลที่ authorize() คืน (ฝังลง JWT ใน jwt callback)
 // แยกเป็น type ตรงๆ แทนการ augment @auth/core/jwt ซึ่ง resolve ยากใน pnpm strict layout
@@ -54,10 +45,6 @@ declare module 'next-auth' {
   }
 }
 
-// § DUMMY_HASH module-scope — bcrypt จริงของ random password ที่ไม่มีใครรู้
-// สร้างครั้งเดียว ไม่ใช่ทุก request (กัน timing oracle: compare รันเต็ม cost เสมอ)
-const DUMMY_HASH = '$2a$10$JbkZT1hKzXmNDkD92B.F3OOPQG9RWfw6ZeWeL/WUvSyENYkMlnB56';
-
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   providers: [
@@ -71,45 +58,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // § "จดจำฉัน" — กำหนดไว้เพื่อให้ authorize() รับค่าแบบ type-safe (ฟอร์ม custom ส่งเอง)
         remember: { label: 'จดจำฉัน', type: 'checkbox' },
       },
-      async authorize(credentials) {
-        // § ไม่ throw ใน authorize — คืน null เสมอเมื่อ fail (Auth.js จะแปลงเป็น error flow)
-        // throwing ทำให้เสี่ยง leak internal error ไปยัง client
-        const email = typeof credentials?.email === 'string' ? credentials.email.trim().toLowerCase() : '';
-        const password = typeof credentials?.password === 'string' ? credentials.password : '';
-        if (!email || !password) return null;
-
-        const db = await getDb();
-        const user = await firstOrUndefined(
-          db.select().from(users).where(eq(users.email, email)).limit(1)
-        );
-
-        // § ไม่แยก "ไม่มี user" กับ "รหัสผ่านผิด" ที่นี่ — ทั้งคู่คืน null (เหมือนกัน)
-        // กัน timing oracle: bcrypt.compare รันเสมอแม้ user ไม่มีอยู่จริง ด้วย DUMMY_HASH ปลอม
-        // (ผลลัพธ์ compare จะเป็น false แต่ใช้เวลาเท่ากับ verify จริง ~100ms → attacker แยก email
-        // จาก timing ไม่ได้) — เพิ่มเติมด้วย per-email rate-limit ใน actions.ts
-        const hash = user?.passwordHash ?? DUMMY_HASH;
-        const ok = await bcrypt.compare(password, hash);
-        if (!user || !user.passwordHash || !ok) return null;
-
-        // § บล็อก citizen + บัญชีระงับตั้งแต่ขั้นออก JWT (หลัง bcrypt — timing คงเดิม)
-        // เดิมออก session ให้ทุกรหัสถูก แล้วพึ่ง login action เตะทีหลัง — ยิง callback
-        // ตรงเลี่ยง action ได้ JWT ผ่าน proxy gate (authorized เช็คแค่ isLoggedIn)
-        if (!isLoginEligible(user.role, user.isActive)) return null;
-
-        // § remember ฟอร์มส่งมาเป็น string ('on' เมื่อติ๊ก) — แปลงเป็น boolean
-        // ส่งต่อให้ jwt callback กำหนดอายุ session (1h vs 30d)
-        const remember = credentials?.remember === 'on' || credentials?.remember === 'true';
-
-        // § คืนเฉพาะข้อมูลจำเป็น ไม่ส่ง passwordHash ไปฝั่ง JWT
-        // § passwordVersion = snapshot ตัด session ค้างหลังเปลี่ยนรหัส
-        return {
-          id: user.id,
-          email: user.email,
-          role: user.role,
-          passwordVersion: user.passwordVersion,
-          remember,
-        };
-      },
+      authorize: authorizeCredentials,
     }),
   ],
   callbacks: {

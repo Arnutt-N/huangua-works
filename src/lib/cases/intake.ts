@@ -43,6 +43,14 @@ export type CaseIntakeResult =
   | { ok: false; error: string; errorCode: 'duplicate' | 'invalid_category' | 'internal'; existingTrackingCode?: string };
 
 export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResult> {
+  // § ด่าน input ก่อนแตะ DB — ไม่มีตัวตน (เว็บไม่มี cid / line ไม่มี lineUserId) = caller ส่ง input ผิด
+  // คืน internal แทน throw (caller map เป็น 500/ข้อความทั่วไป) + log ให้เห็น (ไม่มี PII — แค่ channel)
+  const identity = citizenIdentityOf(input);
+  if (!identity) {
+    console.error(`[intake] createCase ไม่มีตัวตนผู้แจ้ง (channel=${input.channel})`);
+    return { ok: false, error: 'ไม่สามารถสร้างผู้ใช้งานได้', errorCode: 'internal' };
+  }
+
   const db = await getDb();
 
   const category = await firstOrUndefined(
@@ -111,21 +119,9 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
 
   const issuedTrackingCode = trackingCode;
 
-  // § ไม่มี identity = input ผิด (เว็บไม่มี cid / line ไม่มี lineUserId) — return internal
-  // ไม่ throw: throw ใน tx ทำให้ abort + caller ได้ 500 ไม่มี audit
-  const preIdentity = citizenIdentityOf(input);
-  if (!preIdentity) {
-    return { ok: false, error: 'ไม่สามารถสร้างผู้ใช้งานได้', errorCode: 'internal' };
-  }
-
   // § การเขียนผู้แจ้ง/link/consent/เรื่อง/dedup/audit ต้อง commit หรือ rollback พร้อมกัน
   // ระบุตัวตนด้วย resolveCitizen ใน tx นี้ (ลบ resolveSubmitter แล้ว — ดู citizen-access)
   const result = await db.transaction(async (tx): Promise<CaseIntakeResult> => {
-    const identity = citizenIdentityOf(input);
-    if (!identity) {
-      // § กันไว้ชั้นในเผื่อ input เปลี่ยนกลางคัน — ไม่ควรเกิด (เช็ค pre-tx แล้ว)
-      return { ok: false, error: 'ไม่สามารถสร้างผู้ใช้งานได้', errorCode: 'internal' };
-    }
     const submitterId = await resolveCitizen(identity, tx);
 
     // § ทุกช่องทางบันทึกความยินยอมตอนแจ้ง — เดิมบอทไม่บันทึกเพราะไม่มี checkbox ในแชท

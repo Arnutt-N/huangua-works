@@ -187,14 +187,16 @@ Add a role or status **here**, never directly in `schema.ts`.
 | File | Runtime | Contains |
 |---|---|---|
 | `src/auth.config.ts` | Edge-safe | No bcrypt, no postgres. `authorized` callback decides redirects. |
-| `src/auth.ts` | Node | Credentials provider, bcrypt verify, DB lookup, `jwt`/`session` callbacks. |
+| `src/auth.ts` | Node | Credentials provider (`authorize` = `src/lib/auth/authorize-credentials.ts`: DB lookup, bcrypt verify, eligibility), `jwt`/`session` callbacks. |
 | `src/proxy.ts` | Edge | Next.js 16 renamed `middleware.ts` → **`proxy.ts`**. Matcher: `/admin/:path*`. |
 
 `proxy.ts` **must** use `NextAuth(authConfig).auth`, not the `auth` export from `src/auth.ts` — the latter pulls in Node-only bcrypt/postgres, fails to decode the session cookie in edge runtime, and produces a login redirect loop.
 
 Session expiry is enforced by `token.expiresAt` inside the `jwt` callback (1 hour, or 30 days with "จดจำฉัน"), *not* by cookie `maxAge`. The cookie may outlive the session; the callback returns `null` to invalidate it.
 
-`authorize()` deliberately does not check `role`/`isActive` — it runs `bcrypt.compare` against a `DUMMY_HASH` even for nonexistent emails so failure timing is constant, and defers those checks so error messages don't become an enumeration oracle.
+`authorize()` runs `bcrypt.compare` against a `DUMMY_HASH` even for nonexistent emails so failure timing is constant. Only **after** the password verifies does it reject citizen/inactive accounts — by throwing `IneligibleAccountSignin` (`src/lib/auth/login-errors.ts`, a `CredentialsSignin` subclass), so no JWT is ever issued to them. The login action maps the reason to a specific Thai message and an `ACCESS_DENIED` audit row; revealing it is not an enumeration oracle because the password is already proven. The eligibility rule itself is `loginDenialReason()` in `roles.ts`, shared with `resolveStaff`.
+
+The login server action is the **only** way in. `POST /api/auth/callback/credentials` returns 404 (`src/app/api/auth/[...nextauth]/route.ts`) because `signIn()` in the action calls Auth.js in-process, so that HTTP endpoint has no legitimate caller and would bypass the action's rate limit and audit. The action also rejects requests carrying `X-Auth-Return-Redirect`: with that header Auth.js returns instead of throwing `CredentialsSignin`, which would turn a wrong password into "success".
 
 ### Authorization
 
@@ -204,6 +206,8 @@ Session expiry is enforced by `token.expiresAt` inside the `jwt` callback (1 hou
 - `requireStaffApi(allowedRoles?)` — route handlers. Returns `{ ok: false, response }` with 401/403 JSON. **Never signs out** — a stray API call must not clear a browser session.
 
 Both re-fetch the user row from the DB on every call: the JWT `role` is a login-time snapshot, so a demoted or deactivated user would otherwise keep their old privileges until the token expired. Every denial writes an audit row.
+
+A whitelist equal to one of the four tier constants is resolved through the DB tier matrix (`src/lib/auth/tiers.ts`). If that matrix cannot be read, `resolveAllowedRoles` fails closed to `SUPERADMIN_ONLY` — the caller's whitelist is the compiled default, which can be wider than an admin's override. Superadmin is in every tier, so the system never fully locks. A missing `tier_roles` table is not an error: no overrides can exist, so the compiled defaults are exact.
 
 ### Case lifecycle
 

@@ -11,16 +11,46 @@ import { users } from '@/lib/db/schema';
 import { enforceRateLimit } from '@/lib/rate-limit/enforce';
 import { formatReset } from '@/lib/rate-limit/format-reset';
 import { getClientIp } from '@/lib/auth/require-staff';
+import { headers } from 'next/headers';
+import { IneligibleAccountSignin } from '@/lib/auth/login-errors';
+import { loginDenialReason, type LoginDenialReason } from '@/lib/auth/roles';
 
 export interface LoginState {
   error: string | null;
   success?: boolean;
 }
 
+type IneligibleReason = LoginDenialReason | 'no_staff_record';
+
+const INELIGIBLE_MESSAGES: Record<IneligibleReason, string> = {
+  inactive: 'บัญชีนี้ถูกระงับการใช้งาน',
+  citizen_role: 'บัญชีนี้ไม่มีสิทธิ์เข้าใช้งานส่วนเจ้าหน้าที่',
+  no_staff_record: 'บัญชีนี้ไม่มีสิทธิ์เข้าใช้งานส่วนเจ้าหน้าที่',
+};
+
+// § ใช้ access_denied (ไม่ใช่ login_failure) เพราะตัวตนยืนยันผ่านแล้ว — ปฏิเสธการเข้าถึง
+// (login_failure เก็บไว้สำหรับ credential ไม่ถูก เพื่อให้ SIEM คำนวณ brute-force rate แยกจาก suspended-login)
+async function denyLogin(
+  reason: IneligibleReason,
+  userId: string | undefined,
+  email: string,
+  ip: string,
+): Promise<LoginState> {
+  await logAudit({
+    action: AUDIT_ACTIONS.ACCESS_DENIED,
+    resource: 'auth',
+    userId,
+    ipAddress: ip,
+    metadata: { email, reason },
+  });
+  return { error: INELIGIBLE_MESSAGES[reason] };
+}
+
 /**
  * เจ้าหน้าที่ login — email+password ผ่าน Auth.js v5 (Credentials provider)
- * ตรวจ role/isActive ที่นี่ (ไม่ใช่แค่ page-level) เพื่อให้ error message เจาะจงได้
- * (เช่น "บัญชีถูกระงับ") เพราะ ณ จุดนี้ยืนยันรหัสผ่านถูกแล้ว ไม่ใช่ enumeration risk
+ * authorize() ปฏิเสธ citizen/บัญชีระงับหลังยืนยันรหัส (throw IneligibleAccountSignin) — action
+ * แปลงเป็นข้อความเจาะจง + ACCESS_DENIED (ไม่ใช่ enumeration risk: รหัสถูกแล้ว)
+ * post-check หลัง signIn เหลือไว้กัน race (ถูกระงับ/ลบระหว่าง authorize กับตรงนี้)
  */
 export async function login(_prevState: LoginState, formData: FormData): Promise<LoginState> {
   const emailRaw = formData.get('email');
@@ -48,6 +78,19 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
     return { error: `เข้าสู่ระบบถี่เกินไป กรุณารอ ${formatReset(reset)}` };
   }
 
+  // § Auth.js ไม่ throw CredentialsSignin เมื่อ request มี X-Auth-Return-Redirect (signIn copy header
+  // ขาเข้าทั้งชุด) — รหัสผิดจะกลายเป็น "สำเร็จ" + oracle อีเมลจาก post-check; server action
+  // ไม่มีผู้ใช้ header นี้โดยชอบ จึงปฏิเสธทันที (นับเป็น login_failure ให้ SIEM เห็นการ probe)
+  if ((await headers()).has('x-auth-return-redirect')) {
+    await logAudit({
+      action: AUDIT_ACTIONS.LOGIN_FAILURE,
+      resource: 'auth',
+      ipAddress: ip,
+      metadata: { email: normalizedEmail, reason: 'auth_return_redirect_header' },
+    });
+    return { error: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' };
+  }
+
   // § ยืนยันรหัสผ่านก่อน (ผ่าน Auth.js Credentials authorize callback → bcrypt.compare)
   // Auth.js v5: signIn คืน URL string เสมอเมื่อ redirect:false และสำเร็จ;
   // ถ้า authorize คืน null (รหัสผ่านไม่ถูก/ไม่มี user) signIn จะ throw CredentialsSignin error
@@ -72,6 +115,11 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
     // § instanceof เท่านั้น — ห้ามเทียบ err.name: @auth/core ตั้ง name จาก constructor.name
     // ซึ่งโดน minify เปลี่ยนชื่อใน prod build → name ไม่ตรง → re-throw → wrong-password
     // กลายเป็น 500 ทั้งหน้า (dev ไม่ minify จึงไม่เกิด — เจอใน prod อย่างเดียว)
+    // § IneligibleAccountSignin เป็น subclass ของ CredentialsSignin — ต้องเช็คก่อน ไม่งั้นตกไป
+    // branch "รหัสผิด" (รหัสถูกแต่บัญชีระงับ/citizen → ข้อความเจาะจง + ACCESS_DENIED, ไม่มี session)
+    if (err instanceof IneligibleAccountSignin) {
+      return denyLogin(err.reason, err.userId, normalizedEmail, ip);
+    }
     if (!(err instanceof CredentialsSignin)) throw err;
     await logAudit({
       action: AUDIT_ACTIONS.LOGIN_FAILURE,
@@ -84,34 +132,20 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
 
   if (!signInOk) return { error: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' };
 
-  // รหัสผ่านถูกแล้ว — อ่าน role/isActive จาก DB เพื่อตรวจเจาะจง
-  // (authorize callback ตั้งใจไม่เช็ค 2 อย่างนี้ — เก็บ error message ที่เจาะจงเอาไว้ที่นี่แทน)
+  // รหัสผ่านถูกและ authorize ผ่าน eligibility แล้ว — อ่านสดอีกรอบกัน race + เอา userId ไป audit
   const db = await getDb();
   const staffUser = await firstOrUndefined(
     db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1)
   );
 
-  if (!staffUser || staffUser.role === 'citizen' || !staffUser.isActive) {
-    // § รหัสผ่านถูกแต่บัญชีไม่มีสิทธิ์ — ต้อง signOut ทันทีเพื่อล้าง cookie ที่ signIn สร้างไว้
-    // ไม่งั้น session valid แต่หน้า admin เตะออกอยู่ดี (defense-in-depth) เสียประสบการณ์
+  const denial: IneligibleReason | null = !staffUser
+    ? 'no_staff_record'
+    : loginDenialReason(staffUser.role, staffUser.isActive);
+  if (!staffUser || denial) {
+    // § กัน race: ถูกระงับ/ลบระหว่าง authorize กับตรงนี้ — signIn ตั้ง cookie ไปแล้ว ต้อง signOut
+    // ทันที ไม่งั้น session valid แต่หน้า admin เตะออกอยู่ดี (defense-in-depth) เสียประสบการณ์
     await signOut({ redirect: false });
-    // § ใช้ access_denied (ไม่ใช่ login_failure) เพราะตัวตนยืนยันผ่านแล้ว — ปฏิเสธการเข้าถึง
-    // (login_failure เก็บไว้สำหรับ credential ไม่ถูก เพื่อให้ SIEM คำนวณ brute-force rate แยกจาก suspended-login)
-    await logAudit({
-      action: AUDIT_ACTIONS.ACCESS_DENIED,
-      resource: 'auth',
-      userId: staffUser?.id,
-      ipAddress: ip,
-      metadata: {
-        email: normalizedEmail,
-        reason: !staffUser ? 'no_staff_record' : staffUser.role === 'citizen' ? 'citizen_role' : 'inactive',
-      },
-    });
-    return {
-      error: staffUser && !staffUser.isActive
-        ? 'บัญชีนี้ถูกระงับการใช้งาน'
-        : 'บัญชีนี้ไม่มีสิทธิ์เข้าใช้งานส่วนเจ้าหน้าที่',
-    };
+    return denyLogin(denial ?? 'no_staff_record', staffUser?.id, normalizedEmail, ip);
   }
 
   await logAudit({

@@ -4,15 +4,10 @@ export function verifyLineSignature(body: string, signature: string | null): boo
   const channelSecret = process.env.LINE_CHANNEL_SECRET;
   if (!channelSecret || !signature) return false;
 
-  const hash = createHmac('sha256', channelSecret).update(body, 'utf8').digest();
-  // § เทียบ bytes ตรง (base64 decode ก่อน): เดิมเทียบ base64 string ผ่าน utf8 bytes —
-  // ใช้ได้แต่ไม่ canonical (base64 ตัวเดียวกันเขียนได้หลายแบบ) + early-return ตอนยาวต่าง
-  let received: Buffer;
-  try {
-    received = Buffer.from(signature, 'base64');
-  } catch {
-    return false;
-  }
-  if (hash.length !== received.length) return false;
-  return timingSafeEqual(hash, received);
+  // § เทียบ base64 ตรงตัว เพราะ decode ยอมรับรูปไม่ canonical โดยไม่ throw
+  // ตรวจความยาวก่อน timingSafeEqual ซึ่งบังคับให้เท่ากัน (HMAC-SHA256 base64 ยาว 44 ตัวเสมอ)
+  const expected = Buffer.from(createHmac('sha256', channelSecret).update(body, 'utf8').digest('base64'));
+  const received = Buffer.from(signature);
+  if (expected.length !== received.length) return false;
+  return timingSafeEqual(expected, received);
 }

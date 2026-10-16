@@ -3,8 +3,9 @@ import { randomUUID } from 'crypto';
 import { redis } from '@/lib/upstash';
 
 const emitter = new EventEmitter();
-// § ไม่ setMaxListeners — ค่า default (10) คือสัญญาณเตือน listener รั่ว
-// SSE route cleanup ครบแล้ว (cancel → unsubscribe) ถ้า warn ดัง = มีจุดรั่วจริง อย่ากลบ
+// § เพดาน 100 = staff ~20 คน × หลายแท็บ (1 listener ต่อ SSE connection) ยังเหลือ headroom
+// default 10 ต่ำกว่าโหลดปกติ → warn หลอก; เกิน 100 ค่อยเป็นสัญญาณรั่วจริง
+emitter.setMaxListeners(100);
 
 export interface SseEvent {
   type: 'new_message' | 'conversation_update' | 'mode_change';
@@ -35,23 +36,76 @@ export function broadcast(event: SseEvent) {
   }
 }
 
-let subscriberStarted = false;
+type PingWire = { type: 'ping'; _origin: string };
+type WireMessage = WireEvent | PingWire;
 
-function ensureRedisSubscriber() {
-  if (!REDIS_BRIDGE_ENABLED || subscriberStarted) return;
-  subscriberStarted = true;
+// § Upstash อ่าน stream ใน IIFE แยก — stream ขาดไม่ยิง 'error' ให้ Subscriber จึงต้องตรวจเอง:
+// ping วนกลับหาตัวเอง (loopback) ทุก HEARTBEAT_MS เงียบเกิน STALE_AFTER_MS = stream ตาย → ต่อใหม่
+// ข้อความ origin ตัวเอง (ping หรือ broadcast จริง) นับเป็นหลักฐานว่ายังมีชีวิต
+const HEARTBEAT_MS = 30_000;
+const STALE_AFTER_MS = HEARTBEAT_MS * 2 + 5_000;
 
-  const sub = redis.subscribe<WireEvent>(CHANNEL);
-  sub.on('message', ({ message }) => {
-    if (!message || message._origin === SERVER_ID) return;
+type Sub = ReturnType<typeof redis.subscribe<WireMessage>>;
+let sub: Sub | null = null;
+let lastLoopbackAt = 0;
+let watchdog: ReturnType<typeof setInterval> | null = null;
+
+function stopSubscriber(): void {
+  const old = sub;
+  sub = null;
+  if (!old) return;
+  old.removeAllListeners();
+  old.unsubscribe().catch(() => {});
+}
+
+function startSubscriber(): void {
+  stopSubscriber();
+  const current = redis.subscribe<WireMessage>(CHANNEL);
+  sub = current;
+  lastLoopbackAt = Date.now();
+  current.on('message', ({ message }) => {
+    // § ตัวเก่าที่ถูกแทนแล้วห้าม deliver — กันข้อความซ้ำช่วงสลับ subscriber
+    if (sub !== current || !message) return;
+    if (message._origin === SERVER_ID) {
+      lastLoopbackAt = Date.now();
+      return;
+    }
+    if (message.type === 'ping') return;
     const { _origin: _ignored, ...event } = message;
     emitter.emit('sse', event as SseEvent);
   });
-  sub.on('error', (error) => {
-    // § subscriber หลุด = process นี้พลาด cross-process event เงียบ — เปิดทางต่อใหม่
-    console.warn('[sse-broadcaster] redis subscriber error', error);
-    subscriberStarted = false;
+  current.on('error', (error) => {
+    if (sub !== current) return;
+    // § Upstash ยิง 'error' ทั้งตอนต่อไม่ติดและตอน parse ข้อความเดียวพัง — ทั้งสองกรณีต่อใหม่
+    // (กรณีหลังเสียข้อความได้ ≤ 1 heartbeat แลกกับไม่ต้องแยกชนิด error ที่ Upstash ไม่ได้ type ไว้)
+    console.warn('[sse-broadcaster] redis subscriber error — ต่อใหม่รอบ heartbeat ถัดไป', error);
+    stopSubscriber();
   });
+}
+
+function stopWatchdog(): void {
+  if (watchdog) clearInterval(watchdog);
+  watchdog = null;
+}
+
+function heartbeat(): void {
+  if (emitter.listenerCount('sse') === 0) {
+    stopSubscriber();
+    stopWatchdog();
+    return;
+  }
+  if (!sub || Date.now() - lastLoopbackAt > STALE_AFTER_MS) startSubscriber();
+  const ping: PingWire = { type: 'ping', _origin: SERVER_ID };
+  redis.publish(CHANNEL, JSON.stringify(ping)).catch(() => {});
+}
+
+function ensureRedisSubscriber(): void {
+  if (!REDIS_BRIDGE_ENABLED) return;
+  if (!sub) startSubscriber();
+  if (!watchdog) {
+    watchdog = setInterval(heartbeat, HEARTBEAT_MS);
+    watchdog.unref?.();
+  }
 }
 
 export function subscribe(listener: (event: SseEvent) => void): () => void {

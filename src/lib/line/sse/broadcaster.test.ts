@@ -1,4 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
+// § hermetic — .env.local มี Upstash env ทำให้ bridge เปิด; ห้ามยิง Redis จริงจาก unit test
+vi.mock('@/lib/upstash', () => ({
+  redis: {
+    subscribe: () => ({ on: () => {}, unsubscribe: async () => {}, removeAllListeners: () => {} }),
+    publish: async () => 1,
+  },
+}));
+
 import { broadcast, subscribe } from './broadcaster';
 
 describe('broadcaster · subscribe + broadcast', () => {

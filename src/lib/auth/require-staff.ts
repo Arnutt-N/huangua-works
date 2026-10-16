@@ -7,7 +7,7 @@ import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { users } from '@/lib/db/schema';
 import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
-import type { UserRole } from '@/lib/auth/roles';
+import { loginDenialReason, SUPERADMIN_ONLY, type UserRole } from '@/lib/auth/roles';
 import { getTierRoles, tierKeyForRoles } from '@/lib/auth/tiers';
 
 /**
@@ -25,10 +25,11 @@ async function resolveAllowedRoles(
   try {
     return await getTierRoles(key);
   } catch (err) {
-    // § DB/Redis ล่ม = fail-closed ใช้ whitelist ที่ caller ส่งมา (แคบสุดเท่าที่มี)
-    // ไม่ fallback ค่าคงที่กว้างกว่า override ที่แอดมินตั้งแคบไว้ — กันสิทธิ์ขยายเงียบช่วง outage
-    console.error(`[auth] tier matrix unreadable (${key}), fail-closed to caller whitelist`, err);
-    return allowedRoles;
+    // § fail-closed จริง: อ่าน matrix ไม่ได้ = ไม่รู้ว่าแอดมินตั้ง override แคบแค่ไหน — whitelist ของ
+    // caller คือ compiled default ของ tier (tierKeyForRoles เทียบค่า) ซึ่งกว้างกว่า override ได้
+    // เหลือ superadmin ที่อยู่ทุก tier เสมอ (#111) ระบบจึงไม่ล็อกทั้งหมด
+    console.error(`[auth] tier matrix unreadable (${key}), fail-closed to superadmin only`, err);
+    return SUPERADMIN_ONLY;
   }
 }
 import { clientIpFromHeaders } from '@/lib/rate-limit/client-ip';
@@ -84,12 +85,11 @@ async function resolveStaff(allowedRoles?: readonly UserRole[]): Promise<StaffRe
   const ipAddress = await getClientIp();
   const userAgent = await getClientUserAgent();
 
-  if (!staffUser || staffUser.role === 'citizen' || !staffUser.isActive) {
-    const reason: StaffDenialReason = !staffUser
-      ? 'no_staff_record'
-      : staffUser.role === 'citizen'
-        ? 'citizen_role'
-        : 'inactive';
+  const denial: StaffDenialReason | null = !staffUser
+    ? 'no_staff_record'
+    : loginDenialReason(staffUser.role, staffUser.isActive);
+  if (!staffUser || denial) {
+    const reason: StaffDenialReason = denial ?? 'no_staff_record';
     await logAudit({
       action: AUDIT_ACTIONS.ACCESS_DENIED,
       resource: 'auth',

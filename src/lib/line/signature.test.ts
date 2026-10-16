@@ -71,5 +71,25 @@ describe('verifyLineSignature', () => {
     const body = JSON.stringify({ events: [] });
     // Malformed signature should return false, not throw
     expect(() => verifyLineSignature(body, '!!!not-base64!!!')).not.toThrow();
+    expect(verifyLineSignature(body, '!!!not-base64!!!')).toBe(false);
+  });
+
+  test.each([
+    ['ไม่มี padding', (signature: string) => signature.replace(/=+$/, '')],
+    ['มี newline ต่อท้าย', (signature: string) => `${signature}\n`],
+    ['มีขยะปนกลาง', (signature: string) => `${signature.slice(0, 10)}!!${signature.slice(10)}`],
+  ])('ปฏิเสธ base64 ที่ไม่ canonical เมื่อ %s', (_label, variant) => {
+    process.env.LINE_CHANNEL_SECRET = TEST_SECRET;
+    const body = JSON.stringify({ events: [] });
+    expect(verifyLineSignature(body, variant(sign(body)))).toBe(false);
+  });
+
+  test('ปฏิเสธ base64 แบบ URL-safe แม้ decode เป็น HMAC เดียวกัน', () => {
+    process.env.LINE_CHANNEL_SECRET = TEST_SECRET;
+    const body = JSON.stringify({ i: 0 });
+    const signature = sign(body);
+    expect(signature).toMatch(/[+/]/);
+    const urlSafe = signature.replace(/\+/g, '-').replace(/\//g, '_');
+    expect(verifyLineSignature(body, urlSafe)).toBe(false);
   });
 });

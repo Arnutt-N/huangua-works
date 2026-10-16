@@ -3,8 +3,9 @@
  *
  * `roles.ts` ต้อง pure (client bundle + schema ใช้) จึงเก็บ default ไว้ที่นั่น
  * ส่วนตาราง `tier_roles` เก็บ override ที่แอดมินแก้ผ่านหน้า UI ได้โดยไม่ deploy
- * อ่านผ่าน versioned cache (pattern เดียวกับ chat settings) ตก DB = fallback
- * ค่าคงที่เสมอ ไม่มีทางล็อกทั้งระบบ
+ * อ่านผ่าน versioned cache (pattern เดียวกับ chat settings)
+ * § ตาราง tier_roles ยังไม่มี = ค่าคงที่ (ไม่มี override ให้ข้าม); อ่านไม่ได้ด้วยเหตุอื่น = throw
+ * → require-staff fail-closed เหลือ superadmin (อยู่ทุก tier ตาม #111 จึงไม่ล็อกทั้งระบบ)
  */
 
 import { getDb } from '@/lib/db';
@@ -72,13 +73,25 @@ export function pickTierRoles(
   return [...new Set([...clean, 'superadmin' as UserRole])];
 }
 
+const UNDEFINED_TABLE = '42P01';
+
+/** drizzle 0.45 ห่อ error ของ postgres-js ไว้ใน .cause (DrizzleQueryError) — เช็คทั้งสองชั้น */
+function isUndefinedTableError(err: unknown): boolean {
+  const codeOf = (e: unknown): unknown =>
+    e && typeof e === 'object' && 'code' in e ? (e as { code?: unknown }).code : undefined;
+  return codeOf(err) === UNDEFINED_TABLE || codeOf((err as { cause?: unknown } | null)?.cause) === UNDEFINED_TABLE;
+}
+
 async function loadTierMap(): Promise<Record<TierKey, UserRole[]>> {
   const db = await getDb();
   let rows: Array<{ tier: string; roles: string[] }> = [];
   try {
     rows = await db.select({ tier: tierRoles.tier, roles: tierRoles.roles }).from(tierRoles);
-  } catch {
-    // § ตารางยังไม่มี (migrate ไม่ทัน) = fallback ทั้งหมด ไม่ throw
+  } catch (err) {
+    // § ตารางยังไม่มี (migrate ไม่ทัน) = ไม่มี override ได้ → default คือค่าจริง ไม่ใช่ fail-open
+    // error อื่น (DB สะดุด/สิทธิ์) = อ่าน override ไม่ได้ → throw (versioned cache ไม่เก็บ
+    // ความล้มเหลว) ให้ require-staff fail-closed แทนการคืน default ที่กว้างกว่า override
+    if (!isUndefinedTableError(err)) throw err;
     return Object.fromEntries(
       TIER_KEYS.map((k) => [k, [...TIER_DEFAULTS[k]]]),
     ) as Record<TierKey, UserRole[]>;
