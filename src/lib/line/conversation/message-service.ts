@@ -8,7 +8,7 @@ import type { LineOutgoingMessage } from '../types';
 import { isHumanHandled } from './modes';
 import type { LineTransport } from './transport';
 
-export type InboundMessageType = 'text' | 'image' | 'location' | 'sticker';
+export type InboundMessageType = 'text' | 'image' | 'file' | 'video' | 'audio' | 'location' | 'sticker';
 
 export interface InboundMessage {
   conversationId: string;
@@ -16,6 +16,8 @@ export interface InboundMessage {
   mode: ConversationMode;
   messageType: InboundMessageType;
   textContent: string | null;
+  mediaUrl?: string | null;
+  mediaMetadata?: Record<string, unknown> | null;
   locationData: Record<string, unknown> | null;
   lineMessageId: string;
   /**
@@ -38,6 +40,8 @@ export async function recordInboundMessage(input: InboundMessage): Promise<{ mes
     sender: 'user',
     messageType: input.messageType,
     textContent: input.textContent,
+    mediaUrl: input.mediaUrl ?? null,
+    metadata: input.mediaMetadata ?? null,
     locationData: input.locationData,
     lineMessageId: input.lineMessageId,
   });
@@ -62,6 +66,7 @@ export async function recordInboundMessage(input: InboundMessage): Promise<{ mes
       sender: 'user',
       messageType: input.messageType,
       textContent: input.textContent,
+      mediaUrl: input.mediaUrl ?? null,
       createdAt: new Date().toISOString(),
     },
   });

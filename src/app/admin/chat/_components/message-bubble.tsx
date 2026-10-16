@@ -96,7 +96,18 @@ export function MessageBubble({
                 : 'border border-border bg-surface-raised text-ink',
           )}
         >
-          {msg.textContent ?? `[${msg.messageType}]`}
+          {msg.messageType === 'image' && msg.mediaUrl ? (
+            <a href={msg.mediaUrl} target="_blank" rel="noreferrer" aria-label="เปิดรูปต้นฉบับที่ผู้ใช้ส่ง">
+              {/* eslint-disable-next-line @next/next/no-img-element -- รูปจาก storage ภายนอก ไม่ผ่าน Next image optimizer */}
+              <img src={msg.mediaUrl} alt="รูปที่ผู้ใช้ส่ง" className="max-h-64 w-auto rounded-md" />
+            </a>
+          ) : (msg.messageType === 'file' || msg.messageType === 'video' || msg.messageType === 'audio') && msg.mediaUrl ? (
+            <a href={msg.mediaUrl} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+              {msg.messageType === 'file' ? 'ไฟล์แนบ' : msg.messageType === 'video' ? 'วิดีโอแนบ' : 'เสียงแนบ'} (เปิดดู)
+            </a>
+          ) : (
+            (msg.textContent ?? `[${msg.messageType}]`)
+          )}
         </div>
         <span className="flex items-center gap-1 px-1 text-[10px] text-muted">
           {msg.status === 'pending' ? (

@@ -40,6 +40,7 @@ export interface Message {
   sender: string;
   messageType: string;
   textContent: string | null;
+  mediaUrl?: string | null;
   createdAt: string;
   clientTempId?: string | null;
   status?: 'pending' | 'failed';

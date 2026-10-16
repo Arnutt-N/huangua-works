@@ -5,6 +5,7 @@ import { generateId } from '@/lib/id';
 import type { LineWebhookEvent, LineMessageEvent, LineFollowEvent, LinePostbackEvent, LineOutgoingMessage } from '../types';
 import type { ConversationMode } from '../chat-modes';
 import { matchFaq } from './faq-matcher';
+import { ingestLineMedia } from '../media-ingest';
 import { matchIntent } from './intent-matcher';
 import { parseResponseText } from './response-parser';
 import { startCaseFlow, processCaseFlow, handleConfirmPostback, type CaseFlowState } from './case-flow';
@@ -117,9 +118,26 @@ async function handleMessageEvent(
 ) {
   const msg = event.message;
   const messageType: InboundMessageType = msg.type === 'image' ? 'image'
+    : msg.type === 'file' ? 'file'
+    : msg.type === 'video' ? 'video'
+    : msg.type === 'audio' ? 'audio'
     : msg.type === 'location' ? 'location'
     : msg.type === 'sticker' ? 'sticker'
     : 'text';
+
+  // § สื่อจาก LINE เปิดดูได้ชั่วคราว ต้องดึงเก็บทันทีตอน webhook มาถึง ล้มเหลวทุกแบบต้อง
+  // ไม่ทำให้บันทึกข้อความล้ม (ingest คืน skipped ไม่ throw) ผลเก็บลง mediaUrl/metadata
+  let mediaUrl: string | null = null;
+  let mediaMetadata: Record<string, unknown> | null = null;
+  if (msg.type === 'image' || msg.type === 'file' || msg.type === 'video' || msg.type === 'audio') {
+    const ingested = await ingestLineMedia(msg.id);
+    if (ingested.kind === 'stored') {
+      mediaUrl = ingested.url;
+      mediaMetadata = { contentType: ingested.contentType, sizeBytes: ingested.sizeBytes };
+    } else {
+      mediaMetadata = { skipped: ingested.reason };
+    }
+  }
 
   // § อ่าน bot_enabled ก่อนบันทึกข้อความ — ถ้าบอทปิด ข้อความนี้ไม่มีใครตอบอัตโนมัติ
   // จึงต้องนับเป็น unread ของเจ้าหน้าที่ (เดิม reset เป็น 0 เพราะถือว่าบอทตอบแล้ว)
@@ -131,6 +149,8 @@ async function handleMessageEvent(
     mode,
     messageType,
     textContent: msg.type === 'text' ? msg.text : null,
+    mediaUrl,
+    mediaMetadata,
     locationData: msg.type === 'location'
       ? { title: msg.title, address: msg.address, latitude: msg.latitude, longitude: msg.longitude }
       : null,

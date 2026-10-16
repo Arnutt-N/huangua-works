@@ -30,6 +30,9 @@ export interface LineMessageEvent extends LineEventBase {
 export type LineIncomingMessage =
   | { type: 'text'; id: string; text: string }
   | { type: 'image'; id: string }
+  | { type: 'file'; id: string; fileName: string; fileSize: number }
+  | { type: 'video'; id: string; duration?: number }
+  | { type: 'audio'; id: string; duration?: number }
   | { type: 'location'; id: string; title?: string; address?: string; latitude: number; longitude: number }
   | { type: 'sticker'; id: string; packageId: string; stickerId: string };
 

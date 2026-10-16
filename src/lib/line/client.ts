@@ -37,6 +37,25 @@ async function postLine(endpoint: string, payload: unknown): Promise<void> {
   });
 }
 
+/** ดึง binary content ของข้อความที่ประชาชนส่ง (รูป/ไฟล์/วิดีโอ/เสียง) จาก LINE data API */
+export async function getMessageContent(
+  messageId: string,
+): Promise<{ bytes: Uint8Array; contentType: string | null }> {
+  return withLineCircuit('/message/content', async () => {
+    const res = await fetch(`${LINE_DATA_BASE}/message/${messageId}/content`, {
+      headers: { Authorization: `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}` },
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      throw new LineApiError('/message/content', res.status, detail.slice(0, 500));
+    }
+    return {
+      bytes: new Uint8Array(await res.arrayBuffer()),
+      contentType: res.headers.get('content-type'),
+    };
+  });
+}
+
 export async function replyMessage(replyToken: string, messages: LineOutgoingMessage[]): Promise<void> {
   await postLine('/message/reply', { replyToken, messages });
 }
