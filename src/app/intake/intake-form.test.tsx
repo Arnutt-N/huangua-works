@@ -5,15 +5,13 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { INTAKE_DRAFT_KEY, saveIntakeDraft } from '../../components/forms/non-pii-draft';
 import { IntakeForm } from './intake-form';
+import { INTAKE_FILE_TIMEOUT_MS, INTAKE_QUERY_TIMEOUT_MS } from './intake-test-timeouts';
 
 vi.mock('../../components/liff/liff-provider', () => ({
   useLiff: () => ({ authenticated: false, displayName: null }),
 }));
 
-// § ฟอร์มนี้เรนเดอร์หนัก + รอ anti-spam จริงสูงสุด 2 วินาที — full suite เคยวัดได้ 5–7.5 วินาที
-// ต่อเทสภายใต้โหลด parallel จึงเกิน testTimeout ปริยาย 5 วินาที: ขยับเป็น 30 วินาทีเฉพาะไฟล์นี้
-// (assertion พังจริงยังล้มเร็วที่ query timeout 10 วินาที ไม่ได้รอ 30 วินาที)
-vi.setConfig({ testTimeout: 30_000 });
+vi.setConfig({ testTimeout: INTAKE_FILE_TIMEOUT_MS });
 
 const categories = [{ id: 'roads', name: 'ถนน' }];
 
@@ -39,8 +37,7 @@ afterEach(() => {
 
 async function choose(label: string, option: string) {
   fireEvent.keyDown(screen.getByLabelText(label), { key: 'ArrowDown' });
-  // § option อาจมาช้าหากเครื่องโหลดหนัก — timeout ชัดเจน ไม่พึ่งค่า default 1 วินาที
-  fireEvent.click(await screen.findByRole('option', { name: option }, { timeout: 10_000 }));
+  fireEvent.click(await screen.findByRole('option', { name: option }, { timeout: INTAKE_QUERY_TIMEOUT_MS }));
 }
 
 describe('ฟอร์มแจ้งเรื่องสำหรับผู้สูงอายุ', () => {
@@ -64,7 +61,7 @@ describe('ฟอร์มแจ้งเรื่องสำหรับผู�
       name: 'นายทดสอบ', cid: '1234567890123', phone: '0812345678',
       title: 'แจ้งเรื่องของนายทดสอบ', detail: 'ติดต่อ 0812345678', village: 'บ้านนายทดสอบ', addr: 'ที่อยู่ส่วนบุคคล',
     })) fireEvent.change(document.getElementById(id)!, { target: { value } });
-    await waitFor(() => expect(JSON.parse(window.localStorage.getItem(INTAKE_DRAFT_KEY)!)).toEqual({ version: 1, categoryId: 'roads' }), { timeout: 10_000 });
+    await waitFor(() => expect(JSON.parse(window.localStorage.getItem(INTAKE_DRAFT_KEY)!)).toEqual({ version: 1, categoryId: 'roads' }), { timeout: INTAKE_QUERY_TIMEOUT_MS });
     view.unmount();
     render(<IntakeForm categories={categories} />);
     await waitFor(() => expect(screen.getByLabelText('หมวดเรื่อง')).toHaveTextContent('ถนน'));
@@ -91,14 +88,13 @@ describe('ฟอร์มแจ้งเรื่องสำหรับผู�
     fireEvent.change(screen.getByLabelText('หัวเรื่อง'), { target: { value: 'ถนนชำรุด' } });
     fireEvent.change(screen.getByLabelText('รายละเอียด'), { target: { value: 'มีหลุมบนถนน' } });
     await choose('จังหวัด', 'กาฬสินธุ์');
-    await waitFor(() => expect(screen.getByLabelText('อำเภอ')).not.toBeDisabled(), { timeout: 10_000 });
+    await waitFor(() => expect(screen.getByLabelText('อำเภอ')).not.toBeDisabled(), { timeout: INTAKE_QUERY_TIMEOUT_MS });
     await choose('อำเภอ', 'ยางตลาด');
-    await waitFor(() => expect(screen.getByLabelText('ตำบล')).not.toBeDisabled(), { timeout: 10_000 });
+    await waitFor(() => expect(screen.getByLabelText('ตำบล')).not.toBeDisabled(), { timeout: INTAKE_QUERY_TIMEOUT_MS });
     await choose('ตำบล', 'หัวงัว');
     fireEvent.click(screen.getByRole('checkbox'));
     await userEvent.setup().click(screen.getByRole('button', { name: 'ส่งเรื่อง' }));
-    // § ฟอร์มรอ anti-spam สูงสุด 2 วินาทีก่อนส่ง (MIN_SUBMIT_MS) — timeout ต้องเกินค่านี้ชัดเจน
-    await screen.findByRole('heading', { name: 'รับเรื่องเรียบร้อย' }, { timeout: 10_000 });
+    await screen.findByRole('heading', { name: 'รับเรื่องเรียบร้อย' }, { timeout: INTAKE_QUERY_TIMEOUT_MS });
     expect(window.localStorage.getItem(INTAKE_DRAFT_KEY)).toBeNull();
     expect(fetch).toHaveBeenCalledWith('/api/cases/submit', expect.objectContaining({ method: 'POST' }));
   });
