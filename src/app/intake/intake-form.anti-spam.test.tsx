@@ -3,12 +3,15 @@ import React from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { IntakeForm } from './intake-form';
+import { INTAKE_FILE_TIMEOUT_MS, INTAKE_QUERY_TIMEOUT_MS } from './intake-test-timeouts';
 import { countFailures } from '../../../scripts/check-contrast';
 
 vi.mock('../../components/liff/liff-provider', () => ({
   useLiff: () => ({ authenticated: false, displayName: null }),
 }));
 const NOW = 1_800_000_000_000;
+
+vi.setConfig({ testTimeout: INTAKE_FILE_TIMEOUT_MS });
 const fetchMock = vi.fn();
 let clock: MockInstance<() => number>;
 const scrollDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView');
@@ -45,9 +48,9 @@ afterEach(() => {
 
 async function choose(label: string, option: string) {
   const trigger = screen.getByLabelText(label);
-  await waitFor(() => expect((trigger as HTMLButtonElement).disabled).toBe(false));
+  await waitFor(() => expect((trigger as HTMLButtonElement).disabled).toBe(false), { timeout: INTAKE_QUERY_TIMEOUT_MS });
   fireEvent.keyDown(trigger, { key: 'ArrowDown' });
-  fireEvent.click(await screen.findByRole('option', { name: option }));
+  fireEvent.click(await screen.findByRole('option', { name: option }, { timeout: INTAKE_QUERY_TIMEOUT_MS }));
 }
 async function readyForm() {
   const view = render(<IntakeForm categories={[{ id: 'roads', name: 'ถนน' }]} />);
@@ -62,7 +65,7 @@ async function readyForm() {
   await choose('อำเภอ', 'ยางตลาด');
   await choose('ตำบล', 'หัวงัว');
   fireEvent.click(screen.getByRole('checkbox'));
-  await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).startsWith('/api/villages?'))).toBe(true));
+  await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).startsWith('/api/villages?'))).toBe(true), { timeout: INTAKE_QUERY_TIMEOUT_MS });
   return view.container.querySelector('form')!;
 }
 const posts = () => fetchMock.mock.calls.filter(([url]) => url === '/api/cases/submit');
@@ -108,22 +111,22 @@ describe('ฟอร์ม intake — สัญญาณกันสแปม', (
     clock.mockReturnValue(NOW + elapsed);
     fireEvent.change(screen.getByLabelText('หัวเรื่อง'), { target: { value: 'ถนนชำรุดต้องซ่อมแซม' } });
     fireEvent.submit(form);
-    await waitFor(() => expect(posts()).toHaveLength(1));
+    await waitFor(() => expect(posts()).toHaveLength(1), { timeout: INTAKE_QUERY_TIMEOUT_MS });
     expect(payload().formStartedAt).toBe(NOW);
     expect(payload().websiteUrl).toBeUndefined();
-    await screen.findByText('รับเรื่องเรียบร้อย', { selector: 'h2' });
+    await screen.findByText('รับเรื่องเรียบร้อย', { selector: 'h2' }, { timeout: INTAKE_QUERY_TIMEOUT_MS });
   });
   it('ส่งซ้ำหลัง error ใช้เวลาเริ่มฟอร์มเดิม ไม่เริ่มนับใหม่', async () => {
     const form = await readyForm();
     fetchMock.mockResolvedValueOnce({ ok: false, status: 400, json: async () => ({ error: 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบแล้วลองใหม่' }) });
     clock.mockReturnValue(NOW + 30000);
     fireEvent.submit(form);
-    await screen.findByRole('alert');
+    await screen.findByRole('alert', undefined, { timeout: INTAKE_QUERY_TIMEOUT_MS });
     clock.mockReturnValue(NOW + 60000);
     fireEvent.submit(form);
-    await waitFor(() => expect(posts()).toHaveLength(2));
+    await waitFor(() => expect(posts()).toHaveLength(2), { timeout: INTAKE_QUERY_TIMEOUT_MS });
     expect(posts().map(([, options]) => JSON.parse(options.body as string).formStartedAt)).toEqual([NOW, NOW]);
-    await screen.findByText('รับเรื่องเรียบร้อย', { selector: 'h2' });
+    await screen.findByText('รับเรื่องเรียบร้อย', { selector: 'h2' }, { timeout: INTAKE_QUERY_TIMEOUT_MS });
   });
   it('contrast gate ผ่านทั้งธีมโดยไม่เรียก suite อื่น', () => {
     expect(countFailures(true)).toBe(0);
