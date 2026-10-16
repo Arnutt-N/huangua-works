@@ -9,8 +9,9 @@ import { createHmac } from 'node:crypto';
 
 const MIN_KEY_LENGTH = 32;
 
-// § อ่าน key สดทุกครั้ง — ห้าม cache ตอน import: key หมุน/เติมทีหลังจะได้ key เก่าว่าง
-// (HMAC key ว่าง = hash ธรรมดา ไล่ CID 13 หลักได้) assert เช็ค env สดแต่ hash ใช้ตัวแปรเก่า
+// § อ่าน key สดทุกครั้ง ไม่ผูกค่าไว้ตอน import — assert กับ hash ใช้แหล่งเดียวกันในจังหวะเดียวกันเสมอ
+// และโค้ดที่ตั้ง env หลัง import (scripts, test ที่ stubEnv) ได้ key ที่ถูก
+// (production ที่ key ว่าง/สั้น assertKeyUsable throw ก่อน hash เสมอ)
 function currentHmacKey(): string {
   return process.env.CID_HMAC_KEY || '';
 }

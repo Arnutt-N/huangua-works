@@ -13,7 +13,8 @@ import { authConfig } from '@/auth.config';
  *
  * authorized callback (ใน src/auth.config.ts) เป็นคนตัดสินใจ redirect เอง
  * ไม่ทำ role/isActive check ที่นี่ (ต้องคิว DB, proxy ควรเร็ว/ไม่แตะ DB)
- * role check จริงอยู่ที่ admin/actions.ts (login) + admin/page.tsx (defensive re-check)
+ * role/isActive ตัดสินที่ authorize() (ไม่ออก JWT ให้ citizen/บัญชีระงับ) และ
+ * requireStaff/requireStaffApi (re-fetch DB ทุก request)
  *
  * Next.js 16 deprecate middleware.ts แล้ว — ไฟล์ต้องชื่อ proxy.ts ถึงจะถูก invoke
  * ทุก request (ที่ match matcher) ไม่งั้น authorized callback ไม่ทำงาน = redirect หาย

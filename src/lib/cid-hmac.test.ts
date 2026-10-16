@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { generateCidHash, generateDedupHash, generateLegacyDedupHash, legacyDedupPayload, normalizeDedupPayload, verifyDedupHash } from './cid-hmac';
 
@@ -78,12 +79,38 @@ describe('legacyDedupPayload · ช่วงเปลี่ยนผ่าน 7 
     expect(legacyDedupPayload('CID', '  ถนน\n\nชำรุด  ', 'A  B')).toBe('cid|  ถนน\n\nชำรุด  |a  b');
   });
 
-  test('hash เก่าจับเรื่องเก่าได้แม้ข้อความต่างแค่ whitespace กลาง', () => {
+  test('ข้อความมี whitespace กลาง → hash สูตรเก่า ≠ สูตรใหม่ (จึงต้องเทียบทั้งคู่ — ดู dedup.integration.test.ts)', () => {
     const oldHash = generateLegacyDedupHash('c', 'ถนน  ชำรุด', 'x');
     const newHash = generateDedupHash('c', 'ถนน ชำรุด', 'x');
     expect(oldHash).not.toBe(newHash);
-    // checkDuplicate เทียบทั้งสอง hash — เคสนี้ต้องเจอ (กันซ้ำหลุดช่วงเปลี่ยนผ่าน)
-    expect([newHash, oldHash]).toContain(oldHash);
+  });
+
+  test('golden: สูตรเก่า = HMAC ของ payload ทั้งก้อน lower+trim (คำนวณอิสระ)', () => {
+    const expected = createHmac('sha256', process.env.CID_HMAC_KEY ?? '')
+      .update('c|  ถนน  ชำรุด |x'.toLowerCase().trim(), 'utf8')
+      .digest('hex');
+    expect(generateLegacyDedupHash('c', '  ถนน  ชำรุด ', 'x')).toBe(expected);
+  });
+});
+
+describe('อ่าน CID_HMAC_KEY สดทุกครั้ง', () => {
+  // § import ครั้งเดียว (static ด้านบน) แล้วเปลี่ยน env — ถ้ากลับไปผูก key ตอน import test แรกแดง
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  test('เปลี่ยน key หลัง import → hash เปลี่ยนตาม', () => {
+    vi.stubEnv('CID_HMAC_KEY', 'a'.repeat(32));
+    const h1 = generateCidHash('1101200563040');
+    vi.stubEnv('CID_HMAC_KEY', 'b'.repeat(32));
+    const h2 = generateCidHash('1101200563040');
+    expect(h1).not.toBe(h2);
+  });
+
+  test('production + key ถูกล้างหลัง import → throw ก่อน hash', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('CID_HMAC_KEY', '');
+    expect(() => generateCidHash('1101200563040')).toThrow(/CID_HMAC_KEY/);
   });
 });
 
@@ -104,8 +131,8 @@ describe('verifyDedupHash', () => {
 });
 
 describe('assertKeyUsable — ด่านกัน key ว่างตอน runtime', () => {
-  // § HMAC_KEY ถูกอ่านตอน module load ครั้งเดียว การทดสอบจึงต้อง reset module registry
-  // แล้ว import ใหม่ทุกครั้ง ไม่ใช่แค่ stubEnv เฉยๆ
+  // § reset module + import ใหม่ทุกเคส เพื่อจำลอง process ที่ env ต่างกัน (key อ่านสดอยู่แล้ว —
+  // ดู describe 'อ่าน CID_HMAC_KEY สดทุกครั้ง')
   async function loadWith(env: { NODE_ENV?: string; CID_HMAC_KEY?: string }) {
     vi.resetModules();
     vi.stubEnv('NODE_ENV', env.NODE_ENV ?? 'test');

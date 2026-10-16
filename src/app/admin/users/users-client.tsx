@@ -61,7 +61,8 @@ interface UsersClientProps {
   departments: DepartmentOption[];
   canResetPassword: boolean;
   currentUserId: string;
-  tierMatrix: Record<TierKey, string[]>;
+  // § null = อ่าน tier ไม่ได้ชั่วคราว (PR #118 finding A) — ตารางผู้ใช้ยังทำงาน ปิดแค่ tier editor
+  tierMatrix: Record<TierKey, string[]> | null;
 }
 
 const initial: UserActionState = { error: null };
@@ -516,9 +517,20 @@ const TIER_ROLE_OPTIONS: UserRole[] = ALL_ROLES.filter((r): r is UserRole => r !
  * § controlled checkboxes + key รีเซ็ตเมื่อข้อมูลใหม่มา (ไม่จับ DOM ตรง — interrogate B-16)
  * § superadmin ติ๊กค้าง disabled พร้อมป้ายบังคับ (ไม่หลอกว่าเอาออกได้ — interrogate D-11)
  */
-function TierMatrixCard({ tierMatrix }: { tierMatrix: Record<TierKey, string[]> }) {
+function TierMatrixCard({ tierMatrix }: { tierMatrix: Record<TierKey, string[]> | null }) {
   const [state, action, pending] = useActionState(updateTierRoles, { error: null } as TierActionState);
-  const [checks, setChecks] = useState<Record<string, string[]>>(() => tierMatrix);
+  const [checks, setChecks] = useState<Record<string, string[]>>(() => tierMatrix ?? {});
+  // § hook ข้างบนเรียกเหมือนเดิมทุก render (กฎ hooks) — null แสดงการ์ดปิดใช้งานแทนฟอร์ม
+  if (!tierMatrix) {
+    return (
+      <section aria-label="สิทธิ์ตาม tier" className="glass-panel rounded-xl p-6 shadow-sm">
+        <h2 className="text-xl font-semibold">สิทธิ์ตาม tier</h2>
+        <p className="mt-1 text-sm text-muted">
+          อ่านค่าจากฐานข้อมูลไม่ได้ชั่วคราว ส่วนนี้ปิดใช้งาน — จัดการผู้ใช้ได้ตามปกติ
+        </p>
+      </section>
+    );
+  }
   return (
     <section aria-label="สิทธิ์ตาม tier" className="glass-panel rounded-xl p-6 shadow-sm">
       <h2 className="text-xl font-semibold">สิทธิ์ตาม tier</h2>

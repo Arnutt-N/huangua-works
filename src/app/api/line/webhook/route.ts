@@ -53,7 +53,9 @@ export async function POST(request: Request) {
     );
   }
 
-  // § JSON แตก = คืน 400 ไม่ใช่ 500 — 500 ทำให้ LINE redeliver ทั้ง batch วน
+  // § body ผ่าน signature แล้วแต่ parse ไม่ได้/ไม่มี events array = request ผิดรูป → 400 ตามความหมาย
+  // (ไม่ปล่อย JSON.parse throw เป็น 500 ปน error จริงใน log) — หมายเหตุ: LINE redeliver ทุกสถานะ
+  // ที่ไม่ใช่ 2xx เมื่อเปิด webhook redelivery 400 จึงไม่ได้กัน redeliver
   let parsed: LineWebhookRequestBody;
   try {
     parsed = JSON.parse(body) as LineWebhookRequestBody;
@@ -66,8 +68,11 @@ export async function POST(request: Request) {
 
   await Promise.all(
     parsed.events.map(async (event) => {
-      if (await isDuplicateEvent(event)) return;
+      // § event ผิดรูป (null/ไม่ใช่ object) ข้ามทีละตัว และ dedup อยู่ใน try ด้วย —
+      // message event ที่ไม่มี .message ทำ lineMessageIdOf throw ได้ ห้ามลามเป็น 500 ทั้ง batch
+      if (!event || typeof event !== 'object') return;
       try {
+        if (await isDuplicateEvent(event)) return;
         await handleEvent(event);
       } catch (error) {
         // event เดียวพังไม่ควรทำให้ทั้ง batch เป็น 500 (LINE จะ redeliver ทั้งชุด)

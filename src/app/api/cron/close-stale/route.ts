@@ -8,7 +8,7 @@ import { getDb } from '@/lib/db';
 import { cases } from '@/lib/db/schema';
 import { applyCaseUpdate, SYSTEM_ACTOR } from '@/lib/cases/operations';
 import { requireCron } from '@/lib/cron-auth';
-import { eq, and, lt } from 'drizzle-orm';
+import { eq, and, lt, asc } from 'drizzle-orm';
 
 const STALE_DAYS = 7;
 // § จำกัดรอบละ 100 — backlog ใหญ่ select ทั้งหมดแล้ววนทีละเคส lambda timeout ปิดครึ่งค้าง
@@ -21,13 +21,17 @@ export async function GET(req: NextRequest) {
   const db = await getDb();
   const staleThreshold = new Date(Date.now() - STALE_DAYS * 24 * 60 * 60 * 1000);
 
-  const staleCases = await db
+  // § เก่าสุดก่อน (เลือกแถวแน่นอน) + ดึงเกิน 1 แถวเพื่อรู้ว่ายังค้างจริง — `>= LIMIT` บอกค้างหลอกตอนเหลือพอดี
+  const staleRows = await db
     .select({ id: cases.id })
     .from(cases)
     // § ข้ามเรื่องนำเข้าย้อนหลัง — updatedAt ของแถว historical คือวันที่รับเรื่องจริง
     // จึงเก่ากว่า threshold เสมอ ถ้าไม่ข้ามจะถูกปิดอัตโนมัติทั้งหมดตั้งแต่ cron รอบแรก
     .where(and(eq(cases.status, 'done'), eq(cases.isHistorical, false), lt(cases.updatedAt, staleThreshold)))
-    .limit(CLOSE_STALE_BATCH_LIMIT);
+    .orderBy(asc(cases.updatedAt))
+    .limit(CLOSE_STALE_BATCH_LIMIT + 1);
+  const truncated = staleRows.length > CLOSE_STALE_BATCH_LIMIT;
+  const staleCases = staleRows.slice(0, CLOSE_STALE_BATCH_LIMIT);
 
   let closedCount = 0;
   const failures: string[] = [];
@@ -52,11 +56,14 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // § cron-job.org ไม่อ่าน body — log ให้เห็น backlog ใน runtime log
+  if (truncated) console.warn(`[cron/close-stale] ยังค้างเกิน ${CLOSE_STALE_BATCH_LIMIT} เรื่อง — รอบถัดไปปิดต่อ`);
+
   return NextResponse.json({
     success: failures.length === 0,
     closedCount,
     failedCount: failures.length,
-    truncated: staleCases.length >= CLOSE_STALE_BATCH_LIMIT,
+    truncated,
     message: `ปิดเรื่องอัตโนมัติ ${closedCount} รายการ`,
   });
 }

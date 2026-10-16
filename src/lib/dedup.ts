@@ -25,6 +25,9 @@ export async function checkDuplicate(
   // § เทียบทั้ง hash ใหม่ + hash เก่า (สูตร normalize เก่า) — เรื่องที่บันทึกก่อน deploy
   // ยังจับซ้ำได้ตลอด 7 วัน window หลังนั้นแถวเก่าหมดอายุเอง
   const hashes = [generateDedupHash(cid, title, description)];
+  // § ลบ legacy ได้ (บรรทัดนี้ + generateLegacyDedupHash/legacyDedupPayload ใน cid-hmac.ts) เมื่อพ้น
+  // 7 วันหลัง deploy production ที่มี #117 — ตรวจก่อนลบ: SELECT count(*) FROM dedup_hashes
+  // WHERE created_at < '<วัน deploy>' AND expires_at > now() ต้องได้ 0
   const legacy = generateLegacyDedupHash(cid, title, description);
   if (legacy !== hashes[0]) hashes.push(legacy);
   const now = Date.now();

@@ -233,3 +233,31 @@ describe('createCase · ตัวตนที่ถูกสร้างพร�
     expect(mockState.userLookupEmails.filter((value) => value === email)).toHaveLength(2);
   });
 });
+
+describe('createCase · ด่าน identity + PDPA metadata', () => {
+  it.each([
+    ['web ไม่มี cid', { cid: undefined }],
+    ['line ไม่มี lineUserId', { channel: 'line', cid: undefined, lineUserId: undefined }],
+  ])('%s → internal โดยไม่แตะ DB', async (_label, over) => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockDb.select.mockClear();
+    mockDb.transaction.mockClear();
+
+    const result = await createCase(webInput(over));
+
+    expect(result).toMatchObject({ ok: false, errorCode: 'internal' });
+    expect(mockDb.select).not.toHaveBeenCalled();
+    expect(mockDb.transaction).not.toHaveBeenCalled();
+    expect(mockState.insertedCases).toHaveLength(0);
+  });
+
+  it('ไม่เก็บ ipAddress/userAgent ใน cases.metadata (IP อยู่ใน auditLogs ที่มี retention)', async () => {
+    const result = await createCase(webInput({ ipAddress: '203.0.113.9', userAgent: 'ua-test' }));
+
+    expect(result.ok).toBe(true);
+    const meta = JSON.parse(String(mockState.insertedCases[0]?.metadata)) as Record<string, unknown>;
+    expect(meta).not.toHaveProperty('ipAddress');
+    expect(meta).not.toHaveProperty('userAgent');
+    expect(meta).toHaveProperty('source', 'web');
+  });
+});

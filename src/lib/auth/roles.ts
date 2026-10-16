@@ -41,11 +41,21 @@ export function canGrantRole(actorRole: UserRole, targetRole: UserRole): boolean
   return targetRole !== 'superadmin' || actorRole === 'superadmin';
 }
 
+/** เหตุผลที่บัญชีที่ยืนยันรหัสผ่านแล้วยังเข้า /admin ไม่ได้ — ตรงกับ reason ใน audit */
+export type LoginDenialReason = 'citizen_role' | 'inactive';
+
 /**
- * § ด่านออก session — authorize() ใช้หลัง bcrypt ผ่านแล้ว (timing คงเดิม)
- * citizen + บัญชีระงับ (isActive=false) ไม่ได้ JWT แม้รหัสถูก — กันยิง
- * /api/auth/callback/credentials ตรงเลี่ยง login action แล้วถือ session ผ่าน proxy
+ * § กฎเดียวของ "ใครได้ session staff" — authorize() (หลัง bcrypt), login action และ
+ * resolveStaff ใช้ร่วมกัน ไม่เขียนเงื่อนไขซ้ำแยกที่ (drift แล้วสิทธิ์ไม่ตรงกัน)
+ * citizen มาก่อน inactive — citizen ไม่เคยมีสิทธิ์ staff ไม่ว่าสถานะใด
  */
+export function loginDenialReason(role: UserRole, isActive: boolean): LoginDenialReason | null {
+  if (role === 'citizen') return 'citizen_role';
+  if (!isActive) return 'inactive';
+  return null;
+}
+
+/** รูป boolean ของ loginDenialReason — สำหรับจุดที่ไม่ต้องการเหตุผล */
 export function isLoginEligible(role: UserRole, isActive: boolean): boolean {
-  return role !== 'citizen' && isActive;
+  return loginDenialReason(role, isActive) === null;
 }
