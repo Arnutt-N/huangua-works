@@ -5,7 +5,7 @@ import { users, departments } from '@/lib/db/schema';
 import { requireStaff } from '@/lib/auth/require-staff';
 import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { getActiveDepartments } from '@/lib/queries/lookups';
-import { getTierMatrix } from '@/app/admin/actions/tiers';
+import { getTierMatrixSafe } from '@/app/admin/actions/tiers';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { UsersClient, UserSuccessToast } from './users-client';
 
@@ -44,7 +44,8 @@ export default async function UsersPage({
     .orderBy(asc(users.fullName));
 
   const deptOptions = await getActiveDepartments(db);
-  const tierMatrix = await getTierMatrix();
+  // § tier ล้มเฉพาะตารางต้องไม่พาหน้าล่ม (PR #118 finding A) — ล้มคืน null แล้ว client ปิด tier editor
+  const tierMatrix = await getTierMatrixSafe();
 
   return (
     <AdminShell user={staffUser} active="users" title="จัดการผู้ใช้">

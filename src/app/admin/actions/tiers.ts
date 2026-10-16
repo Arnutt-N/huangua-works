@@ -22,6 +22,20 @@ export async function getTierMatrix(): Promise<Record<TierKey, string[]>> {
   };
 }
 
+/**
+ * เมทริกซ์แบบทน tier ล้ม — อ่านไม่ได้คืน null ให้หน้า users แสดงตารางผู้ใช้ต่อ
+ * แล้วปิดเฉพาะส่วน tier editor (PR #118 finding A: tier_roles ล้มเฉพาะตารางต้อง
+ * ไม่พาหน้าทั้งหน้าล่ม; fail-closed ของสิทธิ์ยังคงอยู่ที่ require-staff)
+ */
+export async function getTierMatrixSafe(): Promise<Record<TierKey, string[]> | null> {
+  try {
+    return await getTierMatrix();
+  } catch (err) {
+    console.error('[admin] อ่าน tier matrix ไม่ได้ ปิด tier editor ชั่วคราว', err);
+    return null;
+  }
+}
+
 const TIER_LABELS: Record<TierKey, string> = {
   staff: 'เจ้าหน้าที่ทั่วไป',
   case_supervisor: 'งานเคส',

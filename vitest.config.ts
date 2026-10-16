@@ -20,10 +20,20 @@ export default defineConfig({
       include: ['src/**/*.ts'],
       exclude: ['src/**/*.d.ts', 'src/components/**'],
     },
+    // § contract test เรียก Auth.js ตัวติดตั้งจริงผ่าน vite pipeline (พอร์ตจาก proof config)
+    server: {
+      deps: { inline: ['next-auth'] },
+    },
   },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      // § next/* ชี้ไฟล์จริงเพื่อให้ contract test เรียก Auth.js ตัวติดตั้งจริงได้
+      // (พอร์ตจาก .audit/pr118-blast/proof.config.mts — ไม่กระทบเทสเดิมที่ไม่ได้ import next/*)
+      'next/server': import.meta.resolve('next/server.js'),
+      'next/headers': import.meta.resolve('next/headers.js'),
+      'next/navigation': import.meta.resolve('next/navigation.js'),
+      'next/cache': import.meta.resolve('next/cache.js'),
     },
   },
 });
