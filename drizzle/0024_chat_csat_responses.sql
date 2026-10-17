@@ -5,5 +5,5 @@ CREATE TABLE "public"."chat_csat_responses" (
 	"score" integer NOT NULL,
 	CONSTRAINT "chat_csat_responses_conversation_id_unique" UNIQUE("conversation_id"),
 	CONSTRAINT "chat_csat_responses_score_check" CHECK ("score" BETWEEN 1 AND 5),
-	CONSTRAINT "chat_csat_responses_conversation_id_fk" FOREIGN KEY ("conversation_id") REFERENCES "public"."chat_conversations"("id") ON DELETE CASCADE
+	CONSTRAINT "chat_csat_responses_conversation_id_chat_conversations_id_fk" FOREIGN KEY ("conversation_id") REFERENCES "public"."chat_conversations"("id") ON DELETE CASCADE
 );
