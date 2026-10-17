@@ -84,7 +84,7 @@ const THANK_YOU: Record<number, string> = {
 
 /**
  * บันทึกคะแนน CSAT — unique ต่อห้อง กดซ้ำคืนผลเดิมไม่เพิ่มแถว
- * คืนข้อความขอบคุณให้ผู้เรียกตอบกลับ ไม่ throw
+ * คืนผล {kind, score} ให้ผู้เรียกตัดสินใจต่อ (ข้อความขอบคุณแยกอยู่ csatThankYou) ไม่ throw
  */
 export async function recordCsatResponse(
   conversationId: string,
