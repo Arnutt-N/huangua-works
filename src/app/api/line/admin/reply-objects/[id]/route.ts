@@ -8,11 +8,12 @@ import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit';
 import { z } from 'zod';
 import { sql } from 'drizzle-orm';
+import { replyObjectTypeSchema, validateReplyPayload } from '@/lib/line/reply-object-validation';
 
 export const runtime = 'nodejs';
 
 const updateSchema = z.object({
-  objectType: z.enum(['flex', 'template', 'text', 'text_v2', 'image', 'sticker', 'video', 'audio', 'location', 'imagemap']).optional(),
+  objectType: replyObjectTypeSchema.optional(),
   payload: z.record(z.string(), z.unknown()).optional(),
   altText: z.string().max(200).nullable().optional(),
   isActive: z.boolean().optional(),
@@ -34,6 +35,20 @@ export async function PATCH(
   const [existing] = await db.select({ id: chatReplyObjects.id }).from(chatReplyObjects).where(eq(chatReplyObjects.id, id)).limit(1);
   if (!existing) {
     return NextResponse.json({ error: 'ไม่พบ reply object' }, { status: 404 });
+  }
+
+  // § PATCH ส่งมาเป็น delta — ต้องอ่านแถวเดิมมา merge ก่อนตรวจ ไม่เช่นนั้นเปลี่ยน type
+  // อย่างเดียวจะทิ้ง payload เก่าไว้แล้วกลายเป็นแถวที่ส่งไม่ได้เงียบๆ
+  if (result.data.objectType !== undefined || result.data.payload !== undefined) {
+    const [current] = await db
+      .select({ objectType: chatReplyObjects.objectType, payload: chatReplyObjects.payload })
+      .from(chatReplyObjects)
+      .where(eq(chatReplyObjects.id, id))
+      .limit(1);
+    const mergedType = result.data.objectType ?? current?.objectType;
+    const mergedPayload = (result.data.payload ?? current?.payload) as Record<string, unknown>;
+    const mergedError = mergedType ? validateReplyPayload(mergedType, mergedPayload) : 'ประเภทไม่ถูกต้อง';
+    if (mergedError) return NextResponse.json({ error: mergedError }, { status: 400 });
   }
 
   await db

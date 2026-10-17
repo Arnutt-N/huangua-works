@@ -60,6 +60,7 @@ export const chatMessageTypeEnum = pgEnum('chat_message_type', [
   'sticker',
   'flex',
   'template',
+  'imagemap',
   'system',
 ]);
 

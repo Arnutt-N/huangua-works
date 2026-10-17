@@ -38,59 +38,62 @@ function buildBaseMessage(
   payload: Record<string, unknown>,
   altText: string | null,
 ): LineOutgoingMessage | null {
+  // § quickReply อยู่ใน payload ตาม convention เดียวกัน — ต้องแยกออกก่อนส่ง contents/template
+  // ไม่เช่นนั้น blob quickReply รั่วเข้า Flex body แล้ว LINE อาจ reject ทั้งชุด
+  const { quickReply: _ignored, ...body } = payload;
   switch (objectType) {
     case 'text':
     case 'text_v2':
-      return { type: 'text', text: String(payload.text ?? altText ?? '') };
+      return { type: 'text', text: String(body.text ?? altText ?? '') };
     case 'flex':
-      return { type: 'flex', altText: altText ?? 'ข้อความ', contents: payload };
+      return { type: 'flex', altText: altText ?? 'ข้อความ', contents: body };
     case 'template':
-      return { type: 'template', altText: altText ?? 'เมนู', template: payload };
+      return { type: 'template', altText: altText ?? 'เมนู', template: body };
     case 'image':
       return {
         type: 'image',
-        originalContentUrl: String(payload.url ?? ''),
-        previewImageUrl: String(payload.previewUrl ?? payload.url ?? ''),
+        originalContentUrl: String(body.url ?? ''),
+        previewImageUrl: String(body.previewUrl ?? body.url ?? ''),
       };
     case 'sticker':
-      if (payload.packageId === undefined || payload.stickerId === undefined) return null;
+      if (body.packageId === undefined || body.stickerId === undefined) return null;
       return {
         type: 'sticker',
-        packageId: String(payload.packageId),
-        stickerId: String(payload.stickerId),
+        packageId: String(body.packageId),
+        stickerId: String(body.stickerId),
       };
     case 'video':
-      if (payload.url === undefined) return null;
+      if (body.url === undefined) return null;
       return {
         type: 'video',
-        originalContentUrl: String(payload.url),
-        previewImageUrl: String(payload.previewUrl ?? payload.url),
+        originalContentUrl: String(body.url),
+        previewImageUrl: String(body.previewUrl ?? body.url),
       };
     case 'audio':
-      if (payload.url === undefined) return null;
+      if (body.url === undefined) return null;
       return {
         type: 'audio',
-        originalContentUrl: String(payload.url),
-        duration: Number(payload.duration ?? 0),
+        originalContentUrl: String(body.url),
+        duration: Number(body.duration ?? 0),
       };
     case 'location':
-      if (payload.latitude === undefined || payload.longitude === undefined) return null;
+      if (body.latitude === undefined || body.longitude === undefined) return null;
       return {
         type: 'location',
-        title: String(payload.title ?? 'ตำแหน่ง'),
-        address: String(payload.address ?? ''),
-        latitude: Number(payload.latitude),
-        longitude: Number(payload.longitude),
+        title: String(body.title ?? 'ตำแหน่ง'),
+        address: String(body.address ?? ''),
+        latitude: Number(body.latitude),
+        longitude: Number(body.longitude),
       };
     case 'imagemap': {
-      const baseSize = payload.baseSize as { width?: unknown; height?: unknown } | undefined;
-      if (payload.baseUrl === undefined || baseSize?.width === undefined || baseSize?.height === undefined) return null;
+      const baseSize = body.baseSize as { width?: unknown; height?: unknown } | undefined;
+      if (body.baseUrl === undefined || baseSize?.width === undefined || baseSize?.height === undefined) return null;
       return {
         type: 'imagemap',
-        baseUrl: String(payload.baseUrl),
+        baseUrl: String(body.baseUrl),
         altText: altText ?? 'รูปภาพ',
         baseSize: { width: Number(baseSize.width), height: Number(baseSize.height) },
-        actions: Array.isArray(payload.actions) ? payload.actions : [],
+        actions: Array.isArray(body.actions) ? body.actions : [],
       };
     }
     default:

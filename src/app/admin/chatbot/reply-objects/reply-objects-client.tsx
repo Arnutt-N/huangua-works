@@ -24,33 +24,9 @@ interface FormState {
   isActive: boolean;
 }
 
+import { validateReplyPayload } from '@/lib/line/reply-object-validation';
+
 const EMPTY_FORM: FormState = { objectId: '', objectType: 'text', payloadJson: '{}', altText: '', isActive: true };
-
-/** field ที่แต่ละ type ต้องมีใน payload — ขาดคือ save ไม่ผ่าน (fail ตรงนี้ ไม่ใช่ตอนบอทส่ง) */
-const REQUIRED_PAYLOAD_FIELDS: Record<string, string[]> = {
-  text: ['text'],
-  text_v2: ['text'],
-  image: ['url'],
-  sticker: ['packageId', 'stickerId'],
-  video: ['url'],
-  audio: ['url'],
-  location: ['latitude', 'longitude'],
-  imagemap: ['baseUrl', 'baseSize'],
-};
-
-function validateReplyPayload(objectType: string, payload: Record<string, unknown>): string | null {
-  const required = REQUIRED_PAYLOAD_FIELDS[objectType];
-  if (!required) return null;
-  const missing = required.filter((field) => payload[field] === undefined || payload[field] === null);
-  if (missing.length > 0) return `payload ขาด field ที่จำเป็นสำหรับ ${objectType}: ${missing.join(', ')}`;
-  if (objectType === 'imagemap') {
-    const baseSize = payload.baseSize as { width?: unknown; height?: unknown } | undefined;
-    if (baseSize?.width === undefined || baseSize?.height === undefined) {
-      return 'payload.baseSize ต้องมี width และ height';
-    }
-  }
-  return null;
-}
 
 export function ReplyObjectsClient() {
   const [dialogOpen, setDialogOpen] = useState(false);

@@ -2,6 +2,7 @@ import { eq, and } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { chatIntents, chatIntentKeywords, chatIntentResponses, chatReplyObjects } from '@/lib/db/schema';
 import type { LineOutgoingMessage } from '../types';
+import { buildMessageFromObject } from './response-parser';
 import { readConfigVersion } from '../config-version';
 import {
   BOT_CONFIG_TTL_MS,
@@ -169,30 +170,7 @@ async function resolveReplyObject(objectId: string): Promise<LineOutgoingMessage
 
   if (!obj) return null;
 
-  const payload = obj.payload as Record<string, unknown>;
-
-  switch (obj.objectType) {
-    case 'text':
-      return { type: 'text', text: String(payload.text ?? obj.altText ?? '') };
-    case 'flex':
-      return {
-        type: 'flex',
-        altText: obj.altText ?? 'ข้อความ',
-        contents: payload,
-      } as LineOutgoingMessage;
-    case 'template':
-      return {
-        type: 'template',
-        altText: obj.altText ?? 'เมนู',
-        template: payload,
-      } as LineOutgoingMessage;
-    case 'image':
-      return {
-        type: 'image',
-        originalContentUrl: String(payload.url ?? ''),
-        previewImageUrl: String(payload.previewUrl ?? payload.url ?? ''),
-      } as LineOutgoingMessage;
-    default:
-      return null;
-  }
+  // § builder ตัวเดียวกับ response-parser — เคยมี switch ซ้ำตรงนี้แล้ว drift (ไม่รู้จัก type ใหม่)
+  // ห้ามแยก switch อีก ให้แก้ที่ buildMessageFromObject ที่เดียว
+  return buildMessageFromObject(obj.objectType, obj.payload as Record<string, unknown>, obj.altText);
 }

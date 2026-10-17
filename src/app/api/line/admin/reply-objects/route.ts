@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { asc, eq } from 'drizzle-orm';
+import { asc } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { chatReplyObjects } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
@@ -8,12 +8,13 @@ import { requireStaffApi } from '@/lib/auth/require-staff';
 import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit';
 import { z } from 'zod';
+import { replyObjectTypeSchema, validateReplyPayload } from '@/lib/line/reply-object-validation';
 
 export const runtime = 'nodejs';
 
 const createSchema = z.object({
   objectId: z.string().min(1).max(50).regex(/^[a-z0-9_-]+$/, 'ใช้ a-z, 0-9, -, _ เท่านั้น'),
-  objectType: z.enum(['flex', 'template', 'text', 'text_v2', 'image', 'sticker', 'video', 'audio', 'location', 'imagemap']),
+  objectType: replyObjectTypeSchema,
   payload: z.record(z.string(), z.unknown()),
   altText: z.string().max(200).optional(),
   isActive: z.boolean().default(true),
@@ -38,6 +39,10 @@ export async function POST(request: Request) {
 
   const result = await parseBody(createSchema, request);
   if (!result.ok) return result.response;
+
+  // § payload ตรวจที่ boundary ฝั่ง server ด้วย (client ข้ามได้ด้วย curl) — กฎเดียวกับฟอร์ม
+  const payloadError = validateReplyPayload(result.data.objectType, result.data.payload);
+  if (payloadError) return NextResponse.json({ error: payloadError }, { status: 400 });
 
   const db = await getDb();
   const id = generateId();

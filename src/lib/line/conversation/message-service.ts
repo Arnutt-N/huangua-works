@@ -106,7 +106,7 @@ export async function attachInboundMedia(
 
 /**
  * บันทึกคำตอบของบอท — คงพฤติกรรมเดิมของ engine: ไม่อัปเดต last message และไม่ broadcast
- * (ข้อความที่ไม่ใช่ text เก็บเป็น messageType 'flex' ตามเดิม)
+ * เก็บ type ตรงกับข้อความที่ส่ง (ไม่ยุบเป็น flex) พร้อม payload เต็มใน metadata ให้ย้อนดูได้
  */
 export async function recordBotReplies(conversationId: string, replies: LineOutgoingMessage[]): Promise<void> {
   if (replies.length === 0) return;
@@ -117,9 +117,10 @@ export async function recordBotReplies(conversationId: string, replies: LineOutg
       id: generateId(),
       conversationId,
       sender: 'bot' as const,
-      messageType: reply.type === 'text' ? ('text' as const) : ('flex' as const),
+      messageType: reply.type,
       textContent: reply.type === 'text' ? reply.text : null,
       flexPayload: reply.type === 'flex' ? reply.contents : null,
+      metadata: reply.type === 'text' || reply.type === 'flex' ? null : { reply },
     })),
   );
 }
