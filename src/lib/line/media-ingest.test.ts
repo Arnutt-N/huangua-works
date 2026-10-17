@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ingestLineMedia, sniffLineMediaMime, MAX_LINE_MEDIA_BYTES } from './media-ingest';
-import { LineApiError } from './client';
+import { ContentTooLargeError } from './client';
 
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 0]);
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a]);
@@ -65,11 +65,11 @@ describe('ingestLineMedia', () => {
     expect(result).toEqual({ kind: 'skipped', reason: 'download_failed' });
   });
 
-  it('client โยน 413 (เกินเพดานกลางทาง) → skipped too_large ไม่ใช่ download_failed', async () => {
+  it('client โยน ContentTooLarge (เกินเพดานกลางทาง) → skipped too_large ไม่ใช่ download_failed', async () => {
     const result = await ingestLineMedia('msg-6', {
       ...baseDeps,
       download: async () => {
-        throw new LineApiError('/message/content', 413, 'body เกินเพดาน');
+        throw new ContentTooLargeError('body เกินเพดาน');
       },
     });
     expect(result).toEqual({ kind: 'skipped', reason: 'too_large' });
