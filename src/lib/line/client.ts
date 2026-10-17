@@ -43,6 +43,14 @@ async function postLine(endpoint: string, payload: unknown): Promise<void> {
  */
 const MAX_CONTENT_BYTES = 10 * 1024 * 1024;
 const CONTENT_TIMEOUT_MS = 20000;
+
+/** ไฟล์ใหญ่เกินเพดาน (header หรือกลาง stream) — ไม่ใช่ LINE ล้ม เรียกแยกจาก LineApiError */
+export class ContentTooLargeError extends Error {
+  constructor(detail: string) {
+    super(`content เกินเพดาน: ${detail}`);
+    this.name = 'ContentTooLargeError';
+  }
+}
 export async function getMessageContent(
   messageId: string,
 ): Promise<{ bytes: Uint8Array; contentType: string | null; contentLength: number | null }> {
@@ -58,7 +66,7 @@ export async function getMessageContent(
     const lengthHeader = res.headers.get('content-length');
     const contentLength = lengthHeader !== null && lengthHeader !== '' ? Number(lengthHeader) : null;
     if (contentLength !== null && Number.isFinite(contentLength) && contentLength > MAX_CONTENT_BYTES) {
-      throw new LineApiError('/message/content', 413, `content-length ${contentLength} เกินเพดาน`);
+      throw new ContentTooLargeError(`content-length ${contentLength} เกินเพดาน`);
     }
     // § อ่านแบบ bounded stream ไม่ใช่ arrayBuffer ทั้งก้อน — ไฟล์ใหญ่เกินเพดานต้องตัดตั้งแต่กลางทาง
     // ไม่ใช่บัฟเฟอร์ครบแล้วค่อยทิ้ง (OOM vector บน public webhook)
@@ -72,7 +80,7 @@ export async function getMessageContent(
       total += value.byteLength;
       if (total > MAX_CONTENT_BYTES) {
         await reader.cancel().catch(() => {});
-        throw new LineApiError('/message/content', 413, `body เกินเพดาน ${MAX_CONTENT_BYTES}`);
+        throw new ContentTooLargeError(`body เกินเพดาน ${MAX_CONTENT_BYTES}`);
       }
       chunks.push(value);
     }
