@@ -64,12 +64,16 @@ export async function sendCsatSurvey(
   await recordBotReplies(conversationId, [survey]);
 }
 
+/** ขอบคะแนน CSAT (ตรงกับ CHECK score 1-5 ใน migration 0024) — parse กับ record ใช้ค่านี้ตัวเดียว */
+const CSAT_SCORE_MIN = 1;
+const CSAT_SCORE_MAX = 5;
+
 /** แยก postback csat ออกจาก postback อื่น — ผิดรูปคืน null แล้วผู้เรียก log จบ */
 export function parseCsatPostback(data: string): { conversationId: string; score: number } | null {
   const parts = data.split('|');
   if (parts.length !== 3 || parts[0] !== 'csat') return null;
   const score = Number(parts[2]);
-  if (!Number.isInteger(score) || score < 1 || score > 5) return null;
+  if (!Number.isInteger(score) || score < CSAT_SCORE_MIN || score > CSAT_SCORE_MAX) return null;
   if (!parts[1]) return null;
   return { conversationId: parts[1] as string, score };
 }
@@ -90,8 +94,8 @@ export async function recordCsatResponse(
   conversationId: string,
   score: number,
 ): Promise<CsatRecordResult> {
-  // § กัน caller ในอนาคต (ไม่ใช่แค่ postback) ฝังคะแนนนอก 1-5 — DB มี CHECK เป็นตาข่ายชั้นสอง
-  if (!Number.isInteger(score) || score < 1 || score > 5) return { kind: 'invalid' };
+  // § กัน caller ในอนาคต (ไม่ใช่แค่ postback) ฝังคะแนนนอกช่วง — DB มี CHECK เป็นตาข่ายชั้นสอง
+  if (!Number.isInteger(score) || score < CSAT_SCORE_MIN || score > CSAT_SCORE_MAX) return { kind: 'invalid' };
   const db = await getDb();
   const [existing] = await db
     .select({ score: chatCsatResponses.score })
@@ -122,16 +126,22 @@ export async function recordCsatResponse(
   return { kind: 'recorded', score };
 }
 
-/** true เฉพาะ PG unique violation (23505) — อย่างอื่นต้อง throw ไม่กลืน */
+/** รหัส PG unique violation — ชนแถวซ้ำจาก race เท่านั้นที่นับซ้ำได้ อย่างอื่นต้อง throw */
+const PG_UNIQUE_VIOLATION = '23505';
+
+/** true เฉพาะ PG unique violation — อย่างอื่นต้อง throw ไม่กลืน */
 function isUniqueViolation(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && (error as { code?: unknown }).code === '23505';
+  return typeof error === 'object' && error !== null && (error as { code?: unknown }).code === PG_UNIQUE_VIOLATION;
 }
 
 export function csatThankYou(score: number): string {
   return THANK_YOU[score] ?? 'ขอบคุณสำหรับคะแนนครับ';
 }
 
-/** ดึง line user id ของห้อง — postback ไม่มี source ที่เชื่อได้ ให้อ่านจาก DB แทน */
+/**
+ * ดึง raw LINE id ของห้องจาก DB — push ต้องใช้ id จริง ไม่ใช่ placeholder
+ * (ปลายทาง push คือ LINE user ของห้องนี้ ไม่เกี่ยวกับ user ที่กดปุ่ม)
+ */
 export async function lineUserIdOfConversation(conversationId: string): Promise<string | null> {
   const db = await getDb();
   const [row] = await db
