@@ -1,6 +1,6 @@
 import { generateId } from '@/lib/id';
 import { isStorageConfigured, uploadFile } from '@/lib/storage';
-import { getMessageContent } from './client';
+import { LineApiError, getMessageContent } from './client';
 
 // § เพดานเดียวกับ admin media (10 MB) ตัดสินใน Review Gate ของ PRP line-gap-closure
 export const MAX_LINE_MEDIA_BYTES = 10 * 1024 * 1024;
@@ -68,7 +68,11 @@ export async function ingestLineMedia(
   let bytes: Uint8Array;
   try {
     ({ bytes } = await deps.download(messageId));
-  } catch {
+  } catch (error) {
+    // § client โยน 413 เมื่อ header หรือ body เกินเพดาน — นั่นคือ too_large ไม่ใช่ download ล้ม
+    if (error instanceof LineApiError && error.status === 413) {
+      return { kind: 'skipped', reason: 'too_large' };
+    }
     return { kind: 'skipped', reason: 'download_failed' };
   }
 
