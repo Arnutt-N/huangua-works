@@ -8,29 +8,30 @@ import {
 } from './csat';
 
 describe('parseCsatPostback', () => {
-  it('รูปแบบถูก → conversationId + score', () => {
-    expect(parseCsatPostback('csat|conv-1|5')).toEqual({ conversationId: 'conv-1', score: 5 });
+  it('รูปแบบถูก → score', () => {
+    expect(parseCsatPostback('csat|5')).toEqual({ score: 5 });
   });
   it('คะแนนนอก 1-5 → null', () => {
-    expect(parseCsatPostback('csat|conv-1|0')).toBeNull();
-    expect(parseCsatPostback('csat|conv-1|6')).toBeNull();
+    expect(parseCsatPostback('csat|0')).toBeNull();
+    expect(parseCsatPostback('csat|6')).toBeNull();
   });
-  it('ไม่ใช่ csat protocol → null', () => {
+  it('ไม่ใช่ csat protocol หรือมี id แนบ → null', () => {
     expect(parseCsatPostback('confirm:ok')).toBeNull();
-    expect(parseCsatPostback('csat|conv-1')).toBeNull();
-    expect(parseCsatPostback('csat||5')).toBeNull();
+    expect(parseCsatPostback('csat')).toBeNull();
+    expect(parseCsatPostback('csat|conv-1|5')).toBeNull();
   });
 });
 
 describe('buildCsatSurvey', () => {
-  it('มีปุ่ม 5-1 ครบพร้อม postback data ตรงห้อง', () => {
-    const survey = buildCsatSurvey('conv-9');
+  it('มีปุ่ม 5-1 ครบพร้อม postback data มีแค่ score', () => {
+    const survey = buildCsatSurvey();
     if (survey.type !== 'flex') throw new Error('survey ต้องเป็น flex');
     const footer = (survey.contents as { footer: { contents: unknown[] } }).footer.contents;
     expect(footer).toHaveLength(5);
     const data = JSON.stringify(footer);
-    expect(data).toContain('csat|conv-9|5');
-    expect(data).toContain('csat|conv-9|1');
+    expect(data).toContain('csat|5');
+    expect(data).toContain('csat|1');
+    expect(data).not.toContain('conv-');
   });
 });
 

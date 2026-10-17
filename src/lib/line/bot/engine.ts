@@ -332,8 +332,7 @@ async function handlePostbackEvent(db: Db, event: LinePostbackEvent, conversatio
   // § postback ที่ไม่ใช่ confirm/csat protocol คงพฤติกรรมเดิม: log only ไม่ตอบอะไร
   const csatData = parseCsatPostback(event.postback.data);
   if (csatData) {
-    // § ให้คะแนนห้องของคนกดเท่านั้น — id ที่แนบมากับปุ่มเชื่อไม่ได้ (replay ข้ามห้องได้)
-    // จึงเมิน csatData.conversationId แล้วใช้ conversationId ของ session นี้
+    // § ให้คะแนนห้องของคนกดเท่านั้น — wire มีแค่ score ห้องใช้ของ session นี้ (ไม่มี id ให้ปลอม)
     const recorded = await recordCsatResponse(conversationId, csatData.score);
     // § กดซ้ำไม่ตอบขอบคุณซ้ำ — คะแนนแถวแรกชนะแล้ว thank-you มีในประวัติแล้ว
     if (recorded.kind === 'recorded') {
