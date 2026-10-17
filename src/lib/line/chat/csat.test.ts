@@ -44,8 +44,8 @@ describe('csatThankYou', () => {
 
 describe('recordCsatResponse', () => {
   it('คะแนนนอก 1-5 → invalid โดยไม่แตะ DB', async () => {
-    await expect(recordCsatResponse('conv-ghost', 0)).resolves.toEqual({ kind: 'invalid' });
-    await expect(recordCsatResponse('conv-ghost', 6)).resolves.toEqual({ kind: 'invalid' });
+    await expect(recordCsatResponse('conv-ghost', 0, null)).resolves.toEqual({ kind: 'invalid' });
+    await expect(recordCsatResponse('conv-ghost', 6, null)).resolves.toEqual({ kind: 'invalid' });
   });
 });
 

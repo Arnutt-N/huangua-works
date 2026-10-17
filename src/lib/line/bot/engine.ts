@@ -328,7 +328,9 @@ async function updateBotState(db: Db, lineUserPk: string, state: CaseFlowState |
 }
 
 async function handleFollowEvent(db: Db, event: LineFollowEvent, conversationId: string, transport: LineTransport) {
-  const replies = await getWelcomeMessages();
+  // § โปรไฟล์ดึงแบบ best-effort — พังหรือไม่มียังต้องส่ง welcome ต่อ (display_name ว่าง)
+  const profile = await transport.getProfile(event.source.userId).catch(() => null);
+  const replies = await getWelcomeMessages({ displayName: profile?.displayName ?? null });
 
   // คงพฤติกรรมเดิม: บันทึกแค่ข้อความแรกเป็น text
   await db.insert(chatMessages).values({
@@ -356,7 +358,13 @@ async function handlePostbackEvent(db: Db, event: LinePostbackEvent, conversatio
   const csatData = parseCsatPostback(event.postback.data);
   if (csatData) {
     // § ให้คะแนนห้องของคนกดเท่านั้น — wire มีแค่ score ห้องใช้ของ session นี้ (ไม่มี id ให้ปลอม)
-    const recorded = await recordCsatResponse(conversationId, csatData.score);
+    // รอบปิดอ่านจากห้องตอนแตะ: reopen แล้วปิดใหม่ถือเป็นรอบใหม่ โหวตได้อีก
+    const [conv] = await db
+      .select({ resolvedAt: chatConversations.resolvedAt })
+      .from(chatConversations)
+      .where(eq(chatConversations.id, conversationId))
+      .limit(1);
+    const recorded = await recordCsatResponse(conversationId, csatData.score, conv?.resolvedAt ?? null);
     // § กดซ้ำไม่ตอบขอบคุณซ้ำ — คะแนนแถวแรกชนะแล้ว thank-you มีในประวัติแล้ว
     if (recorded.kind === 'recorded') {
       const thanks: LineOutgoingMessage[] = [{ type: 'text', text: csatThankYou(recorded.score) }];

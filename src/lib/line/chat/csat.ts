@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { chatConversations, chatCsatResponses } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
@@ -96,12 +96,14 @@ const THANK_YOU: Record<number, string> = {
 };
 
 /**
- * บันทึกคะแนน CSAT — unique ต่อห้อง กดซ้ำคืนผลเดิมไม่เพิ่มแถว
+ * บันทึกคะแนน CSAT — unique ต่อ (ห้อง, รอบปิด) ห้อง reuse ได้หลายรอบ แต่ละรอบโหวตใหม่ได้
+ * resolvedAt อ่านจากห้องตอนแตะ (null สำหรับแถวเก่าก่อนมีคอลัมน์ — null ไม่ชนกันเอง)
  * คืนผล {kind, score} ให้ผู้เรียกตัดสินใจต่อ (ข้อความขอบคุณแยกอยู่ csatThankYou) ไม่ throw
  */
 export async function recordCsatResponse(
   conversationId: string,
   score: number,
+  resolvedAt: Date | null,
 ): Promise<CsatRecordResult> {
   // § กัน caller ในอนาคต (ไม่ใช่แค่ postback) ฝังคะแนนนอกช่วง — DB มี CHECK เป็นตาข่ายชั้นสอง
   if (!Number.isInteger(score) || score < CSAT_SCORE_MIN || score > CSAT_SCORE_MAX) return { kind: 'invalid' };
@@ -109,14 +111,15 @@ export async function recordCsatResponse(
   // § เขียนครั้งเดียวด้วย upsert — pre-select กัน race ไม่ได้อยู่ดี ปล่อยให้ constraint ตัดสิน
   const [inserted] = await db
     .insert(chatCsatResponses)
-    .values({ id: generateId(), conversationId, score })
-    .onConflictDoNothing({ target: chatCsatResponses.conversationId })
+    .values({ id: generateId(), conversationId, resolvedAt, score })
+    .onConflictDoNothing({ target: [chatCsatResponses.conversationId, chatCsatResponses.resolvedAt] })
     .returning({ score: chatCsatResponses.score });
   if (inserted) return { kind: 'recorded', score: inserted.score };
   const [existing] = await db
     .select({ score: chatCsatResponses.score })
     .from(chatCsatResponses)
     .where(eq(chatCsatResponses.conversationId, conversationId))
+    .orderBy(desc(chatCsatResponses.createdAt))
     .limit(1);
   if (existing) return { kind: 'duplicate', score: existing.score };
   return { kind: 'invalid' };

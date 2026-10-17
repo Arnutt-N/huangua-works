@@ -42,3 +42,15 @@ describe('getWelcomeMessages', () => {
     expect(text).toMatch(/HGx+/);
   });
 });
+
+describe('fillWelcomeTemplate', () => {
+  it('แทน {display_name} ด้วยชื่อจริง', async () => {
+    const { fillWelcomeTemplate } = await import('./welcome');
+    expect(fillWelcomeTemplate('สวัสดี {display_name}', { displayName: 'สมชาย' })).toBe('สวัสดี สมชาย');
+  });
+
+  it('ไม่มีชื่อ → ว่าง ไม่เหลือ placeholder ค้าง', async () => {
+    const { fillWelcomeTemplate } = await import('./welcome');
+    expect(fillWelcomeTemplate('สวัสดี {display_name} ({follow_count})', {})).toBe('สวัสดี  ()');
+  });
+});

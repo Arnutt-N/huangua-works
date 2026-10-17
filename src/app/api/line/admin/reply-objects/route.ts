@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { asc, eq } from 'drizzle-orm';
+import { asc } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { chatReplyObjects } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
@@ -8,12 +8,20 @@ import { requireStaffApi } from '@/lib/auth/require-staff';
 import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit';
 import { z } from 'zod';
+import { replyObjectTypeSchema, validateReplyPayload } from '@/lib/line/reply-object-validation';
+
+/** รหัส PG unique violation — 409 เฉพาะชนจริง อย่างอื่นต้อง 500 */
+const PG_UNIQUE_VIOLATION = '23505';
+
+function isPgUniqueViolation(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as { code?: unknown }).code === PG_UNIQUE_VIOLATION;
+}
 
 export const runtime = 'nodejs';
 
 const createSchema = z.object({
   objectId: z.string().min(1).max(50).regex(/^[a-z0-9_-]+$/, 'ใช้ a-z, 0-9, -, _ เท่านั้น'),
-  objectType: z.enum(['flex', 'template', 'text', 'image']),
+  objectType: replyObjectTypeSchema,
   payload: z.record(z.string(), z.unknown()),
   altText: z.string().max(200).optional(),
   isActive: z.boolean().default(true),
@@ -39,6 +47,10 @@ export async function POST(request: Request) {
   const result = await parseBody(createSchema, request);
   if (!result.ok) return result.response;
 
+  // § payload ตรวจที่ boundary ฝั่ง server ด้วย (client ข้ามได้ด้วย curl) — กฎเดียวกับฟอร์ม
+  const payloadError = validateReplyPayload(result.data.objectType, result.data.payload);
+  if (payloadError) return NextResponse.json({ error: payloadError }, { status: 400 });
+
   const db = await getDb();
   const id = generateId();
 
@@ -52,8 +64,12 @@ export async function POST(request: Request) {
       isActive: result.data.isActive,
       createdBy: authz.ctx.user.id,
     });
-  } catch {
-    return NextResponse.json({ error: 'object_id นี้ถูกใช้แล้ว' }, { status: 409 });
+  } catch (error) {
+    // § 409 เฉพาะชน unique จริง — error อื่น (เช่น enum/DB) ต้อง 500 ดังๆ ไม่ใช่บอก id ซ้ำผิดๆ
+    if (isPgUniqueViolation(error)) {
+      return NextResponse.json({ error: 'object_id นี้ถูกใช้แล้ว' }, { status: 409 });
+    }
+    throw error;
   }
 
   await logAudit({

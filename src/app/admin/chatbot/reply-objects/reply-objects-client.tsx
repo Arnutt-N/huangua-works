@@ -24,6 +24,8 @@ interface FormState {
   isActive: boolean;
 }
 
+import { validateReplyPayload, REPLY_OBJECT_TYPES } from '@/lib/line/reply-object-validation';
+
 const EMPTY_FORM: FormState = { objectId: '', objectType: 'text', payloadJson: '{}', altText: '', isActive: true };
 
 export function ReplyObjectsClient() {
@@ -65,6 +67,13 @@ export function ReplyObjectsClient() {
       payload = JSON.parse(form.payloadJson);
     } catch {
       notify('error', 'Payload JSON ไม่ถูกต้อง');
+      return;
+    }
+
+    // § ชนิดที่ LINE API ไม่รับต้อง fail ตรงนี้ ไม่ใช่ตอนบอทส่ง (PRP T4 risk)
+    const payloadError = validateReplyPayload(form.objectType, payload);
+    if (payloadError) {
+      notify('error', payloadError);
       return;
     }
 
@@ -185,10 +194,11 @@ export function ReplyObjectsClient() {
                 onChange={(e) => setForm((f) => ({ ...f, objectType: e.target.value }))}
                 className="min-h-touch w-full rounded-md border border-border bg-surface-raised px-4 text-ink"
               >
-                <option value="text">Text</option>
-                <option value="flex">Flex</option>
-                <option value="template">Template</option>
-                <option value="image">Image</option>
+                {REPLY_OBJECT_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
               </select>
             </div>
 
