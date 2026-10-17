@@ -295,7 +295,9 @@ async function updateBotState(db: Db, lineUserPk: string, state: CaseFlowState |
 }
 
 async function handleFollowEvent(db: Db, event: LineFollowEvent, conversationId: string, transport: LineTransport) {
-  const replies = await getWelcomeMessages();
+  // § โปรไฟล์ดึงแบบ best-effort — พังหรือไม่มียังต้องส่ง welcome ต่อ (display_name ว่าง)
+  const profile = await transport.getProfile(event.source.userId).catch(() => null);
+  const replies = await getWelcomeMessages({ displayName: profile?.displayName ?? null });
 
   // คงพฤติกรรมเดิม: บันทึกแค่ข้อความแรกเป็น text
   await db.insert(chatMessages).values({
