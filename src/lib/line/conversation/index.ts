@@ -7,6 +7,7 @@ export { httpLineTransport, type LineTransport } from './transport';
 export {
   attachInboundMedia,
   findInboundByLineMessageId,
+  hasBotReplyAfter,
   recordBotReplies,
   recordInboundMessage,
   sendAdminReply,
