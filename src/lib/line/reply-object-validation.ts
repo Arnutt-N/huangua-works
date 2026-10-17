@@ -1,6 +1,10 @@
 import { z } from 'zod';
+import type { LineQuickReply, LineQuickReplyItem } from './types';
 
-/** ประเภท reply object ทั้งหมด (ตรงกับ replyObjectTypeEnum ใน schema) */
+/**
+ * tuple เดียวของ reply object types — pgEnum, zod schema ฝั่ง server,
+ * และ dropdown ฝั่ง client derive จากที่นี่ ห้าม hardcode รายชื่อที่อื่น
+ */
 export const REPLY_OBJECT_TYPES = [
   'flex',
   'template',
@@ -18,22 +22,53 @@ export type ReplyObjectType = (typeof REPLY_OBJECT_TYPES)[number];
 
 export const replyObjectTypeSchema = z.enum(REPLY_OBJECT_TYPES);
 
-/** field ที่แต่ละ type ต้องมีใน payload — กฎเดียวกับ client ใช้ร่วมกันทั้งสองฝั่ง */
-const REQUIRED_PAYLOAD_FIELDS: Record<ReplyObjectType, string[]> = {
-  flex: [],
-  template: [],
-  text: ['text'],
-  text_v2: ['text'],
-  image: ['url'],
-  sticker: ['packageId', 'stickerId'],
-  video: ['url'],
-  audio: ['url'],
-  location: ['latitude', 'longitude'],
-  imagemap: ['baseUrl', 'baseSize'],
+/** เพดาน items ของ quickReply ต่อข้อความ (โควตา LINE Messaging API) */
+export const LINE_QUICK_REPLY_MAX_ITEMS = 13;
+
+const quickReplyActionSchema = z.union([
+  z.object({ type: z.literal('message'), label: z.string().min(1).max(20), text: z.string().min(1) }),
+  z.object({ type: z.literal('postback'), label: z.string().min(1).max(20), data: z.string().min(1), displayText: z.string().optional() }),
+  z.object({ type: z.literal('uri'), label: z.string().min(1).max(20), uri: z.string().url() }),
+]);
+
+const quickReplySchema = z.object({
+  items: z.array(z.object({ type: z.literal('action'), action: quickReplyActionSchema })).min(1).max(LINE_QUICK_REPLY_MAX_ITEMS),
+});
+
+/** schema ต่อ type — ความจริงเดียวของรูปร่าง payload ที่ถูกต้อง */
+const PAYLOAD_SCHEMAS = {
+  flex: z.record(z.string(), z.unknown()).refine((v) => Object.keys(v).length > 0, 'payload ต้องไม่ว่าง'),
+  template: z.record(z.string(), z.unknown()).refine((v) => Object.keys(v).length > 0, 'payload ต้องไม่ว่าง'),
+  text: z.object({ text: z.string().min(1) }),
+  text_v2: z.object({ text: z.string().min(1) }),
+  image: z.object({ url: z.string().min(1) }),
+  sticker: z.object({ packageId: z.string().min(1), stickerId: z.string().min(1) }),
+  video: z.object({ url: z.string().min(1) }),
+  audio: z.object({ url: z.string().min(1), duration: z.number().nonnegative().optional() }),
+  location: z.object({ latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180) }),
+  imagemap: z.object({
+    baseUrl: z.string().min(1),
+    baseSize: z.object({ width: z.number().positive(), height: z.number().positive() }),
+  }),
+} satisfies Record<ReplyObjectType, z.ZodTypeAny>;
+
+export type ParsedReplyPayload = {
+  [K in ReplyObjectType]: z.infer<(typeof PAYLOAD_SCHEMAS)[K]>;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+/**
+ * แยก quickReply ออกจาก body — เจ้าของกฎนี้ตัวเดียว ทั้ง validator และ builder ใช้
+ * คืน null เมื่อ quickReply ผิดรูป (ห้ามกลืนเงียบ ห้ามส่งแบบแหว่ง)
+ */
+export function parseQuickReply(value: unknown): LineQuickReply | null {
+  if (value === undefined) return null;
+  const parsed = quickReplySchema.safeParse(value);
+  if (!parsed.success) return null;
+  return { items: parsed.data.items as LineQuickReplyItem[] };
 }
 
 /**
@@ -47,33 +82,16 @@ export function validateReplyPayload(
   if (!(REPLY_OBJECT_TYPES as readonly string[]).includes(objectType)) {
     return `ประเภทไม่รองรับ: ${objectType}`;
   }
-  if (!isRecord(payload)) return 'payload ต้องเป็น object';
   const type = objectType as ReplyObjectType;
-  const missing = REQUIRED_PAYLOAD_FIELDS[type].filter((field) => payload[field] === undefined || payload[field] === null);
-  if (missing.length > 0) return `payload ขาด field ที่จำเป็นสำหรับ ${type}: ${missing.join(', ')}`;
-  if (type === 'imagemap') {
-    const baseSize = payload.baseSize;
-    if (!isRecord(baseSize) || baseSize.width === undefined || baseSize.height === undefined) {
-      return 'payload.baseSize ต้องมี width และ height';
-    }
+  if (!isRecord(payload)) return 'payload ต้องเป็น object';
+  const { quickReply: _ignored, ...body } = payload;
+  const result = PAYLOAD_SCHEMAS[type].safeParse(body);
+  if (!result.success) {
+    const first = result.error.issues[0];
+    return first?.message ?? `payload ไม่ถูกต้องสำหรับ ${type}`;
   }
-  if (type === 'location') {
-    const lat = Number(payload.latitude);
-    const lng = Number(payload.longitude);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-      return 'พิกัดไม่ถูกต้อง (lat ±90, lng ±180)';
-    }
-  }
-  if (type === 'audio') {
-    const duration = Number(payload.duration ?? 0);
-    if (!Number.isFinite(duration) || duration < 0) return 'duration ต้องเป็นตัวเลขไม่ติดลบ';
-  }
-  const quickReply = payload.quickReply;
-  if (quickReply !== undefined) {
-    if (!isRecord(quickReply) || !Array.isArray(quickReply.items)) return 'quickReply ต้องมี items เป็น array';
-    if (quickReply.items.length === 0 || quickReply.items.length > 13) {
-      return 'quickReply ต้องมี 1-13 items';
-    }
+  if (payload.quickReply !== undefined && parseQuickReply(payload.quickReply) === null) {
+    return 'quickReply ไม่ถูกต้อง (ต้องมี 1-13 items ที่ action ถูกต้อง)';
   }
   return null;
 }

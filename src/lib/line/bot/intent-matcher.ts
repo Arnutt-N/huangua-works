@@ -1,8 +1,8 @@
 import { eq, and } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
-import { chatIntents, chatIntentKeywords, chatIntentResponses, chatReplyObjects } from '@/lib/db/schema';
+import { chatIntents, chatIntentKeywords, chatIntentResponses } from '@/lib/db/schema';
 import type { LineOutgoingMessage } from '../types';
-import { buildMessageFromObject } from './response-parser';
+import { resolveReplyObject } from './reply-object-store';
 import { readConfigVersion } from '../config-version';
 import {
   BOT_CONFIG_TTL_MS,
@@ -158,19 +158,4 @@ async function resolveIntentResponses(intentId: string): Promise<LineOutgoingMes
   }
 
   return messages;
-}
-
-async function resolveReplyObject(objectId: string): Promise<LineOutgoingMessage | null> {
-  const db = await getDb();
-  const [obj] = await db
-    .select()
-    .from(chatReplyObjects)
-    .where(and(eq(chatReplyObjects.id, objectId), eq(chatReplyObjects.isActive, true)))
-    .limit(1);
-
-  if (!obj) return null;
-
-  // § builder ตัวเดียวกับ response-parser — เคยมี switch ซ้ำตรงนี้แล้ว drift (ไม่รู้จัก type ใหม่)
-  // ห้ามแยก switch อีก ให้แก้ที่ buildMessageFromObject ที่เดียว
-  return buildMessageFromObject(obj.objectType, obj.payload as Record<string, unknown>, obj.altText);
 }

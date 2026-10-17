@@ -15,6 +15,7 @@ import { ALL_STATUSES } from '../cases/state-machine';
 import { ALL_BUDGET_STATUSES } from '../cases/budget';
 import { ALL_ROLES } from '../auth/roles';
 import { CONVERSATION_MODES } from '../line/chat-modes';
+import { REPLY_OBJECT_TYPES } from '../line/reply-object-validation';
 
 /**
  * Schema — อบต.หัวงัว citizen-help (PostgreSQL)
@@ -844,18 +845,8 @@ export const chatConversationTags = pgTable(
 // § Chatbot Management (intent engine, reply objects, broadcast, rich menus)
 // ────────────────────────────────────────────────────────────────────────────
 
-export const replyObjectTypeEnum = pgEnum('reply_object_type', [
-  'flex',
-  'template',
-  'text',
-  'text_v2',
-  'image',
-  'sticker',
-  'video',
-  'audio',
-  'location',
-  'imagemap',
-]);
+/** ประเภท reply object — tuple ต้นทางเดียวที่ reply-object-validation.ts ทุกที่ derive จากที่นี่ */
+export const replyObjectTypeEnum = pgEnum('reply_object_type', [...REPLY_OBJECT_TYPES]);
 
 export const matchTypeEnum = pgEnum('match_type', [
   'exact',

@@ -24,7 +24,7 @@ interface FormState {
   isActive: boolean;
 }
 
-import { validateReplyPayload } from '@/lib/line/reply-object-validation';
+import { validateReplyPayload, REPLY_OBJECT_TYPES } from '@/lib/line/reply-object-validation';
 
 const EMPTY_FORM: FormState = { objectId: '', objectType: 'text', payloadJson: '{}', altText: '', isActive: true };
 
@@ -194,16 +194,11 @@ export function ReplyObjectsClient() {
                 onChange={(e) => setForm((f) => ({ ...f, objectType: e.target.value }))}
                 className="min-h-touch w-full rounded-md border border-border bg-surface-raised px-4 text-ink"
               >
-                <option value="text">Text</option>
-                <option value="text_v2">Text v2</option>
-                <option value="flex">Flex</option>
-                <option value="template">Template</option>
-                <option value="image">Image</option>
-                <option value="sticker">Sticker</option>
-                <option value="video">Video</option>
-                <option value="audio">Audio</option>
-                <option value="location">Location</option>
-                <option value="imagemap">Imagemap</option>
+                {REPLY_OBJECT_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
               </select>
             </div>
 
