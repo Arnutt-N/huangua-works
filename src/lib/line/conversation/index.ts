@@ -6,6 +6,7 @@ export { MODE_TRANSITIONS, allowedSourceModes, canTransition, isHumanHandled } f
 export { httpLineTransport, type LineTransport } from './transport';
 export {
   attachInboundMedia,
+  findInboundByLineMessageId,
   recordBotReplies,
   recordInboundMessage,
   sendAdminReply,

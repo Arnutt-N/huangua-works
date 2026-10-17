@@ -21,6 +21,7 @@ import {
   changeMode,
   httpLineTransport,
   attachInboundMedia,
+  findInboundByLineMessageId,
   isHumanHandled,
   recordBotReplies,
   recordInboundMessage,
@@ -125,6 +126,10 @@ async function handleMessageEvent(
     : msg.type === 'location' ? 'location'
     : msg.type === 'sticker' ? 'sticker'
     : 'text';
+
+  // § redelivery หลัง crash ต้องเจอแถวเดิม — มีแถวแล้วข้ามทั้งก้อน (ไม่ ingest ซ้ำ ไม่ตอบซ้ำ)
+  const dup = await findInboundByLineMessageId(msg.id);
+  if (dup) return;
 
   // § record-first: บันทึกแถวข้อความก่อนดึงสื่อเสมอ — crash กลาง ingest จะเหลือแถวให้ redelivery
   // เห็น ไม่ใช่หายทั้งข้อความ (dedup mark ก่อน process จึงต้องมีแถวรอก่อน) ingest เสร็จค่อยแนบทับ
