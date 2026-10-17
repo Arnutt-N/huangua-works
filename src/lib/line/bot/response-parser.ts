@@ -98,11 +98,14 @@ function buildBaseMessage(
   }
 }
 
-/** quickReply เก็บใน payload ({ items: [...] } ไม่เกิน 13) — ผิดรูปถือว่าไม่มี ไม่พังทั้งข้อความ */
+/** เพดาน items ของ quickReply ต่อข้อความ (โควตา LINE Messaging API) */
+const LINE_QUICK_REPLY_MAX_ITEMS = 13;
+
+/** quickReply เก็บใน payload ({ items: [...] }) — ผิดรูปถือว่าไม่มี ไม่พังทั้งข้อความ */
 function parseQuickReply(value: unknown): LineQuickReply | null {
   if (!value || typeof value !== 'object') return null;
   const items = (value as { items?: unknown }).items;
-  if (!Array.isArray(items) || items.length === 0 || items.length > 13) return null;
+  if (!Array.isArray(items) || items.length === 0 || items.length > LINE_QUICK_REPLY_MAX_ITEMS) return null;
   const valid = items.filter((item): item is LineQuickReplyItem => {
     if (!item || typeof item !== 'object') return false;
     const action = (item as { action?: unknown }).action;
