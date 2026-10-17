@@ -11,7 +11,7 @@ import {
 } from '@/lib/validation';
 import { parseBody } from '@/lib/api-helpers';
 import { changeMode, linkCase, transferOwnership, httpLineTransport } from '@/lib/line/conversation';
-import { lineUserIdOfConversation, sendCsatSurvey } from '@/lib/line/chat/csat';
+import { sendCsatSurveyForConversation } from '@/lib/line/chat/csat';
 
 export const runtime = 'nodejs';
 
@@ -139,8 +139,7 @@ export async function PATCH(
     // ห่อทั้งอ่าน id และส่ง (DB ล้มจุดไหนก็ต้องยังคืน ok เพราะ close เข้าแล้ว)
     if (mode === 'resolved' && result.changed) {
       try {
-        const lineUserId = await lineUserIdOfConversation(id);
-        if (lineUserId) await sendCsatSurvey(id, lineUserId, httpLineTransport);
+        await sendCsatSurveyForConversation(id, httpLineTransport);
       } catch (error) {
         console.error('[conversations] csat survey failed after close', { conversationId: id, error });
       }

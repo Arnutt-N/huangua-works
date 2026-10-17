@@ -11,8 +11,8 @@ export type CsatRecordResult =
   | { kind: 'duplicate'; score: number }
   | { kind: 'invalid' };
 
-/** Flex สำรวจความพึงพอใจ 1-5 — ปุ่ม postback กลับมาเป็น csat|<conversationId>|<score> */
-export function buildCsatSurvey(conversationId: string): LineOutgoingMessage {
+/** Flex สำรวจความพึงพอใจ 1-5 — ปุ่ม postback กลับมาเป็น csat|<score> เท่านั้น ไม่มี id ให้ปลอม */
+export function buildCsatSurvey(): LineOutgoingMessage {
   return {
     type: 'flex',
     altText: 'ประเมินความพึงพอใจ',
@@ -37,7 +37,7 @@ export function buildCsatSurvey(conversationId: string): LineOutgoingMessage {
           action: {
             type: 'postback',
             label: String(score),
-            data: `csat|${conversationId}|${score}`,
+            data: `csat|${score}`,
             displayText: `ให้ ${score} คะแนน`,
           },
         })),
@@ -55,7 +55,7 @@ export async function sendCsatSurvey(
   lineUserId: string,
   transport: LineTransport,
 ): Promise<void> {
-  const survey = buildCsatSurvey(conversationId);
+  const survey = buildCsatSurvey();
   try {
     await transport.push(lineUserId, [survey]);
   } catch {
@@ -64,18 +64,27 @@ export async function sendCsatSurvey(
   await recordBotReplies(conversationId, [survey]);
 }
 
+/**
+ * ส่งสำรวจให้ห้องเดียวจบ (lookup id + ส่ง) — route เรียกบรรทัดเดียว ไม่ต้อง import หลายสัญลักษณ์
+ */
+export async function sendCsatSurveyForConversation(
+  conversationId: string,
+  transport: LineTransport,
+): Promise<void> {
+  const lineUserId = await lineUserIdOfConversation(conversationId);
+  if (!lineUserId) return;
+  await sendCsatSurvey(conversationId, lineUserId, transport);
+}
+
 /** ขอบคะแนน CSAT (ตรงกับ CHECK score 1-5 ใน migration 0024) — parse กับ record ใช้ค่านี้ตัวเดียว */
 const CSAT_SCORE_MIN = 1;
 const CSAT_SCORE_MAX = 5;
 
-/** แยก postback csat ออกจาก postback อื่น — ผิดรูปคืน null แล้วผู้เรียก log จบ */
-export function parseCsatPostback(data: string): { conversationId: string; score: number } | null {
-  const parts = data.split('|');
-  if (parts.length !== 3 || parts[0] !== 'csat') return null;
-  const score = Number(parts[2]);
-  if (!Number.isInteger(score) || score < CSAT_SCORE_MIN || score > CSAT_SCORE_MAX) return null;
-  if (!parts[1]) return null;
-  return { conversationId: parts[1] as string, score };
+/** แยก postback csat ออกจาก postback อื่น — ผิดรูปคืน null แล้วผู้เรียก log จบ (wire มีแค่ score ห้องใช้ของ session) */
+export function parseCsatPostback(data: string): { score: number } | null {
+  const match = /^csat\|([1-5])$/.exec(data);
+  if (!match) return null;
+  return { score: Number(match[1]) };
 }
 
 const THANK_YOU: Record<number, string> = {
@@ -97,41 +106,20 @@ export async function recordCsatResponse(
   // § กัน caller ในอนาคต (ไม่ใช่แค่ postback) ฝังคะแนนนอกช่วง — DB มี CHECK เป็นตาข่ายชั้นสอง
   if (!Number.isInteger(score) || score < CSAT_SCORE_MIN || score > CSAT_SCORE_MAX) return { kind: 'invalid' };
   const db = await getDb();
+  // § เขียนครั้งเดียวด้วย upsert — pre-select กัน race ไม่ได้อยู่ดี ปล่อยให้ constraint ตัดสิน
+  const [inserted] = await db
+    .insert(chatCsatResponses)
+    .values({ id: generateId(), conversationId, score })
+    .onConflictDoNothing({ target: chatCsatResponses.conversationId })
+    .returning({ score: chatCsatResponses.score });
+  if (inserted) return { kind: 'recorded', score: inserted.score };
   const [existing] = await db
     .select({ score: chatCsatResponses.score })
     .from(chatCsatResponses)
     .where(eq(chatCsatResponses.conversationId, conversationId))
     .limit(1);
   if (existing) return { kind: 'duplicate', score: existing.score };
-
-  try {
-    await db.insert(chatCsatResponses).values({
-      id: generateId(),
-      conversationId,
-      score,
-    });
-  } catch (error) {
-    // § เฉพาะชน unique (23505) จาก race เท่านั้นที่นับซ้ำได้ — error อื่นคือของจริง
-    // ต้องดังให้ผู้เรียกได้ยิน ไม่ใช่กลืนเป็น invalid เงียบ
-    if (!isUniqueViolation(error)) throw error;
-    // อ่านผลของผู้ชนะแทน ไม่นับซ้ำ
-    const [winner] = await db
-      .select({ score: chatCsatResponses.score })
-      .from(chatCsatResponses)
-      .where(eq(chatCsatResponses.conversationId, conversationId))
-      .limit(1);
-    if (winner) return { kind: 'duplicate', score: winner.score };
-    return { kind: 'invalid' };
-  }
-  return { kind: 'recorded', score };
-}
-
-/** รหัส PG unique violation — ชนแถวซ้ำจาก race เท่านั้นที่นับซ้ำได้ อย่างอื่นต้อง throw */
-const PG_UNIQUE_VIOLATION = '23505';
-
-/** true เฉพาะ PG unique violation — อย่างอื่นต้อง throw ไม่กลืน */
-function isUniqueViolation(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && (error as { code?: unknown }).code === PG_UNIQUE_VIOLATION;
+  return { kind: 'invalid' };
 }
 
 export function csatThankYou(score: number): string {

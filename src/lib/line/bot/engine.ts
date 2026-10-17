@@ -22,6 +22,7 @@ import {
   changeMode,
   httpLineTransport,
   attachInboundMedia,
+  findInboundByLineMessageId,
   isHumanHandled,
   recordBotReplies,
   recordInboundMessage,
@@ -126,6 +127,10 @@ async function handleMessageEvent(
     : msg.type === 'location' ? 'location'
     : msg.type === 'sticker' ? 'sticker'
     : 'text';
+
+  // § redelivery หลัง crash ต้องเจอแถวเดิม — มีแถวแล้วข้ามทั้งก้อน (ไม่ ingest ซ้ำ ไม่ตอบซ้ำ)
+  const dup = await findInboundByLineMessageId(msg.id);
+  if (dup) return;
 
   // § record-first: บันทึกแถวข้อความก่อนดึงสื่อเสมอ — crash กลาง ingest จะเหลือแถวให้ redelivery
   // เห็น ไม่ใช่หายทั้งข้อความ (dedup mark ก่อน process จึงต้องมีแถวรอก่อน) ingest เสร็จค่อยแนบทับ
@@ -329,8 +334,7 @@ async function handlePostbackEvent(db: Db, event: LinePostbackEvent, conversatio
   // § postback ที่ไม่ใช่ confirm/csat protocol คงพฤติกรรมเดิม: log only ไม่ตอบอะไร
   const csatData = parseCsatPostback(event.postback.data);
   if (csatData) {
-    // § ให้คะแนนห้องของคนกดเท่านั้น — id ที่แนบมากับปุ่มเชื่อไม่ได้ (replay ข้ามห้องได้)
-    // จึงเมิน csatData.conversationId แล้วใช้ conversationId ของ session นี้
+    // § ให้คะแนนห้องของคนกดเท่านั้น — wire มีแค่ score ห้องใช้ของ session นี้ (ไม่มี id ให้ปลอม)
     const recorded = await recordCsatResponse(conversationId, csatData.score);
     // § กดซ้ำไม่ตอบขอบคุณซ้ำ — คะแนนแถวแรกชนะแล้ว thank-you มีในประวัติแล้ว
     if (recorded.kind === 'recorded') {
