@@ -57,8 +57,12 @@ export async function POST(request: Request) {
       isActive: result.data.isActive,
       createdBy: authz.ctx.user.id,
     });
-  } catch {
-    return NextResponse.json({ error: 'object_id นี้ถูกใช้แล้ว' }, { status: 409 });
+  } catch (error) {
+    // § 409 เฉพาะชน unique จริง — error อื่น (เช่น enum/DB) ต้อง 500 ดังๆ ไม่ใช่บอก id ซ้ำผิดๆ
+    if (typeof error === 'object' && error !== null && (error as { code?: unknown }).code === '23505') {
+      return NextResponse.json({ error: 'object_id นี้ถูกใช้แล้ว' }, { status: 409 });
+    }
+    throw error;
   }
 
   await logAudit({

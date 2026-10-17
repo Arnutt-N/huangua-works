@@ -122,7 +122,10 @@ export async function parseResponseText(text: string): Promise<LineOutgoingMessa
   const remaining = text.slice(lastIndex).trim();
   if (remaining) messages.push({ type: 'text', text: remaining });
 
-  if (messages.length === 0) messages.push({ type: 'text', text });
+  // § ref แก้ไม่ได้ต้องไม่รั่วถึงประชาชน — เหลืออากาศเปล่าๆ ส่งข้อความกลางแทน (log อยู่ข้างบน)
+  if (messages.length === 0) {
+    messages.push({ type: 'text', text: 'ขออภัยครับ ระบบขัดข้องชั่วคราว กรุณาลองใหม่อีกครั้ง' });
+  }
 
   return messages;
 }
