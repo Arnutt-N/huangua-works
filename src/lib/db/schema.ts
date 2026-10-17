@@ -699,6 +699,20 @@ export const chatSettings = pgTable(
   })
 );
 
+export const chatCsatResponses = pgTable(
+  'chat_csat_responses',
+  {
+    id: text('id').primaryKey(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+
+    conversationId: text('conversation_id').notNull().unique(),
+    score: integer('score').notNull(),
+  },
+  (table) => ({
+    conversationIdx: uniqueIndex('chat_csat_responses_conversation_id_idx').on(table.conversationId),
+  })
+);
+
 // ────────────────────────────────────────────────────────────────────────────
 // § System Settings (ตั้งค่ากลางทั้งระบบ: key คู่ value ชุดปิดตายผ่าน zod)
 // รูปเดียวกับ chatSettings ด้านบน ต่างแค่ key อยู่ใน allowlist ของ system module

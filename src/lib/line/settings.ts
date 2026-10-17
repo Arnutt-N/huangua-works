@@ -16,6 +16,7 @@ export interface ChatSettingsDefaults {
   business_hours: BusinessHours;
   bot_enabled: boolean;
   bot_engine_v2: boolean;
+  chat_sla: ChatSla;
 }
 
 const DEFAULTS: ChatSettingsDefaults = {
@@ -35,7 +36,14 @@ const DEFAULTS: ChatSettingsDefaults = {
   business_hours: { start: '08:30', end: '16:30', days: [1, 2, 3, 4, 5] },
   bot_enabled: true,
   bot_engine_v2: false,
+  chat_sla: { queueWaitMinutes: 30, firstResponseMinutes: 15, resolutionHours: 24 },
 };
+
+export interface ChatSla {
+  queueWaitMinutes: number;
+  firstResponseMinutes: number;
+  resolutionHours: number;
+}
 
 function isSettingKey(key: string): key is keyof ChatSettingsDefaults {
   return Object.hasOwn(DEFAULTS, key);
@@ -61,6 +69,18 @@ function normalizeSetting(key: keyof ChatSettingsDefaults, value: unknown): Chat
       && hours.days.every((day) => Number.isInteger(day) && day >= 0 && day <= 6);
     if (!isClock(hours.start) || !isClock(hours.end) || hours.start >= hours.end || !daysOk) return undefined;
     return { start: hours.start, end: hours.end, days: [...new Set(hours.days as number[])].sort((a, b) => a - b) };
+  }
+  if (key === 'chat_sla') {
+    if (!value || typeof value !== 'object') return undefined;
+    const sla = value as Record<string, unknown>;
+    const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : undefined);
+    const queueWaitMinutes = num(sla.queueWaitMinutes);
+    const firstResponseMinutes = num(sla.firstResponseMinutes);
+    const resolutionHours = num(sla.resolutionHours);
+    if (queueWaitMinutes === undefined || firstResponseMinutes === undefined || resolutionHours === undefined) {
+      return undefined;
+    }
+    return { queueWaitMinutes, firstResponseMinutes, resolutionHours };
   }
   if (key === 'welcome_message') {
     return typeof value === 'string' && value.length > 0 ? value : undefined;
@@ -111,7 +131,13 @@ export async function setChatSettings(patch: Partial<ChatSettingsDefaults>): Pro
   const db = await getDb();
   await db.transaction(async (tx) => {
     for (const [key, value] of entries) {
-      const json: unknown = JSON.parse(JSON.stringify(value));
+      let json: unknown;
+      try {
+        json = JSON.parse(JSON.stringify(value));
+      } catch {
+        console.warn(`[line-settings] skip unserializable value for key ${key}`);
+        continue;
+      }
       await tx
         .insert(chatSettings)
         .values({ id: generateId(), key, value: json })

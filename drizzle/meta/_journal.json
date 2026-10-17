@@ -169,6 +169,13 @@
       "when": 1792180161657,
       "tag": "0023_line_media_message_types",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1792210085504,
+      "tag": "0024_chat_csat_responses",
+      "breakpoints": true
     }
   ]
 }
