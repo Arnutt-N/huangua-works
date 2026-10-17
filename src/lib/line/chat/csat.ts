@@ -90,6 +90,8 @@ export async function recordCsatResponse(
   conversationId: string,
   score: number,
 ): Promise<CsatRecordResult> {
+  // § กัน caller ในอนาคต (ไม่ใช่แค่ postback) ฝังคะแนนนอก 1-5 — DB มี CHECK เป็นตาข่ายชั้นสอง
+  if (!Number.isInteger(score) || score < 1 || score > 5) return { kind: 'invalid' };
   const db = await getDb();
   const [existing] = await db
     .select({ score: chatCsatResponses.score })
@@ -104,8 +106,11 @@ export async function recordCsatResponse(
       conversationId,
       score,
     });
-  } catch {
-    // ชน unique จาก race — อ่านผลของผู้ชนะแทน ไม่นับซ้ำ
+  } catch (error) {
+    // § เฉพาะชน unique (23505) จาก race เท่านั้นที่นับซ้ำได้ — error อื่นคือของจริง
+    // ต้องดังให้ผู้เรียกได้ยิน ไม่ใช่กลืนเป็น invalid เงียบ
+    if (!isUniqueViolation(error)) throw error;
+    // อ่านผลของผู้ชนะแทน ไม่นับซ้ำ
     const [winner] = await db
       .select({ score: chatCsatResponses.score })
       .from(chatCsatResponses)
@@ -115,6 +120,11 @@ export async function recordCsatResponse(
     return { kind: 'invalid' };
   }
   return { kind: 'recorded', score };
+}
+
+/** true เฉพาะ PG unique violation (23505) — อย่างอื่นต้อง throw ไม่กลืน */
+function isUniqueViolation(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as { code?: unknown }).code === '23505';
 }
 
 export function csatThankYou(score: number): string {
