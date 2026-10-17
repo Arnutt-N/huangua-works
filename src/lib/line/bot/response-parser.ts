@@ -1,7 +1,7 @@
 import { eq, and } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { chatReplyObjects } from '@/lib/db/schema';
-import type { LineOutgoingMessage } from '../types';
+import type { LineOutgoingMessage, LineQuickReply, LineQuickReplyItem } from '../types';
 
 const OBJECT_REF_PATTERN = /\$object_id:([\w-]+)/g;
 
@@ -15,24 +15,103 @@ export async function resolveObjectRef(objectId: string): Promise<LineOutgoingMe
 
   if (!obj) return null;
 
-  const payload = obj.payload as Record<string, unknown>;
+  return buildMessageFromObject(obj.objectType, obj.payload as Record<string, unknown>, obj.altText);
+}
 
-  switch (obj.objectType) {
+/** pure builder — test ได้โดยไม่ต้องมี DB (resolveObjectRef เป็นแค่ boundary อ่านแถว) */
+export function buildMessageFromObject(
+  objectType: string,
+  payload: Record<string, unknown>,
+  altText: string | null,
+): LineOutgoingMessage | null {
+  // § quickReply เป็น modifier ท้ายข้อความ ใช้ได้ทุก type — derive จาก payload ไม่สร้าง state แยก
+  // แนบครั้งเดียวตรงนี้ ไม่ spread ตาม case (ทุก variant มี quickReply? อยู่แล้ว)
+  const base = buildBaseMessage(objectType, payload, altText);
+  if (!base) return null;
+  const quickReply = parseQuickReply(payload.quickReply);
+  if (quickReply) base.quickReply = quickReply;
+  return base;
+}
+
+function buildBaseMessage(
+  objectType: string,
+  payload: Record<string, unknown>,
+  altText: string | null,
+): LineOutgoingMessage | null {
+  switch (objectType) {
     case 'text':
-      return { type: 'text', text: String(payload.text ?? obj.altText ?? '') };
+    case 'text_v2':
+      return { type: 'text', text: String(payload.text ?? altText ?? '') };
     case 'flex':
-      return { type: 'flex', altText: obj.altText ?? 'ข้อความ', contents: payload } as LineOutgoingMessage;
+      return { type: 'flex', altText: altText ?? 'ข้อความ', contents: payload };
     case 'template':
-      return { type: 'template', altText: obj.altText ?? 'เมนู', template: payload } as LineOutgoingMessage;
+      return { type: 'template', altText: altText ?? 'เมนู', template: payload };
     case 'image':
       return {
         type: 'image',
         originalContentUrl: String(payload.url ?? ''),
         previewImageUrl: String(payload.previewUrl ?? payload.url ?? ''),
-      } as LineOutgoingMessage;
+      };
+    case 'sticker':
+      if (payload.packageId === undefined || payload.stickerId === undefined) return null;
+      return {
+        type: 'sticker',
+        packageId: String(payload.packageId),
+        stickerId: String(payload.stickerId),
+      };
+    case 'video':
+      if (payload.url === undefined) return null;
+      return {
+        type: 'video',
+        originalContentUrl: String(payload.url),
+        previewImageUrl: String(payload.previewUrl ?? payload.url),
+      };
+    case 'audio':
+      if (payload.url === undefined) return null;
+      return {
+        type: 'audio',
+        originalContentUrl: String(payload.url),
+        duration: Number(payload.duration ?? 0),
+      };
+    case 'location':
+      if (payload.latitude === undefined || payload.longitude === undefined) return null;
+      return {
+        type: 'location',
+        title: String(payload.title ?? 'ตำแหน่ง'),
+        address: String(payload.address ?? ''),
+        latitude: Number(payload.latitude),
+        longitude: Number(payload.longitude),
+      };
+    case 'imagemap': {
+      const baseSize = payload.baseSize as { width?: unknown; height?: unknown } | undefined;
+      if (payload.baseUrl === undefined || baseSize?.width === undefined || baseSize?.height === undefined) return null;
+      return {
+        type: 'imagemap',
+        baseUrl: String(payload.baseUrl),
+        altText: altText ?? 'รูปภาพ',
+        baseSize: { width: Number(baseSize.width), height: Number(baseSize.height) },
+        actions: Array.isArray(payload.actions) ? payload.actions : [],
+      };
+    }
     default:
       return null;
   }
+}
+
+/** quickReply เก็บใน payload ({ items: [...] } ไม่เกิน 13) — ผิดรูปถือว่าไม่มี ไม่พังทั้งข้อความ */
+function parseQuickReply(value: unknown): LineQuickReply | null {
+  if (!value || typeof value !== 'object') return null;
+  const items = (value as { items?: unknown }).items;
+  if (!Array.isArray(items) || items.length === 0 || items.length > 13) return null;
+  const valid = items.filter((item): item is LineQuickReplyItem => {
+    if (!item || typeof item !== 'object') return false;
+    const action = (item as { action?: unknown }).action;
+    if (!action || typeof action !== 'object') return false;
+    const type = (action as { type?: unknown }).type;
+    return type === 'message' || type === 'postback' || type === 'uri';
+  });
+  if (valid.length === 0) return null;
+  return { items: valid };
 }
 
 export async function parseResponseText(text: string): Promise<LineOutgoingMessage[]> {

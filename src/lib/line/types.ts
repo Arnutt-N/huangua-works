@@ -53,10 +53,27 @@ export interface LinePostbackEvent extends LineEventBase {
 }
 
 export type LineOutgoingMessage =
-  | { type: 'text'; text: string }
-  | { type: 'image'; originalContentUrl: string; previewImageUrl: string }
-  | { type: 'flex'; altText: string; contents: Record<string, unknown> }
-  | { type: 'template'; altText: string; template: Record<string, unknown> };
+  | { type: 'text'; text: string; quickReply?: LineQuickReply }
+  | { type: 'image'; originalContentUrl: string; previewImageUrl: string; quickReply?: LineQuickReply }
+  | { type: 'sticker'; packageId: string; stickerId: string; quickReply?: LineQuickReply }
+  | { type: 'video'; originalContentUrl: string; previewImageUrl: string; quickReply?: LineQuickReply }
+  | { type: 'audio'; originalContentUrl: string; duration: number; quickReply?: LineQuickReply }
+  | { type: 'location'; title: string; address: string; latitude: number; longitude: number; quickReply?: LineQuickReply }
+  | { type: 'imagemap'; baseUrl: string; altText: string; baseSize: { width: number; height: number }; actions: unknown[]; quickReply?: LineQuickReply }
+  | { type: 'flex'; altText: string; contents: Record<string, unknown>; quickReply?: LineQuickReply }
+  | { type: 'template'; altText: string; template: Record<string, unknown>; quickReply?: LineQuickReply };
+
+export interface LineQuickReplyItem {
+  type: 'action';
+  action:
+    | { type: 'message'; label: string; text: string }
+    | { type: 'postback'; label: string; data: string; displayText?: string }
+    | { type: 'uri'; label: string; uri: string };
+}
+
+export interface LineQuickReply {
+  items: LineQuickReplyItem[];
+}
 
 export interface LineProfile {
   userId: string;
