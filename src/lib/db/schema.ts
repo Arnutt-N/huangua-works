@@ -9,6 +9,7 @@ import {
   pgEnum,
   index,
   uniqueIndex,
+  unique,
   check,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
@@ -715,13 +716,16 @@ export const chatCsatResponses = pgTable(
 
     conversationId: text('conversation_id')
       .notNull()
-      .unique()
       .references(() => chatConversations.id, { onDelete: 'cascade' }),
+    // § รอบปิดที่โหวต — ห้อง reuse ได้ คะแนนจึง unique ต่อ (ห้อง, รอบปิด) ไม่ใช่ต่อห้อง
+    // null สำหรับแถวเก่าก่อนมีคอลัมน์ (null ไม่ชนกันเอง)
+    resolvedAt: timestamp('resolved_at', { mode: 'date' }),
     score: integer('score').notNull(),
   },
   (table) => ({
-    // § unique/CHECK/FK ตรงกับ migration 0024 เป๊ะ (constraint สร้าง backing index ให้เอง)
+    // § unique/CHECK/FK ตรงกับ migration 0024+0027 เป๊ะ (constraint สร้าง backing index ให้เอง)
     // ไม่เช่นนั้น generate ครั้งหน้าจะออก index ซ้ำและพยายาม drop FK/CHECK
+    cycleUid: unique('chat_csat_responses_cycle_uid').on(table.conversationId, table.resolvedAt),
     scoreCheck: check('chat_csat_responses_score_check', sql`"score" BETWEEN 1 AND 5`),
   })
 );
