@@ -6,6 +6,7 @@ import type { LineWebhookEvent, LineMessageEvent, LineFollowEvent, LinePostbackE
 import type { ConversationMode } from '../chat-modes';
 import { matchFaq } from './faq-matcher';
 import { ingestLineMedia } from '../media-ingest';
+import { csatThankYou, parseCsatPostback, recordCsatResponse } from '../chat/csat';
 import { matchIntent } from './intent-matcher';
 import { parseResponseText } from './response-parser';
 import { startCaseFlow, processCaseFlow, handleConfirmPostback, type CaseFlowState } from './case-flow';
@@ -318,7 +319,18 @@ async function handlePostbackEvent(db: Db, event: LinePostbackEvent, conversatio
     metadata: event.postback.params ?? null,
   });
 
-  // § postback ที่ไม่ใช่ confirm protocol คงพฤติกรรมเดิม: log only ไม่ตอบอะไร
+  // § postback ที่ไม่ใช่ confirm/csat protocol คงพฤติกรรมเดิม: log only ไม่ตอบอะไร
+  const csatData = parseCsatPostback(event.postback.data);
+  if (csatData) {
+    const recorded = await recordCsatResponse(csatData.conversationId, csatData.score);
+    if (recorded.kind !== 'invalid') {
+      const thanks: LineOutgoingMessage[] = [{ type: 'text', text: csatThankYou(recorded.score) }];
+      await recordBotReplies(conversationId, thanks);
+      await transport.reply(event.replyToken, thanks);
+    }
+    return;
+  }
+
   const confirmData = parseConfirmPostback(event.postback.data);
   if (!confirmData) return;
 
