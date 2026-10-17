@@ -42,6 +42,13 @@ function buildModeUpdates(to: ConversationMode, opts: ChangeModeOptions, now: Da
     updatedAt: now,
     ...(to === 'human_active' ? { assignedAdminId: opts.actorAdminId, assignedAt: now } : {}),
     ...(to === 'resolved' ? { resolvedAt: now } : {}),
+    // § ประทับเวลาเริ่มรอคิวใน metadata ครั้งเดียวตอนเข้า waiting — SLA อ่านจากค่านี้
+    // ไม่ใช้ updatedAt เพราะขยับทุกข้อความ ใช้ UPDATE เดียวกับ claim ไม่เพิ่ม write
+    ...(to === 'waiting_handoff'
+      ? {
+          metadata: sql`jsonb_set(coalesce(${chatConversations.metadata}, '{}'::jsonb), '{waitingSince}', to_jsonb(${now}::timestamptz))`,
+        }
+      : {}),
     ...(opts.linkedCaseId !== undefined ? { linkedCaseId: opts.linkedCaseId } : {}),
   } satisfies Partial<typeof chatConversations.$inferInsert>;
 }

@@ -45,6 +45,7 @@ export function ConversationList({
   searchResults,
   searching,
   selectedId,
+  slaBreachedIds,
   onSelect,
   onTogglePin,
   onToggleMute,
@@ -62,6 +63,7 @@ export function ConversationList({
   searchResults: MessageSearchResult[];
   searching: boolean;
   selectedId: string | null;
+  slaBreachedIds?: ReadonlySet<string>;
   onSelect: (id: string) => void;
   onTogglePin: (id: string, pinned: boolean) => void;
   onToggleMute: (id: string, muted: boolean) => void;
@@ -74,6 +76,7 @@ export function ConversationList({
       key={conv.id}
       conversation={conv}
       isSelected={selectedId === conv.id}
+      slaBreached={slaBreachedIds?.has(conv.id) ?? false}
       onSelect={onSelect}
       onTogglePin={onTogglePin}
       onToggleMute={onToggleMute}

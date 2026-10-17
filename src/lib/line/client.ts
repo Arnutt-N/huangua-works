@@ -37,6 +37,59 @@ async function postLine(endpoint: string, payload: unknown): Promise<void> {
   });
 }
 
+/**
+ * ดึง binary content ของข้อความที่ประชาชนส่ง (รูป/ไฟล์/วิดีโอ/เสียง) จาก LINE data API
+ * มี timeout เสมอ (สื่อช้าห้ามดึง webhook ค้าง) และคืน content-length ให้ caller ตัดก่อนบัฟเฟอร์
+ */
+const MAX_CONTENT_BYTES = 10 * 1024 * 1024;
+const CONTENT_TIMEOUT_MS = 20000;
+export async function getMessageContent(
+  messageId: string,
+): Promise<{ bytes: Uint8Array; contentType: string | null; contentLength: number | null }> {
+  return withLineCircuit('/message/content', async () => {
+    const res = await fetch(`${LINE_DATA_BASE}/message/${encodeURIComponent(messageId)}/content`, {
+      headers: { Authorization: `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}` },
+      signal: AbortSignal.timeout(CONTENT_TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      throw new LineApiError('/message/content', res.status, detail.slice(0, 500));
+    }
+    const lengthHeader = res.headers.get('content-length');
+    const contentLength = lengthHeader !== null && lengthHeader !== '' ? Number(lengthHeader) : null;
+    if (contentLength !== null && Number.isFinite(contentLength) && contentLength > MAX_CONTENT_BYTES) {
+      throw new LineApiError('/message/content', 413, `content-length ${contentLength} เกินเพดาน`);
+    }
+    // § อ่านแบบ bounded stream ไม่ใช่ arrayBuffer ทั้งก้อน — ไฟล์ใหญ่เกินเพดานต้องตัดตั้งแต่กลางทาง
+    // ไม่ใช่บัฟเฟอร์ครบแล้วค่อยทิ้ง (OOM vector บน public webhook)
+    const reader = res.body?.getReader();
+    if (!reader) throw new LineApiError('/message/content', 500, 'no body');
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_CONTENT_BYTES) {
+        await reader.cancel().catch(() => {});
+        throw new LineApiError('/message/content', 413, `body เกินเพดาน ${MAX_CONTENT_BYTES}`);
+      }
+      chunks.push(value);
+    }
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return {
+      bytes,
+      contentType: res.headers.get('content-type'),
+      contentLength: contentLength !== null && Number.isFinite(contentLength) ? contentLength : null,
+    };
+  });
+}
+
 export async function replyMessage(replyToken: string, messages: LineOutgoingMessage[]): Promise<void> {
   await postLine('/message/reply', { replyToken, messages });
 }

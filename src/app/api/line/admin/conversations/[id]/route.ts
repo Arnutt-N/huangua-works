@@ -10,7 +10,8 @@ import {
   validateOrError,
 } from '@/lib/validation';
 import { parseBody } from '@/lib/api-helpers';
-import { changeMode, linkCase, transferOwnership } from '@/lib/line/conversation';
+import { changeMode, linkCase, transferOwnership, httpLineTransport } from '@/lib/line/conversation';
+import { sendCsatSurveyForConversation } from '@/lib/line/chat/csat';
 
 export const runtime = 'nodejs';
 
@@ -22,7 +23,12 @@ export async function GET(
   if (!authz.ok) return authz.response;
 
   const { id } = await params;
-  const url = new URL(request.url);
+  let url: URL;
+  try {
+    url = new URL(request.url);
+  } catch {
+    return NextResponse.json({ error: 'Invalid request URL' }, { status: 400 });
+  }
   const validation = validateOrError(chatPagingQuerySchema, {
     before: url.searchParams.get('before') ?? undefined,
     limit: url.searchParams.get('limit') ?? undefined,
@@ -128,7 +134,18 @@ export async function PATCH(
   // § claim/คืนบอท/ปิดเรื่อง ผ่าน changeMode — guard อยู่ใน WHERE (atomic) ตามตาราง MODE_TRANSITIONS
   // กันสองแอดมินกดรับพร้อมกันแล้วคนหลังทับเงียบ ๆ
   const result = await changeMode(id, mode, { actorAdminId: actorId, linkedCaseId });
-  if (result.ok) return NextResponse.json({ ok: true });
+  if (result.ok) {
+    // § CSAT ส่งหลัง close สำเร็จเท่านั้นและ best-effort — ห้ามทำให้ response ปิดเรื่องล้ม
+    // ห่อทั้งอ่าน id และส่ง (DB ล้มจุดไหนก็ต้องยังคืน ok เพราะ close เข้าแล้ว)
+    if (mode === 'resolved' && result.changed) {
+      try {
+        await sendCsatSurveyForConversation(id, httpLineTransport);
+      } catch (error) {
+        console.error('[conversations] csat survey failed after close', { conversationId: id, error });
+      }
+    }
+    return NextResponse.json({ ok: true });
+  }
   if (result.reason === 'not_found') return NextResponse.json({ error: 'Not found' }, { status: 404 });
   // § claim ห้องที่มีเจ้าของแล้ว — คงข้อความเดิม (client แสดงข้อความนี้ + เทสต์เดิมล็อกไว้)
   if (mode === 'human_active' && result.currentMode === 'human_active') {
