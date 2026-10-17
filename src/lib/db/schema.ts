@@ -660,6 +660,11 @@ export const chatMessages = pgTable(
     conversationIdx: index('chat_messages_conversation_id_idx').on(table.conversationId),
     createdAtIdx: index('chat_messages_created_at_idx').on(table.createdAt),
     lineMessageIdIdx: index('chat_messages_line_message_id_idx').on(table.lineMessageId),
+    // § กัน redelivery แทรกซ้ำหลัง crash (find+insert แบบ check-then-act เดี่ยวๆ ไม่พอ)
+    // partial unique: แถวบอท/แอดมินที่ line_message_id เป็น null ไม่โดนบังคับ
+    lineMessageIdUid: uniqueIndex('chat_messages_line_message_id_uid_idx')
+      .on(table.lineMessageId)
+      .where(sql`line_message_id is not null`),
     clientTempIdIdx: uniqueIndex('chat_messages_client_temp_id_idx')
       .on(table.clientTempId)
       .where(sql`client_temp_id is not null`),
