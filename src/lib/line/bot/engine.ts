@@ -131,9 +131,18 @@ async function handleMessageEvent(
 
   // § redelivery หลัง crash ต้องเจอแถวเดิม — มีแถวแล้วข้าม insert+ingest แต่ถ้ายังไม่เคย
   // ตอบบอทต้องตอบซ่อม (แถวเกิดก่อน reply เสมอ) replyToken เก่าใช้ซ้ำไม่ได้ให้ตกไป push แทน
+  // กั้นแบบ path ปกติ: ห้องคนถือหรือบอทปิดไม่ตอบซ่อม และค้างกลาง case-flow ไม่ป้อนซ้ำ (กัน state เพี้ยน)
   const dup = await findInboundByLineMessageId(msg.id);
   if (dup) {
+    const botEnabledDup = await getChatSetting('bot_enabled');
+    if (isHumanHandled(mode) || !botEnabledDup) return;
     if (!(await hasBotReplyAfter(conversationId, dup.createdAt))) {
+      const [lu] = await db
+        .select({ botState: lineUsers.botState })
+        .from(lineUsers)
+        .where(eq(lineUsers.id, lineUserPk))
+        .limit(1);
+      if (lu?.botState) return;
       const replies = await routeBotMessage(db, event, msg.type === 'text' ? msg.text : null, lineUserPk, conversationId);
       await recordBotReplies(conversationId, replies);
       try {
