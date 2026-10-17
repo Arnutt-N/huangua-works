@@ -21,6 +21,7 @@ import { isWithinBusinessHours, outsideBusinessHoursText } from '../business-hou
 import {
   changeMode,
   httpLineTransport,
+  attachInboundMedia,
   isHumanHandled,
   recordBotReplies,
   recordInboundMessage,
@@ -126,38 +127,42 @@ async function handleMessageEvent(
     : msg.type === 'sticker' ? 'sticker'
     : 'text';
 
-  // § สื่อจาก LINE เปิดดูได้ชั่วคราว ต้องดึงเก็บทันทีตอน webhook มาถึง ล้มเหลวทุกแบบต้อง
-  // ไม่ทำให้บันทึกข้อความล้ม (ingest คืน skipped ไม่ throw) ผลเก็บลง mediaUrl/metadata
-  let mediaUrl: string | null = null;
-  let mediaMetadata: Record<string, unknown> | null = null;
-  if (msg.type === 'image' || msg.type === 'file' || msg.type === 'video' || msg.type === 'audio') {
-    const ingested = await ingestLineMedia(msg.id);
-    if (ingested.kind === 'stored') {
-      mediaUrl = ingested.url;
-      mediaMetadata = { contentType: ingested.contentType, sizeBytes: ingested.sizeBytes };
-    } else {
-      mediaMetadata = { skipped: ingested.reason };
-    }
-  }
+  // § record-first: บันทึกแถวข้อความก่อนดึงสื่อเสมอ — crash กลาง ingest จะเหลือแถวให้ redelivery
+  // เห็น ไม่ใช่หายทั้งข้อความ (dedup mark ก่อน process จึงต้องมีแถวรอก่อน) ingest เสร็จค่อยแนบทับ
+  // ด้วย id เดิม (client แทนที่ด้วย id ไม่ขึ้นซ้ำ) ทุกทางล้มของ ingest จบที่ skipped ไม่ throw
+  const isMedia = msg.type === 'image' || msg.type === 'file' || msg.type === 'video' || msg.type === 'audio';
 
   // § อ่าน bot_enabled ก่อนบันทึกข้อความ — ถ้าบอทปิด ข้อความนี้ไม่มีใครตอบอัตโนมัติ
   // จึงต้องนับเป็น unread ของเจ้าหน้าที่ (เดิม reset เป็น 0 เพราะถือว่าบอทตอบแล้ว)
   const botEnabled = await getChatSetting('bot_enabled');
   const staffHandling = isHumanHandled(mode);
 
-  await recordInboundMessage({
+  const { messageId } = await recordInboundMessage({
     conversationId,
     mode,
     messageType,
     textContent: msg.type === 'text' ? msg.text : null,
-    mediaUrl,
-    mediaMetadata,
+    mediaUrl: null,
+    mediaMetadata: null,
     locationData: msg.type === 'location'
       ? { title: msg.title, address: msg.address, latitude: msg.latitude, longitude: msg.longitude }
       : null,
     lineMessageId: msg.id,
     countUnread: staffHandling || !botEnabled,
   });
+
+  if (isMedia) {
+    const knownSize = msg.type === 'file' ? msg.fileSize : undefined;
+    const ingested = await ingestLineMedia(msg.id, undefined, { knownSize });
+    if (ingested.kind === 'stored') {
+      await attachInboundMedia(messageId, conversationId, messageType, ingested.url, {
+        contentType: ingested.contentType,
+        sizeBytes: ingested.sizeBytes,
+      });
+    } else {
+      await attachInboundMedia(messageId, conversationId, messageType, null, { skipped: ingested.reason });
+    }
+  }
 
   if (staffHandling) {
     return;
@@ -324,8 +329,11 @@ async function handlePostbackEvent(db: Db, event: LinePostbackEvent, conversatio
   // § postback ที่ไม่ใช่ confirm/csat protocol คงพฤติกรรมเดิม: log only ไม่ตอบอะไร
   const csatData = parseCsatPostback(event.postback.data);
   if (csatData) {
-    const recorded = await recordCsatResponse(csatData.conversationId, csatData.score);
-    if (recorded.kind !== 'invalid') {
+    // § ให้คะแนนห้องของคนกดเท่านั้น — id ที่แนบมากับปุ่มเชื่อไม่ได้ (replay ข้ามห้องได้)
+    // จึงเมิน csatData.conversationId แล้วใช้ conversationId ของ session นี้
+    const recorded = await recordCsatResponse(conversationId, csatData.score);
+    // § กดซ้ำไม่ตอบขอบคุณซ้ำ — คะแนนแถวแรกชนะแล้ว thank-you มีในประวัติแล้ว
+    if (recorded.kind === 'recorded') {
       const thanks: LineOutgoingMessage[] = [{ type: 'text', text: csatThankYou(recorded.score) }];
       await recordBotReplies(conversationId, thanks);
       await transport.reply(event.replyToken, thanks);

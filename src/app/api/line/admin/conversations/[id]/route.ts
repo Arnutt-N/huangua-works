@@ -136,9 +136,14 @@ export async function PATCH(
   const result = await changeMode(id, mode, { actorAdminId: actorId, linkedCaseId });
   if (result.ok) {
     // § CSAT ส่งหลัง close สำเร็จเท่านั้นและ best-effort — ห้ามทำให้ response ปิดเรื่องล้ม
+    // ห่อทั้งอ่าน id และส่ง (DB ล้มจุดไหนก็ต้องยังคืน ok เพราะ close เข้าแล้ว)
     if (mode === 'resolved' && result.changed) {
-      const lineUserId = await lineUserIdOfConversation(id);
-      if (lineUserId) await sendCsatSurvey(id, lineUserId, httpLineTransport);
+      try {
+        const lineUserId = await lineUserIdOfConversation(id);
+        if (lineUserId) await sendCsatSurvey(id, lineUserId, httpLineTransport);
+      } catch (error) {
+        console.error('[conversations] csat survey failed after close', { conversationId: id, error });
+      }
     }
     return NextResponse.json({ ok: true });
   }

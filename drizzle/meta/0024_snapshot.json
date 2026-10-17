@@ -4328,28 +4328,39 @@
           "notNull": true
         }
       },
-      "indexes": {
-        "chat_csat_responses_conversation_id_idx": {
-          "name": "chat_csat_responses_conversation_id_idx",
-          "columns": [
-            {
-              "expression": "conversation_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
+      "indexes": {},
+      "foreignKeys": {
+        "chat_csat_responses_conversation_id_chat_conversations_id_fk": {
+          "name": "chat_csat_responses_conversation_id_chat_conversations_id_fk",
+          "tableFrom": "chat_csat_responses",
+          "tableTo": "chat_conversations",
+          "columnsFrom": [
+            "conversation_id"
           ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
-      "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "chat_csat_responses_conversation_id_unique": {
+          "name": "chat_csat_responses_conversation_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "conversation_id"
+          ]
+        }
+      },
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "chat_csat_responses_score_check": {
+          "name": "chat_csat_responses_score_check",
+          "value": "\"score\" BETWEEN 1 AND 5"
+        }
+      },
       "isRLSEnabled": false
     }
   },
