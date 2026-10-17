@@ -1,5 +1,6 @@
 import { and, eq, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
+import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { chatConversations, chatMessages } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import type { ConversationMode } from '../chat-modes';
@@ -28,7 +29,43 @@ export interface InboundMessage {
   countUnread?: boolean;
 }
 
-/** บันทึกข้อความจากผู้ใช้ LINE + อัปเดตข้อความล่าสุดของห้อง + แจ้ง inbox แอดมิน */
+/** หาแถวข้อความขาเข้าจาก LINE message id — redelivery หลัง crash ต้องเจอแถวเดิม ไม่ insert ซ้ำ */
+export async function findInboundByLineMessageId(lineMessageId: string): Promise<{ id: string } | null> {
+  const db = await getDb();
+  return (await firstOrUndefined(
+    db
+      .select({ id: chatMessages.id })
+      .from(chatMessages)
+      .where(eq(chatMessages.lineMessageId, lineMessageId))
+      .limit(1),
+  )) ?? null;
+}
+
+interface InboundPayloadArgs {
+  id: string;
+  conversationId: string;
+  messageType: InboundMessageType;
+  textContent: string | null;
+  mediaUrl: string | null;
+  mediaMetadata: Record<string, unknown> | null;
+}
+
+/** shape เดียวของ new_message ทุกครั้ง — record กับ attach ต้องส่ง field ชุดเดียวกัน */
+function broadcastInbound(args: InboundPayloadArgs): void {
+  broadcast({
+    type: 'new_message',
+    conversationId: args.conversationId,
+    payload: {
+      id: args.id,
+      sender: 'user',
+      messageType: args.messageType,
+      textContent: args.textContent,
+      mediaUrl: args.mediaUrl,
+      mediaMetadata: args.mediaMetadata,
+      createdAt: new Date().toISOString(),
+    },
+  });
+}
 export async function recordInboundMessage(input: InboundMessage): Promise<{ messageId: string }> {
   const db = await getDb();
   const messageId = generateId();
@@ -58,17 +95,13 @@ export async function recordInboundMessage(input: InboundMessage): Promise<{ mes
     })
     .where(eq(chatConversations.id, input.conversationId));
 
-  broadcast({
-    type: 'new_message',
+  broadcastInbound({
+    id: messageId,
     conversationId: input.conversationId,
-    payload: {
-      id: messageId,
-      sender: 'user',
-      messageType: input.messageType,
-      textContent: input.textContent,
-      mediaUrl: input.mediaUrl ?? null,
-      createdAt: new Date().toISOString(),
-    },
+    messageType: input.messageType,
+    textContent: input.textContent,
+    mediaUrl: input.mediaUrl ?? null,
+    mediaMetadata: input.mediaMetadata ?? null,
   });
   broadcast({ type: 'conversation_update', conversationId: input.conversationId, payload: { lastMessageText: preview } });
 
@@ -91,16 +124,14 @@ export async function attachInboundMedia(
     .update(chatMessages)
     .set({ mediaUrl, metadata: mediaMetadata })
     .where(eq(chatMessages.id, messageId));
-  broadcast({
-    type: 'new_message',
+  // § broadcast รูปเดิมใช้ shape เดียวกับตอน record — client แทนที่ด้วย id จึงไม่ขึ้นซ้ำ
+  broadcastInbound({
+    id: messageId,
     conversationId,
-    payload: {
-      id: messageId,
-      sender: 'user',
-      messageType,
-      mediaUrl,
-      createdAt: new Date().toISOString(),
-    },
+    messageType,
+    textContent: null,
+    mediaUrl,
+    mediaMetadata,
   });
 }
 
