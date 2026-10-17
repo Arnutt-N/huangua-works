@@ -847,7 +847,13 @@ export const replyObjectTypeEnum = pgEnum('reply_object_type', [
   'flex',
   'template',
   'text',
+  'text_v2',
   'image',
+  'sticker',
+  'video',
+  'audio',
+  'location',
+  'imagemap',
 ]);
 
 export const matchTypeEnum = pgEnum('match_type', [
