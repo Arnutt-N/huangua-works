@@ -26,6 +26,32 @@ interface FormState {
 
 const EMPTY_FORM: FormState = { objectId: '', objectType: 'text', payloadJson: '{}', altText: '', isActive: true };
 
+/** field ที่แต่ละ type ต้องมีใน payload — ขาดคือ save ไม่ผ่าน (fail ตรงนี้ ไม่ใช่ตอนบอทส่ง) */
+const REQUIRED_PAYLOAD_FIELDS: Record<string, string[]> = {
+  text: ['text'],
+  text_v2: ['text'],
+  image: ['url'],
+  sticker: ['packageId', 'stickerId'],
+  video: ['url'],
+  audio: ['url'],
+  location: ['latitude', 'longitude'],
+  imagemap: ['baseUrl', 'baseSize'],
+};
+
+function validateReplyPayload(objectType: string, payload: Record<string, unknown>): string | null {
+  const required = REQUIRED_PAYLOAD_FIELDS[objectType];
+  if (!required) return null;
+  const missing = required.filter((field) => payload[field] === undefined || payload[field] === null);
+  if (missing.length > 0) return `payload ขาด field ที่จำเป็นสำหรับ ${objectType}: ${missing.join(', ')}`;
+  if (objectType === 'imagemap') {
+    const baseSize = payload.baseSize as { width?: unknown; height?: unknown } | undefined;
+    if (baseSize?.width === undefined || baseSize?.height === undefined) {
+      return 'payload.baseSize ต้องมี width และ height';
+    }
+  }
+  return null;
+}
+
 export function ReplyObjectsClient() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -65,6 +91,13 @@ export function ReplyObjectsClient() {
       payload = JSON.parse(form.payloadJson);
     } catch {
       notify('error', 'Payload JSON ไม่ถูกต้อง');
+      return;
+    }
+
+    // § ชนิดที่ LINE API ไม่รับต้อง fail ตรงนี้ ไม่ใช่ตอนบอทส่ง (PRP T4 risk)
+    const payloadError = validateReplyPayload(form.objectType, payload);
+    if (payloadError) {
+      notify('error', payloadError);
       return;
     }
 
@@ -186,9 +219,15 @@ export function ReplyObjectsClient() {
                 className="min-h-touch w-full rounded-md border border-border bg-surface-raised px-4 text-ink"
               >
                 <option value="text">Text</option>
+                <option value="text_v2">Text v2</option>
                 <option value="flex">Flex</option>
                 <option value="template">Template</option>
                 <option value="image">Image</option>
+                <option value="sticker">Sticker</option>
+                <option value="video">Video</option>
+                <option value="audio">Audio</option>
+                <option value="location">Location</option>
+                <option value="imagemap">Imagemap</option>
               </select>
             </div>
 

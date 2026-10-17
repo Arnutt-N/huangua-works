@@ -12,7 +12,7 @@ import { sql } from 'drizzle-orm';
 export const runtime = 'nodejs';
 
 const updateSchema = z.object({
-  objectType: z.enum(['flex', 'template', 'text', 'image']).optional(),
+  objectType: z.enum(['flex', 'template', 'text', 'text_v2', 'image', 'sticker', 'video', 'audio', 'location', 'imagemap']).optional(),
   payload: z.record(z.string(), z.unknown()).optional(),
   altText: z.string().max(200).nullable().optional(),
   isActive: z.boolean().optional(),

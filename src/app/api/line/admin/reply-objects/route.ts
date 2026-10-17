@@ -13,7 +13,7 @@ export const runtime = 'nodejs';
 
 const createSchema = z.object({
   objectId: z.string().min(1).max(50).regex(/^[a-z0-9_-]+$/, 'ใช้ a-z, 0-9, -, _ เท่านั้น'),
-  objectType: z.enum(['flex', 'template', 'text', 'image']),
+  objectType: z.enum(['flex', 'template', 'text', 'text_v2', 'image', 'sticker', 'video', 'audio', 'location', 'imagemap']),
   payload: z.record(z.string(), z.unknown()),
   altText: z.string().max(200).optional(),
   isActive: z.boolean().default(true),
