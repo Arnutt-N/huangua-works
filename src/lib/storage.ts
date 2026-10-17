@@ -25,14 +25,16 @@ export async function uploadFile(
   key: string,
   body: Buffer,
   contentType: string,
+  timeoutMs = 30000,
 ): Promise<string> {
   const s3 = getS3();
+  // § S3 ค้างต้องจบเป็น skipped ไม่ใช่ดึง webhook ค้าง — caller จับ error เอง
   await s3.send(new PutObjectCommand({
     Bucket: getBucket(),
     Key: key,
     Body: body,
     ContentType: contentType,
-  }));
+  }), { abortSignal: AbortSignal.timeout(timeoutMs) });
   return `${process.env.S3_ENDPOINT}/${getBucket()}/${key}`;
 }
 

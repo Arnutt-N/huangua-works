@@ -1,5 +1,6 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, gt, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
+import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { chatConversations, chatMessages } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import type { ConversationMode } from '../chat-modes';
@@ -8,7 +9,7 @@ import type { LineOutgoingMessage } from '../types';
 import { isHumanHandled } from './modes';
 import type { LineTransport } from './transport';
 
-export type InboundMessageType = 'text' | 'image' | 'location' | 'sticker';
+export type InboundMessageType = 'text' | 'image' | 'file' | 'video' | 'audio' | 'location' | 'sticker';
 
 export interface InboundMessage {
   conversationId: string;
@@ -16,6 +17,8 @@ export interface InboundMessage {
   mode: ConversationMode;
   messageType: InboundMessageType;
   textContent: string | null;
+  mediaUrl?: string | null;
+  mediaMetadata?: Record<string, unknown> | null;
   locationData: Record<string, unknown> | null;
   lineMessageId: string;
   /**
@@ -26,7 +29,57 @@ export interface InboundMessage {
   countUnread?: boolean;
 }
 
-/** บันทึกข้อความจากผู้ใช้ LINE + อัปเดตข้อความล่าสุดของห้อง + แจ้ง inbox แอดมิน */
+/** หาแถวข้อความขาเข้าจาก LINE message id — redelivery หลัง crash ต้องเจอแถวเดิม ไม่ insert ซ้ำ */
+export async function findInboundByLineMessageId(lineMessageId: string): Promise<{ id: string; createdAt: Date } | null> {
+  const db = await getDb();
+  return (await firstOrUndefined(
+    db
+      .select({ id: chatMessages.id, createdAt: chatMessages.createdAt })
+      .from(chatMessages)
+      .where(eq(chatMessages.lineMessageId, lineMessageId))
+      .limit(1),
+  )) ?? null;
+}
+
+/** มีข้อความบอทตอบหลังเวลาที่กำหนดไหม — redelivery ที่ไม่เคยได้คำตอบต้องตอบซ่อม */
+export async function hasBotReplyAfter(conversationId: string, after: Date): Promise<boolean> {
+  const db = await getDb();
+  const row = await firstOrUndefined(
+    db
+      .select({ id: chatMessages.id })
+      .from(chatMessages)
+      .where(and(eq(chatMessages.conversationId, conversationId), eq(chatMessages.sender, 'bot'), gt(chatMessages.createdAt, after)))
+      .limit(1),
+  );
+  return row !== undefined;
+}
+
+interface InboundPayloadArgs {
+  id: string;
+  conversationId: string;
+  messageType: InboundMessageType;
+  textContent: string | null;
+  mediaUrl: string | null;
+  mediaMetadata: Record<string, unknown> | null;
+}
+
+/** shape เดียวของ new_message ทุกครั้ง — record กับ attach ต้องส่ง field ชุดเดียวกัน
+ *  key `metadata` ตรงกับคอลัมน์ DB และ type ฝั่ง client (อย่าใช้ชื่ออื่นจะ mismatch เงียบ) */
+function broadcastInbound(args: InboundPayloadArgs): void {
+  broadcast({
+    type: 'new_message',
+    conversationId: args.conversationId,
+    payload: {
+      id: args.id,
+      sender: 'user',
+      messageType: args.messageType,
+      textContent: args.textContent,
+      mediaUrl: args.mediaUrl,
+      metadata: args.mediaMetadata,
+      createdAt: new Date().toISOString(),
+    },
+  });
+}
 export async function recordInboundMessage(input: InboundMessage): Promise<{ messageId: string }> {
   const db = await getDb();
   const messageId = generateId();
@@ -38,6 +91,8 @@ export async function recordInboundMessage(input: InboundMessage): Promise<{ mes
     sender: 'user',
     messageType: input.messageType,
     textContent: input.textContent,
+    mediaUrl: input.mediaUrl ?? null,
+    metadata: input.mediaMetadata ?? null,
     locationData: input.locationData,
     lineMessageId: input.lineMessageId,
   });
@@ -54,20 +109,44 @@ export async function recordInboundMessage(input: InboundMessage): Promise<{ mes
     })
     .where(eq(chatConversations.id, input.conversationId));
 
-  broadcast({
-    type: 'new_message',
+  broadcastInbound({
+    id: messageId,
     conversationId: input.conversationId,
-    payload: {
-      id: messageId,
-      sender: 'user',
-      messageType: input.messageType,
-      textContent: input.textContent,
-      createdAt: new Date().toISOString(),
-    },
+    messageType: input.messageType,
+    textContent: input.textContent,
+    mediaUrl: input.mediaUrl ?? null,
+    mediaMetadata: input.mediaMetadata ?? null,
   });
   broadcast({ type: 'conversation_update', conversationId: input.conversationId, payload: { lastMessageText: preview } });
 
   return { messageId };
+}
+
+/**
+ * แนบสื่อเข้ากับแถวข้อความที่บันทึกไว้แล้ว (record-first pattern)
+ * ใช้ id เดิม broadcast ซ้ำ — client แทนที่ด้วย id จึงไม่ขึ้นซ้ำ
+ */
+export async function attachInboundMedia(
+  messageId: string,
+  conversationId: string,
+  messageType: InboundMessageType,
+  mediaUrl: string | null,
+  mediaMetadata: Record<string, unknown> | null,
+): Promise<void> {
+  const db = await getDb();
+  await db
+    .update(chatMessages)
+    .set({ mediaUrl, metadata: mediaMetadata })
+    .where(eq(chatMessages.id, messageId));
+  // § broadcast รูปเดิมใช้ shape เดียวกับตอน record — client แทนที่ด้วย id จึงไม่ขึ้นซ้ำ
+  broadcastInbound({
+    id: messageId,
+    conversationId,
+    messageType,
+    textContent: null,
+    mediaUrl,
+    mediaMetadata,
+  });
 }
 
 /**
