@@ -9,6 +9,7 @@ import {
   pgEnum,
   index,
   uniqueIndex,
+  check,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { ALL_STATUSES } from '../cases/state-machine';
@@ -707,11 +708,16 @@ export const chatCsatResponses = pgTable(
     id: text('id').primaryKey(),
     createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
 
-    conversationId: text('conversation_id').notNull().unique(),
+    conversationId: text('conversation_id')
+      .notNull()
+      .unique()
+      .references(() => chatConversations.id, { onDelete: 'cascade' }),
     score: integer('score').notNull(),
   },
   (table) => ({
-    conversationIdx: uniqueIndex('chat_csat_responses_conversation_id_idx').on(table.conversationId),
+    // § unique/CHECK/FK ตรงกับ migration 0024 เป๊ะ (constraint สร้าง backing index ให้เอง)
+    // ไม่เช่นนั้น generate ครั้งหน้าจะออก index ซ้ำและพยายาม drop FK/CHECK
+    scoreCheck: check('chat_csat_responses_score_check', sql`"score" BETWEEN 1 AND 5`),
   })
 );
 
