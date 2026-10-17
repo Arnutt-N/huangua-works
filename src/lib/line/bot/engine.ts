@@ -22,6 +22,7 @@ import {
   httpLineTransport,
   attachInboundMedia,
   findInboundByLineMessageId,
+  hasBotReplyAfter,
   isHumanHandled,
   recordBotReplies,
   recordInboundMessage,
@@ -127,9 +128,21 @@ async function handleMessageEvent(
     : msg.type === 'sticker' ? 'sticker'
     : 'text';
 
-  // § redelivery หลัง crash ต้องเจอแถวเดิม — มีแถวแล้วข้ามทั้งก้อน (ไม่ ingest ซ้ำ ไม่ตอบซ้ำ)
+  // § redelivery หลัง crash ต้องเจอแถวเดิม — มีแถวแล้วข้าม insert+ingest แต่ถ้ายังไม่เคย
+  // ตอบบอทต้องตอบซ่อม (แถวเกิดก่อน reply เสมอ) replyToken เก่าใช้ซ้ำไม่ได้ให้ตกไป push แทน
   const dup = await findInboundByLineMessageId(msg.id);
-  if (dup) return;
+  if (dup) {
+    if (!(await hasBotReplyAfter(conversationId, dup.createdAt))) {
+      const replies = await routeBotMessage(db, event, msg.type === 'text' ? msg.text : null, lineUserPk, conversationId);
+      await recordBotReplies(conversationId, replies);
+      try {
+        await transport.reply(event.replyToken, replies.slice(0, 5));
+      } catch {
+        await transport.push(event.source.userId, replies.slice(0, 5));
+      }
+    }
+    return;
+  }
 
   // § record-first: บันทึกแถวข้อความก่อนดึงสื่อเสมอ — crash กลาง ingest จะเหลือแถวให้ redelivery
   // เห็น ไม่ใช่หายทั้งข้อความ (dedup mark ก่อน process จึงต้องมีแถวรอก่อน) ingest เสร็จค่อยแนบทับ
@@ -162,6 +175,7 @@ async function handleMessageEvent(
       await attachInboundMedia(messageId, conversationId, messageType, ingested.url, {
         contentType: ingested.contentType,
         sizeBytes: ingested.sizeBytes,
+        ...(msg.type === 'file' ? { fileName: msg.fileName } : {}),
       });
     } else {
       await attachInboundMedia(messageId, conversationId, messageType, null, { skipped: ingested.reason });

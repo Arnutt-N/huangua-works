@@ -41,6 +41,7 @@ export interface Message {
   messageType: string;
   textContent: string | null;
   mediaUrl?: string | null;
+  metadata?: { skipped?: string; fileName?: string; sizeBytes?: number; contentType?: string } | null;
   createdAt: string;
   clientTempId?: string | null;
   status?: 'pending' | 'failed';

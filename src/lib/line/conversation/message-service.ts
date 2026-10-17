@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, gt, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { chatConversations, chatMessages } from '@/lib/db/schema';
@@ -30,15 +30,28 @@ export interface InboundMessage {
 }
 
 /** หาแถวข้อความขาเข้าจาก LINE message id — redelivery หลัง crash ต้องเจอแถวเดิม ไม่ insert ซ้ำ */
-export async function findInboundByLineMessageId(lineMessageId: string): Promise<{ id: string } | null> {
+export async function findInboundByLineMessageId(lineMessageId: string): Promise<{ id: string; createdAt: Date } | null> {
   const db = await getDb();
   return (await firstOrUndefined(
     db
-      .select({ id: chatMessages.id })
+      .select({ id: chatMessages.id, createdAt: chatMessages.createdAt })
       .from(chatMessages)
       .where(eq(chatMessages.lineMessageId, lineMessageId))
       .limit(1),
   )) ?? null;
+}
+
+/** มีข้อความบอทตอบหลังเวลาที่กำหนดไหม — redelivery ที่ไม่เคยได้คำตอบต้องตอบซ่อม */
+export async function hasBotReplyAfter(conversationId: string, after: Date): Promise<boolean> {
+  const db = await getDb();
+  const row = await firstOrUndefined(
+    db
+      .select({ id: chatMessages.id })
+      .from(chatMessages)
+      .where(and(eq(chatMessages.conversationId, conversationId), eq(chatMessages.sender, 'bot'), gt(chatMessages.createdAt, after)))
+      .limit(1),
+  );
+  return row !== undefined;
 }
 
 interface InboundPayloadArgs {
@@ -50,7 +63,8 @@ interface InboundPayloadArgs {
   mediaMetadata: Record<string, unknown> | null;
 }
 
-/** shape เดียวของ new_message ทุกครั้ง — record กับ attach ต้องส่ง field ชุดเดียวกัน */
+/** shape เดียวของ new_message ทุกครั้ง — record กับ attach ต้องส่ง field ชุดเดียวกัน
+ *  key `metadata` ตรงกับคอลัมน์ DB และ type ฝั่ง client (อย่าใช้ชื่ออื่นจะ mismatch เงียบ) */
 function broadcastInbound(args: InboundPayloadArgs): void {
   broadcast({
     type: 'new_message',
@@ -61,7 +75,7 @@ function broadcastInbound(args: InboundPayloadArgs): void {
       messageType: args.messageType,
       textContent: args.textContent,
       mediaUrl: args.mediaUrl,
-      mediaMetadata: args.mediaMetadata,
+      metadata: args.mediaMetadata,
       createdAt: new Date().toISOString(),
     },
   });
