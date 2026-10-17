@@ -19,7 +19,7 @@ describe('sniffLineMediaMime', () => {
 describe('ingestLineMedia', () => {
   const baseDeps = {
     isConfigured: () => true,
-    download: async () => ({ bytes: JPEG, contentType: 'image/jpeg' }),
+    download: async () => ({ bytes: JPEG, contentType: 'image/jpeg', contentLength: JPEG.byteLength }),
     upload: vi.fn(async (key: string) => `https://files.example/${key}`),
   };
 
@@ -39,7 +39,7 @@ describe('ingestLineMedia', () => {
     big.set(JPEG.slice(0, 3));
     const result = await ingestLineMedia('msg-2', {
       ...baseDeps,
-      download: async () => ({ bytes: big, contentType: 'image/jpeg' }),
+      download: async () => ({ bytes: big, contentType: 'image/jpeg', contentLength: big.byteLength }),
       upload,
     });
     expect(result).toEqual({ kind: 'skipped', reason: 'too_large' });
@@ -49,7 +49,7 @@ describe('ingestLineMedia', () => {
   it('ชนิดไม่รองรับ → skipped unsupported', async () => {
     const result = await ingestLineMedia('msg-3', {
       ...baseDeps,
-      download: async () => ({ bytes: new Uint8Array([9, 9, 9]), contentType: 'application/zip' }),
+      download: async () => ({ bytes: new Uint8Array([9, 9, 9]), contentType: 'application/zip', contentLength: 3 }),
     });
     expect(result).toEqual({ kind: 'skipped', reason: 'unsupported' });
   });
@@ -65,7 +65,7 @@ describe('ingestLineMedia', () => {
   });
 
   it('storage ไม่ได้ตั้งค่า → skipped storage_unconfigured ไม่ download', async () => {
-    const download = vi.fn(async () => ({ bytes: JPEG, contentType: 'image/jpeg' }));
+    const download = vi.fn(async () => ({ bytes: JPEG, contentType: 'image/jpeg', contentLength: JPEG.byteLength }));
     const result = await ingestLineMedia('msg-5', { ...baseDeps, isConfigured: () => false, download });
     expect(result).toEqual({ kind: 'skipped', reason: 'storage_unconfigured' });
     expect(download).not.toHaveBeenCalled();
