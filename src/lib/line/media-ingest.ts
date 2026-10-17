@@ -7,11 +7,11 @@ export const MAX_LINE_MEDIA_BYTES = 10 * 1024 * 1024;
 
 export type MediaIngestResult =
   | { kind: 'stored'; url: string; contentType: string; sizeBytes: number }
-  | { kind: 'skipped'; reason: 'too_large' | 'unsupported' | 'download_failed' | 'storage_unconfigured' };
+  | { kind: 'skipped'; reason: 'too_large' | 'unsupported' | 'download_failed' | 'upload_failed' | 'storage_unconfigured' };
 
 export interface MediaIngestDeps {
   isConfigured: () => boolean;
-  download: (messageId: string) => Promise<{ bytes: Uint8Array; contentType: string | null }>;
+  download: (messageId: string) => Promise<{ bytes: Uint8Array; contentType: string | null; contentLength: number | null }>;
   upload: (key: string, body: Buffer, contentType: string) => Promise<string>;
 }
 
@@ -53,12 +53,17 @@ export function sniffLineMediaMime(bytes: Uint8Array): { mime: string; ext: stri
 /**
  * ดึงสื่อที่ประชาชนส่งทาง LINE มาเก็บใน storage ของระบบ
  * ทุกความล้มเหลวคืน skipped ไม่ throw เพราะ webhook ต้องบันทึกข้อความต่อให้ได้
+ * ตัดไฟล์ใหญ่ก่อนบัฟเฟอร์: ใช้ knownSize (จาก event) หรือ content-length (จาก header) ก่อนโหลด body
  */
 export async function ingestLineMedia(
   messageId: string,
   deps: MediaIngestDeps = defaultDeps,
+  opts: { knownSize?: number } = {},
 ): Promise<MediaIngestResult> {
   if (!deps.isConfigured()) return { kind: 'skipped', reason: 'storage_unconfigured' };
+  if (opts.knownSize !== undefined && opts.knownSize > MAX_LINE_MEDIA_BYTES) {
+    return { kind: 'skipped', reason: 'too_large' };
+  }
 
   let bytes: Uint8Array;
   try {
@@ -78,6 +83,6 @@ export async function ingestLineMedia(
     const url = await deps.upload(key, Buffer.from(bytes), sniffed.mime);
     return { kind: 'stored', url, contentType: sniffed.mime, sizeBytes: bytes.byteLength };
   } catch {
-    return { kind: 'skipped', reason: 'download_failed' };
+    return { kind: 'skipped', reason: 'upload_failed' };
   }
 }

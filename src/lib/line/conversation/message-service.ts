@@ -76,6 +76,35 @@ export async function recordInboundMessage(input: InboundMessage): Promise<{ mes
 }
 
 /**
+ * แนบสื่อเข้ากับแถวข้อความที่บันทึกไว้แล้ว (record-first pattern)
+ * ใช้ id เดิม broadcast ซ้ำ — client แทนที่ด้วย id จึงไม่ขึ้นซ้ำ
+ */
+export async function attachInboundMedia(
+  messageId: string,
+  conversationId: string,
+  messageType: InboundMessageType,
+  mediaUrl: string | null,
+  mediaMetadata: Record<string, unknown> | null,
+): Promise<void> {
+  const db = await getDb();
+  await db
+    .update(chatMessages)
+    .set({ mediaUrl, metadata: mediaMetadata })
+    .where(eq(chatMessages.id, messageId));
+  broadcast({
+    type: 'new_message',
+    conversationId,
+    payload: {
+      id: messageId,
+      sender: 'user',
+      messageType,
+      mediaUrl,
+      createdAt: new Date().toISOString(),
+    },
+  });
+}
+
+/**
  * บันทึกคำตอบของบอท — คงพฤติกรรมเดิมของ engine: ไม่อัปเดต last message และไม่ broadcast
  * (ข้อความที่ไม่ใช่ text เก็บเป็น messageType 'flex' ตามเดิม)
  */
