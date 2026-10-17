@@ -1,5 +1,8 @@
 import type { LineOutgoingMessage } from '../types';
 import { parseQuickReply } from '../reply-object-validation';
+
+/** ข้อความกลางเมื่อ ref แก้ไม่ได้เลย — ไม่ส่งดิบ $object_id ถึงประชาชน */
+const FALLBACK_APOLOGY_MESSAGE = 'ขออภัยครับ ระบบขัดข้องชั่วคราว กรุณาลองใหม่อีกครั้ง';
 import { resolveObjectRef } from './reply-object-store';
 
 const OBJECT_REF_PATTERN = /\$object_id:([\w-]+)/g;
@@ -124,7 +127,7 @@ export async function parseResponseText(text: string): Promise<LineOutgoingMessa
 
   // § ref แก้ไม่ได้ต้องไม่รั่วถึงประชาชน — เหลืออากาศเปล่าๆ ส่งข้อความกลางแทน (log อยู่ข้างบน)
   if (messages.length === 0) {
-    messages.push({ type: 'text', text: 'ขออภัยครับ ระบบขัดข้องชั่วคราว กรุณาลองใหม่อีกครั้ง' });
+    messages.push({ type: 'text', text: FALLBACK_APOLOGY_MESSAGE });
   }
 
   return messages;

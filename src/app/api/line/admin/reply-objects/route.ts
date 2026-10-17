@@ -10,6 +10,13 @@ import { logAudit, AUDIT_ACTIONS } from '@/lib/audit';
 import { z } from 'zod';
 import { replyObjectTypeSchema, validateReplyPayload } from '@/lib/line/reply-object-validation';
 
+/** รหัส PG unique violation — 409 เฉพาะชนจริง อย่างอื่นต้อง 500 */
+const PG_UNIQUE_VIOLATION = '23505';
+
+function isPgUniqueViolation(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as { code?: unknown }).code === PG_UNIQUE_VIOLATION;
+}
+
 export const runtime = 'nodejs';
 
 const createSchema = z.object({
@@ -59,7 +66,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     // § 409 เฉพาะชน unique จริง — error อื่น (เช่น enum/DB) ต้อง 500 ดังๆ ไม่ใช่บอก id ซ้ำผิดๆ
-    if (typeof error === 'object' && error !== null && (error as { code?: unknown }).code === '23505') {
+    if (isPgUniqueViolation(error)) {
       return NextResponse.json({ error: 'object_id นี้ถูกใช้แล้ว' }, { status: 409 });
     }
     throw error;
