@@ -18,6 +18,7 @@ import { ALL_BUDGET_STATUSES } from '../cases/budget';
 import { ALL_ROLES } from '../auth/roles';
 import { CONVERSATION_MODES } from '../line/chat-modes';
 import { REPLY_OBJECT_TYPES } from '../line/reply-object-validation';
+import type { BroadcastTarget } from '../line/broadcast-target';
 
 /**
  * Schema — อบต.หัวงัว citizen-help (PostgreSQL)
@@ -604,6 +605,26 @@ export const lineUsers = pgTable(
   })
 );
 
+// § ประวัติ follow/unfollow ต่อผู้ใช้ — refollowCount คำนวณจากแถว follow ไม่เก็บตัวเลขซ้ำ
+// webhookEventId unique กัน LINE ส่ง event เดิมซ้ำหลัง Redis dedup TTL หมด
+export const lineFriendEvents = pgTable(
+  'line_friend_events',
+  {
+    id: text('id').primaryKey(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    lineUserId: text('line_user_id')
+      .notNull()
+      .references(() => lineUsers.id, { onDelete: 'cascade' }),
+    event: text('event').notNull(),
+    webhookEventId: text('webhook_event_id').notNull(),
+  },
+  (table) => ({
+    webhookEventIdx: uniqueIndex('line_friend_events_webhook_event_id_idx').on(table.webhookEventId),
+    lineUserIdx: index('line_friend_events_line_user_id_idx').on(table.lineUserId),
+    eventCheck: check('line_friend_events_event_check', sql`${table.event} IN ('follow', 'unfollow')`),
+  })
+);
+
 export const chatConversations = pgTable(
   'chat_conversations',
   {
@@ -981,7 +1002,8 @@ export const chatBroadcasts = pgTable(
 
     content: jsonb('content').notNull(),
     status: broadcastStatusEnum().notNull().default('draft'),
-    target: text('target').notNull().default('all'),
+    // § target เป็น JSON discriminated union (all | line_user_ids ของ PK ภายใน) เดิมเป็น text 'all'
+    target: jsonb('target').$type<BroadcastTarget>().notNull().default({ kind: 'all' }),
     scheduledAt: timestamp('scheduled_at', { mode: 'date' }),
     sentAt: timestamp('sent_at', { mode: 'date' }),
     totalRecipients: integer('total_recipients').notNull().default(0),
@@ -993,6 +1015,29 @@ export const chatBroadcasts = pgTable(
   (table) => ({
     statusIdx: index('chat_broadcasts_status_idx').on(table.status),
     scheduledAtIdx: index('chat_broadcasts_scheduled_at_idx').on(table.scheduledAt),
+  })
+);
+
+// § ผู้รับชุดที่ล้มครบ retry — เก็บเฉพาะ SHA-256 hash ของ raw LINE id ห้ามเก็บ raw id (สอดคล้อง T5)
+export const chatBroadcastFailedRecipients = pgTable(
+  'chat_broadcast_failed_recipients',
+  {
+    id: text('id').primaryKey(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+    broadcastId: text('broadcast_id')
+      .notNull()
+      .references(() => chatBroadcasts.id, { onDelete: 'cascade' }),
+    recipientHash: text('recipient_hash').notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    lastError: text('last_error'),
+  },
+  (table) => ({
+    broadcastRecipientUnique: unique('chat_broadcast_failed_recipients_broadcast_recipient_uid').on(
+      table.broadcastId,
+      table.recipientHash
+    ),
+    broadcastIdx: index('chat_broadcast_failed_recipients_broadcast_id_idx').on(table.broadcastId),
   })
 );
 
