@@ -16,10 +16,12 @@ describe('buildMessageFromObject type ใหม่', () => {
       .toEqual({ type: 'video', originalContentUrl: 'https://x/v.mp4', previewImageUrl: 'https://x/v.mp4' });
     expect(buildMessageFromObject('audio', { url: 'https://x/a.m4a', duration: 30 }, null))
       .toEqual({ type: 'audio', originalContentUrl: 'https://x/a.m4a', duration: 30 });
-    expect(buildMessageFromObject('location', { latitude: 16, longitude: 103 }, null))
+    expect(buildMessageFromObject('location', { title: 'ศาลากลาง', address: 'ถนนหลัก', latitude: 16, longitude: 103 }, null))
       ?.toMatchObject({ type: 'location', latitude: 16, longitude: 103 });
-    expect(buildMessageFromObject('imagemap', { baseUrl: 'https://x/', baseSize: { width: 1040, height: 1040 } }, null))
+    expect(buildMessageFromObject('location', { latitude: 16, longitude: 103 }, null)).toBeNull();
+    expect(buildMessageFromObject('imagemap', { baseUrl: 'https://x/', baseSize: { width: 1040, height: 1040 }, actions: [{ type: 'uri', label: 'เปิด', uri: 'https://x/' }] }, null))
       ?.toMatchObject({ type: 'imagemap', baseSize: { width: 1040, height: 1040 } });
+    expect(buildMessageFromObject('imagemap', { baseUrl: 'https://x/', baseSize: { width: 1040, height: 1040 } }, null)).toBeNull();
   });
 
   it('text_v2 ออกเป็น text', () => {

@@ -15,10 +15,14 @@ describe('parseCsatPostback', () => {
     expect(parseCsatPostback('csat|0')).toBeNull();
     expect(parseCsatPostback('csat|6')).toBeNull();
   });
-  it('ไม่ใช่ csat protocol หรือมี id แนบ → null', () => {
+  it('ไม่ใช่ csat protocol → null', () => {
     expect(parseCsatPostback('confirm:ok')).toBeNull();
     expect(parseCsatPostback('csat')).toBeNull();
-    expect(parseCsatPostback('csat|conv-1|5')).toBeNull();
+    expect(parseCsatPostback('csat|')).toBeNull();
+  });
+  it('wire เก่ามี id แนบ → รับช่วงเปลี่ยนผ่าน ใช้แค่ score', () => {
+    expect(parseCsatPostback('csat|conv-1|5')).toEqual({ score: 5 });
+    expect(parseCsatPostback('csat|conv-1|9')).toBeNull();
   });
 });
 
@@ -46,6 +50,9 @@ describe('recordCsatResponse', () => {
   it('คะแนนนอก 1-5 → invalid โดยไม่แตะ DB', async () => {
     await expect(recordCsatResponse('conv-ghost', 0, null)).resolves.toEqual({ kind: 'invalid' });
     await expect(recordCsatResponse('conv-ghost', 6, null)).resolves.toEqual({ kind: 'invalid' });
+  });
+  it('resolvedAt null → invalid (NULL ไม่ชน unique จะไหลไม่จำกัดแถว)', async () => {
+    await expect(recordCsatResponse('conv-ghost', 5, null)).resolves.toEqual({ kind: 'invalid' });
   });
 });
 

@@ -67,23 +67,19 @@ function buildBaseMessage(
     }
     case 'audio': {
       const url = String(body.url ?? '');
-      const duration = Number(body.duration ?? 0);
-      if (!url || !Number.isFinite(duration) || duration < 0) return null;
+      const duration = Number(body.duration);
+      if (!url || !Number.isFinite(duration) || duration <= 0) return null;
       return { type: 'audio', originalContentUrl: url, duration };
     }
     case 'location': {
       const latitude = Number(body.latitude);
       const longitude = Number(body.longitude);
-      if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+      const title = String(body.title ?? '');
+      const address = String(body.address ?? '');
+      if (!title || !address || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
         return null;
       }
-      return {
-        type: 'location',
-        title: String(body.title ?? 'ตำแหน่ง'),
-        address: String(body.address ?? ''),
-        latitude,
-        longitude,
-      };
+      return { type: 'location', title, address, latitude, longitude };
     }
     case 'imagemap': {
       const baseSize = body.baseSize as { width?: unknown; height?: unknown } | undefined;
@@ -91,12 +87,13 @@ function buildBaseMessage(
       const height = Number(baseSize?.height);
       const baseUrl = String(body.baseUrl ?? '');
       if (!baseUrl || !Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) return null;
+      if (!Array.isArray(body.actions) || body.actions.length === 0) return null;
       return {
         type: 'imagemap',
         baseUrl,
         altText: altText ?? 'รูปภาพ',
         baseSize: { width, height },
-        actions: Array.isArray(body.actions) ? body.actions : [],
+        actions: body.actions,
       };
     }
     default:

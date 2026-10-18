@@ -35,20 +35,27 @@ const quickReplySchema = z.object({
   items: z.array(z.object({ type: z.literal('action'), action: quickReplyActionSchema })).min(1).max(LINE_QUICK_REPLY_MAX_ITEMS),
 });
 
-/** schema ต่อ type — ความจริงเดียวของรูปร่าง payload ที่ถูกต้อง */
+/** schema ต่อ type — ความจริงเดียวของรูปร่าง payload ที่ถูกต้อง (เข้มเท่า LINE รับ ไม่ใช่แค่รูปทรง) */
+const httpsUrl = z.string().url().refine((u) => u.startsWith('https://'), 'ต้องเป็น https URL (LINE ไม่รับ http)');
 const PAYLOAD_SCHEMAS = {
   flex: z.record(z.string(), z.unknown()).refine((v) => Object.keys(v).length > 0, 'payload ต้องไม่ว่าง'),
   template: z.record(z.string(), z.unknown()).refine((v) => Object.keys(v).length > 0, 'payload ต้องไม่ว่าง'),
   text: z.object({ text: z.string().min(1) }),
   text_v2: z.object({ text: z.string().min(1) }),
-  image: z.object({ url: z.string().min(1) }),
+  image: z.object({ url: httpsUrl, previewUrl: httpsUrl.optional() }),
   sticker: z.object({ packageId: z.string().min(1), stickerId: z.string().min(1) }),
-  video: z.object({ url: z.string().min(1) }),
-  audio: z.object({ url: z.string().min(1), duration: z.number().nonnegative().optional() }),
-  location: z.object({ latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180) }),
+  video: z.object({ url: httpsUrl, previewUrl: httpsUrl.optional() }),
+  audio: z.object({ url: httpsUrl, duration: z.number().positive() }),
+  location: z.object({
+    title: z.string().min(1),
+    address: z.string().min(1),
+    latitude: z.number().min(-90).max(90),
+    longitude: z.number().min(-180).max(180),
+  }),
   imagemap: z.object({
-    baseUrl: z.string().min(1),
+    baseUrl: httpsUrl,
     baseSize: z.object({ width: z.number().positive(), height: z.number().positive() }),
+    actions: z.array(z.record(z.string(), z.unknown())).min(1, 'imagemap ต้องมี action อย่างน้อย 1'),
   }),
 } satisfies Record<ReplyObjectType, z.ZodTypeAny>;
 

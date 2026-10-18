@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { chatConversations, chatCsatResponses } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
@@ -80,9 +80,10 @@ export async function sendCsatSurveyForConversation(
 const CSAT_SCORE_MIN = 1;
 const CSAT_SCORE_MAX = 5;
 
-/** แยก postback csat ออกจาก postback อื่น — ผิดรูปคืน null แล้วผู้เรียก log จบ (wire มีแค่ score ห้องใช้ของ session) */
+/** แยก postback csat ออกจาก postback อื่น — ผิดรูปคืน null แล้วผู้เรียก log จบ
+ * wire ใหม่มีแค่ score; wire เก่า `csat|<id>|<score>` รับช่วงเปลี่ยนผ่าน (id ถูกเมิน ห้องใช้ของ session) */
 export function parseCsatPostback(data: string): { score: number } | null {
-  const match = /^csat\|([1-5])$/.exec(data);
+  const match = /^csat\|(?:[^|]+\|)?([1-5])$/.exec(data);
   if (!match) return null;
   return { score: Number(match[1]) };
 }
@@ -107,6 +108,8 @@ export async function recordCsatResponse(
 ): Promise<CsatRecordResult> {
   // § กัน caller ในอนาคต (ไม่ใช่แค่ postback) ฝังคะแนนนอกช่วง — DB มี CHECK เป็นตาข่ายชั้นสอง
   if (!Number.isInteger(score) || score < CSAT_SCORE_MIN || score > CSAT_SCORE_MAX) return { kind: 'invalid' };
+  // § resolvedAt null ไม่มีวันชน unique (NULL ไม่เท่ากันเอง) — รับมาจะไหลไม่จำกัดแถว ปัดทิ้งตรงนี้
+  if (resolvedAt === null) return { kind: 'invalid' };
   const db = await getDb();
   // § เขียนครั้งเดียวด้วย upsert — pre-select กัน race ไม่ได้อยู่ดี ปล่อยให้ constraint ตัดสิน
   const [inserted] = await db
@@ -115,11 +118,11 @@ export async function recordCsatResponse(
     .onConflictDoNothing({ target: [chatCsatResponses.conversationId, chatCsatResponses.resolvedAt] })
     .returning({ score: chatCsatResponses.score });
   if (inserted) return { kind: 'recorded', score: inserted.score };
+  // § fallback อ่านแถวรอบเดียวกันเท่านั้น — อ่านข้ามรอบจะเอาคะแนนรอบใหม่มาตอบรอบเก่า
   const [existing] = await db
     .select({ score: chatCsatResponses.score })
     .from(chatCsatResponses)
-    .where(eq(chatCsatResponses.conversationId, conversationId))
-    .orderBy(desc(chatCsatResponses.createdAt))
+    .where(and(eq(chatCsatResponses.conversationId, conversationId), eq(chatCsatResponses.resolvedAt, resolvedAt)))
     .limit(1);
   if (existing) return { kind: 'duplicate', score: existing.score };
   return { kind: 'invalid' };
