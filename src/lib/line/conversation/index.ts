@@ -5,10 +5,14 @@
 export { MODE_TRANSITIONS, allowedSourceModes, canTransition, isHumanHandled } from './modes';
 export { httpLineTransport, type LineTransport } from './transport';
 export {
+  attachInboundMedia,
+  findInboundByLineMessageId,
+  hasBotReplyAfter,
   recordBotReplies,
   recordInboundMessage,
   sendAdminReply,
   type AdminReplyInput,
+  type InboundDupRow,
   type InboundMessage,
   type InboundMessageType,
   type SendAdminReplyResult,

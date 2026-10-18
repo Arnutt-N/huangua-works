@@ -11,6 +11,22 @@ const SENDER_LABELS: Record<string, string> = {
   bot: 'บอท',
 };
 
+/** เหตุผล ingest ล้มเป็นภาษาแอดมิน — ให้รู้ว่าต้องขอส่งใหม่หรือระบบล้ม */
+function mediaSkippedLabel(reason: string): string {
+  switch (reason) {
+    case 'too_large':
+      return 'ไฟล์ใหญ่เกิน 10 MB';
+    case 'unsupported':
+      return 'ชนิดไฟล์ไม่รองรับ';
+    case 'upload_failed':
+      return 'ฝากไฟล์ไม่สำเร็จ';
+    case 'storage_unconfigured':
+      return 'ระบบฝากไฟล์ยังไม่พร้อม';
+    default:
+      return 'ดาวน์โหลดไม่สำเร็จ';
+  }
+}
+
 export function MessageBubble({
   message: msg,
   customerName,
@@ -96,7 +112,20 @@ export function MessageBubble({
                 : 'border border-border bg-surface-raised text-ink',
           )}
         >
-          {msg.textContent ?? `[${msg.messageType}]`}
+          {msg.messageType === 'image' && msg.mediaUrl ? (
+            <a href={msg.mediaUrl} target="_blank" rel="noreferrer" aria-label="เปิดรูปต้นฉบับที่ผู้ใช้ส่ง">
+              {/* eslint-disable-next-line @next/next/no-img-element -- รูปจาก storage ภายนอก ไม่ผ่าน Next image optimizer */}
+              <img src={msg.mediaUrl} alt="รูปที่ผู้ใช้ส่ง" className="max-h-64 w-auto rounded-md" />
+            </a>
+          ) : (msg.messageType === 'file' || msg.messageType === 'video' || msg.messageType === 'audio') && msg.mediaUrl ? (
+            <a href={msg.mediaUrl} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+              {msg.metadata?.fileName ?? (msg.messageType === 'file' ? 'ไฟล์แนบ' : msg.messageType === 'video' ? 'วิดีโอแนบ' : 'เสียงแนบ')} (เปิดดู)
+            </a>
+          ) : (msg.messageType === 'image' || msg.messageType === 'file' || msg.messageType === 'video' || msg.messageType === 'audio') && msg.metadata?.skipped ? (
+            <span className="text-muted">รับไฟล์ไม่สำเร็จ ({mediaSkippedLabel(msg.metadata.skipped)}) — ขอให้ผู้ใช้ส่งใหม่อีกครั้ง</span>
+          ) : (
+            (msg.textContent ?? `[${msg.messageType}]`)
+          )}
         </div>
         <span className="flex items-center gap-1 px-1 text-[10px] text-muted">
           {msg.status === 'pending' ? (

@@ -1,5 +1,6 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, gt, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
+import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { chatConversations, chatMessages } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import type { ConversationMode } from '../chat-modes';
@@ -8,7 +9,7 @@ import type { LineOutgoingMessage } from '../types';
 import { isHumanHandled } from './modes';
 import type { LineTransport } from './transport';
 
-export type InboundMessageType = 'text' | 'image' | 'location' | 'sticker';
+export type InboundMessageType = 'text' | 'image' | 'file' | 'video' | 'audio' | 'location' | 'sticker';
 
 export interface InboundMessage {
   conversationId: string;
@@ -16,6 +17,8 @@ export interface InboundMessage {
   mode: ConversationMode;
   messageType: InboundMessageType;
   textContent: string | null;
+  mediaUrl?: string | null;
+  mediaMetadata?: Record<string, unknown> | null;
   locationData: Record<string, unknown> | null;
   lineMessageId: string;
   /**
@@ -26,21 +29,100 @@ export interface InboundMessage {
   countUnread?: boolean;
 }
 
-/** บันทึกข้อความจากผู้ใช้ LINE + อัปเดตข้อความล่าสุดของห้อง + แจ้ง inbox แอดมิน */
-export async function recordInboundMessage(input: InboundMessage): Promise<{ messageId: string }> {
+/** แถวข้อความขาเข้าที่ redelivery เจอ — ครบพอให้ซ่อมต่อโดยไม่ต้องอ่านซ้ำ */
+export interface InboundDupRow {
+  id: string;
+  createdAt: Date;
+  messageType: string;
+  mediaUrl: string | null;
+  metadata: unknown;
+}
+
+/** หาแถวข้อความขาเข้าจาก LINE message id — redelivery หลัง crash ต้องเจอแถวเดิม ไม่ insert ซ้ำ */
+export async function findInboundByLineMessageId(lineMessageId: string): Promise<InboundDupRow | null> {
+  const db = await getDb();
+  return (await firstOrUndefined(
+    db
+      .select({
+        id: chatMessages.id,
+        createdAt: chatMessages.createdAt,
+        messageType: chatMessages.messageType,
+        mediaUrl: chatMessages.mediaUrl,
+        metadata: chatMessages.metadata,
+      })
+      .from(chatMessages)
+      .where(eq(chatMessages.lineMessageId, lineMessageId))
+      .limit(1),
+  )) ?? null;
+}
+
+/** มีข้อความบอทตอบหลังเวลาที่กำหนดไหม — redelivery ที่ไม่เคยได้คำตอบต้องตอบซ่อม */
+export async function hasBotReplyAfter(conversationId: string, after: Date): Promise<boolean> {
+  const db = await getDb();
+  const row = await firstOrUndefined(
+    db
+      .select({ id: chatMessages.id })
+      .from(chatMessages)
+      .where(and(eq(chatMessages.conversationId, conversationId), eq(chatMessages.sender, 'bot'), gt(chatMessages.createdAt, after)))
+      .limit(1),
+  );
+  return row !== undefined;
+}
+
+interface InboundPayloadArgs {
+  id: string;
+  conversationId: string;
+  messageType: InboundMessageType;
+  textContent: string | null;
+  mediaUrl: string | null;
+  mediaMetadata: Record<string, unknown> | null;
+}
+
+/** shape เดียวของ new_message ทุกครั้ง — record กับ attach ต้องส่ง field ชุดเดียวกัน
+ *  key `metadata` ตรงกับคอลัมน์ DB และ type ฝั่ง client (อย่าใช้ชื่ออื่นจะ mismatch เงียบ) */
+function broadcastInbound(args: InboundPayloadArgs): void {
+  broadcast({
+    type: 'new_message',
+    conversationId: args.conversationId,
+    payload: {
+      id: args.id,
+      sender: 'user',
+      messageType: args.messageType,
+      textContent: args.textContent,
+      mediaUrl: args.mediaUrl,
+      metadata: args.mediaMetadata,
+      createdAt: new Date().toISOString(),
+    },
+  });
+}
+export async function recordInboundMessage(input: InboundMessage): Promise<{ messageId: string; isNew: boolean }> {
   const db = await getDb();
   const messageId = generateId();
   const preview = input.textContent ?? `[${input.messageType}]`;
 
-  await db.insert(chatMessages).values({
-    id: messageId,
-    conversationId: input.conversationId,
-    sender: 'user',
-    messageType: input.messageType,
-    textContent: input.textContent,
-    locationData: input.locationData,
-    lineMessageId: input.lineMessageId,
-  });
+  // § แข่งกัน insert (redelivery ชนกัน) ให้ constraint ตัดสิน — แพ้แล้วไปเอาแถวผู้ชนะ
+  // ไม่ throw ออกไป เพราะ throw ตรงนี้คือ event ล้มทั้งที่ข้อความอยู่ครบแล้ว
+  const [inserted] = await db
+    .insert(chatMessages)
+    .values({
+      id: messageId,
+      conversationId: input.conversationId,
+      sender: 'user',
+      messageType: input.messageType,
+      textContent: input.textContent,
+      mediaUrl: input.mediaUrl ?? null,
+      metadata: input.mediaMetadata ?? null,
+      locationData: input.locationData,
+      lineMessageId: input.lineMessageId,
+    })
+    .onConflictDoNothing({ target: chatMessages.lineMessageId, where: sql`line_message_id is not null` })
+    .returning({ id: chatMessages.id });
+  if (!inserted) {
+    const winner = await findInboundByLineMessageId(input.lineMessageId);
+    // § ชนะแต่หาแถวไม่เจอเป็นไปไม่ได้ นอกจากแถวถูกลบพร้อมกัน — ให้ webhook catch จัดการแล้ว redelivery ซ่อมทาง dup
+    if (!winner) throw new Error(`inbound race lost with no winner: ${input.lineMessageId}`);
+    return { messageId: winner.id, isNew: false };
+  }
 
   const countUnread = input.countUnread ?? isHumanHandled(input.mode);
   await db
@@ -54,20 +136,44 @@ export async function recordInboundMessage(input: InboundMessage): Promise<{ mes
     })
     .where(eq(chatConversations.id, input.conversationId));
 
-  broadcast({
-    type: 'new_message',
+  broadcastInbound({
+    id: messageId,
     conversationId: input.conversationId,
-    payload: {
-      id: messageId,
-      sender: 'user',
-      messageType: input.messageType,
-      textContent: input.textContent,
-      createdAt: new Date().toISOString(),
-    },
+    messageType: input.messageType,
+    textContent: input.textContent,
+    mediaUrl: input.mediaUrl ?? null,
+    mediaMetadata: input.mediaMetadata ?? null,
   });
   broadcast({ type: 'conversation_update', conversationId: input.conversationId, payload: { lastMessageText: preview } });
 
-  return { messageId };
+  return { messageId, isNew: true };
+}
+
+/**
+ * แนบสื่อเข้ากับแถวข้อความที่บันทึกไว้แล้ว (record-first pattern)
+ * ใช้ id เดิม broadcast ซ้ำ — client แทนที่ด้วย id จึงไม่ขึ้นซ้ำ
+ */
+export async function attachInboundMedia(
+  messageId: string,
+  conversationId: string,
+  messageType: InboundMessageType,
+  mediaUrl: string | null,
+  mediaMetadata: Record<string, unknown> | null,
+): Promise<void> {
+  const db = await getDb();
+  await db
+    .update(chatMessages)
+    .set({ mediaUrl, metadata: mediaMetadata })
+    .where(eq(chatMessages.id, messageId));
+  // § broadcast รูปเดิมใช้ shape เดียวกับตอน record — client แทนที่ด้วย id จึงไม่ขึ้นซ้ำ
+  broadcastInbound({
+    id: messageId,
+    conversationId,
+    messageType,
+    textContent: null,
+    mediaUrl,
+    mediaMetadata,
+  });
 }
 
 /**

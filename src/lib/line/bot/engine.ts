@@ -1,10 +1,12 @@
 import { eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
+import { redis } from '@/lib/upstash';
 import { lineUsers, chatConversations, chatMessages } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import type { LineWebhookEvent, LineMessageEvent, LineFollowEvent, LinePostbackEvent, LineOutgoingMessage } from '../types';
 import type { ConversationMode } from '../chat-modes';
 import { matchFaq } from './faq-matcher';
+import { ingestLineMedia } from '../media-ingest';
 import { matchIntent } from './intent-matcher';
 import { parseResponseText } from './response-parser';
 import { startCaseFlow, processCaseFlow, handleConfirmPostback, type CaseFlowState } from './case-flow';
@@ -19,9 +21,13 @@ import { isWithinBusinessHours, outsideBusinessHoursText } from '../business-hou
 import {
   changeMode,
   httpLineTransport,
+  attachInboundMedia,
+  findInboundByLineMessageId,
+  hasBotReplyAfter,
   isHumanHandled,
   recordBotReplies,
   recordInboundMessage,
+  type InboundDupRow,
   type InboundMessageType,
   type LineTransport,
 } from '../conversation';
@@ -107,6 +113,13 @@ async function getOrCreateConversation(db: Db, lineUserId: string) {
   return { id, lineUserId, mode: 'bot_active' as const };
 }
 
+const REPAIR_AGE_MS = 90_000;
+const REPAIR_LEASE_S = 120;
+
+function isMediaRow(row: InboundDupRow): boolean {
+  return row.messageType === 'image' || row.messageType === 'file' || row.messageType === 'video' || row.messageType === 'audio';
+}
+
 async function handleMessageEvent(
   db: Db,
   event: LineMessageEvent,
@@ -117,26 +130,103 @@ async function handleMessageEvent(
 ) {
   const msg = event.message;
   const messageType: InboundMessageType = msg.type === 'image' ? 'image'
+    : msg.type === 'file' ? 'file'
+    : msg.type === 'video' ? 'video'
+    : msg.type === 'audio' ? 'audio'
     : msg.type === 'location' ? 'location'
     : msg.type === 'sticker' ? 'sticker'
     : 'text';
+
+  // § redelivery หลัง crash ต้องเจอแถวเดิม — ซ่อมผ่าน repairDuplicate ทางเดียว ไม่แยกทาง first/dup
+  // age-gate 90 วิ: ต้นฉบับอาจยังรันอยู่ อย่าตอบซ้ำ + lease กันซ่อมพร้อมกัน (ใครได้ lease คนเดียวที่ซ่อม)
+  const repairDuplicate = async (row: InboundDupRow): Promise<void> => {
+    if (Date.now() - row.createdAt.getTime() < REPAIR_AGE_MS) return;
+    const lease = await redis
+      .set(`repair:${msg.id}`, '1', { nx: true, ex: REPAIR_LEASE_S })
+      .catch(() => null);
+    if (!lease) return;
+    const botEnabledDup = await getChatSetting('bot_enabled');
+    if (isHumanHandled(mode) || !botEnabledDup) return;
+    // § สื่อค้าง (crash ระหว่าง record กับ attach) รัน ingest+attach ซ่อมให้จบ
+    if (isMediaRow(row) && !row.mediaUrl && !(row.metadata as { skipped?: unknown } | null)?.skipped) {
+      const knownSize = msg.type === 'file' ? msg.fileSize : undefined;
+      const ingested = await ingestLineMedia(msg.id, undefined, { knownSize });
+      if (ingested.kind === 'stored') {
+        await attachInboundMedia(row.id, conversationId, messageType, ingested.url, {
+          contentType: ingested.contentType,
+          sizeBytes: ingested.sizeBytes,
+          ...(msg.type === 'file' ? { fileName: msg.fileName } : {}),
+        });
+      } else {
+        await attachInboundMedia(row.id, conversationId, messageType, null, { skipped: ingested.reason });
+      }
+    }
+    // § ค้างกลาง case-flow ไม่ป้อนซ้ำ (กัน state เพี้ยน) + มีคำตอบแล้วไม่ตอบซ้ำ
+    if (await hasBotReplyAfter(conversationId, row.createdAt)) return;
+    const [lu] = await db
+      .select({ botState: lineUsers.botState })
+      .from(lineUsers)
+      .where(eq(lineUsers.id, lineUserPk))
+      .limit(1);
+    if (lu?.botState) return;
+    const replies = await routeBotMessage(db, event, msg.type === 'text' ? msg.text : null, lineUserPk, conversationId);
+    await recordBotReplies(conversationId, replies);
+    try {
+      await transport.reply(event.replyToken, replies.slice(0, 5));
+    } catch {
+      await transport.push(event.source.userId, replies.slice(0, 5));
+    }
+  };
+
+  const dup = await findInboundByLineMessageId(msg.id);
+  if (dup) {
+    await repairDuplicate(dup);
+    return;
+  }
+
+  // § record-first: บันทึกแถวข้อความก่อนดึงสื่อเสมอ — crash กลาง ingest จะเหลือแถวให้ redelivery
+  // เห็น ไม่ใช่หายทั้งข้อความ (dedup mark ก่อน process จึงต้องมีแถวรอก่อน) ingest เสร็จค่อยแนบทับ
+  // ด้วย id เดิม (client แทนที่ด้วย id ไม่ขึ้นซ้ำ) ทุกทางล้มของ ingest จบที่ skipped ไม่ throw
+  const isMedia = msg.type === 'image' || msg.type === 'file' || msg.type === 'video' || msg.type === 'audio';
 
   // § อ่าน bot_enabled ก่อนบันทึกข้อความ — ถ้าบอทปิด ข้อความนี้ไม่มีใครตอบอัตโนมัติ
   // จึงต้องนับเป็น unread ของเจ้าหน้าที่ (เดิม reset เป็น 0 เพราะถือว่าบอทตอบแล้ว)
   const botEnabled = await getChatSetting('bot_enabled');
   const staffHandling = isHumanHandled(mode);
 
-  await recordInboundMessage({
+  const { messageId, isNew } = await recordInboundMessage({
     conversationId,
     mode,
     messageType,
     textContent: msg.type === 'text' ? msg.text : null,
+    mediaUrl: null,
+    mediaMetadata: null,
     locationData: msg.type === 'location'
       ? { title: msg.title, address: msg.address, latitude: msg.latitude, longitude: msg.longitude }
       : null,
     lineMessageId: msg.id,
     countUnread: staffHandling || !botEnabled,
   });
+  if (!isNew) {
+    // § แพ้ race อีก worker — แถวผู้ชนะมีแล้ว เดินทางซ่อมเดียวกับ redelivery
+    const winner = await findInboundByLineMessageId(msg.id);
+    if (winner) await repairDuplicate(winner);
+    return;
+  }
+
+  if (isMedia) {
+    const knownSize = msg.type === 'file' ? msg.fileSize : undefined;
+    const ingested = await ingestLineMedia(msg.id, undefined, { knownSize });
+    if (ingested.kind === 'stored') {
+      await attachInboundMedia(messageId, conversationId, messageType, ingested.url, {
+        contentType: ingested.contentType,
+        sizeBytes: ingested.sizeBytes,
+        ...(msg.type === 'file' ? { fileName: msg.fileName } : {}),
+      });
+    } else {
+      await attachInboundMedia(messageId, conversationId, messageType, null, { skipped: ingested.reason });
+    }
+  }
 
   if (staffHandling) {
     return;

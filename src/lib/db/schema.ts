@@ -53,6 +53,9 @@ export const conversationModeEnum = pgEnum('conversation_mode', CONVERSATION_MOD
 export const chatMessageTypeEnum = pgEnum('chat_message_type', [
   'text',
   'image',
+  'file',
+  'video',
+  'audio',
   'location',
   'sticker',
   'flex',
