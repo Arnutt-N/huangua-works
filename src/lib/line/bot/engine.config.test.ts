@@ -5,7 +5,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 const setMock = vi.fn(() => ({ where: vi.fn(() => ({ returning: vi.fn(() => [{ id: 'conv-1' }]) })) }));
 const mockDb = {
   select: vi.fn(() => ({ from: () => ({ where: () => ({ limit: () => [] }) }) })),
-  insert: vi.fn(() => ({ values: vi.fn(() => ({})) })),
+  insert: vi.fn(() => ({ values: vi.fn(() => ({ onConflictDoNothing: vi.fn(() => ({ returning: vi.fn(async () => [{ id: 'm1' }]) })) })) })),
   update: vi.fn(() => ({ set: setMock })),
 } as never;
 
