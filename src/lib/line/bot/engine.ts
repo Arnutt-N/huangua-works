@@ -19,6 +19,7 @@ import { getFaqReply } from '../messages/rich-menu';
 import { findTrackableCase } from '@/lib/cases/citizen-access';
 import { COPY } from '@/lib/copy';
 import { isWithinBusinessHours, outsideBusinessHoursText } from '../business-hours';
+import { getFollowCount, recordFriendEvent } from '../friend-events';
 import {
   changeMode,
   httpLineTransport,
@@ -48,12 +49,14 @@ export async function handleEvent(event: LineWebhookEvent, transport: LineTransp
       await handleMessageEvent(db, event, lineUser.id, conversation.id, conversation.mode, transport);
       break;
     case 'follow':
-      await handleFollowEvent(db, event, conversation.id, transport);
+      await handleFollowEvent(db, event, lineUser.id, conversation.id, transport);
       break;
     case 'postback':
       await handlePostbackEvent(db, event, conversation.id, transport);
       break;
     case 'unfollow':
+      // § บันทึก event อย่างเดียว ไม่ตอบกลับ (unfollow ไม่มี replyToken ให้ใช้อยู่แล้ว)
+      await recordFriendEvent(db, lineUser.id, 'unfollow', event.webhookEventId).catch(() => false);
       break;
   }
 }
@@ -364,10 +367,13 @@ async function updateBotState(db: Db, lineUserPk: string, state: CaseFlowState |
     .where(eq(lineUsers.id, lineUserPk));
 }
 
-async function handleFollowEvent(db: Db, event: LineFollowEvent, conversationId: string, transport: LineTransport) {
+async function handleFollowEvent(db: Db, event: LineFollowEvent, lineUserPk: string, conversationId: string, transport: LineTransport) {
+  // § บันทึก friend event ก่อน (best-effort) เพื่อให้ {follow_count} รวมครั้งนี้ — พังห้ามล้ม welcome
+  await recordFriendEvent(db, lineUserPk, 'follow', event.webhookEventId).catch(() => false);
+  const followCount = await getFollowCount(db, lineUserPk).catch(() => null);
   // § โปรไฟล์ดึงแบบ best-effort — พังหรือไม่มียังต้องส่ง welcome ต่อ (display_name ว่าง)
   const profile = await transport.getProfile(event.source.userId).catch(() => null);
-  const replies = await getWelcomeMessages({ displayName: profile?.displayName ?? null });
+  const replies = await getWelcomeMessages({ displayName: profile?.displayName ?? null, followCount });
 
   // คงพฤติกรรมเดิม: บันทึกแค่ข้อความแรกเป็น text
   await db.insert(chatMessages).values({
