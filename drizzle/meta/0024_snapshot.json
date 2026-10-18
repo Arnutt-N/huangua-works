@@ -4421,7 +4421,8 @@
         "sticker",
         "flex",
         "template",
-        "system"
+        "system",
+        "imagemap"
       ]
     },
     "public.chat_sender": {

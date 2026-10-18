@@ -44,9 +44,10 @@ function buildModeUpdates(to: ConversationMode, opts: ChangeModeOptions, now: Da
     ...(to === 'resolved' ? { resolvedAt: now } : {}),
     // § ประทับเวลาเริ่มรอคิวใน metadata ครั้งเดียวตอนเข้า waiting — SLA อ่านจากค่านี้
     // ไม่ใช้ updatedAt เพราะขยับทุกข้อความ ใช้ UPDATE เดียวกับ claim ไม่เพิ่ม write
+    // ส่ง ISO string (ไม่ใช่ Date) — postgresjs bind Date ใน to_jsonb($::timestamptz) ไม่ได้ (พิสูจน์ด้วย proof script แล้ว)
     ...(to === 'waiting_handoff'
       ? {
-          metadata: sql`jsonb_set(coalesce(${chatConversations.metadata}, '{}'::jsonb), '{waitingSince}', to_jsonb(${now}::timestamptz))`,
+          metadata: sql`jsonb_set(coalesce(${chatConversations.metadata}, '{}'::jsonb), '{waitingSince}', to_jsonb(${now.toISOString()}::timestamptz))`,
         }
       : {}),
     ...(opts.linkedCaseId !== undefined ? { linkedCaseId: opts.linkedCaseId } : {}),
