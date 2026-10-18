@@ -95,21 +95,33 @@ export interface RichMenuAliasItem {
   menuName: string | null;
 }
 
+export type BroadcastTarget =
+  | { kind: 'all' }
+  | { kind: 'line_user_ids'; ids: string[] };
+
 export interface BroadcastItem {
   id: string;
   content: { type: string; text?: string }[];
   status: string;
+  target: BroadcastTarget;
   scheduledAt: string | null;
   sentAt: string | null;
   totalRecipients: number;
   successCount: number;
   failedCount: number;
+  failedRecipients: number;
   createdAt: string;
 }
 
 export interface BroadcastInput {
   content: { type: string; text?: string }[];
+  target: BroadcastTarget;
   scheduledAt: string | null;
+}
+
+export interface BroadcastRecipientOption {
+  id: string;
+  displayName: string | null;
 }
 
 export interface MediaItem {
@@ -267,6 +279,10 @@ export const adminApi = {
     request<OkBody>('/api/line/admin/broadcasts', withBody('POST', payload)),
   sendBroadcast: (id: string): Promise<ApiResult<OkBody>> =>
     request<OkBody>(`/api/line/admin/broadcasts/${id}/send`, { method: 'POST' }),
+  listBroadcastRecipients: (): Promise<ApiResult<ListOf<BroadcastRecipientOption>>> =>
+    request<ListOf<BroadcastRecipientOption>>('/api/line/admin/broadcasts/recipients'),
+  dryRunBroadcast: (target: BroadcastTarget): Promise<ApiResult<{ estimatedRecipients: number }>> =>
+    request<{ estimatedRecipients: number }>('/api/line/admin/broadcasts/dry-run', withBody('POST', { target })),
 
   // ── Media ──
   listMedia: (): Promise<ApiResult<MediaPage>> => request<MediaPage>('/api/line/admin/media'),

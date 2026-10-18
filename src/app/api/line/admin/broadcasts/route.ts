@@ -1,19 +1,20 @@
 import { NextResponse } from 'next/server';
-import { desc } from 'drizzle-orm';
+import { desc, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
-import { chatBroadcasts } from '@/lib/db/schema';
+import { chatBroadcasts, chatBroadcastFailedRecipients } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import { parseBody } from '@/lib/api-helpers';
 import { requireStaffApi } from '@/lib/auth/require-staff';
 import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit';
+import { broadcastTargetSchema } from '@/lib/line/broadcast-target';
 import { z } from 'zod';
 
 export const runtime = 'nodejs';
 
 const createSchema = z.object({
   content: z.array(z.object({ type: z.string(), text: z.string().optional() }).passthrough()).min(1).max(5),
-  target: z.string().default('all'),
+  target: broadcastTargetSchema.default({ kind: 'all' }),
   scheduledAt: z.string().datetime().nullable().optional(),
 });
 
@@ -28,7 +29,16 @@ export async function GET() {
     .orderBy(desc(chatBroadcasts.createdAt))
     .limit(50);
 
-  return NextResponse.json({ items: rows });
+  // § จำนวนผู้รับที่ล้มต่อ broadcast สำหรับสรุปในรายการ — hash อย่างเดียว ไม่คืนรายละเอียดผู้รับ
+  const failedRows = await db
+    .select({ broadcastId: chatBroadcastFailedRecipients.broadcastId, failedRecipients: sql<number>`count(*)::int` })
+    .from(chatBroadcastFailedRecipients)
+    .groupBy(chatBroadcastFailedRecipients.broadcastId);
+  const failedById = new Map(failedRows.map((r) => [r.broadcastId, r.failedRecipients]));
+
+  return NextResponse.json({
+    items: rows.map((row) => ({ ...row, failedRecipients: failedById.get(row.id) ?? 0 })),
+  });
 }
 
 export async function POST(request: Request) {
