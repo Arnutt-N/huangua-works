@@ -9,6 +9,7 @@ import {
   pgEnum,
   index,
   uniqueIndex,
+  unique,
   check,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
@@ -16,6 +17,7 @@ import { ALL_STATUSES } from '../cases/state-machine';
 import { ALL_BUDGET_STATUSES } from '../cases/budget';
 import { ALL_ROLES } from '../auth/roles';
 import { CONVERSATION_MODES } from '../line/chat-modes';
+import { REPLY_OBJECT_TYPES } from '../line/reply-object-validation';
 
 /**
  * Schema — อบต.หัวงัว citizen-help (PostgreSQL)
@@ -61,6 +63,7 @@ export const chatMessageTypeEnum = pgEnum('chat_message_type', [
   'sticker',
   'flex',
   'template',
+  'imagemap',
   'system',
 ]);
 
@@ -658,6 +661,11 @@ export const chatMessages = pgTable(
     conversationIdx: index('chat_messages_conversation_id_idx').on(table.conversationId),
     createdAtIdx: index('chat_messages_created_at_idx').on(table.createdAt),
     lineMessageIdIdx: index('chat_messages_line_message_id_idx').on(table.lineMessageId),
+    // § กัน redelivery แทรกซ้ำหลัง crash (find+insert แบบ check-then-act เดี่ยวๆ ไม่พอ)
+    // partial unique: แถวบอท/แอดมินที่ line_message_id เป็น null ไม่โดนบังคับ
+    lineMessageIdUid: uniqueIndex('chat_messages_line_message_id_uid_idx')
+      .on(table.lineMessageId)
+      .where(sql`line_message_id is not null`),
     clientTempIdIdx: uniqueIndex('chat_messages_client_temp_id_idx')
       .on(table.clientTempId)
       .where(sql`client_temp_id is not null`),
@@ -708,13 +716,16 @@ export const chatCsatResponses = pgTable(
 
     conversationId: text('conversation_id')
       .notNull()
-      .unique()
       .references(() => chatConversations.id, { onDelete: 'cascade' }),
+    // § รอบปิดที่โหวต — ห้อง reuse ได้ คะแนนจึง unique ต่อ (ห้อง, รอบปิด) ไม่ใช่ต่อห้อง
+    // null สำหรับแถวเก่าก่อนมีคอลัมน์ (null ไม่ชนกันเอง)
+    resolvedAt: timestamp('resolved_at', { mode: 'date' }),
     score: integer('score').notNull(),
   },
   (table) => ({
-    // § unique/CHECK/FK ตรงกับ migration 0024 เป๊ะ (constraint สร้าง backing index ให้เอง)
+    // § unique/CHECK/FK ตรงกับ migration 0024+0027 เป๊ะ (constraint สร้าง backing index ให้เอง)
     // ไม่เช่นนั้น generate ครั้งหน้าจะออก index ซ้ำและพยายาม drop FK/CHECK
+    cycleUid: unique('chat_csat_responses_cycle_uid').on(table.conversationId, table.resolvedAt),
     scoreCheck: check('chat_csat_responses_score_check', sql`"score" BETWEEN 1 AND 5`),
   })
 );
@@ -849,12 +860,8 @@ export const chatConversationTags = pgTable(
 // § Chatbot Management (intent engine, reply objects, broadcast, rich menus)
 // ────────────────────────────────────────────────────────────────────────────
 
-export const replyObjectTypeEnum = pgEnum('reply_object_type', [
-  'flex',
-  'template',
-  'text',
-  'image',
-]);
+/** ประเภท reply object — tuple ต้นทางเดียวที่ reply-object-validation.ts ทุกที่ derive จากที่นี่ */
+export const replyObjectTypeEnum = pgEnum('reply_object_type', [...REPLY_OBJECT_TYPES]);
 
 export const matchTypeEnum = pgEnum('match_type', [
   'exact',

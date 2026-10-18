@@ -1,7 +1,8 @@
 import { eq, and } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
-import { chatIntents, chatIntentKeywords, chatIntentResponses, chatReplyObjects } from '@/lib/db/schema';
+import { chatIntents, chatIntentKeywords, chatIntentResponses } from '@/lib/db/schema';
 import type { LineOutgoingMessage } from '../types';
+import { resolveReplyObject } from './reply-object-store';
 import { readConfigVersion } from '../config-version';
 import {
   BOT_CONFIG_TTL_MS,
@@ -157,42 +158,4 @@ async function resolveIntentResponses(intentId: string): Promise<LineOutgoingMes
   }
 
   return messages;
-}
-
-async function resolveReplyObject(objectId: string): Promise<LineOutgoingMessage | null> {
-  const db = await getDb();
-  const [obj] = await db
-    .select()
-    .from(chatReplyObjects)
-    .where(and(eq(chatReplyObjects.id, objectId), eq(chatReplyObjects.isActive, true)))
-    .limit(1);
-
-  if (!obj) return null;
-
-  const payload = obj.payload as Record<string, unknown>;
-
-  switch (obj.objectType) {
-    case 'text':
-      return { type: 'text', text: String(payload.text ?? obj.altText ?? '') };
-    case 'flex':
-      return {
-        type: 'flex',
-        altText: obj.altText ?? 'ข้อความ',
-        contents: payload,
-      } as LineOutgoingMessage;
-    case 'template':
-      return {
-        type: 'template',
-        altText: obj.altText ?? 'เมนู',
-        template: payload,
-      } as LineOutgoingMessage;
-    case 'image':
-      return {
-        type: 'image',
-        originalContentUrl: String(payload.url ?? ''),
-        previewImageUrl: String(payload.previewUrl ?? payload.url ?? ''),
-      } as LineOutgoingMessage;
-    default:
-      return null;
-  }
 }
