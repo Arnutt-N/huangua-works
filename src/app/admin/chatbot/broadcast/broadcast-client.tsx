@@ -166,11 +166,11 @@ export function BroadcastClient() {
               <Label>กลุ่มผู้รับ</Label>
               <div className="mt-1 flex gap-4 text-sm">
                 <label className="flex items-center gap-2">
-                  <input type="radio" name="bc-target" checked={targetKind === 'all'} onChange={() => { setTargetKind('all'); setEstimate(null); }} />
+                  <input type="radio" aria-label="ผู้ติดตามทุกคน" name="bc-target" checked={targetKind === 'all'} onChange={() => { setTargetKind('all'); setEstimate(null); }} />
                   ผู้ติดตามทุกคน
                 </label>
                 <label className="flex items-center gap-2">
-                  <input type="radio" name="bc-target" checked={targetKind === 'specific'} onChange={() => { setTargetKind('specific'); setEstimate(null); }} />
+                  <input type="radio" aria-label="เลือกเฉพาะราย" name="bc-target" checked={targetKind === 'specific'} onChange={() => { setTargetKind('specific'); setEstimate(null); }} />
                   เลือกเฉพาะราย
                 </label>
               </div>
@@ -182,6 +182,7 @@ export function BroadcastClient() {
                     <label key={opt.id} className="flex items-center gap-2 text-sm">
                       <input
                         type="checkbox"
+                        aria-label={opt.displayName ?? opt.id}
                         checked={selectedIds.includes(opt.id)}
                         onChange={(e) => {
                           setEstimate(null);
