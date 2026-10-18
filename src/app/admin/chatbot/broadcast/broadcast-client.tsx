@@ -35,15 +35,38 @@ export function BroadcastClient() {
   const [message, setMessage] = useState('');
   const [scheduleAt, setScheduleAt] = useState('');
   const [saving, setSaving] = useState(false);
+  const [targetKind, setTargetKind] = useState<'all' | 'specific'>('all');
+  const [recipientOptions, setRecipientOptions] = useState<{ id: string; displayName: string | null }[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [estimate, setEstimate] = useState<number | null>(null);
 
   const { data, loading, feedback, notify, mutate } = useResource({
     load: adminApi.listBroadcasts,
   });
   const items = data?.items ?? [];
 
+  async function openDialog() {
+    setDialogOpen(true);
+    const res = await adminApi.listBroadcastRecipients();
+    if (res.ok) setRecipientOptions(res.data.items);
+  }
+
+  function currentTarget(): { kind: 'all' } | { kind: 'line_user_ids'; ids: string[] } {
+    return targetKind === 'all' ? { kind: 'all' } : { kind: 'line_user_ids', ids: selectedIds };
+  }
+
+  async function refreshEstimate() {
+    const res = await adminApi.dryRunBroadcast(currentTarget());
+    setEstimate(res.ok ? res.data.estimatedRecipients : null);
+  }
+
   async function handleCreate() {
     if (!message.trim()) {
       notify('error', 'กรุณากรอกข้อความ');
+      return;
+    }
+    if (targetKind === 'specific' && selectedIds.length === 0) {
+      notify('error', 'กรุณาเลือกผู้รับอย่างน้อย 1 คน');
       return;
     }
     setSaving(true);
@@ -51,6 +74,7 @@ export function BroadcastClient() {
       () =>
         adminApi.createBroadcast({
           content: [{ type: 'text', text: message.trim() }],
+          target: currentTarget(),
           scheduledAt: scheduleAt || null,
         }),
       scheduleAt ? 'ตั้งเวลาส่งแล้ว' : 'สร้างร่างสำเร็จ',
@@ -60,12 +84,18 @@ export function BroadcastClient() {
       setDialogOpen(false);
       setMessage('');
       setScheduleAt('');
+      setSelectedIds([]);
+      setTargetKind('all');
+      setEstimate(null);
     }
   }
 
   async function handleSend(item: BroadcastItem) {
-    if (!confirm('ส่งประกาศหาผู้ติดตามทุกคนทันที?')) return;
-    // server คืน 409 { error: 'ส่งแล้วหรือกำลังส่ง' } / 404 — mutate โชว์ข้อความนั้น
+    const scope = item.target?.kind === 'line_user_ids'
+      ? `ผู้รับที่เลือก ${item.target.ids.length} คน`
+      : 'ผู้ติดตามทุกคน';
+    if (!confirm(`ส่งประกาศหา${scope}ทันที?`)) return;
+    // server คืน 409 { error: 'ส่งแล้วหรือกำลังส่ง' } / 404 / 502 เมื่อส่งไม่สำเร็จ — mutate โชว์ข้อความนั้น
     await mutate(() => adminApi.sendBroadcast(item.id), 'ส่งประกาศสำเร็จ');
   }
 
@@ -80,7 +110,7 @@ export function BroadcastClient() {
       <AdminCard>
         <AdminCardTitle
           icon={<Send className="h-4 w-4" />}
-          action={<Button onClick={() => setDialogOpen(true)} className="min-h-touch gap-1.5"><Plus className="h-4 w-4" /> สร้างประกาศ</Button>}
+          action={<Button onClick={openDialog} className="min-h-touch gap-1.5"><Plus className="h-4 w-4" /> สร้างประกาศ</Button>}
         >
           ประวัติ Broadcast
         </AdminCardTitle>
@@ -103,7 +133,11 @@ export function BroadcastClient() {
                     <p className="mt-1 text-xs text-muted">
                       {st.label} · สร้าง {new Date(item.createdAt).toLocaleDateString('th-TH')}
                       {item.sentAt && ` · ส่ง ${new Date(item.sentAt).toLocaleString('th-TH')}`}
-                      {item.totalRecipients > 0 && ` · ถึง ~${item.totalRecipients} คน`}
+                      {item.target?.kind === 'line_user_ids'
+                        ? ` · ผู้รับเฉพาะ ${item.target.ids.length} คน`
+                        : ' · ผู้ติดตามทุกคน'}
+                      {item.totalRecipients > 0 && ` · ทั้งหมด ${item.totalRecipients} คน สำเร็จ ${item.successCount} ล้มเหลว ${item.failedCount}`}
+                      {item.failedRecipients > 0 && ` · บันทึกผู้รับล้มเหลว ${item.failedRecipients} ราย`}
                     </p>
                   </div>
                   {(item.status === 'draft' || item.status === 'scheduled') && (
@@ -127,6 +161,43 @@ export function BroadcastClient() {
             <div>
               <Label htmlFor="bc-msg">ข้อความประกาศ</Label>
               <Textarea id="bc-msg" rows={4} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="เช่น ประกาศ: อบต.หัวงัวปิดทำการวันที่ 12 ส.ค." />
+            </div>
+            <div>
+              <Label>กลุ่มผู้รับ</Label>
+              <div className="mt-1 flex gap-4 text-sm">
+                <label className="flex items-center gap-2">
+                  <input type="radio" aria-label="ผู้ติดตามทุกคน" name="bc-target" checked={targetKind === 'all'} onChange={() => { setTargetKind('all'); setEstimate(null); }} />
+                  ผู้ติดตามทุกคน
+                </label>
+                <label className="flex items-center gap-2">
+                  <input type="radio" aria-label="เลือกเฉพาะราย" name="bc-target" checked={targetKind === 'specific'} onChange={() => { setTargetKind('specific'); setEstimate(null); }} />
+                  เลือกเฉพาะราย
+                </label>
+              </div>
+              {targetKind === 'specific' && (
+                <div className="mt-2 max-h-40 space-y-1 overflow-y-auto rounded-md border border-border p-2">
+                  {recipientOptions.length === 0 ? (
+                    <p className="text-sm text-muted">ยังไม่มีผู้ใช้ LINE ในระบบ</p>
+                  ) : recipientOptions.map((opt) => (
+                    <label key={opt.id} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        aria-label={opt.displayName ?? opt.id}
+                        checked={selectedIds.includes(opt.id)}
+                        onChange={(e) => {
+                          setEstimate(null);
+                          setSelectedIds((prev) => e.target.checked ? [...prev, opt.id] : prev.filter((x) => x !== opt.id));
+                        }}
+                      />
+                      {opt.displayName ?? '(ไม่มีชื่อ)'}
+                    </label>
+                  ))}
+                </div>
+              )}
+              <div className="mt-2 flex items-center gap-3">
+                <Button type="button" variant="outline" onClick={refreshEstimate}>ประเมินจำนวนผู้รับ</Button>
+                {estimate !== null && <span className="text-sm text-muted">ประมาณ {estimate} คน</span>}
+              </div>
             </div>
             <div>
               <Label htmlFor="bc-schedule">ตั้งเวลาส่ง (เว้นว่าง = สร้างเป็นร่าง)</Label>

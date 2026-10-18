@@ -28,7 +28,7 @@ export async function POST(
   }
 
   await db.update(chatBroadcasts).set({ status: 'scheduled', scheduledAt: new Date(), updatedAt: new Date() }).where(eq(chatBroadcasts.id, id));
-  await sendBroadcast(id);
+  const outcome = await sendBroadcast(id);
 
   await logAudit({
     userId: authz.ctx.user.id,
@@ -39,5 +39,20 @@ export async function POST(
     userAgent: authz.ctx.userAgent,
   });
 
-  return NextResponse.json({ ok: true });
+  // § ส่งไม่สำเร็จต้องตอบตามจริง ห้ามคืน ok ทั้งที่ service mark failed
+  if (outcome.kind === 'failed') {
+    return NextResponse.json(
+      { ok: false, error: outcome.error, totalRecipients: outcome.totalRecipients, successCount: outcome.successCount, failedCount: outcome.failedCount },
+      { status: 502 },
+    );
+  }
+  if (outcome.kind === 'skipped-not-claimable') {
+    return NextResponse.json({ error: 'ส่งแล้วหรือกำลังส่ง' }, { status: 409 });
+  }
+  return NextResponse.json({
+    ok: true,
+    totalRecipients: outcome.totalRecipients,
+    successCount: outcome.successCount,
+    failedCount: outcome.failedCount,
+  });
 }

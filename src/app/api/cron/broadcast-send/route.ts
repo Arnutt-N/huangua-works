@@ -21,11 +21,16 @@ export async function GET(request: Request) {
 
   const due = await getDueScheduled();
   let sent = 0;
+  let failed = 0;
+  let skipped = 0;
 
   for (const item of due) {
-    await sendBroadcast(item.id);
-    sent++;
+    const outcome = await sendBroadcast(item.id);
+    // § นับ sent เฉพาะที่ส่งสำเร็จจริง — เดิมนับทุกแถวที่แตะทำให้ failed ดูเหมือนส่งแล้ว
+    if (outcome.kind === 'sent') sent++;
+    else if (outcome.kind === 'failed') failed++;
+    else skipped++;
   }
 
-  return NextResponse.json({ ok: true, sent });
+  return NextResponse.json({ ok: true, sent, failed, skipped });
 }

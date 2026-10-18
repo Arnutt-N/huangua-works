@@ -1,0 +1,10 @@
+ts	phase	decision	why	evidence	result
+2026-10-18T00:00:00Z	start	continued backlog on branch feat/t3-t5-followups	keep T3/T5 and operational follow-ups isolated from main and pre-existing local files	git status --short --branch	branch created, local unrelated changes preserved
+2026-10-18T00:00:00Z	shape	kept T3 target as discriminated JSON and failed recipient hash	encode target semantics and prevent raw LINE ID persistence	 docs/plans/line-gap-closure-PRP.md:19-21,67-81	open
+2026-10-18T00:00:00Z	dependency	sequence T3 before T5 and serialize schema/migration writes	migration journals and schema are shared mutable boundaries	docs/plans/line-gap-closure-PRP.md:23-30	open
+2026-10-18T10:41:54Z	start	continued T3 execution in isolated owner worktree and corrected target shape to internal IDs	keep raw LINE IDs out of persisted target and leave T5 plaintext work untouched	t3-t5-followups.todo.md, T3 owner worktree	T3 owner running
+2026-10-18T10:41:54Z	shape	changed T3 target recipient IDs from raw LINE IDs to internal line_users.id	resolved by T3 owner at send boundary	schema review + owner brief	open
+2026-10-18T11:09:08Z	execution	T3 owner and explorers stopped after gateway quota 503	quota outage killed background work; existing read-only findings stand, no code changed	T3 owner + explorer completion notices	T3 implementation incomplete, resume on explicit go
+2026-10-18T11:09:08Z	trail	kept main-thread checklist as current state and did not retry quota-failed agents	avoid duplicate work during outage and keep schema/migration single-writer decision intact	.audit/t3-t5-followups.todo.md	open
+2026-10-18T15:03:12Z	verify	T3 gates green then merged 6 commits	unit 968/968, full 1234/1234, tsc exit 0, T3 lint clean, a11y labels added	worktree commits e807702..37ad9ae	T3 verified and merged
+2026-10-18T15:03:12Z	merge	merged T3 into feat/t3-t5-followups after removing stale index.lock	0-byte lock from dead process, no conflict markers	37ad9ae	T3 on branch

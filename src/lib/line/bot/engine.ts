@@ -9,6 +9,7 @@ import { matchFaq } from './faq-matcher';
 import { ingestLineMedia } from '../media-ingest';
 import { csatThankYou, parseCsatPostback, recordCsatResponse } from '../chat/csat';
 import { matchIntent } from './intent-matcher';
+import { pseudonymizeLineId } from '../identity';
 import { parseResponseText } from './response-parser';
 import { startCaseFlow, processCaseFlow, handleConfirmPostback, type CaseFlowState } from './case-flow';
 import { isHandoffRequest, triggerHandoff } from './handoff';
@@ -19,6 +20,7 @@ import { getFaqReply } from '../messages/rich-menu';
 import { findTrackableCase } from '@/lib/cases/citizen-access';
 import { COPY } from '@/lib/copy';
 import { isWithinBusinessHours, outsideBusinessHoursText } from '../business-hours';
+import { getFollowCount, recordFriendEvent } from '../friend-events';
 import {
   changeMode,
   httpLineTransport,
@@ -48,12 +50,14 @@ export async function handleEvent(event: LineWebhookEvent, transport: LineTransp
       await handleMessageEvent(db, event, lineUser.id, conversation.id, conversation.mode, transport);
       break;
     case 'follow':
-      await handleFollowEvent(db, event, conversation.id, transport);
+      await handleFollowEvent(db, event, lineUser.id, conversation.id, transport);
       break;
     case 'postback':
       await handlePostbackEvent(db, event, conversation.id, transport);
       break;
     case 'unfollow':
+      // § บันทึก event อย่างเดียว ไม่ตอบกลับ (unfollow ไม่มี replyToken ให้ใช้อยู่แล้ว)
+      await recordFriendEvent(db, lineUser.id, 'unfollow', event.webhookEventId).catch(() => false);
       break;
   }
 }
@@ -67,13 +71,24 @@ async function getOrCreateLineUser(db: Db, lineUserId: string, transport: LineTr
     .where(eq(lineUsers.lineUserId, lineUserId))
     .limit(1);
 
+  // § T5 expand dual-write — เติม pseudonym คู่ plaintext เฉพาะแถวที่ยังไม่มี
+  // read path ยังใช้ plaintext เดิม contract phase ถึงย้าย
+  const fillPseudonym = (): { lineUserIdHash: string; lineUserIdEnc: string; lineUserIdHashV: number } | {} => {
+    try {
+      const p = pseudonymizeLineId(lineUserId);
+      return { lineUserIdHash: p.hash, lineUserIdEnc: p.enc, lineUserIdHashV: p.v };
+    } catch {
+      return {};
+    }
+  };
+
   if (existing) {
     // backfill โปรไฟล์ให้ user เก่าที่ยังไม่มีชื่อ (best-effort — พังไม่ล้ม flow)
     // gate ด้วย profileCheckedAt กันยิง LINE API ซ้ำทุกข้อความเมื่อดึงไม่สำเร็จ
     const meta = (existing.metadata as { profileCheckedAt?: string } | null) ?? null;
     const lastCheck = meta?.profileCheckedAt ? Date.parse(meta.profileCheckedAt) : 0;
     const due = Date.now() - lastCheck > PROFILE_RETRY_MS;
-    if (!existing.displayName && due) {
+    if ((!existing.displayName && due) || !existing.lineUserIdHash) {
       const profile = await transport.getProfile(lineUserId).catch(() => null);
       await db
         .update(lineUsers)
@@ -81,6 +96,7 @@ async function getOrCreateLineUser(db: Db, lineUserId: string, transport: LineTr
           ...(profile
             ? { displayName: profile.displayName, pictureUrl: profile.pictureUrl ?? null }
             : {}),
+          ...(!existing.lineUserIdHash ? fillPseudonym() : {}),
           metadata: { ...(meta ?? {}), profileCheckedAt: new Date().toISOString() },
         })
         .where(eq(lineUsers.id, existing.id));
@@ -95,6 +111,7 @@ async function getOrCreateLineUser(db: Db, lineUserId: string, transport: LineTr
     lineUserId,
     displayName: profile?.displayName ?? null,
     pictureUrl: profile?.pictureUrl ?? null,
+    ...fillPseudonym(),
     metadata: { profileCheckedAt: new Date().toISOString() },
   });
   return { id, lineUserId, botState: null };
@@ -364,10 +381,13 @@ async function updateBotState(db: Db, lineUserPk: string, state: CaseFlowState |
     .where(eq(lineUsers.id, lineUserPk));
 }
 
-async function handleFollowEvent(db: Db, event: LineFollowEvent, conversationId: string, transport: LineTransport) {
+async function handleFollowEvent(db: Db, event: LineFollowEvent, lineUserPk: string, conversationId: string, transport: LineTransport) {
+  // § บันทึก friend event ก่อน (best-effort) เพื่อให้ {follow_count} รวมครั้งนี้ — พังห้ามล้ม welcome
+  await recordFriendEvent(db, lineUserPk, 'follow', event.webhookEventId).catch(() => false);
+  const followCount = await getFollowCount(db, lineUserPk).catch(() => null);
   // § โปรไฟล์ดึงแบบ best-effort — พังหรือไม่มียังต้องส่ง welcome ต่อ (display_name ว่าง)
   const profile = await transport.getProfile(event.source.userId).catch(() => null);
-  const replies = await getWelcomeMessages({ displayName: profile?.displayName ?? null });
+  const replies = await getWelcomeMessages({ displayName: profile?.displayName ?? null, followCount });
 
   // คงพฤติกรรมเดิม: บันทึกแค่ข้อความแรกเป็น text
   await db.insert(chatMessages).values({
