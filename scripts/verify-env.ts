@@ -25,6 +25,7 @@ const required: Spec[] = [
   { key: 'UPSTASH_REDIS_REST_URL', label: 'Upstash Redis REST URL' },
   { key: 'UPSTASH_REDIS_REST_TOKEN', label: 'Upstash Redis REST token', minLen: 16 },
   { key: 'CID_HMAC_KEY', label: 'CID keyed-HMAC key (C2 — ≥32 char)', minLen: 32 },
+  { key: 'LINE_ID_HMAC_KEY', label: 'LINE id pseudonym key (T5 — ≥32 char, ห้ามใช้ร่วมกับ CID_HMAC_KEY)', minLen: 32 },
   { key: 'CRON_SECRET', label: 'Cron shared secret (Authorization: Bearer — ≥16 char)', minLen: 16 },
 ];
 

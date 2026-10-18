@@ -204,6 +204,13 @@
       "when": 1792324406902,
       "tag": "0028_line_friend_broadcast_target",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1792342301934,
+      "tag": "0029_line_identity_expand",
+      "breakpoints": true
     }
   ]
 }

@@ -9,6 +9,7 @@ import { matchFaq } from './faq-matcher';
 import { ingestLineMedia } from '../media-ingest';
 import { csatThankYou, parseCsatPostback, recordCsatResponse } from '../chat/csat';
 import { matchIntent } from './intent-matcher';
+import { pseudonymizeLineId } from '../identity';
 import { parseResponseText } from './response-parser';
 import { startCaseFlow, processCaseFlow, handleConfirmPostback, type CaseFlowState } from './case-flow';
 import { isHandoffRequest, triggerHandoff } from './handoff';
@@ -70,13 +71,24 @@ async function getOrCreateLineUser(db: Db, lineUserId: string, transport: LineTr
     .where(eq(lineUsers.lineUserId, lineUserId))
     .limit(1);
 
+  // § T5 expand dual-write — เติม pseudonym คู่ plaintext เฉพาะแถวที่ยังไม่มี
+  // read path ยังใช้ plaintext เดิม contract phase ถึงย้าย
+  const fillPseudonym = (): { lineUserIdHash: string; lineUserIdEnc: string; lineUserIdHashV: number } | {} => {
+    try {
+      const p = pseudonymizeLineId(lineUserId);
+      return { lineUserIdHash: p.hash, lineUserIdEnc: p.enc, lineUserIdHashV: p.v };
+    } catch {
+      return {};
+    }
+  };
+
   if (existing) {
     // backfill โปรไฟล์ให้ user เก่าที่ยังไม่มีชื่อ (best-effort — พังไม่ล้ม flow)
     // gate ด้วย profileCheckedAt กันยิง LINE API ซ้ำทุกข้อความเมื่อดึงไม่สำเร็จ
     const meta = (existing.metadata as { profileCheckedAt?: string } | null) ?? null;
     const lastCheck = meta?.profileCheckedAt ? Date.parse(meta.profileCheckedAt) : 0;
     const due = Date.now() - lastCheck > PROFILE_RETRY_MS;
-    if (!existing.displayName && due) {
+    if ((!existing.displayName && due) || !existing.lineUserIdHash) {
       const profile = await transport.getProfile(lineUserId).catch(() => null);
       await db
         .update(lineUsers)
@@ -84,6 +96,7 @@ async function getOrCreateLineUser(db: Db, lineUserId: string, transport: LineTr
           ...(profile
             ? { displayName: profile.displayName, pictureUrl: profile.pictureUrl ?? null }
             : {}),
+          ...(!existing.lineUserIdHash ? fillPseudonym() : {}),
           metadata: { ...(meta ?? {}), profileCheckedAt: new Date().toISOString() },
         })
         .where(eq(lineUsers.id, existing.id));
@@ -98,6 +111,7 @@ async function getOrCreateLineUser(db: Db, lineUserId: string, transport: LineTr
     lineUserId,
     displayName: profile?.displayName ?? null,
     pictureUrl: profile?.pictureUrl ?? null,
+    ...fillPseudonym(),
     metadata: { profileCheckedAt: new Date().toISOString() },
   });
   return { id, lineUserId, botState: null };
