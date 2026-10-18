@@ -29,12 +29,27 @@ export interface InboundMessage {
   countUnread?: boolean;
 }
 
+/** แถวข้อความขาเข้าที่ redelivery เจอ — ครบพอให้ซ่อมต่อโดยไม่ต้องอ่านซ้ำ */
+export interface InboundDupRow {
+  id: string;
+  createdAt: Date;
+  messageType: string;
+  mediaUrl: string | null;
+  metadata: unknown;
+}
+
 /** หาแถวข้อความขาเข้าจาก LINE message id — redelivery หลัง crash ต้องเจอแถวเดิม ไม่ insert ซ้ำ */
-export async function findInboundByLineMessageId(lineMessageId: string): Promise<{ id: string; createdAt: Date } | null> {
+export async function findInboundByLineMessageId(lineMessageId: string): Promise<InboundDupRow | null> {
   const db = await getDb();
   return (await firstOrUndefined(
     db
-      .select({ id: chatMessages.id, createdAt: chatMessages.createdAt })
+      .select({
+        id: chatMessages.id,
+        createdAt: chatMessages.createdAt,
+        messageType: chatMessages.messageType,
+        mediaUrl: chatMessages.mediaUrl,
+        metadata: chatMessages.metadata,
+      })
       .from(chatMessages)
       .where(eq(chatMessages.lineMessageId, lineMessageId))
       .limit(1),
@@ -80,22 +95,34 @@ function broadcastInbound(args: InboundPayloadArgs): void {
     },
   });
 }
-export async function recordInboundMessage(input: InboundMessage): Promise<{ messageId: string }> {
+export async function recordInboundMessage(input: InboundMessage): Promise<{ messageId: string; isNew: boolean }> {
   const db = await getDb();
   const messageId = generateId();
   const preview = input.textContent ?? `[${input.messageType}]`;
 
-  await db.insert(chatMessages).values({
-    id: messageId,
-    conversationId: input.conversationId,
-    sender: 'user',
-    messageType: input.messageType,
-    textContent: input.textContent,
-    mediaUrl: input.mediaUrl ?? null,
-    metadata: input.mediaMetadata ?? null,
-    locationData: input.locationData,
-    lineMessageId: input.lineMessageId,
-  });
+  // § แข่งกัน insert (redelivery ชนกัน) ให้ constraint ตัดสิน — แพ้แล้วไปเอาแถวผู้ชนะ
+  // ไม่ throw ออกไป เพราะ throw ตรงนี้คือ event ล้มทั้งที่ข้อความอยู่ครบแล้ว
+  const [inserted] = await db
+    .insert(chatMessages)
+    .values({
+      id: messageId,
+      conversationId: input.conversationId,
+      sender: 'user',
+      messageType: input.messageType,
+      textContent: input.textContent,
+      mediaUrl: input.mediaUrl ?? null,
+      metadata: input.mediaMetadata ?? null,
+      locationData: input.locationData,
+      lineMessageId: input.lineMessageId,
+    })
+    .onConflictDoNothing({ target: chatMessages.lineMessageId, where: sql`line_message_id is not null` })
+    .returning({ id: chatMessages.id });
+  if (!inserted) {
+    const winner = await findInboundByLineMessageId(input.lineMessageId);
+    // § ชนะแต่หาแถวไม่เจอเป็นไปไม่ได้ นอกจากแถวถูกลบพร้อมกัน — ให้ webhook catch จัดการแล้ว redelivery ซ่อมทาง dup
+    if (!winner) throw new Error(`inbound race lost with no winner: ${input.lineMessageId}`);
+    return { messageId: winner.id, isNew: false };
+  }
 
   const countUnread = input.countUnread ?? isHumanHandled(input.mode);
   await db
@@ -119,7 +146,7 @@ export async function recordInboundMessage(input: InboundMessage): Promise<{ mes
   });
   broadcast({ type: 'conversation_update', conversationId: input.conversationId, payload: { lastMessageText: preview } });
 
-  return { messageId };
+  return { messageId, isNew: true };
 }
 
 /**

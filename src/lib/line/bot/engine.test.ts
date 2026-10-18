@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it, vi, beforeEach } from 'vitest';
 
 const mockDb = {
   select: vi.fn(() => ({ from: () => ({ where: () => ({ limit: () => [] }) }) })),
-  insert: vi.fn(() => ({ values: vi.fn(() => ({})) })),
+  insert: vi.fn(() => ({ values: vi.fn(() => ({ onConflictDoNothing: vi.fn(() => ({ returning: vi.fn(async () => [{ id: 'm1' }]) })) })) })),
   // § returning รองรับ changeMode (triggerHandoff ถูกเรียกผ่าน engine) — คืนแถวเดียว = เปลี่ยนสำเร็จ
   update: vi.fn(() => ({ set: () => ({ where: () => ({ returning: vi.fn(() => [{ id: 'conv-1' }]) }) }) })),
 } as never;
