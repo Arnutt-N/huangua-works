@@ -22,6 +22,7 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
   const [cannedManageOpen, setCannedManageOpen] = useState(false);
   const [cannedResponses, setCannedResponses] = useState<CannedResponse[]>([]);
   const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [slaBreachedIds, setSlaBreachedIds] = useState<ReadonlySet<string>>(new Set());
 
   const {
     conversations,
@@ -59,6 +60,16 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
 
   const { results: searchResults, searching } = useMessageSearch(query);
 
+  const loadSlaBreaches = useCallback(() => {
+    // § เตือนเฉพาะในหน้าแชท ไม่ยิง notification (ตัดสินใน Review Gate ของ PRP line-gap-closure)
+    void fetch('/api/line/admin/sla-breaches')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body: { breaches?: { conversationId: string }[] } | null) => {
+        if (body?.breaches) setSlaBreachedIds(new Set(body.breaches.map((b) => b.conversationId)));
+      })
+      .catch(() => {});
+  }, []);
+
   const loadCanned = useCallback(() => {
     void fetchCannedResponses().then(setCannedResponses);
   }, []);
@@ -66,7 +77,8 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
   useEffect(() => {
     loadCanned();
     void fetchStaff().then(setStaff);
-  }, [loadCanned]);
+    loadSlaBreaches();
+  }, [loadCanned, loadSlaBreaches]);
 
   useChatSse({
     onOpen: () => {
@@ -76,6 +88,8 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
     onEvent: (event: SseChatEvent) => {
       if (event.type === 'new_message') {
         if (event.conversationId === selectedId) {
+          // SAFETY: SSE new_message payload มาจาก server เดียวกับที่เสิร์ฟ list — shape ตรง Message
+          // ถ้า drift จะพังที่ render ของข้อความนั้น ไม่ใช่ทั้งหน้า (applyIncoming ไม่ throw)
           applyIncoming(event.payload as unknown as Message);
           markConversationRead(selectedId);
         }
@@ -83,6 +97,7 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
       }
       if (event.type === 'mode_change' || event.type === 'conversation_update') {
         loadConversations();
+        loadSlaBreaches();
         if (event.conversationId === selectedId) {
           if (event.payload?.mode) setSelectedMode(event.payload.mode);
           // อัปเดตเจ้าของห้องทันที (โอนแชท/รับเรื่องจากเครื่องอื่น) — banner สลับถูกต้อง
@@ -153,6 +168,7 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
           searchResults={searchResults}
           searching={searching}
           selectedId={selectedId}
+          slaBreachedIds={slaBreachedIds}
           onSelect={handleSelect}
           onTogglePin={(id, pinned) => togglePref(id, { pinned })}
           onToggleMute={(id, muted) => togglePref(id, { muted })}

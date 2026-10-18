@@ -7,6 +7,7 @@ import type { LineWebhookEvent, LineMessageEvent, LineFollowEvent, LinePostbackE
 import type { ConversationMode } from '../chat-modes';
 import { matchFaq } from './faq-matcher';
 import { ingestLineMedia } from '../media-ingest';
+import { csatThankYou, parseCsatPostback, recordCsatResponse } from '../chat/csat';
 import { matchIntent } from './intent-matcher';
 import { parseResponseText } from './response-parser';
 import { startCaseFlow, processCaseFlow, handleConfirmPostback, type CaseFlowState } from './case-flow';
@@ -388,7 +389,20 @@ async function handlePostbackEvent(db: Db, event: LinePostbackEvent, conversatio
     metadata: event.postback.params ?? null,
   });
 
-  // § postback ที่ไม่ใช่ confirm protocol คงพฤติกรรมเดิม: log only ไม่ตอบอะไร
+  // § postback ที่ไม่ใช่ confirm/csat protocol คงพฤติกรรมเดิม: log only ไม่ตอบอะไร
+  const csatData = parseCsatPostback(event.postback.data);
+  if (csatData) {
+    // § ให้คะแนนห้องของคนกดเท่านั้น — wire มีแค่ score ห้องใช้ของ session นี้ (ไม่มี id ให้ปลอม)
+    const recorded = await recordCsatResponse(conversationId, csatData.score);
+    // § กดซ้ำไม่ตอบขอบคุณซ้ำ — คะแนนแถวแรกชนะแล้ว thank-you มีในประวัติแล้ว
+    if (recorded.kind === 'recorded') {
+      const thanks: LineOutgoingMessage[] = [{ type: 'text', text: csatThankYou(recorded.score) }];
+      await recordBotReplies(conversationId, thanks);
+      await transport.reply(event.replyToken, thanks);
+    }
+    return;
+  }
+
   const confirmData = parseConfirmPostback(event.postback.data);
   if (!confirmData) return;
 

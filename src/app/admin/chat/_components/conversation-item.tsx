@@ -19,6 +19,7 @@ const MAX_TAGS = 2;
 export const ConversationItem = memo(function ConversationItem({
   conversation: conv,
   isSelected,
+  slaBreached,
   onSelect,
   onTogglePin,
   onToggleMute,
@@ -26,6 +27,8 @@ export const ConversationItem = memo(function ConversationItem({
 }: {
   conversation: Conversation;
   isSelected: boolean;
+  /** ห้องนี้เกิน SLA ฝั่งแชท — โชว์ป้ายเตือน (danger-ink/danger-soft คู่ contrast ที่ลงทะเบียนแล้ว) */
+  slaBreached?: boolean;
   onSelect: (id: string) => void;
   onTogglePin: (id: string, pinned: boolean) => void;
   onToggleMute: (id: string, muted: boolean) => void;
@@ -130,6 +133,16 @@ export const ConversationItem = memo(function ConversationItem({
                 )}
                 {MODE_SHORT[conv.mode] ?? conv.mode}
               </span>
+              {slaBreached === true && (
+                <span
+                  role="img"
+                  aria-label="เกิน SLA"
+                  title="เกิน SLA ฝั่งแชท"
+                  className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-pill bg-danger-soft px-1 text-[10px] font-bold tabular-nums text-danger-ink"
+                >
+                  !
+                </span>
+              )}
               {conv.unreadAdmin > 0 && (
                 <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-pill bg-danger px-1 text-[10px] font-bold tabular-nums text-white">
                   {conv.unreadAdmin > 9 ? '9+' : conv.unreadAdmin}
