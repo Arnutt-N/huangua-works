@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
+import { redis } from '@/lib/upstash';
 import { lineUsers, chatConversations, chatMessages } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import type { LineWebhookEvent, LineMessageEvent, LineFollowEvent, LinePostbackEvent, LineOutgoingMessage } from '../types';
@@ -26,6 +27,7 @@ import {
   isHumanHandled,
   recordBotReplies,
   recordInboundMessage,
+  type InboundDupRow,
   type InboundMessageType,
   type LineTransport,
 } from '../conversation';
@@ -111,6 +113,13 @@ async function getOrCreateConversation(db: Db, lineUserId: string) {
   return { id, lineUserId, mode: 'bot_active' as const };
 }
 
+const REPAIR_AGE_MS = 90_000;
+const REPAIR_LEASE_S = 120;
+
+function isMediaRow(row: InboundDupRow): boolean {
+  return row.messageType === 'image' || row.messageType === 'file' || row.messageType === 'video' || row.messageType === 'audio';
+}
+
 async function handleMessageEvent(
   db: Db,
   event: LineMessageEvent,
@@ -128,28 +137,50 @@ async function handleMessageEvent(
     : msg.type === 'sticker' ? 'sticker'
     : 'text';
 
-  // § redelivery หลัง crash ต้องเจอแถวเดิม — มีแถวแล้วข้าม insert+ingest แต่ถ้ายังไม่เคย
-  // ตอบบอทต้องตอบซ่อม (แถวเกิดก่อน reply เสมอ) replyToken เก่าใช้ซ้ำไม่ได้ให้ตกไป push แทน
-  // กั้นแบบ path ปกติ: ห้องคนถือหรือบอทปิดไม่ตอบซ่อม และค้างกลาง case-flow ไม่ป้อนซ้ำ (กัน state เพี้ยน)
-  const dup = await findInboundByLineMessageId(msg.id);
-  if (dup) {
+  // § redelivery หลัง crash ต้องเจอแถวเดิม — ซ่อมผ่าน repairDuplicate ทางเดียว ไม่แยกทาง first/dup
+  // age-gate 90 วิ: ต้นฉบับอาจยังรันอยู่ อย่าตอบซ้ำ + lease กันซ่อมพร้อมกัน (ใครได้ lease คนเดียวที่ซ่อม)
+  const repairDuplicate = async (row: InboundDupRow): Promise<void> => {
+    if (Date.now() - row.createdAt.getTime() < REPAIR_AGE_MS) return;
+    const lease = await redis
+      .set(`repair:${msg.id}`, '1', { nx: true, ex: REPAIR_LEASE_S })
+      .catch(() => null);
+    if (!lease) return;
     const botEnabledDup = await getChatSetting('bot_enabled');
     if (isHumanHandled(mode) || !botEnabledDup) return;
-    if (!(await hasBotReplyAfter(conversationId, dup.createdAt))) {
-      const [lu] = await db
-        .select({ botState: lineUsers.botState })
-        .from(lineUsers)
-        .where(eq(lineUsers.id, lineUserPk))
-        .limit(1);
-      if (lu?.botState) return;
-      const replies = await routeBotMessage(db, event, msg.type === 'text' ? msg.text : null, lineUserPk, conversationId);
-      await recordBotReplies(conversationId, replies);
-      try {
-        await transport.reply(event.replyToken, replies.slice(0, 5));
-      } catch {
-        await transport.push(event.source.userId, replies.slice(0, 5));
+    // § สื่อค้าง (crash ระหว่าง record กับ attach) รัน ingest+attach ซ่อมให้จบ
+    if (isMediaRow(row) && !row.mediaUrl && !(row.metadata as { skipped?: unknown } | null)?.skipped) {
+      const knownSize = msg.type === 'file' ? msg.fileSize : undefined;
+      const ingested = await ingestLineMedia(msg.id, undefined, { knownSize });
+      if (ingested.kind === 'stored') {
+        await attachInboundMedia(row.id, conversationId, messageType, ingested.url, {
+          contentType: ingested.contentType,
+          sizeBytes: ingested.sizeBytes,
+          ...(msg.type === 'file' ? { fileName: msg.fileName } : {}),
+        });
+      } else {
+        await attachInboundMedia(row.id, conversationId, messageType, null, { skipped: ingested.reason });
       }
     }
+    // § ค้างกลาง case-flow ไม่ป้อนซ้ำ (กัน state เพี้ยน) + มีคำตอบแล้วไม่ตอบซ้ำ
+    if (await hasBotReplyAfter(conversationId, row.createdAt)) return;
+    const [lu] = await db
+      .select({ botState: lineUsers.botState })
+      .from(lineUsers)
+      .where(eq(lineUsers.id, lineUserPk))
+      .limit(1);
+    if (lu?.botState) return;
+    const replies = await routeBotMessage(db, event, msg.type === 'text' ? msg.text : null, lineUserPk, conversationId);
+    await recordBotReplies(conversationId, replies);
+    try {
+      await transport.reply(event.replyToken, replies.slice(0, 5));
+    } catch {
+      await transport.push(event.source.userId, replies.slice(0, 5));
+    }
+  };
+
+  const dup = await findInboundByLineMessageId(msg.id);
+  if (dup) {
+    await repairDuplicate(dup);
     return;
   }
 
@@ -163,7 +194,7 @@ async function handleMessageEvent(
   const botEnabled = await getChatSetting('bot_enabled');
   const staffHandling = isHumanHandled(mode);
 
-  const { messageId } = await recordInboundMessage({
+  const { messageId, isNew } = await recordInboundMessage({
     conversationId,
     mode,
     messageType,
@@ -176,6 +207,12 @@ async function handleMessageEvent(
     lineMessageId: msg.id,
     countUnread: staffHandling || !botEnabled,
   });
+  if (!isNew) {
+    // § แพ้ race อีก worker — แถวผู้ชนะมีแล้ว เดินทางซ่อมเดียวกับ redelivery
+    const winner = await findInboundByLineMessageId(msg.id);
+    if (winner) await repairDuplicate(winner);
+    return;
+  }
 
   if (isMedia) {
     const knownSize = msg.type === 'file' ? msg.fileSize : undefined;

@@ -12,6 +12,7 @@ export {
   recordInboundMessage,
   sendAdminReply,
   type AdminReplyInput,
+  type InboundDupRow,
   type InboundMessage,
   type InboundMessageType,
   type SendAdminReplyResult,
