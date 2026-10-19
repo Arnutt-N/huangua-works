@@ -151,7 +151,6 @@ export async function listMyCases(lineUserId: string, db?: DbOrTx): Promise<MyCa
     .innerJoin(lineUsers, eq(lineUsers.linkedUserId, cases.submittedBy))
     .where(
       and(
-        // § T5 contract step 3 — lookup ผ่าน hash ไม่แตะ plaintext column ตรง
         eq(lineUsers.lineUserIdHash, lookupHash(lineUserId)),
         isNotNull(cases.trackingCode),
         consentActiveFor(cases.submittedBy),

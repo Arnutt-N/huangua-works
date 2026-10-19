@@ -590,8 +590,6 @@ export const lineUsers = pgTable(
     createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
 
-    // § T5 contract step 9 (0031) — plaintext LINE id ถูกลบแล้ว เหลือ hash/enc เท่านั้น
-    // rollback ได้เฉพาะ restore จาก backup prod-t5-drop-pre-*.sql.gz
     displayName: text('display_name'),
     pictureUrl: text('picture_url'),
 
@@ -637,7 +635,6 @@ export const chatConversations = pgTable(
     createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
 
-    // § T5 contract step 9 (0031) — plaintext LINE id ถูกลบแล้ว เหลือ hash เท่านั้น
     lineUserIdHash: text('line_user_id_hash').notNull(),
     mode: conversationModeEnum().notNull().default('bot_active'),
 

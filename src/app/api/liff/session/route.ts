@@ -61,7 +61,6 @@ export async function POST(req: NextRequest) {
     userId,
     action: AUDIT_ACTIONS.LIFF_LOGIN,
     resource: 'auth',
-    // § T5 contract step 4 — audit เก็บเฉพาะ hash ไม่เก็บ raw LINE id
     resourceId: lookupHash(identity.lineUserId),
     ipAddress: ip,
     userAgent: req.headers.get('user-agent') || undefined,

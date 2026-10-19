@@ -222,9 +222,6 @@ describe('createCase · ลูปกันชนของ trackingCode', () => {
 // § จำลอง user ที่เกิดระหว่าง SELECT กับ INSERT เพื่อพิสูจน์ว่า unique conflict ไม่ทำ tx abort
 describe('createCase · ตัวตนที่ถูกสร้างพร้อมกัน', () => {
   it.each(['web', 'line'] as const)('ใช้ผู้ชนะของ unique email ฝั่ง %s และสร้างเรื่องต่อได้', async (channel) => {
-    // § T5 contract step 9 — placeholder ฝั่ง line เป็น hash ไม่ใช่ raw id อีก
-    // web lookup 1 ครั้ง (findUserIdByEmail) / line lookup 1 ครั้ง (findLineUserByRaw ไม่ผ่าน mock
-    // นี้เพราะ mock นับเฉพาะ WHERE ที่มี @ — hash lookup ไม่มี @ จึงไม่ถูกนับ)
     const { lookupHash } = await import('@/lib/line/identity');
     const { linePlaceholderEmail } = await import('@/lib/line/placeholder-email');
     const email = channel === 'web'
@@ -235,8 +232,6 @@ describe('createCase · ตัวตนที่ถูกสร้างพร�
     expect(result.ok).toBe(true);
     expect(mockState.insertedUsers).toHaveLength(0);
     expect(mockState.insertedCases[0]?.submittedBy).toBe('winner-user');
-    // § resolveCitizen lookup email 2 ครั้งทั้งสองฝั่ง: ครั้งแรกไม่เจอ → insert ชนะ race
-    // ด้วย ON CONFLICT DO NOTHING คืนแถวว่าง → lookup ซ้ำครั้งที่สองเจอผู้ชนะ
     expect(mockState.userLookupEmails.filter((value) => value === email)).toHaveLength(2);
   });
 });

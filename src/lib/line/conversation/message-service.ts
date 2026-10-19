@@ -229,7 +229,6 @@ export async function sendAdminReply(
     .limit(1);
   if (!conv?.lineUserIdHash) return { kind: 'not_found' };
 
-  // § T5 contract step 7 — resolve raw LINE id ผ่าน hash ไม่แตะ plaintext column
   const lineUser = await firstOrUndefined(
     db
       .select({ id: lineUsers.id })
@@ -237,7 +236,6 @@ export async function sendAdminReply(
       .where(eq(lineUsers.lineUserIdHash, conv.lineUserIdHash))
       .limit(1),
   );
-  // § หา raw id ที่จะ push — ถอดจาก enc (production hash ครบแล้วทุกแถว)
   const rawLineUserId = lineUser
     ? await resolveRawLineId(db, lineUser.id)
     : null;

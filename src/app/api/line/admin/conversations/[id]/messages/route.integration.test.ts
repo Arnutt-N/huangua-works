@@ -62,7 +62,6 @@ beforeAll(async () => {
   conversationId = generateId();
   lineUserId = `it-line-reply-${conversationId}`;
   const db = await getDb();
-  // § T5 contract step 9 (0031) — fixture เขียน hash/enc ไม่เขียน plaintext
   const p = pseudonymizeLineId(lineUserId);
   await db.insert(lineUsers).values({
     id: generateId(),
@@ -90,7 +89,6 @@ afterAll(async () => {
   const db = await getDb();
   await db.delete(chatMessages).where(eq(chatMessages.conversationId, conversationId));
   await db.delete(chatConversations).where(eq(chatConversations.id, conversationId));
-  // § T5 contract step 9 (0031) — cleanup ผ่าน hash ของ fixture
   const { lookupHash } = await import('@/lib/line/identity');
   await db.delete(lineUsers).where(eq(lineUsers.lineUserIdHash, lookupHash(lineUserId)));
   await closeDb();

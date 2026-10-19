@@ -14,7 +14,6 @@ import { createRecordingTransport } from './recording-transport';
 
 const created: string[] = [];
 
-/** § T5 contract — fixture ต้องมี line_users พร้อม enc ให้ resolveRawLineId ถอดได้ */
 async function createLineUser(rawLineUserId: string): Promise<string> {
   const db = await getDb();
   const p = pseudonymizeLineId(rawLineUserId);
@@ -34,7 +33,6 @@ async function createConv(mode: ConversationMode, unreadAdmin = 0): Promise<stri
   const id = generateId();
   const rawLineUserId = `it-msg-${id}`;
   await createLineUser(rawLineUserId);
-  // § T5 contract step 9 (0031) — fixture conversation เขียน hash เท่านั้น
   await db.insert(chatConversations).values({ id, lineUserIdHash: pseudonymizeLineId(rawLineUserId).hash, mode, unreadAdmin });
   created.push(id);
   return id;

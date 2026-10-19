@@ -11,7 +11,6 @@ const created: string[] = [];
 async function createConv(): Promise<string> {
   const db = await getDb();
   const id = generateId();
-  // § T5 contract step 9 (0031) — conversation เขียน hash เท่านั้น
   await db.insert(chatConversations).values({ id, lineUserIdHash: pseudonymizeLineId(`it-csat-${id}`).hash, mode: 'resolved' });
   created.push(id);
   return id;

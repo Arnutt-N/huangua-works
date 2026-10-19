@@ -66,8 +66,6 @@ export async function handleEvent(event: LineWebhookEvent, transport: LineTransp
 const PROFILE_RETRY_MS = 24 * 60 * 60 * 1000; // ลองดึงโปรไฟล์ที่พลาดซ้ำได้วันละครั้ง
 
 async function getOrCreateLineUser(db: Db, lineUserId: string, transport: LineTransport) {
-  // § T5 contract step 9 (0031) — lookup ผ่าน hash อย่างเดียว ไม่มี fallback plaintext
-  // plaintext column ถูกลบแล้ว แถวที่หาไม่เจอคือแถวใหม่ ให้สร้างด้านล่าง
   const existing = await findLineUserByRaw(db, lineUserId);
 
   if (existing) {
@@ -93,7 +91,6 @@ async function getOrCreateLineUser(db: Db, lineUserId: string, transport: LineTr
 
   const id = generateId();
   const profile = await transport.getProfile(lineUserId).catch(() => null);
-  // § plaintext column ถูกลบแล้ว — เขียน hash/enc เท่านั้น
   const p = pseudonymizeLineId(lineUserId);
   await db.insert(lineUsers).values({
     id,
@@ -108,8 +105,6 @@ async function getOrCreateLineUser(db: Db, lineUserId: string, transport: LineTr
 }
 
 async function getOrCreateConversation(db: Db, lineUserId: string) {
-  // § T5 contract step 9 (0031) — lookup ผ่าน hash อย่างเดียว plaintext column ถูกลบแล้ว
-  // key หาย = lookupHash throw = แถวใหม่สร้างไม่ได้ ให้ error ดัง (fail-closed)
   const hash = lookupHash(lineUserId);
   const [found] = await db
     .select()
@@ -121,7 +116,6 @@ async function getOrCreateConversation(db: Db, lineUserId: string) {
   }
 
   const id = generateId();
-  // § T5 contract step 9 (0031) — เขียน hash เท่านั้น plaintext column ถูกลบแล้ว
   await db.insert(chatConversations).values({ id, lineUserIdHash: hash, });
   return { id, mode: 'bot_active' as const };
 }
@@ -429,7 +423,6 @@ async function handlePostbackEvent(db: Db, event: LinePostbackEvent, conversatio
   const confirmData = parseConfirmPostback(event.postback.data);
   if (!confirmData) return;
 
-  // § T5 contract step 3 — lookup ผ่าน hash ไม่แตะ plaintext column ตรง
   const lineUser = await findLineUserByRaw(db, event.source.userId);
   const botState = (lineUser?.botState as CaseFlowState | null) ?? null;
   // § นอก confirm step (เช่น กดปุ่มซ้ำหลังส่งเรื่องแล้ว) คืน null → คง log-only ไม่ตอบซ้ำ

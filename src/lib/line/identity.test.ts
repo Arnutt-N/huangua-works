@@ -54,7 +54,6 @@ describe('identity resolver (integration)', () => {
   const RAW = `U-resolver-${Date.now()}`;
   let pk: string;
 
-  // § key ต้องถูก stub ใหม่ก่อนทุก test — afterEach ระดับ module unstubs ระหว่าง test
   beforeEach(() => {
     vi.stubEnv('LINE_ID_HMAC_KEY', TEST_KEY);
   });

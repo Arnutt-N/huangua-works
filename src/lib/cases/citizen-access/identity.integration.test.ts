@@ -36,7 +36,6 @@ function parseMeta(value: unknown): Record<string, unknown> {
 
 afterAll(async () => {
   const db = await getDb();
-  // § T5 contract step 9 (0031) — cleanup ผ่าน hash (plaintext column ถูกลบแล้ว)
   await db.delete(lineUsers).where(inArray(lineUsers.lineUserIdHash, createdLineIds.map(lookupHash)));
   if (createdUserIds.size > 0) {
     await db.delete(users).where(inArray(users.id, [...createdUserIds]));
@@ -102,7 +101,6 @@ describe('resolveCitizen · ผู้ใช้ LINE', () => {
       isActive: true,
       fullName: 'เจ้าของเดิม',
     });
-    // § T5 contract step 9 (0031) — fixture เขียน hash/enc ไม่เขียน plaintext
     const lp = pseudonymizeLineId(LINE_LINKED);
     await db.insert(lineUsers).values({
       id: generateId(),

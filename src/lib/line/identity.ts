@@ -7,8 +7,6 @@ import type { DbOrTx } from '@/lib/db';
 // § เจ้าของ pseudonym ของ LINE id ตัวเดียวใน repo — ที่อื่นห้ามสร้าง hash/enc เอง
 // hash ใช้ lookup แบบ deterministic, enc เก็บ raw ไว้ถอดกลับตอนส่งออก boundary เท่านั้น
 // key แยกจาก CID_HMAC_KEY เสมอ (decision ล็อกใน PRD T5)
-// step 3 T5 contract — ตั้งแต่บรรทัดนี้เป็นต้นไป lookup ทุกจุดต้องผ่าน resolver ด้านล่าง
-// ห้าม query eq(lineUsers.lineUserId, raw) ตรงอีก (fallback ชั่วคราวเฉพาะช่วงย้าย)
 
 export const LINE_ID_HASH_VERSION = 1;
 const MIN_KEY_LENGTH = 32;
@@ -68,10 +66,7 @@ export function decryptLineId(enc: string): string {
   return Buffer.concat([decipher.update(body), decipher.final()]).toString('utf8');
 }
 
-/**
- * § T5 contract step 3 — resolver กลางสำหรับ lookup ผู้ใช้ LINE จาก raw id
- * ภายในใช้ hash เท่านั้น ไม่แตะ plaintext column ตรง (จะลบตอน contract phase)
- */
+/** lookup ผู้ใช้ LINE จาก raw id ผ่าน hash */
 export async function findLineUserByRaw(db: DbOrTx, rawLineUserId: string) {
   const hash = lookupHash(rawLineUserId);
   return firstOrUndefined(
@@ -79,10 +74,7 @@ export async function findLineUserByRaw(db: DbOrTx, rawLineUserId: string) {
   );
 }
 
-/**
- * § ถอด raw LINE id จาก enc ตอนต้องส่งออก boundary เท่านั้น (push/multicast/getProfile)
- * ห้ามเรียกจาก read path ทั่วไปหรือ log
- */
+/** ถอด raw LINE id จาก enc — เรียกเฉพาะตอนส่งออก boundary (push/multicast/getProfile) */
 export async function resolveRawLineId(db: DbOrTx, lineUserPk: string): Promise<string | null> {
   const row = await firstOrUndefined(
     db

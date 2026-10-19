@@ -170,7 +170,6 @@ describe('toggleCitizenActive กับกติกามองเห็น', ()
     });
     createdCaseIds.push(caseId);
     lineRowId = generateId();
-    // § T5 contract step 9 (0031) — fixture เขียน hash/enc ไม่เขียน plaintext
     const cp = pseudonymizeLineId(LINE_OWNER);
     await db.insert(lineUsers).values({ id: lineRowId, lineUserIdHash: cp.hash, lineUserIdEnc: cp.enc, lineUserIdHashV: cp.v, linkedUserId: id });
 
@@ -229,7 +228,6 @@ describe('unlinkCitizenLine', () => {
     const db = await getDb();
     const id = await createCitizen('unlink');
     const rowId = generateId();
-    // § T5 contract step 9 (0031) — fixture เขียน hash/enc ไม่เขียน plaintext
     const up = pseudonymizeLineId(`U-it-citizen-unlink-${RUN}`);
     await db.insert(lineUsers).values({ id: rowId, lineUserIdHash: up.hash, lineUserIdEnc: up.enc, lineUserIdHashV: up.v, linkedUserId: id });
 

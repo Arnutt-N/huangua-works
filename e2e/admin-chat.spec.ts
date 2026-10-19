@@ -13,6 +13,7 @@ const ADMIN_PASSWORD = 'ChangeMe123!'; // local dev seed password (scripts/seed.
 // § spec นี้ seed บทสนทนาของตัวเอง — ไม่พึ่งผลรันค้างจาก scripts/test-webhook.ts อีกต่อไป
 // (แพตเทิร์นเดียวกับ e2e/track.spec.ts: seed ใน beforeAll + ลบใน afterAll)
 const TEST_LINE_USER_ID = 'U_test_local_webhook_user';
+const TEST_DISPLAY_NAME = 'ผู้ใช้ทดสอบแชต E2E';
 let testLineUserRowId: string;
 let testConversationId: string;
 
@@ -20,16 +21,13 @@ test.beforeAll(async () => {
   const db = await getDb();
 
   testLineUserRowId = generateId();
-  // § T5 contract step 9 (0031) — fixture เขียน hash/enc ไม่เขียน plaintext
   const p = pseudonymizeLineId(TEST_LINE_USER_ID);
   await db.insert(lineUsers).values({
     id: testLineUserRowId,
     lineUserIdHash: p.hash,
     lineUserIdEnc: p.enc,
     lineUserIdHashV: p.v,
-    // § รายการแชตแสดง displayName ตรง ๆ — ใช้ค่าเดียวกับ lineUserId เพื่อให้ locator เดิมยังเจอ
-    // (T5 contract: raw id ไม่ควรเป็น displayName แต่ E2E fixture นี้ใช้แทนชื่อเพื่อ locator)
-    displayName: TEST_LINE_USER_ID,
+    displayName: TEST_DISPLAY_NAME,
   });
 
   testConversationId = generateId();
@@ -77,7 +75,7 @@ test.describe('admin chat page', () => {
     await expect(page.getByLabel('ค้นหาการสนทนา')).toBeVisible({ timeout: 20_000 });
 
     // บทสนทนาถูก seed ใน beforeAll — ต้องเห็นปุ่มบทสนทนาเสมอ (ไม่มี fallback empty state)
-    const conversationButton = page.locator('button:has-text("U_test_local")');
+    const conversationButton = page.locator('button:has-text("ผู้ใช้ทดสอบแชต E2E")');
     await expect(conversationButton).toBeVisible({ timeout: 15_000 });
   });
 
@@ -92,7 +90,7 @@ test.describe('admin chat page', () => {
     await page.goto('/admin/chat', { waitUntil: 'domcontentloaded' });
 
     // Try to find a conversation; if none, skip the rest
-    const convButton = page.locator('button:has-text("U_test_local")');
+    const convButton = page.locator('button:has-text("ผู้ใช้ทดสอบแชต E2E")');
     const hasConversation = await convButton.isVisible().catch(() => false);
 
     if (hasConversation) {
@@ -163,7 +161,7 @@ test.describe('admin chat page', () => {
     await page.goto('/admin/chat', { waitUntil: 'domcontentloaded' });
     await expect(page.getByLabel('ค้นหาการสนทนา')).toBeVisible({ timeout: 20_000 });
 
-    const convButton = page.locator('button:has-text("U_test_local")');
+    const convButton = page.locator('button:has-text("ผู้ใช้ทดสอบแชต E2E")');
     const hasConversation = await convButton.isVisible().catch(() => false);
     if (!hasConversation) return; // DB was cleaned — nothing to open
 

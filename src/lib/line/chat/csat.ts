@@ -137,7 +137,6 @@ export function csatThankYou(score: number): string {
 /**
  * ดึง raw LINE id ของห้องจาก DB — push ต้องใช้ id จริง ไม่ใช่ placeholder
  * (ปลายทาง push คือ LINE user ของห้องนี้ ไม่เกี่ยวกับ user ที่กดปุ่ม)
- * § T5 contract step 7 — resolve ผ่าน hash ไม่แตะ plaintext column
  */
 export async function lineUserIdOfConversation(conversationId: string): Promise<string | null> {
   const db = await getDb();
@@ -155,6 +154,5 @@ export async function lineUserIdOfConversation(conversationId: string): Promise<
       .limit(1),
   );
   if (!user) return null;
-  // § หา raw id ที่จะ push — ถอดจาก enc (production hash ครบแล้วทุกแถว)
   return resolveRawLineId(db, user.id);
 }

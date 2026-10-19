@@ -66,7 +66,6 @@ async function cleanupFixture(): Promise<void> {
     await db.delete(cases).where(inArray(cases.id, caseIds));
   }
   // § LINE_BOT/LINE_LIFF ของ c1 ประกาศท้ายไฟล์ — afterAll รันหลัง module โหลดครบจึงอ้างได้
-  // § T5 contract step 9 (0031) — cleanup ผ่าน hash (plaintext column ถูกลบแล้ว)
   const rawIds = [LINE_NEW, LINE_EXISTING, LINE_BOT, LINE_LIFF];
   await db.delete(lineUsers).where(inArray(lineUsers.lineUserIdHash, rawIds.map(lookupHash)));
   const { linePlaceholderEmail } = await import('@/lib/line/placeholder-email');

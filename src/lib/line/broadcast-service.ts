@@ -144,8 +144,7 @@ async function recordFailedRecipients(db: Db, broadcastId: string, rawIds: strin
 }
 
 async function deliverTargeted(db: Db, id: string, messages: LineOutgoingMessage[], internalIds: string[]): Promise<SendBroadcastOutcome> {
-  // § แปลง PK ภายในเป็น raw LINE id เฉพาะตรงขอบเขตส่งนี้เท่านั้น — raw id ไม่ถูก persist ที่ไหน
-  // § T5 contract step 4 — resolve ผ่าน internal PK + decrypt ที่ boundary ไม่แตะ plaintext column
+  // raw id มีชีวิตเฉพาะในฟังก์ชันนี้ — ถอดจาก enc เพื่อยิง multicast แล้วทิ้ง ไม่ persist
   const rows = await db
     .select({ lineUserIdEnc: lineUsers.lineUserIdEnc })
     .from(lineUsers)

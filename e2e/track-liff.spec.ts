@@ -37,7 +37,6 @@ test.beforeAll(async () => {
   });
 
   testLineUserId = generateId();
-  // § T5 contract step 9 (0031) — fixture เขียน hash/enc ไม่เขียน plaintext
   const tp = pseudonymizeLineId(MOCK_LINE_USER);
   await db.insert(lineUsers).values({
     id: testLineUserId,
