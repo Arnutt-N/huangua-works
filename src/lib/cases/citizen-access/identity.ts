@@ -5,7 +5,7 @@ import { lineUsers, users } from '../../db/schema';
 import { generateId } from '../../id';
 import { generateCidHash } from '../../cid-hmac';
 import { linePlaceholderEmail } from '../../line/placeholder-email';
-import { findLineUserByRaw, pseudonymizeLineId } from '../../line/identity';
+import { findLineUserByRaw, lookupHash, pseudonymizeLineId } from '../../line/identity';
 
 /**
  * ตัวตนของประชาชนที่ระบบรับรู้ได้ — เว็บผูกกับ CID เท่านั้น, LINE ผูกกับ lineUserId
@@ -154,7 +154,9 @@ async function resolveLineCitizen(db: DbOrTx, identity: LineIdentity): Promise<s
   // reuse row เดิมก่อนสร้างใหม่เสมอ — กันชน unique(users.email) จากการแจ้ง/login ซ้ำ
   let userId = lineRow?.linkedUserId ?? undefined;
   if (!userId) {
-    const email = linePlaceholderEmail(identity.lineUserId);
+    // § T5 contract step 5 — placeholder ใหม่ใช้ hash ไม่ฝัง raw LINE id อีก
+    // (ของเก่า line-<raw>@... ยังอยู่ใน DB เป็นประวัติ — จัดการแยก ไม่ migrate เงียบ)
+    const email = linePlaceholderEmail(lookupHash(identity.lineUserId));
     userId =
       (await findUserIdByEmail(db, email)) ??
       (await insertUserOrReuse(db, {
