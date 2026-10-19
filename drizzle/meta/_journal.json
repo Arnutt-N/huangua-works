@@ -218,6 +218,13 @@
       "when": 1792399273346,
       "tag": "0030_conversation_identity_hash",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1792412343512,
+      "tag": "0031_drop_line_plaintext",
+      "breakpoints": true
     }
   ]
 }

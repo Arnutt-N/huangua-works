@@ -37,12 +37,13 @@ test.beforeAll(async () => {
   });
 
   testLineUserId = generateId();
-  // § T5 contract — fixture ต้องมี hash ให้ listMyCases lookup ใหม่เจอ
+  // § T5 contract step 9 (0031) — fixture เขียน hash/enc ไม่เขียน plaintext
   const tp = pseudonymizeLineId(MOCK_LINE_USER);
   await db.insert(lineUsers).values({
     id: testLineUserId,
-    lineUserId: MOCK_LINE_USER,
     lineUserIdHash: tp.hash,
+    lineUserIdEnc: tp.enc,
+    lineUserIdHashV: tp.v,
     displayName: 'ผู้ใช้ LINE ทดสอบ Track',
     linkedUserId: testUserId,
   });

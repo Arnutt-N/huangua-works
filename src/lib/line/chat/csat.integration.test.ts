@@ -3,6 +3,7 @@ import { afterAll, describe, expect, test } from 'vitest';
 import { closeDb, getDb } from '@/lib/db';
 import { chatConversations, chatCsatResponses } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
+import { pseudonymizeLineId } from '@/lib/line/identity';
 import { recordCsatResponse } from './csat';
 
 const created: string[] = [];
@@ -10,7 +11,8 @@ const created: string[] = [];
 async function createConv(): Promise<string> {
   const db = await getDb();
   const id = generateId();
-  await db.insert(chatConversations).values({ id, lineUserId: `it-csat-${id}`, mode: 'resolved' });
+  // § T5 contract step 9 (0031) — conversation เขียน hash เท่านั้น
+  await db.insert(chatConversations).values({ id, lineUserIdHash: pseudonymizeLineId(`it-csat-${id}`).hash, mode: 'resolved' });
   created.push(id);
   return id;
 }

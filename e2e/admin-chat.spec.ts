@@ -20,11 +20,10 @@ test.beforeAll(async () => {
   const db = await getDb();
 
   testLineUserRowId = generateId();
-  // § T5 contract — fixture ต้องมี hash/enc ให้ lookup ใหม่เจอ (production hash ครบแล้ว)
+  // § T5 contract step 9 (0031) — fixture เขียน hash/enc ไม่เขียน plaintext
   const p = pseudonymizeLineId(TEST_LINE_USER_ID);
   await db.insert(lineUsers).values({
     id: testLineUserRowId,
-    lineUserId: TEST_LINE_USER_ID,
     lineUserIdHash: p.hash,
     lineUserIdEnc: p.enc,
     lineUserIdHashV: p.v,
@@ -36,7 +35,6 @@ test.beforeAll(async () => {
   testConversationId = generateId();
   await db.insert(chatConversations).values({
     id: testConversationId,
-    lineUserId: TEST_LINE_USER_ID,
     lineUserIdHash: p.hash,
     mode: 'bot_active',
     lastMessageText: 'ข้อความทดสอบ E2E (admin-chat)',

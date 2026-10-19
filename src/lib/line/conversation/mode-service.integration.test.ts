@@ -3,6 +3,7 @@ import { afterAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { closeDb, getDb } from '@/lib/db';
 import { chatConversations } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
+import { pseudonymizeLineId } from '@/lib/line/identity';
 import type { ConversationMode } from '../chat-modes';
 
 vi.mock('../sse/broadcaster', () => ({ broadcast: vi.fn() }));
@@ -17,7 +18,7 @@ const created: string[] = [];
 async function createConv(mode: ConversationMode, assignedAdminId: string | null = null): Promise<string> {
   const db = await getDb();
   const id = generateId();
-  await db.insert(chatConversations).values({ id, lineUserId: `it-mode-${id}`, mode, assignedAdminId });
+  await db.insert(chatConversations).values({ id, lineUserIdHash: pseudonymizeLineId(`it-mode-${id}`).hash, mode, assignedAdminId });
   created.push(id);
   return id;
 }

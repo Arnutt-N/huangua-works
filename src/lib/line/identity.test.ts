@@ -66,7 +66,6 @@ describe('identity resolver (integration)', () => {
     pk = generateId();
     await db.insert(lineUsers).values({
       id: pk,
-      lineUserId: RAW,
       lineUserIdHash: p.hash,
       lineUserIdEnc: p.enc,
       lineUserIdHashV: p.v,

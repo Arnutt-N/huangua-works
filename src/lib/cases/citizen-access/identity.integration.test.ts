@@ -3,7 +3,7 @@ import { afterAll, describe, expect, test } from 'vitest';
 import { closeDb, getDb } from '@/lib/db';
 import { lineUsers, users } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
-import { pseudonymizeLineId } from '@/lib/line/identity';
+import { lookupHash, pseudonymizeLineId } from '@/lib/line/identity';
 import { resolveCitizen } from './index';
 
 /**
@@ -36,7 +36,8 @@ function parseMeta(value: unknown): Record<string, unknown> {
 
 afterAll(async () => {
   const db = await getDb();
-  await db.delete(lineUsers).where(inArray(lineUsers.lineUserId, createdLineIds));
+  // § T5 contract step 9 (0031) — cleanup ผ่าน hash (plaintext column ถูกลบแล้ว)
+  await db.delete(lineUsers).where(inArray(lineUsers.lineUserIdHash, createdLineIds.map(lookupHash)));
   if (createdUserIds.size > 0) {
     await db.delete(users).where(inArray(users.id, [...createdUserIds]));
   }
@@ -85,7 +86,7 @@ describe('resolveCitizen · ผู้ใช้ LINE', () => {
     const again = await resolveCitizen({ kind: 'line', lineUserId: LINE_NEW, source: 'line_intake' });
 
     expect(again).toBe(first);
-    const [lineRow] = await db.select().from(lineUsers).where(eq(lineUsers.lineUserId, LINE_NEW)).limit(1);
+    const [lineRow] = await db.select().from(lineUsers).where(eq(lineUsers.lineUserIdHash, lookupHash(LINE_NEW))).limit(1);
     expect(lineRow?.linkedUserId).toBe(first);
     const [userRow] = await db.select().from(users).where(eq(users.id, first)).limit(1);
     expect(userRow?.fullName).toBe('ผู้ใช้ LINE');
@@ -101,10 +102,13 @@ describe('resolveCitizen · ผู้ใช้ LINE', () => {
       isActive: true,
       fullName: 'เจ้าของเดิม',
     });
+    // § T5 contract step 9 (0031) — fixture เขียน hash/enc ไม่เขียน plaintext
+    const lp = pseudonymizeLineId(LINE_LINKED);
     await db.insert(lineUsers).values({
       id: generateId(),
-      lineUserId: LINE_LINKED,
-      lineUserIdHash: pseudonymizeLineId(LINE_LINKED).hash,
+      lineUserIdHash: lp.hash,
+      lineUserIdEnc: lp.enc,
+      lineUserIdHashV: lp.v,
       displayName: 'ชื่อเก่า',
       linkedUserId: ownerId,
     });
@@ -118,7 +122,7 @@ describe('resolveCitizen · ผู้ใช้ LINE', () => {
     });
 
     expect(resolved).toBe(ownerId);
-    const [lineRow] = await db.select().from(lineUsers).where(eq(lineUsers.lineUserId, LINE_LINKED)).limit(1);
+    const [lineRow] = await db.select().from(lineUsers).where(eq(lineUsers.lineUserIdHash, lookupHash(LINE_LINKED))).limit(1);
     expect(lineRow?.displayName).toBe('ชื่อใหม่');
     expect(lineRow?.pictureUrl).toBe('https://profile.line-scdn.net/it-ca');
   });

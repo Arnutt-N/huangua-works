@@ -45,7 +45,9 @@ function request(via: 'web' | 'liff') {
 beforeAll(async () => {
   const db = await getDb();
   await db.insert(users).values({ id: userId, email: 'cid-' + generateCidHash(cid) + '@placeholder.local', role: 'citizen', isActive: true, fullName: 'ทดสอบ ถอน consent' });
-  await db.insert(lineUsers).values({ id: lineId, lineUserId: control.lineId, lineUserIdHash: pseudonymizeLineId(control.lineId).hash, linkedUserId: userId });
+  // § T5 contract step 9 (0031) — fixture เขียน hash/enc ไม่เขียน plaintext
+  const wp = pseudonymizeLineId(control.lineId);
+  await db.insert(lineUsers).values({ id: lineId, lineUserIdHash: wp.hash, lineUserIdEnc: wp.enc, lineUserIdHashV: wp.v, linkedUserId: userId });
   await db.insert(cases).values({ id: caseId, title: 'ทดสอบ route ถอน consent', description: 'ทดสอบ tx', location: 'หัวงัว', categoryId: 'test-category', submittedBy: userId, trackingCode });
 });
 beforeEach(async () => {

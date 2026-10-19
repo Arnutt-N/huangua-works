@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { closeDb, getDb } from '@/lib/db';
 import { chatConversations, chatMessages } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
+import { pseudonymizeLineId } from '@/lib/line/identity';
 
 vi.mock('@/lib/auth/require-staff', () => ({
   requireStaffApi: vi.fn(async () => ({
@@ -33,7 +34,7 @@ beforeAll(async () => {
   conversationId = generateId();
   await db.insert(chatConversations).values({
     id: conversationId,
-    lineUserId: `it-line-search-${conversationId}`,
+    lineUserIdHash: pseudonymizeLineId(`it-line-search-${conversationId}`).hash,
     mode: 'bot_active',
   });
 

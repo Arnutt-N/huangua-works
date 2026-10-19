@@ -66,20 +66,9 @@ export async function handleEvent(event: LineWebhookEvent, transport: LineTransp
 const PROFILE_RETRY_MS = 24 * 60 * 60 * 1000; // ลองดึงโปรไฟล์ที่พลาดซ้ำได้วันละครั้ง
 
 async function getOrCreateLineUser(db: Db, lineUserId: string, transport: LineTransport) {
-  // § T5 contract step 7 — lookup ผ่าน hash อย่างเดียว ไม่มี fallback plaintext
-  // (production backfill ครบทุกแถวแล้ว — แถวที่หาไม่เจอคือแถวใหม่ ให้สร้างด้านล่าง)
+  // § T5 contract step 9 (0031) — lookup ผ่าน hash อย่างเดียว ไม่มี fallback plaintext
+  // plaintext column ถูกลบแล้ว แถวที่หาไม่เจอคือแถวใหม่ ให้สร้างด้านล่าง
   const existing = await findLineUserByRaw(db, lineUserId);
-
-  // § T5 expand dual-write — เติม pseudonym คู่ plaintext เฉพาะแถวที่ยังไม่มี
-  // read path ยังใช้ plaintext เดิม contract phase ถึงย้าย
-  const fillPseudonym = (): { lineUserIdHash: string; lineUserIdEnc: string; lineUserIdHashV: number } | {} => {
-    try {
-      const p = pseudonymizeLineId(lineUserId);
-      return { lineUserIdHash: p.hash, lineUserIdEnc: p.enc, lineUserIdHashV: p.v };
-    } catch {
-      return {};
-    }
-  };
 
   if (existing) {
     // backfill โปรไฟล์ให้ user เก่าที่ยังไม่มีชื่อ (best-effort — พังไม่ล้ม flow)
@@ -87,7 +76,7 @@ async function getOrCreateLineUser(db: Db, lineUserId: string, transport: LineTr
     const meta = (existing.metadata as { profileCheckedAt?: string } | null) ?? null;
     const lastCheck = meta?.profileCheckedAt ? Date.parse(meta.profileCheckedAt) : 0;
     const due = Date.now() - lastCheck > PROFILE_RETRY_MS;
-    if ((!existing.displayName && due) || !existing.lineUserIdHash) {
+    if (!existing.displayName && due) {
       const profile = await transport.getProfile(lineUserId).catch(() => null);
       await db
         .update(lineUsers)
@@ -95,7 +84,6 @@ async function getOrCreateLineUser(db: Db, lineUserId: string, transport: LineTr
           ...(profile
             ? { displayName: profile.displayName, pictureUrl: profile.pictureUrl ?? null }
             : {}),
-          ...(!existing.lineUserIdHash ? fillPseudonym() : {}),
           metadata: { ...(meta ?? {}), profileCheckedAt: new Date().toISOString() },
         })
         .where(eq(lineUsers.id, existing.id));
@@ -105,35 +93,37 @@ async function getOrCreateLineUser(db: Db, lineUserId: string, transport: LineTr
 
   const id = generateId();
   const profile = await transport.getProfile(lineUserId).catch(() => null);
+  // § plaintext column ถูกลบแล้ว — เขียน hash/enc เท่านั้น
+  const p = pseudonymizeLineId(lineUserId);
   await db.insert(lineUsers).values({
     id,
-    lineUserId,
+    lineUserIdHash: p.hash,
+    lineUserIdEnc: p.enc,
+    lineUserIdHashV: p.v,
     displayName: profile?.displayName ?? null,
     pictureUrl: profile?.pictureUrl ?? null,
-    ...fillPseudonym(),
     metadata: { profileCheckedAt: new Date().toISOString() },
   });
-  return { id, lineUserId, botState: null };
+  return { id, botState: null };
 }
 
 async function getOrCreateConversation(db: Db, lineUserId: string) {
-  // § T5 contract step 7 — lookup ผ่าน hash อย่างเดียว ไม่มี fallback plaintext
-  // (production backfill ครบทุกแถวแล้ว — แถวที่หาไม่เจอคือห้องใหม่ ให้สร้างด้านล่าง)
-  const hash = (() => { try { return lookupHash(lineUserId); } catch { return null; } })();
-  const [found] = hash
-    ? await db
-        .select()
-        .from(chatConversations)
-        .where(eq(chatConversations.lineUserIdHash, hash))
-        .limit(1)
-    : [];
+  // § T5 contract step 9 (0031) — lookup ผ่าน hash อย่างเดียว plaintext column ถูกลบแล้ว
+  // key หาย = lookupHash throw = แถวใหม่สร้างไม่ได้ ให้ error ดัง (fail-closed)
+  const hash = lookupHash(lineUserId);
+  const [found] = await db
+    .select()
+    .from(chatConversations)
+    .where(eq(chatConversations.lineUserIdHash, hash))
+    .limit(1);
   if (found) {
     return found;
   }
 
   const id = generateId();
-  await db.insert(chatConversations).values({ id, lineUserId, lineUserIdHash: hash, });
-  return { id, lineUserId, mode: 'bot_active' as const };
+  // § T5 contract step 9 (0031) — เขียน hash เท่านั้น plaintext column ถูกลบแล้ว
+  await db.insert(chatConversations).values({ id, lineUserIdHash: hash, });
+  return { id, mode: 'bot_active' as const };
 }
 
 const REPAIR_AGE_MS = 90_000;

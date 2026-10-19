@@ -190,16 +190,15 @@ async function linkLineRow(
     return;
   }
 
-  // § unique(line_users.line_user_id) แพ้ race — ON CONFLICT แล้วเขียน link ในคำสั่งเดียวกัน
+  // § unique(line_users.line_user_id_hash) แพ้ race — ON CONFLICT แล้วเขียน link ในคำสั่งเดียวกัน
   // ห้าม catch แล้ว update: ใน transaction ของ createCase statement error ทำให้ทั้ง tx abort
-  // target คือ uniqueIndex('line_users_line_user_id_idx') — partial index ของ hash
-  // ใช้เป็น arbiter ไม่ได้ (Postgres 42P10) จึงชนกันที่ plaintext แล้วเขียน hash คู่เสมอ
+  // target คือ uniqueIndex('line_users_line_user_id_hash_idx') — hash เป็น NOT NULL แล้ว
+  // ใช้เป็น arbiter ได้ (ตอน 0029 เป็น partial index จึงชนกันที่ plaintext — ตอนนี้ลบแล้ว)
   const p = pseudonymizeLineId(identity.lineUserId);
   await db
     .insert(lineUsers)
     .values({
       id: generateId(),
-      lineUserId: identity.lineUserId,
       lineUserIdHash: p.hash,
       lineUserIdEnc: p.enc,
       lineUserIdHashV: p.v,
@@ -209,7 +208,7 @@ async function linkLineRow(
       metadata: { profileCheckedAt: new Date().toISOString() },
     })
     .onConflictDoUpdate({
-      target: lineUsers.lineUserId,
+      target: lineUsers.lineUserIdHash,
       set: { linkedUserId: userId, updatedAt: new Date() },
     });
 }
