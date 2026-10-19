@@ -642,6 +642,9 @@ export const chatConversations = pgTable(
     updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
 
     lineUserId: text('line_user_id').notNull().unique(),
+    // § T5 contract step 6 — conversation อ้าง hash แทน plaintext (backfill จาก join เดิม)
+    // ลบ plaintext ตอนขั้น 9 พร้อม line_users
+    lineUserIdHash: text('line_user_id_hash'),
     mode: conversationModeEnum().notNull().default('bot_active'),
 
     assignedAdminId: text('assigned_admin_id'),
@@ -661,6 +664,9 @@ export const chatConversations = pgTable(
   },
   (table) => ({
     lineUserIdIdx: uniqueIndex('chat_conversations_line_user_id_idx').on(table.lineUserId),
+    lineUserIdHashIdx: uniqueIndex('chat_conversations_line_user_id_hash_idx')
+      .on(table.lineUserIdHash)
+      .where(sql`line_user_id_hash IS NOT NULL`),
     modeIdx: index('chat_conversations_mode_idx').on(table.mode),
     assignedAdminIdx: index('chat_conversations_assigned_admin_id_idx').on(table.assignedAdminId),
     lastMessageAtIdx: index('chat_conversations_last_message_at_idx').on(table.lastMessageAt),

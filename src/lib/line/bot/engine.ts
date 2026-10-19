@@ -10,7 +10,7 @@ import { matchFaq } from './faq-matcher';
 import { ingestLineMedia } from '../media-ingest';
 import { csatThankYou, parseCsatPostback, recordCsatResponse } from '../chat/csat';
 import { matchIntent } from './intent-matcher';
-import { pseudonymizeLineId, findLineUserByRaw } from '../identity';
+import { pseudonymizeLineId, findLineUserByRaw, lookupHash } from '../identity';
 import { parseResponseText } from './response-parser';
 import { startCaseFlow, processCaseFlow, handleConfirmPostback, type CaseFlowState } from './case-flow';
 import { isHandoffRequest, triggerHandoff } from './handoff';
@@ -119,16 +119,37 @@ async function getOrCreateLineUser(db: Db, lineUserId: string, transport: LineTr
 }
 
 async function getOrCreateConversation(db: Db, lineUserId: string) {
-  const [existing] = await db
-    .select()
-    .from(chatConversations)
-    .where(eq(chatConversations.lineUserId, lineUserId))
-    .limit(1);
-
-  if (existing) return existing;
+  // § T5 contract step 6 — lookup ผ่าน hash ไม่แตะ plaintext column ตรง
+  // (fallback ชั่วคราวเฉพาะช่วงย้าย — แถวเก่าที่ยังไม่มี hash ยังเจอได้ผ่าน plaintext)
+  const hash = (() => { try { return lookupHash(lineUserId); } catch { return null; } })();
+  const [existing] = hash
+    ? await db
+        .select()
+        .from(chatConversations)
+        .where(eq(chatConversations.lineUserIdHash, hash))
+        .limit(1)
+    : [];
+  const legacy = existing ? undefined : await firstOrUndefined(
+    db
+      .select()
+      .from(chatConversations)
+      .where(eq(chatConversations.lineUserId, lineUserId))
+      .limit(1),
+  );
+  const found = existing ?? legacy;
+  if (found) {
+    // § เติม hash ให้แถวเก่าที่ยังไม่มี (backfill ระหว่างรัน) — ไม่ overwrite ของที่มี
+    if (!found.lineUserIdHash && hash) {
+      await db
+        .update(chatConversations)
+        .set({ lineUserIdHash: hash, updatedAt: new Date() })
+        .where(eq(chatConversations.id, found.id));
+    }
+    return found;
+  }
 
   const id = generateId();
-  await db.insert(chatConversations).values({ id, lineUserId });
+  await db.insert(chatConversations).values({ id, lineUserId, lineUserIdHash: hash, });
   return { id, lineUserId, mode: 'bot_active' as const };
 }
 
