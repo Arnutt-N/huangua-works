@@ -23,6 +23,7 @@ import { closeDb, getDb } from '@/lib/db';
 import { auditLogs, cases, consentRecords, lineUsers, users } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import { generateCidHash } from '@/lib/cid-hmac';
+import { pseudonymizeLineId } from '@/lib/line/identity';
 import { CONSENT_VERSION, grantConsent, hasConsent } from '@/lib/consent';
 import { enforceRateLimit } from '@/lib/rate-limit/enforce';
 import { POST } from './route';
@@ -44,7 +45,7 @@ function request(via: 'web' | 'liff') {
 beforeAll(async () => {
   const db = await getDb();
   await db.insert(users).values({ id: userId, email: 'cid-' + generateCidHash(cid) + '@placeholder.local', role: 'citizen', isActive: true, fullName: 'ทดสอบ ถอน consent' });
-  await db.insert(lineUsers).values({ id: lineId, lineUserId: control.lineId, linkedUserId: userId });
+  await db.insert(lineUsers).values({ id: lineId, lineUserId: control.lineId, lineUserIdHash: pseudonymizeLineId(control.lineId).hash, linkedUserId: userId });
   await db.insert(cases).values({ id: caseId, title: 'ทดสอบ route ถอน consent', description: 'ทดสอบ tx', location: 'หัวงัว', categoryId: 'test-category', submittedBy: userId, trackingCode });
 });
 beforeEach(async () => {

@@ -25,6 +25,7 @@ import { closeDb, getDb } from '@/lib/db';
 import { auditLogs, cases, caseUpdates, categories, consentRecords, lineUsers, users } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import { generateCidHash } from '@/lib/cid-hmac';
+import { pseudonymizeLineId } from '@/lib/line/identity';
 import { findTrackableCase, listMyCases } from '@/lib/cases/citizen-access';
 import {
   deleteCitizen,
@@ -169,7 +170,7 @@ describe('toggleCitizenActive กับกติกามองเห็น', ()
     });
     createdCaseIds.push(caseId);
     lineRowId = generateId();
-    await db.insert(lineUsers).values({ id: lineRowId, lineUserId: LINE_OWNER, linkedUserId: id });
+    await db.insert(lineUsers).values({ id: lineRowId, lineUserId: LINE_OWNER, lineUserIdHash: pseudonymizeLineId(LINE_OWNER).hash, linkedUserId: id });
 
     expect(await findTrackableCase(CODE_T, { channel: 'web' })).not.toBeNull();
     expect(await listMyCases(LINE_OWNER)).toHaveLength(1);
@@ -226,7 +227,7 @@ describe('unlinkCitizenLine', () => {
     const db = await getDb();
     const id = await createCitizen('unlink');
     const rowId = generateId();
-    await db.insert(lineUsers).values({ id: rowId, lineUserId: `U-it-citizen-unlink-${RUN}`, linkedUserId: id });
+    await db.insert(lineUsers).values({ id: rowId, lineUserId: `U-it-citizen-unlink-${RUN}`, lineUserIdHash: pseudonymizeLineId(`U-it-citizen-unlink-${RUN}`).hash, linkedUserId: id });
 
     const result = await unlinkCitizenLine({ error: null }, form({ userId: id }));
     expect(result.error).toBeNull();

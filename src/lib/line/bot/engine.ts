@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
+import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { redis } from '@/lib/upstash';
 import { lineUsers, chatConversations, chatMessages } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
@@ -9,7 +10,7 @@ import { matchFaq } from './faq-matcher';
 import { ingestLineMedia } from '../media-ingest';
 import { csatThankYou, parseCsatPostback, recordCsatResponse } from '../chat/csat';
 import { matchIntent } from './intent-matcher';
-import { pseudonymizeLineId } from '../identity';
+import { pseudonymizeLineId, findLineUserByRaw } from '../identity';
 import { parseResponseText } from './response-parser';
 import { startCaseFlow, processCaseFlow, handleConfirmPostback, type CaseFlowState } from './case-flow';
 import { isHandoffRequest, triggerHandoff } from './handoff';
@@ -65,11 +66,11 @@ export async function handleEvent(event: LineWebhookEvent, transport: LineTransp
 const PROFILE_RETRY_MS = 24 * 60 * 60 * 1000; // ลองดึงโปรไฟล์ที่พลาดซ้ำได้วันละครั้ง
 
 async function getOrCreateLineUser(db: Db, lineUserId: string, transport: LineTransport) {
-  const [existing] = await db
-    .select()
-    .from(lineUsers)
-    .where(eq(lineUsers.lineUserId, lineUserId))
-    .limit(1);
+  // § T5 contract step 3 — lookup ผ่าน hash ไม่แตะ plaintext column ตรง
+  // (fallback ชั่วคราวเฉพาะช่วงย้าย — แถวเก่าที่ยังไม่มี hash ยังเจอได้ผ่าน plaintext)
+  const existing = await findLineUserByRaw(db, lineUserId) ?? await firstOrUndefined(
+    db.select().from(lineUsers).where(eq(lineUsers.lineUserId, lineUserId)).limit(1),
+  );
 
   // § T5 expand dual-write — เติม pseudonym คู่ plaintext เฉพาะแถวที่ยังไม่มี
   // read path ยังใช้ plaintext เดิม contract phase ถึงย้าย
@@ -434,11 +435,8 @@ async function handlePostbackEvent(db: Db, event: LinePostbackEvent, conversatio
   const confirmData = parseConfirmPostback(event.postback.data);
   if (!confirmData) return;
 
-  const [lineUser] = await db
-    .select()
-    .from(lineUsers)
-    .where(eq(lineUsers.lineUserId, event.source.userId))
-    .limit(1);
+  // § T5 contract step 3 — lookup ผ่าน hash ไม่แตะ plaintext column ตรง
+  const lineUser = await findLineUserByRaw(db, event.source.userId);
   const botState = (lineUser?.botState as CaseFlowState | null) ?? null;
   // § นอก confirm step (เช่น กดปุ่มซ้ำหลังส่งเรื่องแล้ว) คืน null → คง log-only ไม่ตอบซ้ำ
   const result = await handleConfirmPostback(confirmData, botState, event.source.userId);

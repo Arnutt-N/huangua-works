@@ -5,6 +5,7 @@ import { lineUsers, users } from '../../db/schema';
 import { generateId } from '../../id';
 import { generateCidHash } from '../../cid-hmac';
 import { linePlaceholderEmail } from '../../line/placeholder-email';
+import { findLineUserByRaw, pseudonymizeLineId } from '../../line/identity';
 
 /**
  * ตัวตนของประชาชนที่ระบบรับรู้ได้ — เว็บผูกกับ CID เท่านั้น, LINE ผูกกับ lineUserId
@@ -141,7 +142,8 @@ async function resolveLineCitizen(db: DbOrTx, identity: LineIdentity): Promise<s
   // ใน intake + linkLineIdentity ใน liff/session) ที่ทำต่างกันเล็กน้อย: ตัวหนึ่งไม่สร้าง
   // line_users ตัวหนึ่งกัน race ตัวหนึ่งไม่กัน — แจ้งผ่านบอทครั้งที่ 2 เคยชน unique(users.email)
   // และ "เรื่องของฉัน" (LIFF) มองไม่เห็นเคสของบอท
-  const lineRow = await firstOrUndefined(
+  // § T5 contract step 3 — lookup ผ่าน hash ก่อน fallback plaintext เฉพาะช่วงย้าย
+  const lineRow = await findLineUserByRaw(db, identity.lineUserId) ?? await firstOrUndefined(
     db
       .select({ id: lineUsers.id, linkedUserId: lineUsers.linkedUserId })
       .from(lineUsers)
@@ -194,11 +196,16 @@ async function linkLineRow(
   // § unique(line_users.line_user_id) แพ้ race — ON CONFLICT แล้วเขียน link ในคำสั่งเดียวกัน
   // ห้าม catch แล้ว update: ใน transaction ของ createCase statement error ทำให้ทั้ง tx abort
   // target คือ uniqueIndex('line_users_line_user_id_idx')
+  // § T5 contract step 3 — เขียน hash/enc คู่ plaintext เสมอ (dual-write) เพื่อให้ lookup ใหม่เจอ
+  const p = pseudonymizeLineId(identity.lineUserId);
   await db
     .insert(lineUsers)
     .values({
       id: generateId(),
       lineUserId: identity.lineUserId,
+      lineUserIdHash: p.hash,
+      lineUserIdEnc: p.enc,
+      lineUserIdHashV: p.v,
       displayName: profile.displayName ?? null,
       pictureUrl: profile.pictureUrl ?? null,
       linkedUserId: userId,
