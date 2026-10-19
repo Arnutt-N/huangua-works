@@ -13,6 +13,11 @@ vi.mock('./client', () => ({
   multicast: multicastMock,
 }));
 
+// § mock decrypt ให้คืนค่าตรงๆ — enc จริงต้องผ่าน key ซึ่ง test นี้ไม่ต้องการพิสูจน์
+vi.mock('./identity', () => ({
+  decryptLineId: (enc: string) => enc,
+}));
+
 vi.mock('@/lib/db', () => ({
   getDb: vi.fn(),
 }));
@@ -26,7 +31,7 @@ function hash(raw: string) {
   return createHash('sha256').update(raw).digest('hex');
 }
 
-// § stub DB แบบ stateful ขั้นต่ำ — update claim คืนแถวครั้งแรก, select line_users คืน raw ids
+// § stub DB แบบ stateful ขั้นต่ำ — update claim คืนแถวครั้งแรก, select line_users คืน enc
 // insert failed recipients เก็บลง array ให้ตรวจว่าไม่มี raw id หลุด
 function dbStub(row: Row | null, rawByInternal: Record<string, string> = {}) {
   const updates: Record<string, unknown>[] = [];
@@ -50,7 +55,8 @@ function dbStub(row: Row | null, rawByInternal: Record<string, string> = {}) {
     }),
     select: () => ({
       from: () => ({
-        where: async () => Object.values(rawByInternal).map((lineUserId) => ({ lineUserId })),
+        // § mock enc ด้วย raw ตรงๆ — decryptLineId ถูก mock ข้างล่างให้คืนค่านี้กลับ
+        where: async () => Object.values(rawByInternal).map((lineUserId) => ({ lineUserIdEnc: lineUserId })),
       }),
     }),
     insert: () => ({

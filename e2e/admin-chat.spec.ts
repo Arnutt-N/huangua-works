@@ -22,7 +22,8 @@ test.beforeAll(async () => {
   await db.insert(lineUsers).values({
     id: testLineUserRowId,
     lineUserId: TEST_LINE_USER_ID,
-    // § รายการแชตแสดง displayName ตรง ๆ — ใช้ค่าเดียวกับ lineUserId เพื่อให้ locator 'U_test_local' เดิมยังเจอ
+    // § รายการแชตแสดง displayName ตรง ๆ — ใช้ค่าเดียวกับ lineUserId เพื่อให้ locator เดิมยังเจอ
+    // (T5 contract: raw id ไม่ควรเป็น displayName แต่ E2E fixture นี้ใช้แทนชื่อเพื่อ locator)
     displayName: TEST_LINE_USER_ID,
   });
 

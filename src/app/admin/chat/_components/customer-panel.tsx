@@ -73,7 +73,8 @@ export function CustomerPanel({
         <div>
           <p className="text-sm font-bold text-ink">{name}</p>
           <p className="text-[11px] text-muted" title="LINE user id (ปิดบังบางส่วน)">
-            {maskLineUserId(conversation.lineUserId)}
+            {/* § T5 contract — API คืน masked id มาแล้ว ห้าม slice raw อีก */}
+            {conversation.lineUserId}
           </p>
         </div>
         <span

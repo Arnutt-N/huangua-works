@@ -1,10 +1,12 @@
 import { createHash } from 'node:crypto';
 import { eq, and, sql, inArray, lt } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
+import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { chatBroadcasts, chatBroadcastFailedRecipients, lineUsers } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import { broadcastMessage, getFollowerIds, multicast } from './client';
 import { parseBroadcastTarget, type BroadcastTarget } from './broadcast-target';
+import { decryptLineId } from './identity';
 import type { LineOutgoingMessage } from './types';
 
 // § retry ระดับชุด (batch) — multicast ล้มเป็น all-or-nothing ต่อคำขอ (400/409/429)
@@ -143,11 +145,20 @@ async function recordFailedRecipients(db: Db, broadcastId: string, rawIds: strin
 
 async function deliverTargeted(db: Db, id: string, messages: LineOutgoingMessage[], internalIds: string[]): Promise<SendBroadcastOutcome> {
   // § แปลง PK ภายในเป็น raw LINE id เฉพาะตรงขอบเขตส่งนี้เท่านั้น — raw id ไม่ถูก persist ที่ไหน
+  // § T5 contract step 4 — resolve ผ่าน internal PK + decrypt ที่ boundary ไม่แตะ plaintext column
   const rows = await db
-    .select({ lineUserId: lineUsers.lineUserId })
+    .select({ lineUserIdEnc: lineUsers.lineUserIdEnc })
     .from(lineUsers)
     .where(inArray(lineUsers.id, internalIds));
-  const rawIds = rows.map((r) => r.lineUserId);
+  const rawIds: string[] = [];
+  for (const r of rows) {
+    if (!r.lineUserIdEnc) continue;
+    try {
+      rawIds.push(decryptLineId(r.lineUserIdEnc));
+    } catch {
+      continue;
+    }
+  }
   const total = rawIds.length;
 
   if (total === 0) {

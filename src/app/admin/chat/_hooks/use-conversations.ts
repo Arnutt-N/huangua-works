@@ -80,10 +80,12 @@ export function useConversations() {
 
     const q = query.trim().toLowerCase();
     if (q) {
+      // § T5 contract — ค้นด้วย displayName เท่านั้น ห้ามค้นด้วย raw id
+      // (API คืน masked id มาแล้ว ค้นหาก็เจอแค่ 8 ตัวแรก)
       list = list.filter(
         (c) =>
           (c.displayName ?? '').toLowerCase().includes(q) ||
-          c.lineUserId.toLowerCase().includes(q),
+          (c.lineUserId ?? '').toLowerCase().includes(q),
       );
     }
 

@@ -1,6 +1,8 @@
 import { and, eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
-import { chatConversations, chatCsatResponses } from '@/lib/db/schema';
+import { firstOrUndefined } from '@/lib/db/query-helpers';
+import { chatConversations, chatCsatResponses, lineUsers } from '@/lib/db/schema';
+import { resolveRawLineId } from '../identity';
 import { generateId } from '@/lib/id';
 import type { LineOutgoingMessage } from '../types';
 import { recordBotReplies } from '../conversation/message-service';
@@ -135,13 +137,25 @@ export function csatThankYou(score: number): string {
 /**
  * ดึง raw LINE id ของห้องจาก DB — push ต้องใช้ id จริง ไม่ใช่ placeholder
  * (ปลายทาง push คือ LINE user ของห้องนี้ ไม่เกี่ยวกับ user ที่กดปุ่ม)
+ * § T5 contract step 4 — resolve ผ่าน internal PK + decrypt ที่ boundary
+ * ยังอ่านผ่าน conversation plaintext ได้ (fallback ชั่วคราวถึงขั้น 7)
  */
 export async function lineUserIdOfConversation(conversationId: string): Promise<string | null> {
   const db = await getDb();
-  const [row] = await db
+  const [conv] = await db
     .select({ lineUserId: chatConversations.lineUserId })
     .from(chatConversations)
     .where(and(eq(chatConversations.id, conversationId)))
     .limit(1);
-  return row?.lineUserId ?? null;
+  if (!conv) return null;
+  const user = await firstOrUndefined(
+    db
+      .select({ id: lineUsers.id })
+      .from(lineUsers)
+      .where(eq(lineUsers.lineUserId, conv.lineUserId))
+      .limit(1),
+  );
+  if (!user) return conv.lineUserId;
+  // § หา raw id ที่จะ push — ถอดจาก enc (production hash ครบแล้วทุกแถว)
+  return (await resolveRawLineId(db, user.id)) ?? conv.lineUserId;
 }

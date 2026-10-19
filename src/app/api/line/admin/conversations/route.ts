@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import {
   chatAdminPrefs,
@@ -33,7 +33,8 @@ export async function GET() {
       linkedCaseId: chatConversations.linkedCaseId,
       displayName: lineUsers.displayName,
       pictureUrl: lineUsers.pictureUrl,
-      lineUserId: chatConversations.lineUserId,
+      // § T5 contract step 4 — ห้ามคืน raw LINE id ออก API (mask ฝั่ง server เท่านั้น)
+      lineUserId: sql<string | null>`left(${lineUsers.lineUserId}, 8)`,
       pinned: chatAdminPrefs.pinned,
       muted: chatAdminPrefs.muted,
     })

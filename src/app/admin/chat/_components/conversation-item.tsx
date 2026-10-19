@@ -36,7 +36,8 @@ export const ConversationItem = memo(function ConversationItem({
 }) {
   const pinned = conv.pinned ?? false;
   const muted = conv.muted ?? false;
-  const name = conv.displayName ?? `ผู้ใช้ LINE ${maskLineUserId(conv.lineUserId)}`;
+  // § T5 contract — API คืน masked id มาแล้ว ห้าม slice raw อีก
+  const name = conv.displayName ?? `ผู้ใช้ LINE ${conv.lineUserId ?? ''}`;
   const isBot = conv.mode === 'bot_active';
   const tags = conv.tags ?? [];
   const extraTags = tags.length - MAX_TAGS;

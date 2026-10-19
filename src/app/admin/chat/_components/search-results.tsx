@@ -36,7 +36,8 @@ export function SearchResults({
         >
           <span className="flex items-center justify-between gap-2">
             <span className="truncate text-[11px] font-medium text-ink">
-              {r.displayName ?? r.lineUserId.slice(0, 8)}
+              {/* § T5 contract — API คืน masked id มาแล้ว ห้าม slice raw อีก */}
+              {r.displayName ?? r.lineUserId}
             </span>
             <span className="flex-none text-[11px] text-muted tabular-nums">
               {formatTime(r.createdAt)}

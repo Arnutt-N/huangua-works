@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { and, asc, count, eq, ilike, inArray } from 'drizzle-orm';
+import { and, asc, count, eq, ilike, inArray, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { cases, lineUsers, users } from '@/lib/db/schema';
 import { requireStaff } from '@/lib/auth/require-staff';
@@ -56,7 +56,8 @@ export default async function CitizensPage({
     ? await db
         .select({
           linkedUserId: lineUsers.linkedUserId,
-          lineUserId: lineUsers.lineUserId,
+          // § T5 contract step 4 — ห้ามคืน raw LINE id ออกหน้า admin (mask ฝั่ง server เท่านั้น)
+          lineUserId: sql<string | null>`left(${lineUsers.lineUserId}, 8)`,
           displayName: lineUsers.displayName,
         })
         .from(lineUsers)
@@ -69,11 +70,11 @@ export default async function CitizensPage({
         .where(inArray(cases.submittedBy, ids))
         .groupBy(cases.submittedBy)
     : [];
-  const linksByUser = new Map<string, { lineUserId: string; displayName: string | null }[]>();
+  const linksByUser = new Map<string, { lineUserId: string | null; displayName: string | null }[]>();
   for (const l of links) {
     if (!l.linkedUserId) continue;
     const arr = linksByUser.get(l.linkedUserId) ?? [];
-    arr.push({ lineUserId: l.lineUserId, displayName: l.displayName });
+    arr.push({ lineUserId: l.lineUserId ?? null, displayName: l.displayName });
     linksByUser.set(l.linkedUserId, arr);
   }
   const countsByUser = new Map(counts.map((c) => [c.submittedBy, c.n]));

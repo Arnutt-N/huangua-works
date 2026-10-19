@@ -41,7 +41,8 @@ export interface CitizenRow {
   contactEmail: string | null;
   isActive: boolean;
   createdAt: Date;
-  lineLinks: { lineUserId: string; displayName: string | null }[];
+  // § T5 contract — lineUserId เป็น masked id เท่านั้น ห้ามใช้ค้นหาหรือ join
+  lineLinks: { lineUserId: string | null; displayName: string | null }[];
   caseCount: number;
 }
 
