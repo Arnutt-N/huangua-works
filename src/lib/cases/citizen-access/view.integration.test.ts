@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { closeDb, getDb } from '@/lib/db';
 import { auditLogs, caseUpdates, cases, categories, consentRecords, lineUsers, users } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
+import { pseudonymizeLineId } from '@/lib/line/identity';
 import { findTrackableCase, listMyCases } from './index';
 
 /**
@@ -61,7 +62,7 @@ beforeAll(async () => {
     { id: noConsentOwnerId, email: `it-ca-view-noconsent-${RUN}@placeholder.local`, role: 'citizen', isActive: true, fullName: 'ผู้แจ้งไม่มีบันทึกความยินยอม' },
   ]);
   lineRowId = generateId();
-  await db.insert(lineUsers).values({ id: lineRowId, lineUserId: LINE_OWNER, linkedUserId: ownerId });
+  await db.insert(lineUsers).values({ id: lineRowId, lineUserId: LINE_OWNER, lineUserIdHash: pseudonymizeLineId(LINE_OWNER).hash, linkedUserId: ownerId });
   await db.insert(consentRecords).values({
     id: generateId(),
     userId: ownerId,
@@ -255,7 +256,7 @@ describe('§ ปิดใช้งานบัญชี — หายจาก�
       trackingCode: CODE_DEACT,
     });
     const lrow = generateId();
-    await db.insert(lineUsers).values({ id: lrow, lineUserId: LINE_DEACT, linkedUserId: uid });
+    await db.insert(lineUsers).values({ id: lrow, lineUserId: LINE_DEACT, lineUserIdHash: pseudonymizeLineId(LINE_DEACT).hash, linkedUserId: uid });
 
     try {
       expect(await findTrackableCase(CODE_DEACT, { channel: 'web' })).not.toBeNull();

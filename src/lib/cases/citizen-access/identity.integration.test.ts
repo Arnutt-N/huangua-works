@@ -3,6 +3,7 @@ import { afterAll, describe, expect, test } from 'vitest';
 import { closeDb, getDb } from '@/lib/db';
 import { lineUsers, users } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
+import { pseudonymizeLineId } from '@/lib/line/identity';
 import { resolveCitizen } from './index';
 
 /**
