@@ -239,7 +239,14 @@ export async function sendAdminReply(
   const rawLineUserId = lineUser
     ? await resolveRawLineId(db, lineUser.id)
     : null;
-  if (!rawLineUserId) return { kind: 'push_failed', messageId: '', pushStatus: 'failed' };
+  if (!rawLineUserId) {
+    // § แยกสาเหตุ decrypt-null (แถว line_users หาย/key ผิด) ออกจาก push ล้ม — retry ไม่ช่วย
+    console.error('[sendAdminReply] resolve raw LINE id ไม่ได้', {
+      conversationId: input.conversationId,
+      hasLineUser: Boolean(lineUser),
+    });
+    return { kind: 'push_failed', messageId: '', pushStatus: 'failed' };
+  }
 
   // idempotency ตาม clientTempId — แถวที่มีอยู่แล้ว = retry: push ใหม่เฉพาะเมื่อครั้งก่อนพัง
   // (คง route เดิม: สำเร็จแล้วไม่ push ซ้ำ — ไม่งั้นประชาชนได้ข้อความเดิมสองรอบ)

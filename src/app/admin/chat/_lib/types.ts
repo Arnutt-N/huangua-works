@@ -4,6 +4,9 @@ export interface ChatTag {
   color: string;
 }
 
+/** prefix base64 ของ enc 8 ตัวอักษร — ใช้แสดงผลเท่านั้น ห้ามค้นหาหรือ join */
+export type MaskedLineId = string | null;
+
 export interface Conversation {
   id: string;
   mode: string;
@@ -16,7 +19,7 @@ export interface Conversation {
   linkedCaseId: string | null;
   displayName: string | null;
   pictureUrl?: string | null;
-  lineUserId: string;
+  lineUserId: MaskedLineId;
   pinned?: boolean;
   muted?: boolean;
   tags?: ChatTag[];
@@ -25,7 +28,7 @@ export interface Conversation {
 export interface ConversationDetail {
   id: string;
   mode: string;
-  lineUserId: string;
+  lineUserId: MaskedLineId;
   assignedAdminId: string | null;
   linkedCaseId: string | null;
   adminNote: string | null;
@@ -73,6 +76,6 @@ export interface MessageSearchResult {
   sender: string;
   createdAt: string;
   displayName: string | null;
-  lineUserId: string;
+  lineUserId: MaskedLineId;
 }
 

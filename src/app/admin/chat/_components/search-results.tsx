@@ -36,7 +36,7 @@ export function SearchResults({
         >
           <span className="flex items-center justify-between gap-2">
             <span className="truncate text-[11px] font-medium text-ink">
-              {r.displayName ?? r.lineUserId}
+              {r.displayName ?? r.lineUserId ?? 'ผู้ใช้ LINE'}
             </span>
             <span className="flex-none text-[11px] text-muted tabular-nums">
               {formatTime(r.createdAt)}

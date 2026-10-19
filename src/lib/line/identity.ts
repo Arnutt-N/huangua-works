@@ -1,4 +1,4 @@
-import { createHash, createHmac, hkdfSync, createCipheriv, createDecipheriv } from 'node:crypto';
+import { createHmac, hkdfSync, createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { lineUsers } from '@/lib/db/schema';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
@@ -39,7 +39,8 @@ function encKey(): Buffer {
 export function pseudonymizeLineId(rawLineUserId: string): LineIdentityPseudonym {
   assertLineIdKeyUsable();
   const hash = createHmac('sha256', currentKey()).update(rawLineUserId, 'utf8').digest('hex');
-  const iv = createHash('sha256').update(`iv:${rawLineUserId}`, 'utf8').digest().subarray(0, 12);
+  // § GCM ห้ามใช้ nonce ซ้ำ — สุ่ม IV ใหม่ทุกครั้ง รูปแบบ enc (iv||tag||body) รองรับอยู่แล้ว
+  const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', encKey(), iv);
   const encBody = Buffer.concat([cipher.update(rawLineUserId, 'utf8'), cipher.final()]);
   const tag = cipher.getAuthTag();

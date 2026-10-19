@@ -30,6 +30,15 @@ describe('line identity pseudonym', () => {
     expect(decryptLineId(a.enc)).toBe('Uabc123');
   });
 
+  it('enc ใช้ IV สุ่ม — id เดิมได้ enc ต่างกันทุกครั้ง แต่ถอดกลับได้', () => {
+    vi.stubEnv('LINE_ID_HMAC_KEY', TEST_KEY);
+    const a = pseudonymizeLineId('Uabc123');
+    const b = pseudonymizeLineId('Uabc123');
+    expect(a.enc).not.toBe(b.enc);
+    expect(decryptLineId(a.enc)).toBe('Uabc123');
+    expect(decryptLineId(b.enc)).toBe('Uabc123');
+  });
+
   it('id ต่างกันได้ hash ต่างกัน', () => {
     vi.stubEnv('LINE_ID_HMAC_KEY', TEST_KEY);
     expect(pseudonymizeLineId('Uaaa').hash).not.toBe(pseudonymizeLineId('Ubbb').hash);

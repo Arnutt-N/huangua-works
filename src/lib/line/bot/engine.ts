@@ -92,7 +92,9 @@ async function getOrCreateLineUser(db: Db, lineUserId: string, transport: LineTr
   const id = generateId();
   const profile = await transport.getProfile(lineUserId).catch(() => null);
   const p = pseudonymizeLineId(lineUserId);
-  await db.insert(lineUsers).values({
+  // § webhook race (follow+message, LINE retry) ชน unique hash ได้ — ON CONFLICT แล้วอ่านแถวผู้ชนะ
+  // แพทเทิร์นเดียวกับ linkLineRow ใน citizen-access/identity.ts
+  const inserted = await db.insert(lineUsers).values({
     id,
     lineUserIdHash: p.hash,
     lineUserIdEnc: p.enc,
@@ -100,8 +102,12 @@ async function getOrCreateLineUser(db: Db, lineUserId: string, transport: LineTr
     displayName: profile?.displayName ?? null,
     pictureUrl: profile?.pictureUrl ?? null,
     metadata: { profileCheckedAt: new Date().toISOString() },
-  });
-  return { id, botState: null };
+  })
+    .onConflictDoNothing({ target: lineUsers.lineUserIdHash })
+    .returning({ id: lineUsers.id });
+  const winnerId = inserted[0]?.id ?? (await findLineUserByRaw(db, lineUserId))?.id ?? id;
+  const [winner] = await db.select().from(lineUsers).where(eq(lineUsers.id, winnerId)).limit(1);
+  return { id: winnerId, botState: (winner?.botState as null) ?? null };
 }
 
 async function getOrCreateConversation(db: Db, lineUserId: string) {
@@ -116,8 +122,16 @@ async function getOrCreateConversation(db: Db, lineUserId: string) {
   }
 
   const id = generateId();
-  await db.insert(chatConversations).values({ id, lineUserIdHash: hash, });
-  return { id, mode: 'bot_active' as const };
+  // § race เดียวกับ getOrCreateLineUser — ON CONFLICT แล้วอ่านแถวผู้ชนะ
+  const inserted = await db.insert(chatConversations).values({ id, lineUserIdHash: hash, })
+    .onConflictDoNothing({ target: chatConversations.lineUserIdHash })
+    .returning({ id: chatConversations.id });
+  const winnerId = inserted[0]?.id ?? (await firstOrUndefined(
+    db.select({ id: chatConversations.id }).from(chatConversations)
+      .where(eq(chatConversations.lineUserIdHash, hash)).limit(1),
+  ))?.id ?? id;
+  const [winner] = await db.select().from(chatConversations).where(eq(chatConversations.id, winnerId)).limit(1);
+  return winner ?? { id: winnerId, mode: 'bot_active' as const };
 }
 
 const REPAIR_AGE_MS = 90_000;
