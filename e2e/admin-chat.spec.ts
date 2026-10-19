@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { closeDb, getDb } from '../src/lib/db';
 import { chatConversations, lineUsers } from '../src/lib/db/schema';
 import { generateId } from '../src/lib/id';
+import { pseudonymizeLineId } from '../src/lib/line/identity';
 import { E2E_CLIENT_IP, resetRateLimits } from './helpers/reset-rate-limits';
 import { rateLimitKey } from '../src/lib/rate-limit/policies';
 
@@ -19,9 +20,14 @@ test.beforeAll(async () => {
   const db = await getDb();
 
   testLineUserRowId = generateId();
+  // § T5 contract — fixture ต้องมี hash/enc ให้ lookup ใหม่เจอ (production hash ครบแล้ว)
+  const p = pseudonymizeLineId(TEST_LINE_USER_ID);
   await db.insert(lineUsers).values({
     id: testLineUserRowId,
     lineUserId: TEST_LINE_USER_ID,
+    lineUserIdHash: p.hash,
+    lineUserIdEnc: p.enc,
+    lineUserIdHashV: p.v,
     // § รายการแชตแสดง displayName ตรง ๆ — ใช้ค่าเดียวกับ lineUserId เพื่อให้ locator เดิมยังเจอ
     // (T5 contract: raw id ไม่ควรเป็น displayName แต่ E2E fixture นี้ใช้แทนชื่อเพื่อ locator)
     displayName: TEST_LINE_USER_ID,
@@ -31,6 +37,7 @@ test.beforeAll(async () => {
   await db.insert(chatConversations).values({
     id: testConversationId,
     lineUserId: TEST_LINE_USER_ID,
+    lineUserIdHash: p.hash,
     mode: 'bot_active',
     lastMessageText: 'ข้อความทดสอบ E2E (admin-chat)',
     lastMessageAt: new Date(),
