@@ -56,8 +56,8 @@ export default async function CitizensPage({
     ? await db
         .select({
           linkedUserId: lineUsers.linkedUserId,
-          // § T5 contract step 4 — ห้ามคืน raw LINE id ออกหน้า admin (mask ฝั่ง server เท่านั้น)
-          lineUserId: sql<string | null>`left(${lineUsers.lineUserId}, 8)`,
+          // § T5 contract step 7 — ห้ามคืน raw LINE id ออกหน้า admin (mask ฝั่ง server จาก enc เท่านั้น)
+          lineUserId: sql<string | null>`left(${lineUsers.lineUserIdEnc}, 8)`,
           displayName: lineUsers.displayName,
         })
         .from(lineUsers)

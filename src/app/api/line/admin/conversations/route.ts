@@ -33,13 +33,15 @@ export async function GET() {
       linkedCaseId: chatConversations.linkedCaseId,
       displayName: lineUsers.displayName,
       pictureUrl: lineUsers.pictureUrl,
-      // § T5 contract step 4 — ห้ามคืน raw LINE id ออก API (mask ฝั่ง server เท่านั้น)
-      lineUserId: sql<string | null>`left(${lineUsers.lineUserId}, 8)`,
+      // § T5 contract step 7 — ห้ามคืน raw LINE id ออก API (mask ฝั่ง server จาก enc เท่านั้น)
+      // masked 8 ตัวแรกพอระบุตัวใน UI ไม่เผยทั้งเส้น — ถอดจาก enc ไม่แตะ plaintext column
+      lineUserId: sql<string | null>`left(${lineUsers.lineUserIdEnc}, 8)`,
       pinned: chatAdminPrefs.pinned,
       muted: chatAdminPrefs.muted,
     })
     .from(chatConversations)
-    .leftJoin(lineUsers, eq(chatConversations.lineUserId, lineUsers.lineUserId))
+    // § T5 contract step 7 — join ผ่าน hash ไม่แตะ plaintext column
+    .leftJoin(lineUsers, eq(chatConversations.lineUserIdHash, lineUsers.lineUserIdHash))
     .leftJoin(users, eq(chatConversations.assignedAdminId, users.id))
     .leftJoin(
       chatAdminPrefs,

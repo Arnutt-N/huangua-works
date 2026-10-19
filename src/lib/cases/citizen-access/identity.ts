@@ -142,14 +142,9 @@ async function resolveLineCitizen(db: DbOrTx, identity: LineIdentity): Promise<s
   // ใน intake + linkLineIdentity ใน liff/session) ที่ทำต่างกันเล็กน้อย: ตัวหนึ่งไม่สร้าง
   // line_users ตัวหนึ่งกัน race ตัวหนึ่งไม่กัน — แจ้งผ่านบอทครั้งที่ 2 เคยชน unique(users.email)
   // และ "เรื่องของฉัน" (LIFF) มองไม่เห็นเคสของบอท
-  // § T5 contract step 3 — lookup ผ่าน hash ก่อน fallback plaintext เฉพาะช่วงย้าย
-  const lineRow = await findLineUserByRaw(db, identity.lineUserId) ?? await firstOrUndefined(
-    db
-      .select({ id: lineUsers.id, linkedUserId: lineUsers.linkedUserId })
-      .from(lineUsers)
-      .where(eq(lineUsers.lineUserId, identity.lineUserId))
-      .limit(1),
-  );
+  // § T5 contract step 7 — lookup ผ่าน hash อย่างเดียว ไม่มี fallback plaintext
+  // (production backfill ครบทุกแถวแล้ว — แถวที่หาไม่เจอคือแถวใหม่ ให้สร้างผ่าน linkLineRow)
+  const lineRow = await findLineUserByRaw(db, identity.lineUserId);
 
   // reuse row เดิมก่อนสร้างใหม่เสมอ — กันชน unique(users.email) จากการแจ้ง/login ซ้ำ
   let userId = lineRow?.linkedUserId ?? undefined;
@@ -197,8 +192,8 @@ async function linkLineRow(
 
   // § unique(line_users.line_user_id) แพ้ race — ON CONFLICT แล้วเขียน link ในคำสั่งเดียวกัน
   // ห้าม catch แล้ว update: ใน transaction ของ createCase statement error ทำให้ทั้ง tx abort
-  // target คือ uniqueIndex('line_users_line_user_id_idx')
-  // § T5 contract step 3 — เขียน hash/enc คู่ plaintext เสมอ (dual-write) เพื่อให้ lookup ใหม่เจอ
+  // target คือ uniqueIndex('line_users_line_user_id_idx') — partial index ของ hash
+  // ใช้เป็น arbiter ไม่ได้ (Postgres 42P10) จึงชนกันที่ plaintext แล้วเขียน hash คู่เสมอ
   const p = pseudonymizeLineId(identity.lineUserId);
   await db
     .insert(lineUsers)

@@ -104,6 +104,7 @@ describe('resolveCitizen · ผู้ใช้ LINE', () => {
     await db.insert(lineUsers).values({
       id: generateId(),
       lineUserId: LINE_LINKED,
+      lineUserIdHash: pseudonymizeLineId(LINE_LINKED).hash,
       displayName: 'ชื่อเก่า',
       linkedUserId: ownerId,
     });

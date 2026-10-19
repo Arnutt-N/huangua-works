@@ -223,19 +223,18 @@ export async function sendAdminReply(
 ): Promise<SendAdminReplyResult> {
   const db = await getDb();
   const [conv] = await db
-    .select({ id: chatConversations.id, lineUserId: chatConversations.lineUserId })
+    .select({ id: chatConversations.id, lineUserIdHash: chatConversations.lineUserIdHash })
     .from(chatConversations)
     .where(eq(chatConversations.id, input.conversationId))
     .limit(1);
-  if (!conv) return { kind: 'not_found' };
+  if (!conv?.lineUserIdHash) return { kind: 'not_found' };
 
-  // § T5 contract step 4 — resolve raw LINE id จาก line_users ผ่าน internal PK
-  // ตอนนี้ยังอ่านผ่าน conversation plaintext ได้ (fallback ชั่วคราวถึงขั้น 7)
+  // § T5 contract step 7 — resolve raw LINE id ผ่าน hash ไม่แตะ plaintext column
   const lineUser = await firstOrUndefined(
     db
       .select({ id: lineUsers.id })
       .from(lineUsers)
-      .where(eq(lineUsers.lineUserId, conv.lineUserId))
+      .where(eq(lineUsers.lineUserIdHash, conv.lineUserIdHash))
       .limit(1),
   );
   // § หา raw id ที่จะ push — ถอดจาก enc (production hash ครบแล้วทุกแถว)
@@ -305,7 +304,7 @@ export async function sendAdminReply(
 
 interface ReplyConv {
   id: string;
-  lineUserId: string;
+  lineUserIdHash: string | null;
 }
 
 function getPushStatus(metadata: unknown): string | undefined {

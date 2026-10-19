@@ -35,7 +35,8 @@ async function createConv(mode: ConversationMode, unreadAdmin = 0): Promise<stri
   const id = generateId();
   const rawLineUserId = `it-msg-${id}`;
   await createLineUser(rawLineUserId);
-  await db.insert(chatConversations).values({ id, lineUserId: rawLineUserId, mode, unreadAdmin });
+  // § T5 contract — fixture conversation ต้องมี hash ให้ sendAdminReply resolve ได้
+  await db.insert(chatConversations).values({ id, lineUserId: rawLineUserId, lineUserIdHash: pseudonymizeLineId(rawLineUserId).hash, mode, unreadAdmin });
   created.push(id);
   return id;
 }

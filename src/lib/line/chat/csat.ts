@@ -137,25 +137,24 @@ export function csatThankYou(score: number): string {
 /**
  * ดึง raw LINE id ของห้องจาก DB — push ต้องใช้ id จริง ไม่ใช่ placeholder
  * (ปลายทาง push คือ LINE user ของห้องนี้ ไม่เกี่ยวกับ user ที่กดปุ่ม)
- * § T5 contract step 4 — resolve ผ่าน internal PK + decrypt ที่ boundary
- * ยังอ่านผ่าน conversation plaintext ได้ (fallback ชั่วคราวถึงขั้น 7)
+ * § T5 contract step 7 — resolve ผ่าน hash ไม่แตะ plaintext column
  */
 export async function lineUserIdOfConversation(conversationId: string): Promise<string | null> {
   const db = await getDb();
   const [conv] = await db
-    .select({ lineUserId: chatConversations.lineUserId })
+    .select({ lineUserIdHash: chatConversations.lineUserIdHash })
     .from(chatConversations)
     .where(and(eq(chatConversations.id, conversationId)))
     .limit(1);
-  if (!conv) return null;
+  if (!conv?.lineUserIdHash) return null;
   const user = await firstOrUndefined(
     db
       .select({ id: lineUsers.id })
       .from(lineUsers)
-      .where(eq(lineUsers.lineUserId, conv.lineUserId))
+      .where(eq(lineUsers.lineUserIdHash, conv.lineUserIdHash))
       .limit(1),
   );
-  if (!user) return conv.lineUserId;
+  if (!user) return null;
   // § หา raw id ที่จะ push — ถอดจาก enc (production hash ครบแล้วทุกแถว)
-  return (await resolveRawLineId(db, user.id)) ?? conv.lineUserId;
+  return resolveRawLineId(db, user.id);
 }

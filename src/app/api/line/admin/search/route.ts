@@ -36,12 +36,13 @@ export async function GET(request: Request) {
       sender: chatMessages.sender,
       createdAt: chatMessages.createdAt,
       displayName: lineUsers.displayName,
-      // § T5 contract step 4 — ห้ามคืน raw LINE id ออก API (mask ฝั่ง server เท่านั้น)
-      lineUserId: sql<string | null>`left(${lineUsers.lineUserId}, 8)`,
+      // § T5 contract step 7 — ห้ามคืน raw LINE id ออก API (mask ฝั่ง server จาก enc เท่านั้น)
+      lineUserId: sql<string | null>`left(${lineUsers.lineUserIdEnc}, 8)`,
     })
     .from(chatMessages)
     .innerJoin(chatConversations, eq(chatMessages.conversationId, chatConversations.id))
-    .leftJoin(lineUsers, eq(chatConversations.lineUserId, lineUsers.lineUserId))
+    // § T5 contract step 7 — join ผ่าน hash ไม่แตะ plaintext column
+    .leftJoin(lineUsers, eq(chatConversations.lineUserIdHash, lineUsers.lineUserIdHash))
     .where(ilike(chatMessages.textContent, `%${escapeLike(validation.data.q)}%`))
     .orderBy(desc(chatMessages.id))
     .limit(20);

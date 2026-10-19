@@ -42,7 +42,8 @@ export async function listSlaBreaches(now: Date = new Date()): Promise<SlaBreach
       metadata: chatConversations.metadata,
     })
     .from(chatConversations)
-    .leftJoin(lineUsers, eq(lineUsers.lineUserId, chatConversations.lineUserId))
+    // § T5 contract step 7 — join ผ่าน hash ไม่แตะ plaintext column
+    .leftJoin(lineUsers, eq(lineUsers.lineUserIdHash, chatConversations.lineUserIdHash))
     .where(and(eq(chatConversations.mode, 'waiting_handoff')));
 
   const active = await db
@@ -53,7 +54,8 @@ export async function listSlaBreaches(now: Date = new Date()): Promise<SlaBreach
       createdAt: chatConversations.createdAt,
     })
     .from(chatConversations)
-    .leftJoin(lineUsers, eq(lineUsers.lineUserId, chatConversations.lineUserId))
+    // § T5 contract step 7 — join ผ่าน hash ไม่แตะ plaintext column
+    .leftJoin(lineUsers, eq(lineUsers.lineUserIdHash, chatConversations.lineUserIdHash))
     .where(and(eq(chatConversations.mode, 'human_active')));
 
   const breaches: SlaBreach[] = [];

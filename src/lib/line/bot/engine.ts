@@ -66,11 +66,9 @@ export async function handleEvent(event: LineWebhookEvent, transport: LineTransp
 const PROFILE_RETRY_MS = 24 * 60 * 60 * 1000; // ลองดึงโปรไฟล์ที่พลาดซ้ำได้วันละครั้ง
 
 async function getOrCreateLineUser(db: Db, lineUserId: string, transport: LineTransport) {
-  // § T5 contract step 3 — lookup ผ่าน hash ไม่แตะ plaintext column ตรง
-  // (fallback ชั่วคราวเฉพาะช่วงย้าย — แถวเก่าที่ยังไม่มี hash ยังเจอได้ผ่าน plaintext)
-  const existing = await findLineUserByRaw(db, lineUserId) ?? await firstOrUndefined(
-    db.select().from(lineUsers).where(eq(lineUsers.lineUserId, lineUserId)).limit(1),
-  );
+  // § T5 contract step 7 — lookup ผ่าน hash อย่างเดียว ไม่มี fallback plaintext
+  // (production backfill ครบทุกแถวแล้ว — แถวที่หาไม่เจอคือแถวใหม่ ให้สร้างด้านล่าง)
+  const existing = await findLineUserByRaw(db, lineUserId);
 
   // § T5 expand dual-write — เติม pseudonym คู่ plaintext เฉพาะแถวที่ยังไม่มี
   // read path ยังใช้ plaintext เดิม contract phase ถึงย้าย
@@ -119,32 +117,17 @@ async function getOrCreateLineUser(db: Db, lineUserId: string, transport: LineTr
 }
 
 async function getOrCreateConversation(db: Db, lineUserId: string) {
-  // § T5 contract step 6 — lookup ผ่าน hash ไม่แตะ plaintext column ตรง
-  // (fallback ชั่วคราวเฉพาะช่วงย้าย — แถวเก่าที่ยังไม่มี hash ยังเจอได้ผ่าน plaintext)
+  // § T5 contract step 7 — lookup ผ่าน hash อย่างเดียว ไม่มี fallback plaintext
+  // (production backfill ครบทุกแถวแล้ว — แถวที่หาไม่เจอคือห้องใหม่ ให้สร้างด้านล่าง)
   const hash = (() => { try { return lookupHash(lineUserId); } catch { return null; } })();
-  const [existing] = hash
+  const [found] = hash
     ? await db
         .select()
         .from(chatConversations)
         .where(eq(chatConversations.lineUserIdHash, hash))
         .limit(1)
     : [];
-  const legacy = existing ? undefined : await firstOrUndefined(
-    db
-      .select()
-      .from(chatConversations)
-      .where(eq(chatConversations.lineUserId, lineUserId))
-      .limit(1),
-  );
-  const found = existing ?? legacy;
   if (found) {
-    // § เติม hash ให้แถวเก่าที่ยังไม่มี (backfill ระหว่างรัน) — ไม่ overwrite ของที่มี
-    if (!found.lineUserIdHash && hash) {
-      await db
-        .update(chatConversations)
-        .set({ lineUserIdHash: hash, updatedAt: new Date() })
-        .where(eq(chatConversations.id, found.id));
-    }
     return found;
   }
 
