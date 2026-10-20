@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, ilike, inArray } from 'drizzle-orm';
 import { closeDb, getDb } from '../src/lib/db';
 import { lineFriendEvents, lineUsers } from '../src/lib/db/schema';
 import { generateId } from '../src/lib/id';
@@ -8,9 +8,8 @@ import { E2E_CLIENT_IP, resetRateLimits } from './helpers/reset-rate-limits';
 import { rateLimitKey } from '../src/lib/rate-limit/policies';
 
 const ADMIN_EMAIL = 'admin@huangua.go.th';
-const ADMIN_PASSWORD = 'ChangeMe123!'; // local dev seed password (scripts/seed.ts)
+const ADMIN_PASSWORD = 'ChangeMe123!';
 
-// § spec นี้ seed เพื่อนของตัวเอง — ไม่พึ่งข้อมูล LINE จริง (pattern เดียวกับ e2e/admin-chat.spec.ts)
 const RAW_FOLLOWING = 'U_test_e2e_friends_following';
 const RAW_UNFOLLOWED = 'U_test_e2e_friends_unfollowed';
 const NAME_FOLLOWING = 'ผู้ใช้ทดสอบเพื่อน E2E ติดตาม';
@@ -19,6 +18,17 @@ const seededUserIds: string[] = [];
 
 test.beforeAll(async () => {
   const db = await getDb();
+
+  // § กันแถวค้างจากรันที่ crash (raw id คงที่ insert ซ้ำชน unique hash)
+  const orphans = await db
+    .select({ id: lineUsers.id })
+    .from(lineUsers)
+    .where(ilike(lineUsers.displayName, 'ผู้ใช้ทดสอบเพื่อน E2E%'));
+  if (orphans.length > 0) {
+    const orphanIds = orphans.map((o) => o.id);
+    await db.delete(lineFriendEvents).where(inArray(lineFriendEvents.lineUserId, orphanIds));
+    await db.delete(lineUsers).where(inArray(lineUsers.id, orphanIds));
+  }
 
   for (const [raw, name] of [[RAW_FOLLOWING, NAME_FOLLOWING], [RAW_UNFOLLOWED, NAME_UNFOLLOWED]] as const) {
     const id = generateId();
@@ -88,7 +98,7 @@ test.describe('admin friends page', () => {
   });
 
   test('authenticated supervisor sees the friends table with follow states', async ({ page }) => {
-    test.slow(); // Turbopack compile on slow FS
+    test.slow();
     await loginAsAdmin(page);
 
     await page.goto('/admin/friends', { waitUntil: 'domcontentloaded' });

@@ -9,6 +9,8 @@ import { requireStaffApi } from '@/lib/auth/require-staff';
 import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit';
 import { resolveRawLineId } from '@/lib/line/identity';
+import { LineApiError, linkUserRichMenu, unlinkUserRichMenu } from '@/lib/line/client';
+import { getAssignedMenuId, withAssignedMenuId, withoutAssignedMenuId } from '../../assigned-menu';
 
 export const runtime = 'nodejs';
 
@@ -16,35 +18,27 @@ const assignSchema = z.object({
   richMenuId: z.string().min(1, 'กรุณาเลือก Rich Menu'),
 });
 
-// § ไม่มี link-helper รายคนใน lib/line/client (มีแต่ default/alias) และ rich-menu client
-// เป็นของ PAR-8 จึงเรียก LINE per-user link API ตรงจาก route นี้ — ไม่แตะไฟล์นอก scope PAR-3
-const LINE_API_BASE = 'https://api.line.me/v2/bot';
-const LINE_TIMEOUT_MS = 10_000;
-
-function lineToken(): string {
-  return process.env.LINE_CHANNEL_ACCESS_TOKEN ?? '';
+/** แปลง LINE error เป็นข้อความไทย — raw detail ลง server log เท่านั้น ไม่ส่งออก UI */
+function lineErrorToThai(err: unknown): { status: number; error: string } {
+  if (err instanceof LineApiError) {
+    console.error(`[friends] LINE richmenu failed: ${err.endpoint} status=${err.status} detail=${err.message}`);
+    if (err.status === 404) {
+      return { status: 404, error: 'ไม่พบเมนูนี้บน LINE — กด Sync ที่หน้าริชเมนูอีกครั้ง' };
+    }
+    if (err.status === 400) {
+      return { status: 422, error: 'LINE ปฏิเสธคำสั่ง — ตรวจสอบว่าเมนูยังใช้งานได้' };
+    }
+    if (err.status === 429) {
+      return { status: 429, error: 'LINE จำกัดจำนวนคำสั่ง — รอสักครู่แล้วลองใหม่' };
+    }
+    return { status: 502, error: 'ติดต่อ LINE ไม่ได้ — ลองใหม่อีกครั้ง' };
+  }
+  console.error('[friends] LINE richmenu failed (network)', err);
+  return { status: 502, error: 'ติดต่อ LINE ไม่ได้ — ลองใหม่อีกครั้ง' };
 }
 
-async function callLine(method: 'POST' | 'DELETE', path: string): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
-  const token = lineToken();
-  if (!token) {
-    return { ok: false, status: 503, error: 'ยังไม่ได้ตั้งค่า LINE channel' };
-  }
-  let res: Response;
-  try {
-    res = await fetch(`${LINE_API_BASE}${path}`, {
-      method,
-      headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(LINE_TIMEOUT_MS),
-    });
-  } catch {
-    return { ok: false, status: 502, error: 'ติดต่อ LINE ไม่ได้ — ลองใหม่อีกครั้ง' };
-  }
-  if (!res.ok) {
-    const detail = await res.text().catch(() => '');
-    return { ok: false, status: 502, error: detail.slice(0, 200) || `LINE ตอบกลับ ${res.status}` };
-  }
-  return { ok: true };
+function noToken(): boolean {
+  return !process.env.LINE_CHANNEL_ACCESS_TOKEN;
 }
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -61,7 +55,7 @@ export async function POST(request: Request, { params }: RouteParams) {
   const db = await getDb();
   const menu = await firstOrUndefined(
     db
-      .select({ id: richMenus.id, name: richMenus.name, lineRichMenuId: richMenus.lineRichMenuId })
+      .select({ id: richMenus.id, name: richMenus.name, lineRichMenuId: richMenus.lineRichMenuId, status: richMenus.status })
       .from(richMenus)
       .where(eq(richMenus.id, body.data.richMenuId))
       .limit(1),
@@ -74,6 +68,9 @@ export async function POST(request: Request, { params }: RouteParams) {
       { error: 'เมนูนี้ยังไม่ได้ sync ขึ้น LINE — กด Sync ที่หน้าริชเมนูก่อน' },
       { status: 422 },
     );
+  }
+  if (menu.status === 'inactive') {
+    return NextResponse.json({ error: 'เมนูนี้ถูกปิดใช้งานแล้ว — เลือกเมนูอื่น' }, { status: 422 });
   }
 
   const user = await firstOrUndefined(
@@ -92,25 +89,31 @@ export async function POST(request: Request, { params }: RouteParams) {
   if (!rawLineUserId) {
     return NextResponse.json({ error: 'ถอดรหัส LINE id ไม่ได้ — ติดต่อผู้ดูแลระบบ' }, { status: 500 });
   }
-
-  const linked = await callLine(
-    'POST',
-    `/user/${encodeURIComponent(rawLineUserId)}/richmenu/${encodeURIComponent(menu.lineRichMenuId)}`,
-  );
-  if (!linked.ok) {
-    return NextResponse.json({ error: linked.error }, { status: linked.status });
+  if (noToken()) {
+    return NextResponse.json({ error: 'ยังไม่ได้ตั้งค่า LINE channel' }, { status: 503 });
   }
 
-  const nextMetadata = {
-    ...((user.metadata as { richMenuId?: string } | null) ?? {}),
-    richMenuId: menu.id,
-  };
-  await db.update(lineUsers).set({ metadata: nextMetadata, updatedAt: new Date() }).where(eq(lineUsers.id, id));
+  try {
+    await linkUserRichMenu(rawLineUserId, menu.lineRichMenuId);
+  } catch (err) {
+    const mapped = lineErrorToThai(err);
+    return NextResponse.json({ error: mapped.error }, { status: mapped.status });
+  }
 
-  // § reuse RICH_MENU_UPDATE — AUDIT_ACTIONS เป็น closed map ของ shared lib (นอก scope PAR-3)
+  try {
+    await db
+      .update(lineUsers)
+      .set({ metadata: withAssignedMenuId(user.metadata, menu.id), updatedAt: new Date() })
+      .where(eq(lineUsers.id, id));
+  } catch {
+    // § LINE ผูกแล้วแต่บันทึกพัง — ชดเชยด้วยการปลดฝั่ง LINE กันสองฝั่งไม่ตรงกัน
+    await unlinkUserRichMenu(rawLineUserId).catch(() => {});
+    return NextResponse.json({ error: 'บันทึกไม่สำเร็จ — ลองใหม่อีกครั้ง' }, { status: 500 });
+  }
+
   await logAudit({
     userId: authz.ctx.user.id,
-    action: AUDIT_ACTIONS.RICH_MENU_UPDATE,
+    action: AUDIT_ACTIONS.RICH_MENU_ASSIGN,
     resource: 'line_users',
     resourceId: id,
     metadata: { richMenuId: menu.id },
@@ -138,8 +141,7 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
   if (!user) {
     return NextResponse.json({ error: 'ไม่พบเพื่อนคนนี้' }, { status: 404 });
   }
-  const current = (user.metadata as { richMenuId?: string } | null)?.richMenuId ?? null;
-  if (!current) {
+  if (!getAssignedMenuId(user.metadata)) {
     return NextResponse.json({ error: 'ผู้ใช้นี้ยังไม่มีริชเมนูเฉพาะบุคคล' }, { status: 404 });
   }
 
@@ -147,19 +149,29 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
   if (!rawLineUserId) {
     return NextResponse.json({ error: 'ถอดรหัส LINE id ไม่ได้ — ติดต่อผู้ดูแลระบบ' }, { status: 500 });
   }
-
-  const unlinked = await callLine('DELETE', `/user/${encodeURIComponent(rawLineUserId)}/richmenu`);
-  if (!unlinked.ok) {
-    return NextResponse.json({ error: unlinked.error }, { status: unlinked.status });
+  if (noToken()) {
+    return NextResponse.json({ error: 'ยังไม่ได้ตั้งค่า LINE channel' }, { status: 503 });
   }
 
-  const { richMenuId: _removed, ...rest } = (user.metadata as { richMenuId?: string } | null) ?? {};
-  void _removed;
-  await db.update(lineUsers).set({ metadata: rest, updatedAt: new Date() }).where(eq(lineUsers.id, id));
+  try {
+    await unlinkUserRichMenu(rawLineUserId);
+  } catch (err) {
+    // § 404 = ไม่มี link ฝั่ง LINE อยู่แล้ว (โดนลบจาก OA Manager ฯลฯ) — ล้าง metadata ต่อได้เลย
+    // กันแถวค้างสถานะผูกตลอดกาลเพราะ retry ชน error เดิมซ้ำ
+    if (!(err instanceof LineApiError) || err.status !== 404) {
+      const mapped = lineErrorToThai(err);
+      return NextResponse.json({ error: mapped.error }, { status: mapped.status });
+    }
+  }
+
+  await db
+    .update(lineUsers)
+    .set({ metadata: withoutAssignedMenuId(user.metadata), updatedAt: new Date() })
+    .where(eq(lineUsers.id, id));
 
   await logAudit({
     userId: authz.ctx.user.id,
-    action: AUDIT_ACTIONS.RICH_MENU_UPDATE,
+    action: AUDIT_ACTIONS.RICH_MENU_UNASSIGN,
     resource: 'line_users',
     resourceId: id,
     metadata: { richMenuId: null },
