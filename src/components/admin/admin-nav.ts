@@ -10,6 +10,9 @@ import {
   Image,
   LayoutGrid,
   HeartPulse,
+  History,
+  UsersRound,
+  Zap,
   Settings,
   Palette,
   ListChecks,
@@ -24,6 +27,8 @@ export type AdminTab =
   | 'dashboard'
   | 'reports'
   | 'chat'
+  | 'chat-histories'
+  | 'friends'
   | 'users'
   | 'citizens'
   | 'responsible'
@@ -32,6 +37,7 @@ export type AdminTab =
   | 'profile'
   | 'chatbot'
   | 'auto-replies'
+  | 'canned-responses'
   | 'reply-objects'
   | 'broadcast'
   | 'rich-menus'
@@ -102,7 +108,10 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     label: 'แชทบอท',
     items: [
       { key: 'chatbot', label: 'ภาพรวมบอท', href: '/admin/chatbot', icon: Bot, supervisorOnly: true },
+      { key: 'chat-histories', label: 'ประวัติการสนทนา', href: '/admin/chat-histories', icon: History, supervisorOnly: true },
+      { key: 'friends', label: 'เพื่อน LINE', href: '/admin/friends', icon: UsersRound, supervisorOnly: true },
       { key: 'auto-replies', label: 'ตอบอัตโนมัติ', href: '/admin/chatbot/auto-replies', icon: MessageSquare, supervisorOnly: true },
+      { key: 'canned-responses', label: 'ข้อความด่วน', href: '/admin/chatbot/canned-responses', icon: Zap, supervisorOnly: true },
       { key: 'reply-objects', label: 'ข้อความสำเร็จรูป', href: '/admin/chatbot/reply-objects', icon: LayoutGrid, supervisorOnly: true },
       { key: 'broadcast', label: 'ส่งประกาศ', href: '/admin/chatbot/broadcast', icon: Send, supervisorOnly: true },
       { key: 'rich-menus', label: 'Rich Menu', href: '/admin/chatbot/rich-menus', icon: LayoutGrid, supervisorOnly: true },

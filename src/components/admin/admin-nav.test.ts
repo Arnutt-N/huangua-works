@@ -19,6 +19,21 @@ describe('visibleNavGroups', () => {
     expect(visibleNavGroups('officer').map((g) => g.label)).not.toContain('แชทบอท');
   });
 
+  it('officer ไม่เห็นสามเมนูใหม่ แต่ยังเห็น "การสนทนา"', () => {
+    const keys = visibleNavGroups('officer').flatMap((g) => g.items).map((i) => i.key);
+    expect(keys).toContain('chat');
+    expect(keys).not.toContain('chat-histories');
+    expect(keys).not.toContain('friends');
+    expect(keys).not.toContain('canned-responses');
+  });
+
+  it('head เห็นสามเมนูใหม่ในกลุ่ม "แชทบอท"', () => {
+    const bot = visibleNavGroups('head').find((g) => g.label === 'แชทบอท');
+    expect(bot?.items.map((i) => i.key)).toEqual(
+      expect.arrayContaining(['chat-histories', 'friends', 'canned-responses']),
+    );
+  });
+
   it('chief อยู่ต่ำกว่า ADMIN_ROLES จึงไม่เห็นเมนู supervisorOnly ใด ๆ', () => {
     const items = visibleNavGroups('chief').flatMap((g) => g.items);
     expect(items.every((i) => !i.supervisorOnly)).toBe(true);
@@ -74,11 +89,14 @@ const PAGE_OF: Record<string, string> = {
   dashboard: 'src/app/admin/page.tsx',
   reports: 'src/app/admin/reports/page.tsx',
   chat: 'src/app/admin/chat/page.tsx',
+  'chat-histories': 'src/app/admin/chat-histories/page.tsx',
+  friends: 'src/app/admin/friends/page.tsx',
   users: 'src/app/admin/users/page.tsx',
   citizens: 'src/app/admin/citizens/page.tsx',
   responsible: 'src/app/admin/responsible/page.tsx',
   'master-data': 'src/app/admin/master-data/page.tsx',
   chatbot: 'src/app/admin/chatbot/page.tsx',
+  'canned-responses': 'src/app/admin/chatbot/canned-responses/page.tsx',
   'auto-replies': 'src/app/admin/chatbot/auto-replies/page.tsx',
   'reply-objects': 'src/app/admin/chatbot/reply-objects/page.tsx',
   broadcast: 'src/app/admin/chatbot/broadcast/page.tsx',
