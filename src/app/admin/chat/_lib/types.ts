@@ -29,6 +29,9 @@ export interface ConversationDetail {
   id: string;
   mode: string;
   lineUserId: MaskedLineId;
+  displayName: string | null;
+  pictureUrl?: string | null;
+  lastMessageAt: string | null;
   assignedAdminId: string | null;
   linkedCaseId: string | null;
   adminNote: string | null;
