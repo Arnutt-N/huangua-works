@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { closeDb, getDb } from '@/lib/db';
-import { chatConversations, chatMessages, users } from '@/lib/db/schema';
+import { chatConversations, chatMessages, lineUsers, users } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import { pseudonymizeLineId } from '@/lib/line/identity';
 
@@ -25,6 +25,7 @@ import { GET, PATCH } from './route';
 let adminAId: string;
 let adminBId: string;
 let conversationId: string;
+let conversationHash: string;
 let messageIds: string[] = [];
 
 function getRequest(id: string, query = ''): Request {
@@ -74,10 +75,22 @@ beforeAll(async () => {
   ]);
 
   conversationId = generateId();
+  const pseudo = pseudonymizeLineId(`it-line-${conversationId}`);
+  conversationHash = pseudo.hash;
   await db.insert(chatConversations).values({
     id: conversationId,
-    lineUserIdHash: pseudonymizeLineId(`it-line-${conversationId}`).hash,
+    lineUserIdHash: pseudo.hash,
     mode: 'bot_active',
+    lastMessageText: 'ข้อความทดสอบล่าสุด',
+    lastMessageAt: new Date('2026-10-19T10:00:00.000Z'),
+  });
+  await db.insert(lineUsers).values({
+    id: generateId(),
+    displayName: 'ผู้ใช้ทดสอบประวัติ',
+    pictureUrl: 'https://example.test/pic.jpg',
+    lineUserIdHash: pseudo.hash,
+    lineUserIdEnc: pseudo.enc,
+    lineUserIdHashV: pseudo.v,
   });
 
   // UUIDv7 เรียงตามเวลา — สร้างตามลำดับให้ cursor paging ตรวจได้
@@ -101,6 +114,7 @@ afterAll(async () => {
   const db = await getDb();
   await db.delete(chatMessages).where(eq(chatMessages.conversationId, conversationId));
   await db.delete(chatConversations).where(eq(chatConversations.id, conversationId));
+  await db.delete(lineUsers).where(eq(lineUsers.lineUserIdHash, conversationHash));
   await db.delete(users).where(eq(users.id, adminAId));
   await db.delete(users).where(eq(users.id, adminBId));
   await closeDb();
@@ -145,6 +159,21 @@ describe('GET /api/line/admin/conversations/[id] — cursor paging', () => {
     const missing = generateId();
     const res = await GET(getRequest(missing), params(missing));
     expect(res.status).toBe(404);
+  });
+
+  test('detail carries header from lineUsers join, masked id only', async () => {
+    const res = await GET(getRequest(conversationId, '?limit=1'), params(conversationId));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    expect(body.conversation.displayName).toBe('ผู้ใช้ทดสอบประวัติ');
+    expect(body.conversation.pictureUrl).toBe('https://example.test/pic.jpg');
+    expect(body.conversation.lastMessageText).toBe('ข้อความทดสอบล่าสุด');
+    expect(body.conversation.lastMessageAt).not.toBeNull();
+    expect(typeof body.conversation.lineUserId).toBe('string');
+    expect(body.conversation.lineUserId).toHaveLength(8);
+    const payload = JSON.stringify(body);
+    expect(payload).not.toMatch(/U[0-9a-f]{32}/);
   });
 });
 

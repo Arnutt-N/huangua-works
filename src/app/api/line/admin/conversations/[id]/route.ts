@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { and, desc, eq, inArray, lt } from 'drizzle-orm';
+import { and, desc, eq, inArray, lt, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
-import { chatMessages, chatConversations, users } from '@/lib/db/schema';
+import { chatMessages, chatConversations, lineUsers, users } from '@/lib/db/schema';
 import { requireStaffApi } from '@/lib/auth/require-staff';
 import { STAFF_ROLES } from '@/lib/auth/roles';
 import {
@@ -40,15 +40,24 @@ export async function GET(
 
   const db = await getDb();
 
-  const [conversation] = await db
-    .select()
+  // § header มากับ detail (join lineUsers) — กัน ChatHistoryDetail ต้องดึงลิสต์ทั้งห้องมาเรนเดอร์แถวเดียว
+  const [row] = await db
+    .select({
+      conversation: chatConversations,
+      displayName: lineUsers.displayName,
+      pictureUrl: lineUsers.pictureUrl,
+      // masked 8 ตัวแรกพอระบุตัวใน UI ไม่เผยทั้งเส้น
+      lineUserId: sql<string | null>`left(${lineUsers.lineUserIdEnc}, 8)`,
+    })
     .from(chatConversations)
+    .leftJoin(lineUsers, eq(chatConversations.lineUserIdHash, lineUsers.lineUserIdHash))
     .where(eq(chatConversations.id, id))
     .limit(1);
 
-  if (!conversation) {
+  if (!row) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
+  const { conversation, displayName, pictureUrl, lineUserId } = row;
 
   // cursor = message id (UUIDv7 เรียงตามเวลา) — ดึงใหม่สุด limit+1 แล้ว reverse
   // ให้ client ได้ messages เรียง asc เหมือนเดิม + รู้ว่ามีหน้าก่อนหน้าอีกไหม
@@ -67,7 +76,11 @@ export async function GET(
   const hasMore = page.length > limit;
   const messages = page.slice(0, limit).reverse();
 
-  return NextResponse.json({ conversation, messages, hasMore });
+  return NextResponse.json({
+    conversation: { ...conversation, displayName, pictureUrl, lineUserId },
+    messages,
+    hasMore,
+  });
 }
 
 async function isActiveStaff(userId: string): Promise<boolean> {

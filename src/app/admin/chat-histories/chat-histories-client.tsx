@@ -246,10 +246,7 @@ export function ChatHistoryDetail({ conversationId }: { conversationId: string }
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const [page, rows] = await Promise.all([
-        fetchConversationPage(conversationId),
-        fetchConversations(),
-      ]);
+      const page = await fetchConversationPage(conversationId);
       if (cancelled) return;
       if (!page) {
         setLoadError('โหลดข้อมูลไม่สำเร็จ');
@@ -258,13 +255,12 @@ export function ChatHistoryDetail({ conversationId }: { conversationId: string }
       }
       setMessages(page.messages);
       setHasMore(page.hasMore);
-      const match = rows?.find((c) => c.id === conversationId) ?? null;
       setHeader({
-        displayName: match?.displayName ?? null,
-        pictureUrl: match?.pictureUrl,
-        lineUserId: match?.lineUserId ?? null,
+        displayName: page.conversation.displayName ?? null,
+        pictureUrl: page.conversation.pictureUrl,
+        lineUserId: page.conversation.lineUserId ?? null,
         mode: page.conversation.mode,
-        lastMessageAt: match?.lastMessageAt ?? null,
+        lastMessageAt: page.conversation.lastMessageAt ?? null,
       });
       setLoaded(true);
     })();
