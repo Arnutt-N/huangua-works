@@ -43,6 +43,44 @@ export interface FaqPage extends ListOf<FaqItem> {
   total: number;
 }
 
+export type IntentMatchType = 'exact' | 'starts_with' | 'contains' | 'regex';
+
+export interface IntentKeyword {
+  id: string;
+  keyword: string;
+  matchType: IntentMatchType;
+}
+
+export interface IntentResponse {
+  id: string;
+  replyType: 'text' | 'reply_object';
+  textContent: string | null;
+  replyObjectId: string | null;
+  displayOrder: number;
+}
+
+export interface IntentItem {
+  id: string;
+  name: string;
+  description: string | null;
+  isActive: boolean;
+  keywords: IntentKeyword[];
+  responses: IntentResponse[];
+}
+
+export interface IntentPayload {
+  name: string;
+  description?: string | null;
+  isActive: boolean;
+  keywords: { keyword: string; matchType: IntentMatchType }[];
+  responses: {
+    replyType: 'text' | 'reply_object';
+    textContent?: string | null;
+    replyObjectId?: string | null;
+    displayOrder?: number;
+  }[];
+}
+
 export interface ReplyObject {
   id: string;
   objectId: string;
@@ -238,6 +276,16 @@ export const adminApi = {
     request<OkBody>(`/api/line/admin/faq/${id}`, withBody('PATCH', payload)),
   deleteFaq: (id: string): Promise<ApiResult<OkBody>> =>
     request<OkBody>(`/api/line/admin/faq/${id}`, { method: 'DELETE' }),
+
+  // ── Intents / หมวดหมู่เจตนา ──
+  listIntents: (): Promise<ApiResult<ListOf<IntentItem>>> =>
+    request<ListOf<IntentItem>>('/api/line/admin/intents'),
+  createIntent: (payload: IntentPayload): Promise<ApiResult<OkBody>> =>
+    request<OkBody>('/api/line/admin/intents', withBody('POST', payload)),
+  updateIntent: (id: string, payload: IntentPayload): Promise<ApiResult<OkBody>> =>
+    request<OkBody>(`/api/line/admin/intents/${id}`, withBody('PATCH', payload)),
+  deleteIntent: (id: string): Promise<ApiResult<OkBody>> =>
+    request<OkBody>(`/api/line/admin/intents/${id}`, { method: 'DELETE' }),
 
   // ── Reply objects ──
   listReplyObjects: (): Promise<ApiResult<ListOf<ReplyObject>>> =>
