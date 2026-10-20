@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { History, Search } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
@@ -240,6 +240,7 @@ export function ChatHistoryDetail({ conversationId }: { conversationId: string }
   const [messages, setMessages] = useState<Message[]>([]);
   const [header, setHeader] = useState<HistoryHeader | null>(null);
   const [hasMore, setHasMore] = useState(false);
+  const loadingRef = useRef(false);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -271,13 +272,19 @@ export function ChatHistoryDetail({ conversationId }: { conversationId: string }
 
   const firstId = messages[0]?.id;
   const loadOlder = useCallback(async () => {
-    if (!firstId) return;
-    const page = await fetchConversationPage(conversationId, { before: firstId });
-    if (page) {
-      setMessages((prev) => [...page.messages, ...prev]);
-      setHasMore(page.hasMore);
+    if (loadingRef.current || !hasMore) return;
+    loadingRef.current = true;
+    try {
+      if (!firstId) return;
+      const page = await fetchConversationPage(conversationId, { before: firstId });
+      if (page) {
+        setMessages((prev) => [...page.messages, ...prev]);
+        setHasMore(page.hasMore);
+      }
+    } finally {
+      loadingRef.current = false;
     }
-  }, [conversationId, firstId]);
+  }, [conversationId, firstId, hasMore]);
 
   if (!loaded) {
     return <p className="py-12 text-center text-sm text-muted">กำลังโหลด...</p>;

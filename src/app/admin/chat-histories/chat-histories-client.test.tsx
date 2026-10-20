@@ -7,7 +7,6 @@ import type { Conversation, Message } from '@/app/admin/chat/_lib/types';
 import { ChatHistoriesClient, ChatHistoryDetail } from './chat-histories-client';
 
 beforeAll(() => {
-  // jsdom ไม่มี scrollIntoView — MessageList เรียกตอน mount เพื่อเลื่อนลงล่างสุด
   Element.prototype.scrollIntoView = vi.fn();
 });
 

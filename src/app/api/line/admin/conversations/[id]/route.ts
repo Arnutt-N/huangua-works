@@ -46,7 +46,6 @@ export async function GET(
       conversation: chatConversations,
       displayName: lineUsers.displayName,
       pictureUrl: lineUsers.pictureUrl,
-      // masked 8 ตัวแรกพอระบุตัวใน UI ไม่เผยทั้งเส้น
       lineUserId: sql<string | null>`left(${lineUsers.lineUserIdEnc}, 8)`,
     })
     .from(chatConversations)
@@ -58,6 +57,7 @@ export async function GET(
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
   const { conversation, displayName, pictureUrl, lineUserId } = row;
+  const { lineUserIdHash: _lineUserIdHash, ...safeConversation } = conversation;
 
   // cursor = message id (UUIDv7 เรียงตามเวลา) — ดึงใหม่สุด limit+1 แล้ว reverse
   // ให้ client ได้ messages เรียง asc เหมือนเดิม + รู้ว่ามีหน้าก่อนหน้าอีกไหม
@@ -77,7 +77,7 @@ export async function GET(
   const messages = page.slice(0, limit).reverse();
 
   return NextResponse.json({
-    conversation: { ...conversation, displayName, pictureUrl, lineUserId },
+    conversation: { ...safeConversation, displayName, pictureUrl, lineUserId },
     messages,
     hasMore,
   });
