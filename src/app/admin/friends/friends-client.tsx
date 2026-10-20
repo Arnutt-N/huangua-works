@@ -13,65 +13,11 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/field';
 import { useResource } from '@/app/admin/_lib/use-resource';
-import type { ApiResult } from '@/app/admin/_lib/admin-api';
+import { adminApi, type FriendItem, type RichMenuItem } from '@/app/admin/_lib/admin-api';
 
-type FollowState = 'following' | 'unfollowed';
-type StatusFilter = 'all' | FollowState;
-
-interface FriendItem {
-  id: string;
-  maskedId: string | null;
-  displayName: string | null;
-  pictureUrl: string | null;
-  followState: FollowState;
-  followCount: number;
-  refollowCount: number;
-  lastActiveAt: string | null;
-  lastFollowAt: string | null;
-  richMenuId: string | null;
-  richMenuName: string | null;
-}
-
-interface FriendsPage {
-  items: FriendItem[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
-
-interface RichMenuOption {
-  id: string;
-  name: string;
-  lineRichMenuId: string | null;
-  status: string;
-}
+type StatusFilter = 'all' | FriendItem['followState'];
 
 const PAGE_SIZE = 20;
-
-// § fetch ตรงจากหน้านี้ — ไม่เพิ่ม helper ลง admin-api.ts (shared lib นอก scope PAR-3)
-async function fetchJson<T>(url: string, init?: RequestInit): Promise<ApiResult<T>> {
-  let res: Response;
-  try {
-    res = await fetch(url, init);
-  } catch {
-    return { ok: false, error: 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ — ลองใหม่อีกครั้ง', status: 0 };
-  }
-  let body: unknown = null;
-  try {
-    body = await res.json();
-  } catch {
-    body = null;
-  }
-  if (!res.ok) {
-    const msg = (body as { error?: unknown } | null)?.error;
-    return { ok: false, error: typeof msg === 'string' ? msg : `เกิดข้อผิดพลาด (${res.status})`, status: res.status };
-  }
-  return { ok: true, data: body as T };
-}
-
-function loadFriends(query: string): Promise<ApiResult<FriendsPage>> {
-  return fetchJson<FriendsPage>(`/api/line/admin/friends?${query}`);
-}
 
 function formatThaiDateTime(iso: string | null): string {
   if (!iso) return '—';
@@ -97,7 +43,7 @@ export function FriendsClient() {
   }, [q, status, page]);
 
   const { data, loading, feedback, notify, reload } = useResource({
-    load: loadFriends,
+    load: adminApi.listFriends,
     query,
     debounceMs: 300,
   });
@@ -107,8 +53,9 @@ export function FriendsClient() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const [assignTarget, setAssignTarget] = useState<FriendItem | null>(null);
-  const [menus, setMenus] = useState<RichMenuOption[] | null>(null);
+  const [menus, setMenus] = useState<RichMenuItem[] | null>(null);
   const [menusLoading, setMenusLoading] = useState(false);
+  const [menusError, setMenusError] = useState<string | null>(null);
   const [selectedMenu, setSelectedMenu] = useState('');
   const [assignSaving, setAssignSaving] = useState(false);
 
@@ -116,16 +63,18 @@ export function FriendsClient() {
     setAssignTarget(friend);
     setSelectedMenu(friend.richMenuId ?? '');
     setMenus(null);
+    setMenusError(null);
     setMenusLoading(true);
-    const res = await fetchJson<{ items: RichMenuOption[] }>('/api/line/admin/rich-menus');
+    const res = await adminApi.listRichMenus();
     setMenusLoading(false);
     if (res.ok) setMenus(res.data.items);
-    else notify('error', res.error);
+    else setMenusError(res.error);
   }
 
   function closeAssign() {
     setAssignTarget(null);
     setMenus(null);
+    setMenusError(null);
     setSelectedMenu('');
   }
 
@@ -136,14 +85,7 @@ export function FriendsClient() {
       return;
     }
     setAssignSaving(true);
-    const res = await fetchJson<{ ok: boolean }>(
-      `/api/line/admin/friends/${assignTarget.id}/rich-menu`,
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ richMenuId: selectedMenu }),
-      },
-    );
+    const res = await adminApi.assignUserRichMenu(assignTarget.id, selectedMenu);
     setAssignSaving(false);
     if (!res.ok) {
       notify('error', res.error);
@@ -158,10 +100,7 @@ export function FriendsClient() {
     if (!assignTarget) return;
     if (!confirm(`ปลดริชเมนูเฉพาะบุคคลของ "${assignTarget.displayName ?? 'เพื่อนคนนี้'}"?`)) return;
     setAssignSaving(true);
-    const res = await fetchJson<{ ok: boolean }>(
-      `/api/line/admin/friends/${assignTarget.id}/rich-menu`,
-      { method: 'DELETE' },
-    );
+    const res = await adminApi.unassignUserRichMenu(assignTarget.id);
     setAssignSaving(false);
     if (!res.ok) {
       notify('error', res.error);
@@ -341,6 +280,17 @@ export function FriendsClient() {
               <Label htmlFor="friend-rich-menu">เลือก Rich Menu</Label>
               {menusLoading ? (
                 <p className="py-2 text-sm text-muted">กำลังโหลดรายการเมนู...</p>
+              ) : menusError ? (
+                <div className="space-y-2 py-2">
+                  <p className="text-sm text-danger">โหลดรายการเมนูไม่สำเร็จ: {menusError}</p>
+                  <Button
+                    variant="outline"
+                    onClick={() => assignTarget && openAssign(assignTarget)}
+                    className="min-h-touch text-xs"
+                  >
+                    ลองใหม่
+                  </Button>
+                </div>
               ) : (
                 <select
                   id="friend-rich-menu"
@@ -349,15 +299,18 @@ export function FriendsClient() {
                   className="min-h-touch w-full rounded-lg border border-border/50 bg-surface px-3 text-sm"
                 >
                   <option value="">เลือกเมนู...</option>
-                  {(menus ?? []).map((m) => (
-                    <option key={m.id} value={m.id} disabled={!m.lineRichMenuId}>
-                      {m.name}{m.lineRichMenuId ? '' : ' (ยังไม่ sync)'}
-                    </option>
-                  ))}
+                  {(menus ?? []).map((m) => {
+                    const usable = m.lineRichMenuId && m.status !== 'inactive';
+                    return (
+                      <option key={m.id} value={m.id} disabled={!usable}>
+                        {m.name}{usable ? '' : ' (ใช้ไม่ได้ — ยังไม่ sync หรือปิดใช้งาน)'}
+                      </option>
+                    );
+                  })}
                 </select>
               )}
               <p className="mt-1 text-xs text-muted">
-                เมนูที่ยังไม่ sync ขึ้น LINE เลือกไม่ได้ — กด Sync ที่หน้าริชเมนูก่อน
+                เมนูที่ยังไม่ sync ขึ้น LINE หรือถูกปิดใช้งานเลือกไม่ได้ — จัดการที่หน้าริชเมนู
               </p>
             </div>
           </div>
@@ -368,7 +321,7 @@ export function FriendsClient() {
               </Button>
             )}
             <Button variant="ghost" onClick={closeAssign}>ยกเลิก</Button>
-            <Button onClick={handleAssign} disabled={assignSaving || menusLoading}>
+            <Button onClick={handleAssign} disabled={assignSaving || menusLoading || !!menusError}>
               {assignSaving ? 'กำลังบันทึก...' : 'บันทึก'}
             </Button>
           </DialogFooter>

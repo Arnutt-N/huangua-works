@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
-import { desc, ilike, inArray, sql } from 'drizzle-orm';
+import { and, count, ilike, inArray, sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '@/lib/db';
 import { lineFriendEvents, lineUsers, richMenus } from '@/lib/db/schema';
+import { escapeLike } from '@/lib/db/like';
+import { countFollowStats } from '@/lib/line/friend-events';
 import { requireStaffApi } from '@/lib/auth/require-staff';
 import { ADMIN_ROLES } from '@/lib/auth/roles';
+import { getAssignedMenuId } from './assigned-menu';
 
 export const runtime = 'nodejs';
 
@@ -16,11 +19,6 @@ const querySchema = z.object({
 });
 
 export type FriendFollowState = 'following' | 'unfollowed';
-
-/** escape LIKE metacharacters — กัน q ที่มี % / _ / \ ทำ pattern เพี้ยน (pattern เดียวกับ search route) */
-function escapeLike(value: string): string {
-  return value.replace(/[\\%_]/g, (c) => `\\${c}`);
-}
 
 export async function GET(request: Request) {
   const authz = await requireStaffApi(ADMIN_ROLES);
@@ -43,29 +41,47 @@ export async function GET(request: Request) {
 
   const db = await getDb();
 
-  // § คอลัมน์ที่ select ออก API นี้ — ห้ามเพิ่ม lineUserIdEnc เต็มเส้นหรือ raw id เด็ดขาด (T5)
+  // event ล่าสุดต่อคน — scalar subquery ใช้ซ้ำใน SELECT + WHERE (filter ใน SQL ไม่โหลดทั้งตาราง)
+  // § ห้ามเขียน ${lineUsers.id} ใน subquery นี้ — drizzle render column ใน sql fragment แบบไม่ qualify
+  // ("id" ลอยๆ จะ bind กับ line_friend_events.id ของ scope ใน ทำให้ subquery ว่างตลอด — พิสูจน์ด้วย toSQL)
+  // outer query ไม่ตั้ง alias จึงอ้าง "line_users"."id" ตรงๆ ได้เสมอ
+  // ไม่มี event = เคย follow มาก่อน (แถว lineUsers เกิดจาก follow/message) จึงนับเป็น following
+  const latestEvent = sql<string | null>`(SELECT ${lineFriendEvents.event} FROM ${lineFriendEvents} WHERE ${lineFriendEvents.lineUserId} = ${sql.raw('"line_users"."id"')} ORDER BY ${lineFriendEvents.createdAt} DESC LIMIT 1)`;
+
+  const conditions: SQL[] = [];
+  if (q) conditions.push(ilike(lineUsers.displayName, `%${escapeLike(q)}%`));
+  if (status === 'following') {
+    conditions.push(sql`(${latestEvent} IS NULL OR ${latestEvent} = 'follow')`);
+  } else if (status === 'unfollowed') {
+    conditions.push(sql`${latestEvent} = 'unfollow'`);
+  }
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const [countRow] = await db.select({ value: count() }).from(lineUsers).where(where);
+  const total = countRow?.value ?? 0;
+
+  // § select นี้ห้ามเพิ่ม lineUserIdEnc เต็มเส้นหรือ raw id เด็ดขาด (T5) —
   // maskedId 8 ตัวแรกพอระบุตัวใน UI ตรง convention เดียวกับ conversations/search route
-  const baseQuery = db
+  const rows = await db
     .select({
       id: lineUsers.id,
       displayName: lineUsers.displayName,
       pictureUrl: lineUsers.pictureUrl,
       lastMessageAt: lineUsers.lastMessageAt,
-      createdAt: lineUsers.createdAt,
       metadata: lineUsers.metadata,
       maskedId: sql<string | null>`left(${lineUsers.lineUserIdEnc}, 8)`,
+      latestEvent,
     })
-    .from(lineUsers);
-  const candidates = await (q
-    ? baseQuery
-        .where(ilike(lineUsers.displayName, `%${escapeLike(q)}%`))
-        .orderBy(sql`${lineUsers.lastMessageAt} DESC NULLS LAST`, lineUsers.id)
-    : baseQuery.orderBy(sql`${lineUsers.lastMessageAt} DESC NULLS LAST`, lineUsers.id));
+    .from(lineUsers)
+    .where(where)
+    .orderBy(sql`${lineUsers.lastMessageAt} DESC NULLS LAST`, lineUsers.id)
+    .limit(pageSize)
+    .offset((page - 1) * pageSize);
 
-  // follow state derive จาก event ล่าสุดต่อคน — ดึง events ทีเดียวกัน N+1
-  const ids = candidates.map((c) => c.id);
+  // สถิติ follow นับจาก events ของแถวในหน้านี้เท่านั้น (สูงสุด pageSize แถว ไม่ใช่ทั้งตาราง)
+  const pageIds = rows.map((r) => r.id);
   const eventsByUser = new Map<string, { event: string; createdAt: Date }[]>();
-  if (ids.length > 0) {
+  if (pageIds.length > 0) {
     const events = await db
       .select({
         lineUserId: lineFriendEvents.lineUserId,
@@ -73,8 +89,8 @@ export async function GET(request: Request) {
         createdAt: lineFriendEvents.createdAt,
       })
       .from(lineFriendEvents)
-      .where(inArray(lineFriendEvents.lineUserId, ids))
-      .orderBy(desc(lineFriendEvents.createdAt));
+      .where(inArray(lineFriendEvents.lineUserId, pageIds))
+      .orderBy(lineFriendEvents.createdAt);
     for (const e of events) {
       const list = eventsByUser.get(e.lineUserId) ?? [];
       list.push({ event: e.event, createdAt: e.createdAt });
@@ -82,45 +98,23 @@ export async function GET(request: Request) {
     }
   }
 
-  const enriched = candidates.map((c) => {
-    const events = eventsByUser.get(c.id) ?? [];
-    // desc อยู่แล้ว แถวแรก = ล่าสุด; ไม่มี event = เคย follow มาก่อน (แถว lineUsers เกิดจาก follow/message)
-    const followState: FriendFollowState = events[0]?.event === 'unfollow' ? 'unfollowed' : 'following';
-    let followCount = 0;
-    let refollowCount = 0;
-    let seenUnfollow = false;
-    let lastFollowAt: Date | null = null;
-    // § นิยาม refollow เดียวกับ getRefollowCount (ไล่เก่า→ใหม่: follow แรกไม่นับ ที่ตามหลัง unfollow นับ)
-    for (let i = events.length - 1; i >= 0; i--) {
-      const e = events[i]!;
-      if (e.event === 'unfollow') {
-        seenUnfollow = true;
-      } else {
-        followCount++;
-        if (seenUnfollow) refollowCount++;
-        lastFollowAt = e.createdAt;
-      }
-    }
+  const items = rows.map((r) => {
+    const stats = countFollowStats(eventsByUser.get(r.id) ?? []);
+    const followState: FriendFollowState = r.latestEvent === 'unfollow' ? 'unfollowed' : 'following';
     return {
-      id: c.id,
-      maskedId: c.maskedId,
-      displayName: c.displayName,
-      pictureUrl: c.pictureUrl,
+      id: r.id,
+      maskedId: r.maskedId,
+      displayName: r.displayName,
+      pictureUrl: r.pictureUrl,
       followState,
-      followCount,
-      refollowCount,
-      lastActiveAt: c.lastMessageAt,
-      lastFollowAt,
-      richMenuId: (c.metadata as { richMenuId?: string } | null)?.richMenuId ?? null,
+      followCount: stats.followCount,
+      refollowCount: stats.refollowCount,
+      lastActiveAt: r.lastMessageAt,
+      richMenuId: getAssignedMenuId(r.metadata),
     };
   });
 
-  const filtered = status === 'all' ? enriched : enriched.filter((r) => r.followState === status);
-  const total = filtered.length;
-  const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
-
-  // ชื่อเมนูที่ผูกไว้รายคน — join ทีเดียวจาก metadata.richMenuId
-  const menuIds = [...new Set(paged.map((r) => r.richMenuId).filter((v): v is string => v !== null))];
+  const menuIds = [...new Set(items.map((r) => r.richMenuId).filter((v): v is string => v !== null))];
   const menuNames = new Map<string, string>();
   if (menuIds.length > 0) {
     const menus = await db
@@ -131,7 +125,7 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json({
-    items: paged.map((r) => ({
+    items: items.map((r) => ({
       ...r,
       richMenuName: r.richMenuId ? (menuNames.get(r.richMenuId) ?? null) : null,
     })),

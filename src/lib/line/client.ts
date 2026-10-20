@@ -302,3 +302,38 @@ export async function setDefaultLineRichMenu(richMenuId: string): Promise<void> 
     throw new LineApiError(`/user/all/richmenu/${richMenuId}`, res.status, detail.slice(0, 500));
   }
 }
+
+/** ผูกริชเมนูให้ผู้ใช้รายคน — error เป็น LineApiError (caller แปลงเป็นข้อความไทยเอง) */
+export async function linkUserRichMenu(rawLineUserId: string, lineRichMenuId: string): Promise<void> {
+  const endpoint = `/user/{id}/richmenu/${lineRichMenuId}`;
+  await withLineCircuit(endpoint, async () => {
+    const res = await fetch(
+      `${LINE_API_BASE}/user/${encodeURIComponent(rawLineUserId)}/richmenu/${encodeURIComponent(lineRichMenuId)}`,
+      {
+        method: 'POST',
+        headers: getHeaders(),
+        signal: AbortSignal.timeout(10_000),
+      },
+    );
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      throw new LineApiError(endpoint, res.status, detail.slice(0, 500));
+    }
+  });
+}
+
+/** ปลดริชเมนูเฉพาะบุคคล (กลับไปใช้ default) — 404 = ไม่มี link อยู่แล้ว ไม่ใช่ error */
+export async function unlinkUserRichMenu(rawLineUserId: string): Promise<void> {
+  const endpoint = '/user/{id}/richmenu';
+  await withLineCircuit(endpoint, async () => {
+    const res = await fetch(`${LINE_API_BASE}/user/${encodeURIComponent(rawLineUserId)}/richmenu`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      throw new LineApiError(endpoint, res.status, detail.slice(0, 500));
+    }
+  });
+}

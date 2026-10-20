@@ -64,7 +64,7 @@ async function cleanup() {
     await db.delete(lineFriendEvents).where(inArray(lineFriendEvents.lineUserId, ids));
     await db.delete(lineUsers).where(inArray(lineUsers.id, ids));
   }
-  // § กวาด orphan ข้ามไฟล์ (vitest รันไฟล์ขนานบน DB เดียว + กัน leftover จากรันที่ crash)
+  // § กันแถวค้างจากไฟล์ test ที่รันขนานบน DB เดียวกัน
   const orphans = await db
     .select({ id: lineUsers.id })
     .from(lineUsers)
@@ -80,7 +80,6 @@ async function cleanup() {
 beforeEach(async () => {
   await cleanup();
   const base = Date.now();
-  // A ติดตามอยู่ (follow ล่าสุด), B เลิกติดตาม (unfollow ล่าสุด), C ไม่มี event
   userA = await seedUser(RAW_A, 'it-fr-สมชาย', new Date(base - 3000));
   userB = await seedUser(RAW_B, 'it-fr-สมหญิง', new Date(base - 2000));
   userC = await seedUser(RAW_C, 'it-fr-สมปอง', new Date(base - 1000));
@@ -96,7 +95,7 @@ afterAll(async () => {
 
 describe('GET /api/line/admin/friends', () => {
   test('คืนรายการพร้อม maskedId และไม่มี raw LINE id ปนใน response', async () => {
-    // § scope ด้วย q prefix ของไฟล์นี้ — กันแถว seed จากไฟล์ test ที่รันขนานบน DB เดียวกัน
+    // § q prefix ของไฟล์นี้ — กันแถว seed จากไฟล์ที่รันขนาน
     const res = await GET(req('?q=it-fr-สม'));
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -107,7 +106,7 @@ describe('GET /api/line/admin/friends', () => {
     expect(names).toEqual(expect.arrayContaining(['it-fr-สมชาย', 'it-fr-สมหญิง', 'it-fr-สมปอง']));
 
     const dumped = JSON.stringify(body);
-    // § mask audit: raw id ต้องไม่ปรากฏที่ใดใน response (T5)
+    // § mask audit (T5): raw id ต้องไม่ปรากฏที่ใดใน response
     expect(dumped).not.toContain(RAW_A);
     expect(dumped).not.toContain(RAW_B);
     expect(dumped).not.toContain(RAW_C);
@@ -128,7 +127,7 @@ describe('GET /api/line/admin/friends', () => {
   });
 
   test('follow state มาจาก event ล่าสุด + นับ follow/refollow ถูก', async () => {
-    const res = await GET(req('?pageSize=100'));
+    const res = await GET(req('?q=it-fr-สม&pageSize=100'));
     const body = await res.json();
     const byName = Object.fromEntries(
       body.items.map((i: { displayName: string; followState: string; followCount: number; refollowCount: number }) => [
