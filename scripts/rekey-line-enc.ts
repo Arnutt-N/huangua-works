@@ -10,6 +10,7 @@
  */
 
 import { config } from 'dotenv';
+import { eq } from 'drizzle-orm';
 import { closeDb, getDb } from '../src/lib/db';
 import { lineUsers } from '../src/lib/db/schema';
 import { decryptLineId, lookupHash, pseudonymizeLineId } from '../src/lib/line/identity';
@@ -38,7 +39,7 @@ for (const r of rows) {
     const [check] = await db
       .select({ id: lineUsers.id })
       .from(lineUsers)
-      .where((await import('drizzle-orm')).eq(lineUsers.lineUserIdHash, expectHash))
+      .where(eq(lineUsers.lineUserIdHash, expectHash))
       .limit(1);
     if (!check || check.id !== r.id) {
       console.log(`  ! ${r.id} — hash ไม่ตรง ข้าม (key อาจผิด)`);
@@ -47,7 +48,7 @@ for (const r of rows) {
     }
     const next = pseudonymizeLineId(raw);
     if (apply) {
-      await db.update(lineUsers).set({ lineUserIdEnc: next.enc }).where((await import('drizzle-orm')).eq(lineUsers.id, r.id));
+      await db.update(lineUsers).set({ lineUserIdEnc: next.enc }).where(eq(lineUsers.id, r.id));
     }
     rewritten++;
   } catch (e) {

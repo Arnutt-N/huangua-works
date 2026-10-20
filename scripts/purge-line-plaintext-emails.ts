@@ -10,7 +10,7 @@
  */
 
 import { config } from 'dotenv';
-import { like } from 'drizzle-orm';
+import { eq, like } from 'drizzle-orm';
 import { closeDb, getDb } from '../src/lib/db';
 import { lineUsers, users } from '../src/lib/db/schema';
 import { decryptLineId, lookupHash } from '../src/lib/line/identity';
@@ -58,7 +58,7 @@ for (const u of candidates) {
   const next = linePlaceholderEmail(lookupHash(raw));
   console.log(`  ${apply ? '✓' : '·'} ${u.email} → ${next}`);
   if (apply) {
-    await db.update(users).set({ email: next }).where(like(users.id, u.id));
+    await db.update(users).set({ email: next }).where(eq(users.id, u.id));
     purged++;
   }
 }

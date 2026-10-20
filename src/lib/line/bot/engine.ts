@@ -107,7 +107,7 @@ async function getOrCreateLineUser(db: Db, lineUserId: string, transport: LineTr
     .returning({ id: lineUsers.id });
   const winnerId = inserted[0]?.id ?? (await findLineUserByRaw(db, lineUserId))?.id ?? id;
   const [winner] = await db.select().from(lineUsers).where(eq(lineUsers.id, winnerId)).limit(1);
-  return { id: winnerId, botState: (winner?.botState as null) ?? null };
+  return { id: winnerId, botState: winner?.botState ?? null };
 }
 
 async function getOrCreateConversation(db: Db, lineUserId: string) {

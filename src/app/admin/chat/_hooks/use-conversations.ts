@@ -80,7 +80,6 @@ export function useConversations() {
 
     const q = query.trim().toLowerCase();
     if (q) {
-      // § lineUserId เป็น masked prefix ใช้แสดงผลเท่านั้น — ค้นด้วย displayName เป็นหลัก
       list = list.filter(
         (c) =>
           (c.displayName ?? '').toLowerCase().includes(q) ||
