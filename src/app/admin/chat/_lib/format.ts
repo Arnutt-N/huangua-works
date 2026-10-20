@@ -23,11 +23,6 @@ export function formatDateSeparator(iso: string): string {
   return date.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-/** LINE userId ยาว 33 ตัว — โชว์แค่หัวพอระบุตัว ไม่เผยทั้งเส้น */
-export function maskLineUserId(lineUserId: string): string {
-  return lineUserId.slice(0, 8);
-}
-
 /** เวลาสัมพัทธ์แบบสั้นสำหรับรายการสนทนา — 5 นาที / 3 ชม. / 2 วัน */
 export function formatRelativeTime(iso: string | null): string {
   if (!iso) return '';

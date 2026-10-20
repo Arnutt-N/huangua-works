@@ -6,6 +6,7 @@ import { parseBody } from '@/lib/api-helpers';
 import { liffSessionSchema } from '@/lib/validation';
 import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
 import { resolveCitizen } from '@/lib/cases/citizen-access';
+import { lookupHash } from '@/lib/line/identity';
 import { verifyLineIdToken, type VerifiedLineIdentity } from '@/lib/liff/verify-line-id-token';
 import {
   LIFF_SESSION_COOKIE,
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
     userId,
     action: AUDIT_ACTIONS.LIFF_LOGIN,
     resource: 'auth',
-    resourceId: identity.lineUserId,
+    resourceId: lookupHash(identity.lineUserId),
     ipAddress: ip,
     userAgent: req.headers.get('user-agent') || undefined,
     metadata: { via: 'liff_session' },

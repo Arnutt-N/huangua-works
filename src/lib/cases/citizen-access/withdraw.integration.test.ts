@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { closeDb, getDb } from '@/lib/db';
 import { auditLogs, cases, categories, consentRecords, lineUsers, users } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
+import { lookupHash } from '@/lib/line/identity';
 import { findTrackableCase, resolveCitizen, withdrawCaseConsent } from './index';
 
 /**
@@ -82,7 +83,7 @@ afterAll(async () => {
   await db.delete(auditLogs).where(inArray(auditLogs.resourceId, caseIds));
   await db.delete(cases).where(inArray(cases.id, caseIds));
   await db.delete(consentRecords).where(inArray(consentRecords.userId, userIds));
-  await db.delete(lineUsers).where(inArray(lineUsers.lineUserId, [LINE_OWNER, LINE_STRANGER]));
+  await db.delete(lineUsers).where(inArray(lineUsers.lineUserIdHash, [LINE_OWNER, LINE_STRANGER].map(lookupHash)));
   await db.delete(users).where(inArray(users.id, userIds));
   await closeDb();
 });

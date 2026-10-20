@@ -5,6 +5,7 @@ import { cases, lineUsers, users } from '../../db/schema';
 import { AUDIT_ACTIONS, logAudit } from '../../audit';
 import { normalizeTrackingCode } from '../../case-tracking';
 import { revokeConsentWithAudit } from '../../consent';
+import { lookupHash } from '../../line/identity';
 import { cidPlaceholderEmail } from './identity';
 
 /**
@@ -90,7 +91,7 @@ async function ownershipDenial(
       db
         .select({ id: lineUsers.id })
         .from(lineUsers)
-        .where(and(eq(lineUsers.lineUserId, proof.lineUserId), eq(lineUsers.linkedUserId, ownerId)))
+        .where(and(eq(lineUsers.lineUserIdHash, lookupHash(proof.lineUserId)), eq(lineUsers.linkedUserId, ownerId)))
         .limit(1),
     );
     return owned ? null : 'not_case_owner_line';

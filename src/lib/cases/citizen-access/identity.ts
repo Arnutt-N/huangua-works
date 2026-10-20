@@ -5,6 +5,7 @@ import { lineUsers, users } from '../../db/schema';
 import { generateId } from '../../id';
 import { generateCidHash } from '../../cid-hmac';
 import { linePlaceholderEmail } from '../../line/placeholder-email';
+import { findLineUserByRaw, lookupHash, pseudonymizeLineId } from '../../line/identity';
 
 /**
  * ตัวตนของประชาชนที่ระบบรับรู้ได้ — เว็บผูกกับ CID เท่านั้น, LINE ผูกกับ lineUserId
@@ -141,18 +142,12 @@ async function resolveLineCitizen(db: DbOrTx, identity: LineIdentity): Promise<s
   // ใน intake + linkLineIdentity ใน liff/session) ที่ทำต่างกันเล็กน้อย: ตัวหนึ่งไม่สร้าง
   // line_users ตัวหนึ่งกัน race ตัวหนึ่งไม่กัน — แจ้งผ่านบอทครั้งที่ 2 เคยชน unique(users.email)
   // และ "เรื่องของฉัน" (LIFF) มองไม่เห็นเคสของบอท
-  const lineRow = await firstOrUndefined(
-    db
-      .select({ id: lineUsers.id, linkedUserId: lineUsers.linkedUserId })
-      .from(lineUsers)
-      .where(eq(lineUsers.lineUserId, identity.lineUserId))
-      .limit(1),
-  );
+  const lineRow = await findLineUserByRaw(db, identity.lineUserId);
 
   // reuse row เดิมก่อนสร้างใหม่เสมอ — กันชน unique(users.email) จากการแจ้ง/login ซ้ำ
   let userId = lineRow?.linkedUserId ?? undefined;
   if (!userId) {
-    const email = linePlaceholderEmail(identity.lineUserId);
+    const email = linePlaceholderEmail(lookupHash(identity.lineUserId));
     userId =
       (await findUserIdByEmail(db, email)) ??
       (await insertUserOrReuse(db, {
@@ -191,21 +186,23 @@ async function linkLineRow(
     return;
   }
 
-  // § unique(line_users.line_user_id) แพ้ race — ON CONFLICT แล้วเขียน link ในคำสั่งเดียวกัน
+  // § แพ้ race ที่ unique hash — ON CONFLICT แล้วเขียน link ในคำสั่งเดียวกัน
   // ห้าม catch แล้ว update: ใน transaction ของ createCase statement error ทำให้ทั้ง tx abort
-  // target คือ uniqueIndex('line_users_line_user_id_idx')
+  const p = pseudonymizeLineId(identity.lineUserId);
   await db
     .insert(lineUsers)
     .values({
       id: generateId(),
-      lineUserId: identity.lineUserId,
+      lineUserIdHash: p.hash,
+      lineUserIdEnc: p.enc,
+      lineUserIdHashV: p.v,
       displayName: profile.displayName ?? null,
       pictureUrl: profile.pictureUrl ?? null,
       linkedUserId: userId,
       metadata: { profileCheckedAt: new Date().toISOString() },
     })
     .onConflictDoUpdate({
-      target: lineUsers.lineUserId,
+      target: lineUsers.lineUserIdHash,
       set: { linkedUserId: userId, updatedAt: new Date() },
     });
 }

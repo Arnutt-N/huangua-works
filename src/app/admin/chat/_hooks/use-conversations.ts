@@ -83,7 +83,7 @@ export function useConversations() {
       list = list.filter(
         (c) =>
           (c.displayName ?? '').toLowerCase().includes(q) ||
-          c.lineUserId.toLowerCase().includes(q),
+          (c.lineUserId ?? '').toLowerCase().includes(q),
       );
     }
 

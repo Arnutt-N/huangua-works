@@ -9,7 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { formatRelativeTime, maskLineUserId } from '../_lib/format';
+import { formatRelativeTime } from '../_lib/format';
 import { MODE_SHORT } from '../_lib/labels';
 import type { Conversation } from '../_lib/types';
 import { LineAvatar } from './line-avatar';
@@ -36,7 +36,7 @@ export const ConversationItem = memo(function ConversationItem({
 }) {
   const pinned = conv.pinned ?? false;
   const muted = conv.muted ?? false;
-  const name = conv.displayName ?? `ผู้ใช้ LINE ${maskLineUserId(conv.lineUserId)}`;
+  const name = conv.displayName ?? (conv.lineUserId ? `ผู้ใช้ LINE ${conv.lineUserId}` : 'ผู้ใช้ LINE');
   const isBot = conv.mode === 'bot_active';
   const tags = conv.tags ?? [];
   const extraTags = tags.length - MAX_TAGS;

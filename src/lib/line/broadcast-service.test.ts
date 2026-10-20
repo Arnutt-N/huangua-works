@@ -13,6 +13,10 @@ vi.mock('./client', () => ({
   multicast: multicastMock,
 }));
 
+vi.mock('./identity', () => ({
+  decryptLineId: (enc: string) => enc,
+}));
+
 vi.mock('@/lib/db', () => ({
   getDb: vi.fn(),
 }));
@@ -26,8 +30,6 @@ function hash(raw: string) {
   return createHash('sha256').update(raw).digest('hex');
 }
 
-// § stub DB แบบ stateful ขั้นต่ำ — update claim คืนแถวครั้งแรก, select line_users คืน raw ids
-// insert failed recipients เก็บลง array ให้ตรวจว่าไม่มี raw id หลุด
 function dbStub(row: Row | null, rawByInternal: Record<string, string> = {}) {
   const updates: Record<string, unknown>[] = [];
   const failedInserts: Record<string, unknown>[] = [];
@@ -50,7 +52,7 @@ function dbStub(row: Row | null, rawByInternal: Record<string, string> = {}) {
     }),
     select: () => ({
       from: () => ({
-        where: async () => Object.values(rawByInternal).map((lineUserId) => ({ lineUserId })),
+        where: async () => Object.values(rawByInternal).map((lineUserId) => ({ lineUserIdEnc: lineUserId })),
       }),
     }),
     insert: () => ({

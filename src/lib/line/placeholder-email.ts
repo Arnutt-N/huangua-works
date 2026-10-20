@@ -9,7 +9,7 @@
 const EMAIL_PREFIX = 'line-';
 const EMAIL_SUFFIX = '@placeholder.local';
 
-/** localPart = lineUserId จริง หรือ generateId() กรณี intake ไม่รู้ lineUserId */
+/** localPart = hash ของ LINE id หรือ generateId() กรณี intake ไม่รู้ lineUserId */
 export function linePlaceholderEmail(localPart: string): string {
   return `${EMAIL_PREFIX}${localPart}${EMAIL_SUFFIX}`;
 }

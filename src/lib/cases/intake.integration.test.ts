@@ -29,6 +29,7 @@ import { closeDb, getDb } from '@/lib/db';
 import { auditLogs, cases, categories, consentRecords, dedupHashes, lineUsers, users } from '@/lib/db/schema';
 import { generateCidHash, generateDedupHash } from '@/lib/cid-hmac';
 import { generateId } from '@/lib/id';
+import { lookupHash, pseudonymizeLineId } from '@/lib/line/identity';
 import { createCase } from './intake';
 import { findTrackableCase } from './citizen-access';
 
@@ -65,17 +66,16 @@ async function cleanupFixture(): Promise<void> {
     await db.delete(cases).where(inArray(cases.id, caseIds));
   }
   // § LINE_BOT/LINE_LIFF ของ c1 ประกาศท้ายไฟล์ — afterAll รันหลัง module โหลดครบจึงอ้างได้
-  await db.delete(lineUsers).where(inArray(lineUsers.lineUserId, [LINE_NEW, LINE_EXISTING, LINE_BOT, LINE_LIFF]));
+  const rawIds = [LINE_NEW, LINE_EXISTING, LINE_BOT, LINE_LIFF];
+  await db.delete(lineUsers).where(inArray(lineUsers.lineUserIdHash, rawIds.map(lookupHash)));
+  const { linePlaceholderEmail } = await import('@/lib/line/placeholder-email');
   const userRows = await db
     .select({ id: users.id })
     .from(users)
     .where(
       or(
         inArray(users.email, createdEmails),
-        eq(users.email, `line-${LINE_NEW}@placeholder.local`),
-        eq(users.email, `line-${LINE_EXISTING}@placeholder.local`),
-        eq(users.email, `line-${LINE_BOT}@placeholder.local`),
-        eq(users.email, `line-${LINE_LIFF}@placeholder.local`),
+        ...rawIds.map((raw) => eq(users.email, linePlaceholderEmail(lookupHash(raw)))),
       ),
     );
   const userIds = userRows.map((u) => u.id);
@@ -192,15 +192,19 @@ describe('createCase · atomic (integration)', () => {
     ).rejects.toThrow('audit insert failed (forced)');
 
     const db = await getDb();
-    expect(await db.select().from(lineUsers).where(eq(lineUsers.lineUserId, LINE_NEW))).toHaveLength(0);
-    expect(await db.select().from(users).where(eq(users.email, `line-${LINE_NEW}@placeholder.local`))).toHaveLength(0);
+    expect(await db.select().from(lineUsers).where(eq(lineUsers.lineUserIdHash, lookupHash(LINE_NEW)))).toHaveLength(0);
+    const { linePlaceholderEmail } = await import('@/lib/line/placeholder-email');
+    expect(await db.select().from(users).where(eq(users.email, linePlaceholderEmail(lookupHash(LINE_NEW))))).toHaveLength(0);
   });
 
   test('audit ล้ม (channel=line, มี line_users แล้ว) → linkedUserId ไม่ถูกเขียนค้าง', async () => {
     const db = await getDb();
+    const p = pseudonymizeLineId(LINE_EXISTING);
     await db.insert(lineUsers).values({
       id: generateId(),
-      lineUserId: LINE_EXISTING,
+      lineUserIdHash: p.hash,
+      lineUserIdEnc: p.enc,
+      lineUserIdHashV: p.v,
       linkedUserId: null,
     });
     auditControl.failNext = true;
@@ -216,7 +220,7 @@ describe('createCase · atomic (integration)', () => {
       }),
     ).rejects.toThrow('audit insert failed (forced)');
 
-    const [row] = await db.select().from(lineUsers).where(eq(lineUsers.lineUserId, LINE_EXISTING));
+    const [row] = await db.select().from(lineUsers).where(eq(lineUsers.lineUserIdHash, lookupHash(LINE_EXISTING)));
     expect(row?.linkedUserId ?? null).toBeNull();
   });
 });

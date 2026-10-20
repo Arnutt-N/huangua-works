@@ -1,4 +1,8 @@
-import { createHash, createHmac, hkdfSync, createCipheriv, createDecipheriv } from 'node:crypto';
+import { createHmac, hkdfSync, createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
+import { eq } from 'drizzle-orm';
+import { lineUsers } from '@/lib/db/schema';
+import { firstOrUndefined } from '@/lib/db/query-helpers';
+import type { DbOrTx } from '@/lib/db';
 
 // § เจ้าของ pseudonym ของ LINE id ตัวเดียวใน repo — ที่อื่นห้ามสร้าง hash/enc เอง
 // hash ใช้ lookup แบบ deterministic, enc เก็บ raw ไว้ถอดกลับตอนส่งออก boundary เท่านั้น
@@ -35,7 +39,8 @@ function encKey(): Buffer {
 export function pseudonymizeLineId(rawLineUserId: string): LineIdentityPseudonym {
   assertLineIdKeyUsable();
   const hash = createHmac('sha256', currentKey()).update(rawLineUserId, 'utf8').digest('hex');
-  const iv = createHash('sha256').update(`iv:${rawLineUserId}`, 'utf8').digest().subarray(0, 12);
+  // § GCM ห้ามใช้ nonce ซ้ำ — สุ่ม IV ใหม่ทุกครั้ง รูปแบบ enc (iv||tag||body) รองรับอยู่แล้ว
+  const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', encKey(), iv);
   const encBody = Buffer.concat([cipher.update(rawLineUserId, 'utf8'), cipher.final()]);
   const tag = cipher.getAuthTag();
@@ -60,4 +65,29 @@ export function decryptLineId(enc: string): string {
   const decipher = createDecipheriv('aes-256-gcm', encKey(), iv);
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(body), decipher.final()]).toString('utf8');
+}
+
+/** lookup ผู้ใช้ LINE จาก raw id ผ่าน hash */
+export async function findLineUserByRaw(db: DbOrTx, rawLineUserId: string) {
+  const hash = lookupHash(rawLineUserId);
+  return firstOrUndefined(
+    db.select().from(lineUsers).where(eq(lineUsers.lineUserIdHash, hash)).limit(1),
+  );
+}
+
+/** ถอด raw LINE id จาก enc — เรียกเฉพาะตอนส่งออก boundary (push/multicast/getProfile) */
+export async function resolveRawLineId(db: DbOrTx, lineUserPk: string): Promise<string | null> {
+  const row = await firstOrUndefined(
+    db
+      .select({ enc: lineUsers.lineUserIdEnc })
+      .from(lineUsers)
+      .where(eq(lineUsers.id, lineUserPk))
+      .limit(1),
+  );
+  if (!row?.enc) return null;
+  try {
+    return decryptLineId(row.enc);
+  } catch {
+    return null;
+  }
 }

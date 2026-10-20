@@ -2,6 +2,7 @@ import { and, desc, eq, isNotNull } from 'drizzle-orm';
 import { getDb, type DbOrTx } from '../../db';
 import { firstOrUndefined } from '../../db/query-helpers';
 import { caseUpdates, cases, categories, lineUsers } from '../../db/schema';
+import { lookupHash } from '../../line/identity';
 import { AUDIT_ACTIONS, logAudit } from '../../audit';
 import { normalizeTrackingCode } from '../../case-tracking';
 import type { CaseStatus } from '../state-machine';
@@ -150,7 +151,7 @@ export async function listMyCases(lineUserId: string, db?: DbOrTx): Promise<MyCa
     .innerJoin(lineUsers, eq(lineUsers.linkedUserId, cases.submittedBy))
     .where(
       and(
-        eq(lineUsers.lineUserId, lineUserId),
+        eq(lineUsers.lineUserIdHash, lookupHash(lineUserId)),
         isNotNull(cases.trackingCode),
         consentActiveFor(cases.submittedBy),
       ),

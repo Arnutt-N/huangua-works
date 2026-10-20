@@ -41,7 +41,8 @@ export interface CitizenRow {
   contactEmail: string | null;
   isActive: boolean;
   createdAt: Date;
-  lineLinks: { lineUserId: string; displayName: string | null }[];
+  /** masked id 8 ตัวแรก — ใช้แสดงผลเท่านั้น ห้ามใช้ค้นหาหรือ join */
+  lineLinks: { lineUserId: string | null; displayName: string | null }[];
   caseCount: number;
 }
 
@@ -85,7 +86,7 @@ export function CitizensClient({ rows, query }: { rows: CitizenRow[]; query: str
                 <p className="mt-0.5 truncate text-xs text-muted">
                   {c.phoneNumber ?? '—'} · {c.contactEmail ?? 'ไม่มีอีเมลติดต่อ'} ·{' '}
                   {c.lineLinks.length > 0
-                    ? `LINE: ${c.lineLinks[0]?.displayName ?? c.lineLinks[0]?.lineUserId}${c.lineLinks.length > 1 ? ` (+${c.lineLinks.length - 1})` : ''}`
+                    ? `LINE: ${c.lineLinks[0]?.displayName ?? c.lineLinks[0]?.lineUserId ?? 'ไม่ระบุ'}${c.lineLinks.length > 1 ? ` (+${c.lineLinks.length - 1})` : ''}`
                     : 'ไม่ผูก LINE'}{' '}
                   · {c.caseCount} เรื่อง
                 </p>

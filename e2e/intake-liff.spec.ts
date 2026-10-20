@@ -10,6 +10,7 @@ import {
 } from '../src/lib/db/schema';
 import { fillGeographyCascade, loadFirstGeography, type Geography } from './helpers/geography';
 import { E2E_CLIENT_IP, resetRateLimits } from './helpers/reset-rate-limits';
+import { lookupHash } from '../src/lib/line/identity';
 import { rateLimitKey } from '../src/lib/rate-limit/policies';
 
 /**
@@ -53,7 +54,7 @@ test.afterAll(async () => {
     await db.delete(consentRecords).where(eq(consentRecords.userId, owner.id));
     await db.delete(users).where(eq(users.id, owner.id));
   }
-  await db.delete(lineUsers).where(eq(lineUsers.lineUserId, MOCK_LINE_USER));
+  await db.delete(lineUsers).where(eq(lineUsers.lineUserIdHash, lookupHash(MOCK_LINE_USER)));
   await closeDb();
 });
 

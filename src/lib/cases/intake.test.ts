@@ -222,9 +222,11 @@ describe('createCase · ลูปกันชนของ trackingCode', () => {
 // § จำลอง user ที่เกิดระหว่าง SELECT กับ INSERT เพื่อพิสูจน์ว่า unique conflict ไม่ทำ tx abort
 describe('createCase · ตัวตนที่ถูกสร้างพร้อมกัน', () => {
   it.each(['web', 'line'] as const)('ใช้ผู้ชนะของ unique email ฝั่ง %s และสร้างเรื่องต่อได้', async (channel) => {
+    const { lookupHash } = await import('@/lib/line/identity');
+    const { linePlaceholderEmail } = await import('@/lib/line/placeholder-email');
     const email = channel === 'web'
       ? `cid-${generateCidHash(VALID_CID)}@placeholder.local`
-      : 'line-U-conflict@placeholder.local';
+      : linePlaceholderEmail(lookupHash('U-conflict'));
     mockState.conflictWinner = { id: 'winner-user', email };
     const result = await createCase({ ...webInput(), channel, lineUserId: 'U-conflict' });
     expect(result.ok).toBe(true);

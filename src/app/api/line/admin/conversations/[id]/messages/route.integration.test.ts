@@ -1,8 +1,9 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { closeDb, getDb } from '@/lib/db';
-import { chatConversations, chatMessages } from '@/lib/db/schema';
+import { chatConversations, chatMessages, lineUsers } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
+import { pseudonymizeLineId } from '@/lib/line/identity';
 
 const mocks = vi.hoisted(() => ({ currentUserId: '' }));
 
@@ -61,9 +62,16 @@ beforeAll(async () => {
   conversationId = generateId();
   lineUserId = `it-line-reply-${conversationId}`;
   const db = await getDb();
+  const p = pseudonymizeLineId(lineUserId);
+  await db.insert(lineUsers).values({
+    id: generateId(),
+    lineUserIdHash: p.hash,
+    lineUserIdEnc: p.enc,
+    lineUserIdHashV: p.v,
+  });
   await db.insert(chatConversations).values({
     id: conversationId,
-    lineUserId,
+    lineUserIdHash: p.hash,
     mode: 'human_active',
     assignedAdminId: mocks.currentUserId,
     unreadAdmin: 2,
@@ -81,6 +89,8 @@ afterAll(async () => {
   const db = await getDb();
   await db.delete(chatMessages).where(eq(chatMessages.conversationId, conversationId));
   await db.delete(chatConversations).where(eq(chatConversations.id, conversationId));
+  const { lookupHash } = await import('@/lib/line/identity');
+  await db.delete(lineUsers).where(eq(lineUsers.lineUserIdHash, lookupHash(lineUserId)));
   await closeDb();
 });
 

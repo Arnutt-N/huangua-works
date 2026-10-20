@@ -1,13 +1,14 @@
 import { and, eq, gt, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
-import { chatConversations, chatMessages } from '@/lib/db/schema';
+import { chatConversations, chatMessages, lineUsers } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import type { ConversationMode } from '../chat-modes';
 import { broadcast } from '../sse/broadcaster';
 import type { LineOutgoingMessage } from '../types';
 import { isHumanHandled } from './modes';
 import type { LineTransport } from './transport';
+import { resolveRawLineId } from '../identity';
 
 export type InboundMessageType = 'text' | 'image' | 'file' | 'video' | 'audio' | 'location' | 'sticker';
 
@@ -222,11 +223,30 @@ export async function sendAdminReply(
 ): Promise<SendAdminReplyResult> {
   const db = await getDb();
   const [conv] = await db
-    .select({ id: chatConversations.id, lineUserId: chatConversations.lineUserId })
+    .select({ id: chatConversations.id, lineUserIdHash: chatConversations.lineUserIdHash })
     .from(chatConversations)
     .where(eq(chatConversations.id, input.conversationId))
     .limit(1);
-  if (!conv) return { kind: 'not_found' };
+  if (!conv?.lineUserIdHash) return { kind: 'not_found' };
+
+  const lineUser = await firstOrUndefined(
+    db
+      .select({ id: lineUsers.id })
+      .from(lineUsers)
+      .where(eq(lineUsers.lineUserIdHash, conv.lineUserIdHash))
+      .limit(1),
+  );
+  const rawLineUserId = lineUser
+    ? await resolveRawLineId(db, lineUser.id)
+    : null;
+  if (!rawLineUserId) {
+    // § แยกสาเหตุ decrypt-null (แถว line_users หาย/key ผิด) ออกจาก push ล้ม — retry ไม่ช่วย
+    console.error('[sendAdminReply] resolve raw LINE id ไม่ได้', {
+      conversationId: input.conversationId,
+      hasLineUser: Boolean(lineUser),
+    });
+    return { kind: 'push_failed', messageId: '', pushStatus: 'failed' };
+  }
 
   // idempotency ตาม clientTempId — แถวที่มีอยู่แล้ว = retry: push ใหม่เฉพาะเมื่อครั้งก่อนพัง
   // (คง route เดิม: สำเร็จแล้วไม่ push ซ้ำ — ไม่งั้นประชาชนได้ข้อความเดิมสองรอบ)
@@ -246,7 +266,7 @@ export async function sendAdminReply(
         return { kind: 'duplicate', messageId: existing.id, pushStatus: 'sent' };
       }
       try {
-        await transport.push(conv.lineUserId, [{ type: 'text', text: input.text }]);
+        await transport.push(rawLineUserId, [{ type: 'text', text: input.text }]);
       } catch {
         return { kind: 'push_failed', messageId: existing.id, pushStatus: 'failed' };
       }
@@ -264,7 +284,7 @@ export async function sendAdminReply(
   const pending = await insertAdminMessage(db, conv, input, 'sending');
   if (pending.kind !== 'pending') return pending;
   try {
-    await transport.push(conv.lineUserId, [{ type: 'text', text: input.text }]);
+    await transport.push(rawLineUserId, [{ type: 'text', text: input.text }]);
   } catch {
     await markPushStatus(db, pending.messageId, 'failed');
     return { kind: 'push_failed', messageId: pending.messageId, pushStatus: 'failed' };
@@ -289,7 +309,7 @@ export async function sendAdminReply(
 
 interface ReplyConv {
   id: string;
-  lineUserId: string;
+  lineUserIdHash: string | null;
 }
 
 function getPushStatus(metadata: unknown): string | undefined {

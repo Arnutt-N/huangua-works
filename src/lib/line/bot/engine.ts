@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
+import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { redis } from '@/lib/upstash';
 import { lineUsers, chatConversations, chatMessages } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
@@ -9,7 +10,7 @@ import { matchFaq } from './faq-matcher';
 import { ingestLineMedia } from '../media-ingest';
 import { csatThankYou, parseCsatPostback, recordCsatResponse } from '../chat/csat';
 import { matchIntent } from './intent-matcher';
-import { pseudonymizeLineId } from '../identity';
+import { pseudonymizeLineId, findLineUserByRaw, lookupHash } from '../identity';
 import { parseResponseText } from './response-parser';
 import { startCaseFlow, processCaseFlow, handleConfirmPostback, type CaseFlowState } from './case-flow';
 import { isHandoffRequest, triggerHandoff } from './handoff';
@@ -65,22 +66,7 @@ export async function handleEvent(event: LineWebhookEvent, transport: LineTransp
 const PROFILE_RETRY_MS = 24 * 60 * 60 * 1000; // ลองดึงโปรไฟล์ที่พลาดซ้ำได้วันละครั้ง
 
 async function getOrCreateLineUser(db: Db, lineUserId: string, transport: LineTransport) {
-  const [existing] = await db
-    .select()
-    .from(lineUsers)
-    .where(eq(lineUsers.lineUserId, lineUserId))
-    .limit(1);
-
-  // § T5 expand dual-write — เติม pseudonym คู่ plaintext เฉพาะแถวที่ยังไม่มี
-  // read path ยังใช้ plaintext เดิม contract phase ถึงย้าย
-  const fillPseudonym = (): { lineUserIdHash: string; lineUserIdEnc: string; lineUserIdHashV: number } | {} => {
-    try {
-      const p = pseudonymizeLineId(lineUserId);
-      return { lineUserIdHash: p.hash, lineUserIdEnc: p.enc, lineUserIdHashV: p.v };
-    } catch {
-      return {};
-    }
-  };
+  const existing = await findLineUserByRaw(db, lineUserId);
 
   if (existing) {
     // backfill โปรไฟล์ให้ user เก่าที่ยังไม่มีชื่อ (best-effort — พังไม่ล้ม flow)
@@ -88,7 +74,7 @@ async function getOrCreateLineUser(db: Db, lineUserId: string, transport: LineTr
     const meta = (existing.metadata as { profileCheckedAt?: string } | null) ?? null;
     const lastCheck = meta?.profileCheckedAt ? Date.parse(meta.profileCheckedAt) : 0;
     const due = Date.now() - lastCheck > PROFILE_RETRY_MS;
-    if ((!existing.displayName && due) || !existing.lineUserIdHash) {
+    if (!existing.displayName && due) {
       const profile = await transport.getProfile(lineUserId).catch(() => null);
       await db
         .update(lineUsers)
@@ -96,7 +82,6 @@ async function getOrCreateLineUser(db: Db, lineUserId: string, transport: LineTr
           ...(profile
             ? { displayName: profile.displayName, pictureUrl: profile.pictureUrl ?? null }
             : {}),
-          ...(!existing.lineUserIdHash ? fillPseudonym() : {}),
           metadata: { ...(meta ?? {}), profileCheckedAt: new Date().toISOString() },
         })
         .where(eq(lineUsers.id, existing.id));
@@ -106,29 +91,47 @@ async function getOrCreateLineUser(db: Db, lineUserId: string, transport: LineTr
 
   const id = generateId();
   const profile = await transport.getProfile(lineUserId).catch(() => null);
-  await db.insert(lineUsers).values({
+  const p = pseudonymizeLineId(lineUserId);
+  // § webhook race (follow+message, LINE retry) ชน unique hash ได้ — ON CONFLICT แล้วอ่านแถวผู้ชนะ
+  // แพทเทิร์นเดียวกับ linkLineRow ใน citizen-access/identity.ts
+  const inserted = await db.insert(lineUsers).values({
     id,
-    lineUserId,
+    lineUserIdHash: p.hash,
+    lineUserIdEnc: p.enc,
+    lineUserIdHashV: p.v,
     displayName: profile?.displayName ?? null,
     pictureUrl: profile?.pictureUrl ?? null,
-    ...fillPseudonym(),
     metadata: { profileCheckedAt: new Date().toISOString() },
-  });
-  return { id, lineUserId, botState: null };
+  })
+    .onConflictDoNothing({ target: lineUsers.lineUserIdHash })
+    .returning({ id: lineUsers.id });
+  const winnerId = inserted[0]?.id ?? (await findLineUserByRaw(db, lineUserId))?.id ?? id;
+  const [winner] = await db.select().from(lineUsers).where(eq(lineUsers.id, winnerId)).limit(1);
+  return { id: winnerId, botState: winner?.botState ?? null };
 }
 
 async function getOrCreateConversation(db: Db, lineUserId: string) {
-  const [existing] = await db
+  const hash = lookupHash(lineUserId);
+  const [found] = await db
     .select()
     .from(chatConversations)
-    .where(eq(chatConversations.lineUserId, lineUserId))
+    .where(eq(chatConversations.lineUserIdHash, hash))
     .limit(1);
-
-  if (existing) return existing;
+  if (found) {
+    return found;
+  }
 
   const id = generateId();
-  await db.insert(chatConversations).values({ id, lineUserId });
-  return { id, lineUserId, mode: 'bot_active' as const };
+  // § race เดียวกับ getOrCreateLineUser — ON CONFLICT แล้วอ่านแถวผู้ชนะ
+  const inserted = await db.insert(chatConversations).values({ id, lineUserIdHash: hash, })
+    .onConflictDoNothing({ target: chatConversations.lineUserIdHash })
+    .returning({ id: chatConversations.id });
+  const winnerId = inserted[0]?.id ?? (await firstOrUndefined(
+    db.select({ id: chatConversations.id }).from(chatConversations)
+      .where(eq(chatConversations.lineUserIdHash, hash)).limit(1),
+  ))?.id ?? id;
+  const [winner] = await db.select().from(chatConversations).where(eq(chatConversations.id, winnerId)).limit(1);
+  return winner ?? { id: winnerId, mode: 'bot_active' as const };
 }
 
 const REPAIR_AGE_MS = 90_000;
@@ -434,11 +437,7 @@ async function handlePostbackEvent(db: Db, event: LinePostbackEvent, conversatio
   const confirmData = parseConfirmPostback(event.postback.data);
   if (!confirmData) return;
 
-  const [lineUser] = await db
-    .select()
-    .from(lineUsers)
-    .where(eq(lineUsers.lineUserId, event.source.userId))
-    .limit(1);
+  const lineUser = await findLineUserByRaw(db, event.source.userId);
   const botState = (lineUser?.botState as CaseFlowState | null) ?? null;
   // § นอก confirm step (เช่น กดปุ่มซ้ำหลังส่งเรื่องแล้ว) คืน null → คง log-only ไม่ตอบซ้ำ
   const result = await handleConfirmPostback(confirmData, botState, event.source.userId);

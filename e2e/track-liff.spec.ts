@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { closeDb, getDb } from '../src/lib/db';
 import { cases, categories, consentRecords, lineUsers, users } from '../src/lib/db/schema';
 import { generateId } from '../src/lib/id';
+import { pseudonymizeLineId } from '../src/lib/line/identity';
 import { E2E_CLIENT_IP, resetRateLimits } from './helpers/reset-rate-limits';
 import { rateLimitKey } from '../src/lib/rate-limit/policies';
 
@@ -36,9 +37,12 @@ test.beforeAll(async () => {
   });
 
   testLineUserId = generateId();
+  const tp = pseudonymizeLineId(MOCK_LINE_USER);
   await db.insert(lineUsers).values({
     id: testLineUserId,
-    lineUserId: MOCK_LINE_USER,
+    lineUserIdHash: tp.hash,
+    lineUserIdEnc: tp.enc,
+    lineUserIdHashV: tp.v,
     displayName: 'ผู้ใช้ LINE ทดสอบ Track',
     linkedUserId: testUserId,
   });

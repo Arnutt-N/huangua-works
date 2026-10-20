@@ -1,6 +1,8 @@
 import { and, eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
-import { chatConversations, chatCsatResponses } from '@/lib/db/schema';
+import { firstOrUndefined } from '@/lib/db/query-helpers';
+import { chatConversations, chatCsatResponses, lineUsers } from '@/lib/db/schema';
+import { resolveRawLineId } from '../identity';
 import { generateId } from '@/lib/id';
 import type { LineOutgoingMessage } from '../types';
 import { recordBotReplies } from '../conversation/message-service';
@@ -138,10 +140,19 @@ export function csatThankYou(score: number): string {
  */
 export async function lineUserIdOfConversation(conversationId: string): Promise<string | null> {
   const db = await getDb();
-  const [row] = await db
-    .select({ lineUserId: chatConversations.lineUserId })
+  const [conv] = await db
+    .select({ lineUserIdHash: chatConversations.lineUserIdHash })
     .from(chatConversations)
     .where(and(eq(chatConversations.id, conversationId)))
     .limit(1);
-  return row?.lineUserId ?? null;
+  if (!conv?.lineUserIdHash) return null;
+  const user = await firstOrUndefined(
+    db
+      .select({ id: lineUsers.id })
+      .from(lineUsers)
+      .where(eq(lineUsers.lineUserIdHash, conv.lineUserIdHash))
+      .limit(1),
+  );
+  if (!user) return null;
+  return resolveRawLineId(db, user.id);
 }

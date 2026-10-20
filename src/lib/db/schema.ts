@@ -590,14 +590,11 @@ export const lineUsers = pgTable(
     createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
 
-    lineUserId: text('line_user_id').notNull().unique(),
     displayName: text('display_name'),
     pictureUrl: text('picture_url'),
 
-    // § T5 expand — pseudonym ของ LINE id (hash ใช้ lookup, enc ถอดกลับตอนส่งออก)
-    // contract phase ถึงจะย้าย read path มาใช้คอลัมน์นี้ ตอนนี้ dual-write อย่างเดียว
-    lineUserIdHash: text('line_user_id_hash'),
-    lineUserIdEnc: text('line_user_id_enc'),
+    lineUserIdHash: text('line_user_id_hash').notNull(),
+    lineUserIdEnc: text('line_user_id_enc').notNull(),
     lineUserIdHashV: integer('line_user_id_hash_v').notNull().default(1),
 
     linkedUserId: text('linked_user_id'),
@@ -606,10 +603,7 @@ export const lineUsers = pgTable(
     metadata: jsonb('metadata'),
   },
   (table) => ({
-    lineUserIdIdx: uniqueIndex('line_users_line_user_id_idx').on(table.lineUserId),
-    lineUserIdHashIdx: uniqueIndex('line_users_line_user_id_hash_idx')
-      .on(table.lineUserIdHash)
-      .where(sql`line_user_id_hash IS NOT NULL`),
+    lineUserIdHashIdx: uniqueIndex('line_users_line_user_id_hash_idx').on(table.lineUserIdHash),
     linkedUserIdx: index('line_users_linked_user_id_idx').on(table.linkedUserId),
   })
 );
@@ -641,7 +635,7 @@ export const chatConversations = pgTable(
     createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
 
-    lineUserId: text('line_user_id').notNull().unique(),
+    lineUserIdHash: text('line_user_id_hash').notNull(),
     mode: conversationModeEnum().notNull().default('bot_active'),
 
     assignedAdminId: text('assigned_admin_id'),
@@ -660,7 +654,7 @@ export const chatConversations = pgTable(
     metadata: jsonb('metadata'),
   },
   (table) => ({
-    lineUserIdIdx: uniqueIndex('chat_conversations_line_user_id_idx').on(table.lineUserId),
+    lineUserIdHashIdx: uniqueIndex('chat_conversations_line_user_id_hash_idx').on(table.lineUserIdHash),
     modeIdx: index('chat_conversations_mode_idx').on(table.mode),
     assignedAdminIdx: index('chat_conversations_assigned_admin_id_idx').on(table.assignedAdminId),
     lastMessageAtIdx: index('chat_conversations_last_message_at_idx').on(table.lastMessageAt),

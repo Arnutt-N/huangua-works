@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { ExternalLink, UserRound, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { formatRelativeTime, maskLineUserId } from '../_lib/format';
+import { formatRelativeTime } from '../_lib/format';
 import { FALLBACK_BADGE, MODE_BADGE, MODE_LABELS } from '../_lib/labels';
 import type { Conversation, ConversationDetail, StaffMember } from '../_lib/types';
 import { useNoteAutosave } from '../_hooks/use-note-autosave';
@@ -73,7 +73,7 @@ export function CustomerPanel({
         <div>
           <p className="text-sm font-bold text-ink">{name}</p>
           <p className="text-[11px] text-muted" title="LINE user id (ปิดบังบางส่วน)">
-            {maskLineUserId(conversation.lineUserId)}
+            {conversation.lineUserId ?? '—'}
           </p>
         </div>
         <span

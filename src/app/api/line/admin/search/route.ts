@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { desc, eq, ilike } from 'drizzle-orm';
+import { desc, eq, ilike, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { chatMessages, chatConversations, lineUsers } from '@/lib/db/schema';
 import { requireStaffApi } from '@/lib/auth/require-staff';
@@ -36,11 +36,11 @@ export async function GET(request: Request) {
       sender: chatMessages.sender,
       createdAt: chatMessages.createdAt,
       displayName: lineUsers.displayName,
-      lineUserId: chatConversations.lineUserId,
+      lineUserId: sql<string | null>`left(${lineUsers.lineUserIdEnc}, 8)`,
     })
     .from(chatMessages)
     .innerJoin(chatConversations, eq(chatMessages.conversationId, chatConversations.id))
-    .leftJoin(lineUsers, eq(chatConversations.lineUserId, lineUsers.lineUserId))
+    .leftJoin(lineUsers, eq(chatConversations.lineUserIdHash, lineUsers.lineUserIdHash))
     .where(ilike(chatMessages.textContent, `%${escapeLike(validation.data.q)}%`))
     .orderBy(desc(chatMessages.id))
     .limit(20);

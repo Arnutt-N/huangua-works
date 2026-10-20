@@ -1,8 +1,9 @@
 import { asc, eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { closeDb, getDb } from '@/lib/db';
-import { chatConversations, chatMessages } from '@/lib/db/schema';
+import { chatConversations, chatMessages, lineUsers } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
+import { pseudonymizeLineId } from '@/lib/line/identity';
 import type { ConversationMode } from '../chat-modes';
 
 vi.mock('../sse/broadcaster', () => ({ broadcast: vi.fn() }));
@@ -13,10 +14,26 @@ import { createRecordingTransport } from './recording-transport';
 
 const created: string[] = [];
 
+async function createLineUser(rawLineUserId: string): Promise<string> {
+  const db = await getDb();
+  const p = pseudonymizeLineId(rawLineUserId);
+  const id = generateId();
+  await db.insert(lineUsers).values({
+    id,
+    lineUserIdHash: p.hash,
+    lineUserIdEnc: p.enc,
+    lineUserIdHashV: p.v,
+  });
+  created.push(id);
+  return id;
+}
+
 async function createConv(mode: ConversationMode, unreadAdmin = 0): Promise<string> {
   const db = await getDb();
   const id = generateId();
-  await db.insert(chatConversations).values({ id, lineUserId: `it-msg-${id}`, mode, unreadAdmin });
+  const rawLineUserId = `it-msg-${id}`;
+  await createLineUser(rawLineUserId);
+  await db.insert(chatConversations).values({ id, lineUserIdHash: pseudonymizeLineId(rawLineUserId).hash, mode, unreadAdmin });
   created.push(id);
   return id;
 }
@@ -46,6 +63,7 @@ afterAll(async () => {
   if (created.length > 0) {
     await db.delete(chatMessages).where(inArray(chatMessages.conversationId, created));
     await db.delete(chatConversations).where(inArray(chatConversations.id, created));
+    await db.delete(lineUsers).where(inArray(lineUsers.id, created));
   }
   await closeDb();
 });

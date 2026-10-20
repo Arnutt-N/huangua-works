@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { closeDb, getDb } from '@/lib/db';
 import { chatConversations, chatMessages, users } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
+import { pseudonymizeLineId } from '@/lib/line/identity';
 
 const mocks = vi.hoisted(() => ({ currentUserId: '' }));
 
@@ -75,7 +76,7 @@ beforeAll(async () => {
   conversationId = generateId();
   await db.insert(chatConversations).values({
     id: conversationId,
-    lineUserId: `it-line-${conversationId}`,
+    lineUserIdHash: pseudonymizeLineId(`it-line-${conversationId}`).hash,
     mode: 'bot_active',
   });
 

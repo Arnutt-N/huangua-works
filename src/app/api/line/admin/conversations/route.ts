@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import {
   chatAdminPrefs,
@@ -33,12 +33,13 @@ export async function GET() {
       linkedCaseId: chatConversations.linkedCaseId,
       displayName: lineUsers.displayName,
       pictureUrl: lineUsers.pictureUrl,
-      lineUserId: chatConversations.lineUserId,
+      // masked 8 ตัวแรกพอระบุตัวใน UI ไม่เผยทั้งเส้น
+      lineUserId: sql<string | null>`left(${lineUsers.lineUserIdEnc}, 8)`,
       pinned: chatAdminPrefs.pinned,
       muted: chatAdminPrefs.muted,
     })
     .from(chatConversations)
-    .leftJoin(lineUsers, eq(chatConversations.lineUserId, lineUsers.lineUserId))
+    .leftJoin(lineUsers, eq(chatConversations.lineUserIdHash, lineUsers.lineUserIdHash))
     .leftJoin(users, eq(chatConversations.assignedAdminId, users.id))
     .leftJoin(
       chatAdminPrefs,

@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { closeDb, getDb } from '@/lib/db';
 import { cases, categories, consentRecords, dedupHashes, lineUsers, users } from '@/lib/db/schema';
 import { generateCidHash } from '@/lib/cid-hmac';
+import { lookupHash } from '@/lib/line/identity';
 import { POST } from './route';
 
 /**
@@ -64,7 +65,7 @@ afterAll(async () => {
     if (lineOwners.length > 0) {
       await db.delete(consentRecords).where(inArray(consentRecords.userId, lineOwners.map((u) => u.id)));
     }
-    await db.delete(lineUsers).where(inArray(lineUsers.lineUserId, createdLineUserIds));
+    await db.delete(lineUsers).where(inArray(lineUsers.lineUserIdHash, createdLineUserIds.map(lookupHash)));
     await db.delete(users).where(like(users.email, 'line-U-dedup-%@placeholder.local'));
   }
   // § ล้าง consent records ของ users ที่ทดสอบสร้างขึ้น (ใช้ email LIKE prefix)
