@@ -148,14 +148,24 @@ describe('ChatHistoriesClient อ่านอย่างเดียว', () =>
 
 describe('ChatHistoryDetail อ่านอย่างเดียว', () => {
   function mockDetail(
-    convs: Conversation[] = [conversation()],
+    conv: {
+      id?: string;
+      mode?: string;
+      displayName?: string | null;
+      pictureUrl?: string | null;
+      lineUserId?: string | null;
+      lastMessageAt?: string | null;
+    } = {},
     msgs: Message[] = [message(), message({ id: 'm2', sender: 'admin', textContent: 'รับเรื่องแล้วครับ' })],
   ) {
     fetchConversationPage.mockResolvedValue({
       conversation: {
-        id: 'conv-1',
-        mode: 'resolved',
-        lineUserId: null,
+        id: conv.id ?? 'conv-1',
+        mode: conv.mode ?? 'resolved',
+        lineUserId: conv.lineUserId ?? 'a1b2c3d4',
+        displayName: conv.displayName ?? 'สมชาย',
+        pictureUrl: conv.pictureUrl ?? null,
+        lastMessageAt: conv.lastMessageAt ?? '2026-10-19T10:00:00.000Z',
         assignedAdminId: null,
         linkedCaseId: null,
         adminNote: null,
@@ -167,7 +177,8 @@ describe('ChatHistoryDetail อ่านอย่างเดียว', () => {
       messages: msgs,
       hasMore: false,
     });
-    fetchConversations.mockResolvedValue(convs);
+    // § ไม่ใช้ลิสต์ทั้งห้องเรนเดอร์ header แถวเดียว — detail payload ต้องมี header ครบ
+    fetchConversations.mockResolvedValue(null);
   }
 
   it('ข้อความเรียงเก่าไปใหม่ ไม่มีช่องส่ง', async () => {
@@ -189,17 +200,37 @@ describe('ChatHistoryDetail อ่านอย่างเดียว', () => {
     render(<ChatHistoryDetail conversationId="conv-1" />);
 
     await screen.findByText('รับเรื่องแล้วครับ');
+    expect(screen.getAllByText('สมชาย').length).toBeGreaterThan(0);
     expect(screen.getByText('ปิดเรื่อง')).toBeInTheDocument();
     expect(screen.getByText('a1b2c3d4')).toBeInTheDocument();
+    expect(fetchConversations).not.toHaveBeenCalled();
     expect(bodyText()).not.toContain(RAW_LINE_ID);
     expect(bodyText()).not.toMatch(/\bresolved\b/);
   });
 
+  it('หัวห้องใช้ displayName/pictureUrl/masked id จาก detail payload', async () => {
+    mockDetail({
+      displayName: 'สมหญิง',
+      pictureUrl: 'https://example.test/pic.jpg',
+      lineUserId: 'z9y8x7w6',
+    });
+    render(<ChatHistoryDetail conversationId="conv-1" />);
+
+    await screen.findByText('รับเรื่องแล้วครับ');
+    expect(screen.getAllByText('สมหญิง').length).toBeGreaterThan(0);
+    expect(screen.getByText('z9y8x7w6')).toBeInTheDocument();
+    const payload = await fetchConversationPage.mock.results[0]?.value;
+    expect(payload.conversation.displayName).toBe('สมหญิง');
+    expect(payload.conversation.pictureUrl).toBe('https://example.test/pic.jpg');
+    expect(payload.conversation.lineUserId).toBe('z9y8x7w6');
+    expect(JSON.stringify(payload)).not.toContain(RAW_LINE_ID);
+  });
+
   it('โหลดไม่สำเร็จแสดงข้อความไทย ไม่ใช่หน้าว่าง', async () => {
     fetchConversationPage.mockResolvedValue(null);
-    fetchConversations.mockResolvedValue([]);
     render(<ChatHistoryDetail conversationId="conv-404" />);
     expect(await screen.findByRole('status')).toHaveTextContent('โหลดข้อมูลไม่สำเร็จ');
+    expect(fetchConversations).not.toHaveBeenCalled();
   });
 });
 
