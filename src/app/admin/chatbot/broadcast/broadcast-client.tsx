@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import type { BroadcastItem } from '@/app/admin/_lib/admin-api';
 import { adminApi } from '@/app/admin/_lib/admin-api';
 import { useResource } from '@/app/admin/_lib/use-resource';
@@ -110,7 +111,19 @@ export function BroadcastClient() {
       <AdminCard>
         <AdminCardTitle
           icon={<Send className="h-4 w-4" />}
-          action={<Button onClick={openDialog} className="min-h-touch gap-1.5"><Plus className="h-4 w-4" /> สร้างประกาศ</Button>}
+          action={
+            <span className="flex gap-2">
+              <Link
+                href="/admin/chatbot/broadcast/new"
+                className="inline-flex min-h-touch items-center gap-1.5 rounded-md bg-accent-strong px-4 text-sm font-semibold text-on-accent"
+              >
+                <Plus className="h-4 w-4" /> ตัวช่วยสร้าง
+              </Link>
+              <Button onClick={openDialog} variant="outline" className="min-h-touch gap-1.5">
+                <Plus className="h-4 w-4" /> ด่วน
+              </Button>
+            </span>
+          }
         >
           ประวัติ Broadcast
         </AdminCardTitle>
