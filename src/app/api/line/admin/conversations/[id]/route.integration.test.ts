@@ -172,6 +172,7 @@ describe('GET /api/line/admin/conversations/[id] — cursor paging', () => {
     expect(body.conversation.lastMessageAt).not.toBeNull();
     expect(typeof body.conversation.lineUserId).toBe('string');
     expect(body.conversation.lineUserId).toHaveLength(8);
+    expect(body.conversation.lineUserIdHash).toBeUndefined();
     const payload = JSON.stringify(body);
     expect(payload).not.toMatch(/U[0-9a-f]{32}/);
   });
