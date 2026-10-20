@@ -23,17 +23,30 @@ const RAW_USER = 'U_it_friends_assign_raw';
 let userPk = '';
 let syncedMenuId = '';
 let draftMenuId = '';
+let inactiveMenuId = '';
 
 const lineCalls: { method: string; url: string }[] = [];
 
-function stubLineOk() {
+/**
+ * § stub แยก LINE API ออกจาก infra — withLineCircuit ยิง redis.get ผ่าน global fetch
+ * เหมือนกัน จึงนับเฉพาะ api.line.me เป็น LINE call (กัน circuit call ปนมาใน assertion)
+ */
+function stubLineWith(status: number, body: string | null) {
   vi.stubGlobal(
     'fetch',
-    vi.fn(async (url: string, init?: { method?: string }) => {
-      lineCalls.push({ method: init?.method ?? 'GET', url });
-      return new Response(null, { status: 200 });
+    vi.fn(async (url: string | URL | Request, init?: { method?: string }) => {
+      const href = typeof url === 'string' ? url : url.toString();
+      if (!href.includes('api.line.me')) {
+        return new Response('null', { status: 200 });
+      }
+      lineCalls.push({ method: init?.method ?? 'GET', url: href });
+      return new Response(body, { status });
     }),
   );
+}
+
+function stubLineOk() {
+  stubLineWith(200, null);
 }
 
 function req(id: string, method: string, body?: unknown): Request {
@@ -52,7 +65,7 @@ beforeEach(async () => {
   lineCalls.length = 0;
 
   const db = await getDb();
-  // § กวาด orphan จากรันที่ crash ก่อน seed ใหม่ (displayName/menu prefix ของไฟล์นี้เท่านั้น)
+  // § กันแถวค้างจากรันที่ crash (prefix ของไฟล์นี้เท่านั้น)
   const orphanUsers = await db
     .select({ id: lineUsers.id })
     .from(lineUsers)
@@ -91,6 +104,17 @@ beforeEach(async () => {
     chatBarText: 'เมนู',
     config: { size: { width: 2500, height: 1686 } } as never,
   });
+
+  inactiveMenuId = generateId();
+  await db.insert(richMenus).values({
+    id: inactiveMenuId,
+    name: 'it-fr-menu-inactive',
+    chatBarText: 'เมนู',
+    config: { size: { width: 2500, height: 1686 } } as never,
+    lineRichMenuId: 'line-it-fr-inactive',
+    status: 'inactive',
+    syncStatus: 'synced',
+  });
 });
 
 afterEach(async () => {
@@ -101,8 +125,8 @@ afterEach(async () => {
   await db.delete(lineUsers).where(eq(lineUsers.id, userPk));
   await db
     .delete(richMenus)
-    .where(inArray(richMenus.id, [syncedMenuId, draftMenuId].filter(Boolean)));
-  userPk = syncedMenuId = draftMenuId = '';
+    .where(inArray(richMenus.id, [syncedMenuId, draftMenuId, inactiveMenuId].filter(Boolean)));
+  userPk = syncedMenuId = draftMenuId = inactiveMenuId = '';
 });
 
 afterAll(async () => {
@@ -118,7 +142,7 @@ describe('POST /api/line/admin/friends/[id]/rich-menu', () => {
     expect(body.richMenuId).toBe(syncedMenuId);
     expect(body.richMenuName).toBe('it-fr-menu-synced');
 
-    // § mask audit ฝั่ง assign ด้วย — raw id ห้ามหลุดทั้ง request/response
+    // § mask audit ฝั่ง assign (T5)
     expect(JSON.stringify(body)).not.toContain(RAW_USER);
 
     expect(lineCalls).toHaveLength(1);
@@ -134,6 +158,21 @@ describe('POST /api/line/admin/friends/[id]/rich-menu', () => {
     const res = await POST(req(userPk, 'POST', { richMenuId: draftMenuId }), params(userPk));
     expect(res.status).toBe(422);
     expect(lineCalls).toHaveLength(0);
+  });
+
+  test('เมนูถูกปิดใช้งาน → 422 และไม่ยิง LINE', async () => {
+    const res = await POST(req(userPk, 'POST', { richMenuId: inactiveMenuId }), params(userPk));
+    expect(res.status).toBe(422);
+    expect(lineCalls).toHaveLength(0);
+  });
+
+  test('LINE ล้ม → ข้อความไทย ไม่ leak raw detail', async () => {
+    stubLineWith(500, '{"message":"error"}');
+    const res = await POST(req(userPk, 'POST', { richMenuId: syncedMenuId }), params(userPk));
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body.error).not.toContain('message');
+    expect(JSON.stringify(body)).not.toContain(RAW_USER);
   });
 
   test('body ไม่มี richMenuId → 400', async () => {
@@ -189,5 +228,20 @@ describe('DELETE /api/line/admin/friends/[id]/rich-menu', () => {
     const res = await DELETE(req(userPk, 'DELETE'), params(userPk));
     expect(res.status).toBe(404);
     expect(lineCalls).toHaveLength(0);
+  });
+
+  test('LINE ตอบ 404 (link หายฝั่ง LINE) → 200 + ล้าง metadata ต่อ ไม่ค้าง', async () => {
+    const db = await getDb();
+    await db
+      .update(lineUsers)
+      .set({ metadata: { richMenuId: syncedMenuId } })
+      .where(eq(lineUsers.id, userPk));
+    stubLineWith(404, '{"message":"Not found"}');
+
+    const res = await DELETE(req(userPk, 'DELETE'), params(userPk));
+    expect(res.status).toBe(200);
+
+    const [row] = await db.select().from(lineUsers).where(eq(lineUsers.id, userPk)).limit(1);
+    expect((row!.metadata as { richMenuId?: string }).richMenuId).toBeUndefined();
   });
 });

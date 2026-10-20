@@ -2,16 +2,12 @@ import { NextResponse } from 'next/server';
 import { desc, eq, ilike, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { chatMessages, chatConversations, lineUsers } from '@/lib/db/schema';
+import { escapeLike } from '@/lib/db/like';
 import { requireStaffApi } from '@/lib/auth/require-staff';
 import { STAFF_ROLES } from '@/lib/auth/roles';
 import { chatSearchQuerySchema, validateOrError } from '@/lib/validation';
 
 export const runtime = 'nodejs';
-
-/** escape LIKE metacharacters — กัน q ที่มี % / _ / \ ทำ pattern เพี้ยน */
-function escapeLike(value: string): string {
-  return value.replace(/[\\%_]/g, (c) => `\\${c}`);
-}
 
 export async function GET(request: Request) {
   const authz = await requireStaffApi(STAFF_ROLES);

@@ -20,9 +20,36 @@ export async function recordFriendEvent(
 }
 
 /**
- * § refollow นิยามแบบ derive — จำนวนครั้งที่ผู้ใช้กลับมา follow หลังเคย unfollow มาก่อน
- * (follow แรกไม่นับ, follow ที่สองขึ้นไปที่ตามหลัง unfollow อย่างน้อยหนึ่งครั้งนับ)
+ * § pure kernel นับ follow/refollow จาก events — getRefollowCount/getFollowCount กับหน้า friends
+ * ใช้ตัวเดียวกันนิยามจะได้ไม่ drift ไปคนละทางเมื่อเจอ edge case ใหม่
+ * รับ events เรียงเก่า→ใหม่; follow แรกไม่นับ refollow ที่ตามหลัง unfollow นับ
  */
+export interface FollowEventLike {
+  event: string;
+  createdAt: Date;
+}
+
+export function countFollowStats(eventsOldestFirst: FollowEventLike[]): {
+  followCount: number;
+  refollowCount: number;
+  lastFollowAt: Date | null;
+} {
+  let followCount = 0;
+  let refollowCount = 0;
+  let seenUnfollow = false;
+  let lastFollowAt: Date | null = null;
+  for (const e of eventsOldestFirst) {
+    if (e.event === 'unfollow') {
+      seenUnfollow = true;
+    } else {
+      followCount++;
+      if (seenUnfollow) refollowCount++;
+      lastFollowAt = e.createdAt;
+    }
+  }
+  return { followCount, refollowCount, lastFollowAt };
+}
+
 export async function getRefollowCount(
   db: Awaited<ReturnType<typeof getDb>>,
   lineUserPk: string,
@@ -32,13 +59,7 @@ export async function getRefollowCount(
     .from(lineFriendEvents)
     .where(eq(lineFriendEvents.lineUserId, lineUserPk))
     .orderBy(lineFriendEvents.createdAt);
-  let seenUnfollow = false;
-  let refollows = 0;
-  for (const row of rows) {
-    if (row.event === 'unfollow') seenUnfollow = true;
-    else if (seenUnfollow) refollows++;
-  }
-  return refollows;
+  return countFollowStats(rows).refollowCount;
 }
 
 /** จำนวน follow ทั้งหมดของผู้ใช้ — ใช้แทน placeholder {follow_count} ในข้อความต้อนรับ */

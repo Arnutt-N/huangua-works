@@ -89,6 +89,25 @@ export interface RichMenuInput {
   displayEndAt?: string;
 }
 
+export interface FriendItem {
+  id: string;
+  maskedId: string | null;
+  displayName: string | null;
+  pictureUrl: string | null;
+  followState: 'following' | 'unfollowed';
+  followCount: number;
+  refollowCount: number;
+  lastActiveAt: string | null;
+  richMenuId: string | null;
+  richMenuName: string | null;
+}
+
+export interface FriendsPage extends ListOf<FriendItem> {
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 export interface RichMenuAliasItem {
   aliasId: string;
   richMenuId: string;
@@ -271,6 +290,14 @@ export const adminApi = {
     form.append('file', file);
     return request<OkBody>(`/api/line/admin/rich-menus/${id}/upload`, { method: 'POST', body: form });
   },
+
+  // ── Friends ──
+  listFriends: (query: string): Promise<ApiResult<FriendsPage>> =>
+    request<FriendsPage>(`/api/line/admin/friends?${query}`),
+  assignUserRichMenu: (friendId: string, richMenuId: string): Promise<ApiResult<OkBody>> =>
+    request<OkBody>(`/api/line/admin/friends/${friendId}/rich-menu`, withBody('POST', { richMenuId })),
+  unassignUserRichMenu: (friendId: string): Promise<ApiResult<OkBody>> =>
+    request<OkBody>(`/api/line/admin/friends/${friendId}/rich-menu`, { method: 'DELETE' }),
 
   // ── Broadcasts ──
   listBroadcasts: (): Promise<ApiResult<ListOf<BroadcastItem>>> =>
