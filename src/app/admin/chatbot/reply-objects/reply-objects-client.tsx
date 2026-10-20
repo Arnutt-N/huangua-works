@@ -25,6 +25,7 @@ interface FormState {
 }
 
 import { validateReplyPayload, REPLY_OBJECT_TYPES } from '@/lib/line/reply-object-validation';
+import { hasQuickReply, payloadSummary, typeBadgeClass } from './reply-preview';
 
 const EMPTY_FORM: FormState = { objectId: '', objectType: 'text', payloadJson: '{}', altText: '', isActive: true };
 
@@ -130,44 +131,48 @@ export function ReplyObjectsClient() {
         ) : items.length === 0 ? (
           <div className="py-12 text-center text-muted">ยังไม่มี reply object — กด &quot;สร้าง&quot; เพื่อเริ่ม</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-border text-xs uppercase text-muted">
-                  <th className="px-3 py-2 font-medium">Object ID</th>
-                  <th className="px-3 py-2 font-medium">ประเภท</th>
-                  <th className="px-3 py-2 font-medium">Alt Text</th>
-                  <th className="px-3 py-2 text-center font-medium">สถานะ</th>
-                  <th className="px-3 py-2 text-right font-medium">จัดการ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item) => (
-                  <tr key={item.id} className="border-b border-border/50 hover:bg-accent/5">
-                    <td className="px-3 py-3 font-mono text-accent-strong">${item.objectId}</td>
-                    <td className="px-3 py-3">
-                      <span className="rounded bg-accent-sunken px-1.5 py-0.5 text-xs text-accent-strong">{item.objectType}</span>
-                    </td>
-                    <td className="max-w-[200px] truncate px-3 py-3 text-muted">{item.altText ?? '—'}</td>
-                    <td className="px-3 py-3 text-center">
-                      <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${item.isActive ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}>
-                        {item.isActive ? 'ใช้งาน' : 'ปิด'}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3">
-                      <div className="flex justify-end gap-1">
-                        <button onClick={() => openEdit(item)} className="min-h-touch min-w-touch flex items-center justify-center rounded-md hover:bg-accent/10" aria-label={`แก้ไข ${item.objectId}`}>
-                          <Pencil className="h-4 w-4 text-muted" />
-                        </button>
-                        <button onClick={() => handleDelete(item)} className="min-h-touch min-w-touch flex items-center justify-center rounded-md hover:bg-danger/10" aria-label={`ลบ ${item.objectId}`}>
-                          <Trash2 className="h-4 w-4 text-danger" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {items.map((item) => (
+              <div
+                key={item.id}
+                className="flex flex-col gap-2 rounded-lg border border-border/50 p-4 hover:bg-accent/5"
+              >
+                <p className="font-mono text-sm font-bold text-accent-strong">
+                  $${item.objectId}
+                </p>
+                <p className="line-clamp-2 min-h-10 text-sm font-medium text-ink">
+                  {payloadSummary(item.objectType, item.payload)}
+                </p>
+                <p className="flex flex-wrap items-center gap-1.5">
+                  <span
+                    className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${typeBadgeClass(item.objectType)}`}
+                  >
+                    {item.objectType}
+                  </span>
+                  {hasQuickReply(item.payload) && (
+                    <span className="rounded bg-accent-gold-soft px-1.5 py-0.5 text-[10px] font-bold text-warning-ink">
+                      quick reply
+                    </span>
+                  )}
+                  <span
+                    className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${item.isActive ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}
+                  >
+                    {item.isActive ? 'ใช้งาน' : 'ปิด'}
+                  </span>
+                </p>
+                {item.altText && (
+                  <p className="line-clamp-1 text-xs text-muted">{item.altText}</p>
+                )}
+                <div className="mt-auto flex justify-end gap-1 pt-1">
+                  <button onClick={() => openEdit(item)} className="min-h-touch min-w-touch flex items-center justify-center rounded-md hover:bg-accent/10" aria-label={`แก้ไข ${item.objectId}`}>
+                    <Pencil className="h-4 w-4 text-muted" />
+                  </button>
+                  <button onClick={() => handleDelete(item)} className="min-h-touch min-w-touch flex items-center justify-center rounded-md hover:bg-danger/10" aria-label={`ลบ ${item.objectId}`}>
+                    <Trash2 className="h-4 w-4 text-danger" />
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </AdminCard>
