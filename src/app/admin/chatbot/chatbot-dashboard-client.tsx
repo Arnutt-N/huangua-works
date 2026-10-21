@@ -16,7 +16,13 @@ interface ReadinessIntent {
 }
 
 async function listIntentsForReadiness(): Promise<ApiResult<ListOf<ReadinessIntent>>> {
-  const res = await fetch('/api/line/admin/intents');
+  // § fetch อยู่ขอบระบบ: network ล้มต้องคืน ApiFail เอง — useResource ไม่มี try/catch ข้างใน
+  let res: Response;
+  try {
+    res = await fetch('/api/line/admin/intents');
+  } catch {
+    return { ok: false, error: 'เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ', status: 0 };
+  }
   const body: unknown = await res.json().catch(() => null);
   if (!res.ok) {
     const envelope = (body as { error?: unknown } | null)?.error;
@@ -43,13 +49,18 @@ function KpiCard({ icon, label, value, sub }: { icon: React.ReactNode; label: st
 }
 
 export function ChatbotDashboardClient() {
-  const { data: stats, loading, feedback } = useResource({
+  const { data: stats, loading: statsLoading, feedback } = useResource({
     load: adminApi.getChatbotStats,
   });
-  const intentsRes = useResource({ load: listIntentsForReadiness });
-  const intents: ReadinessIntent[] = intentsRes.data?.items ?? [];
+  const { data: intentsData, loading: intentsLoading, feedback: intentsFeedback } = useResource({
+    load: listIntentsForReadiness,
+  });
+  const intents: ReadinessIntent[] = intentsData?.items ?? [];
+  // § feedback ของ intents แยกจาก stats: intents ล้มต้องไม่เหมารวมกับ stats และไม่หลอกว่าไม่มีหมวด
+  const intentsError = intentsFeedback?.type === 'error' ? intentsFeedback.msg : null;
 
-  if (loading) return <div className="py-12 text-center text-muted">กำลังโหลด...</div>;
+  // § รวม loading ทั้งสองแหล่ง — กัน flash false-empty ตอน stats เสร็จก่อน intents
+  if (statsLoading || intentsLoading) return <div className="py-12 text-center text-muted">กำลังโหลด...</div>;
   if (!stats) {
     return (
       <div className="py-12 text-center text-danger">
@@ -69,7 +80,13 @@ export function ChatbotDashboardClient() {
 
       <AdminCard>
         <AdminCardTitle>ความพร้อมบอท (Readiness)</AdminCardTitle>
-        {intents.length === 0 ? (
+        {/* § intents ล้มต้องเห็น error ไทยเหนือการ์ดนี้ — ห้ามตกไป empty state ชวนสร้างหมวดซ้ำ */}
+        {intentsError && (
+          <div role="status" className="mb-3 rounded-lg bg-danger/10 px-4 py-3 text-sm font-medium text-danger">
+            {intentsError}
+          </div>
+        )}
+        {intentsError ? null : intents.length === 0 ? (
           <p className="text-sm text-muted">
             ยังไม่มีหมวดเจตนา —{' '}
             <Link href="/admin/chatbot/auto-replies" className="font-semibold text-accent-strong hover:underline">

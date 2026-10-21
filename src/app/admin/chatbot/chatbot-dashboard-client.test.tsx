@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/app/admin/_lib/admin-api', () => ({
@@ -31,12 +31,23 @@ function intent(over = {}) {
 
 const mockStats = vi.mocked(adminApi.getChatbotStats);
 
-function mockIntents(items: unknown[]) {
+function mockIntentsOk(items: unknown[]) {
   vi.stubGlobal(
     'fetch',
     vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ items }),
+    } as Response) as unknown as typeof fetch,
+  );
+}
+
+function mockIntentsFail(status: number, error: string) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({
+      ok: false,
+      status,
+      json: () => Promise.resolve({ error }),
     } as Response) as unknown as typeof fetch,
   );
 }
@@ -53,7 +64,7 @@ beforeEach(() => {
 
 describe('ChatbotDashboardClient readiness', () => {
   it('หมวดพร้อมแสดงพร้อมและ KPI เดิมอยู่ครบ', async () => {
-    mockIntents([intent()]);
+    mockIntentsOk([intent()]);
     render(<ChatbotDashboardClient />);
 
     expect(await screen.findByText('เวลาทำการ')).toBeInTheDocument();
@@ -63,14 +74,14 @@ describe('ChatbotDashboardClient readiness', () => {
   });
 
   it('หมวดไม่มี keyword แสดงเหตุผลไม่พร้อม', async () => {
-    mockIntents([intent({ keywords: [] })]);
+    mockIntentsOk([intent({ keywords: [] })]);
     render(<ChatbotDashboardClient />);
 
     expect(await screen.findByText('ยังไม่มี keyword')).toBeInTheDocument();
   });
 
   it('ไม่มีหมวดแสดงลิงก์ไปสร้าง', async () => {
-    mockIntents([]);
+    mockIntentsOk([]);
     render(<ChatbotDashboardClient />);
 
     expect(await screen.findByText('ไปสร้างหมวด')).toBeInTheDocument();
@@ -84,9 +95,38 @@ describe('ChatbotDashboardClient error', () => {
       error: 'Forbidden',
       status: 403,
     });
-    mockIntents([]);
+    mockIntentsOk([]);
     render(<ChatbotDashboardClient />);
     expect(await screen.findByText('Forbidden')).toBeInTheDocument();
     expect(screen.queryByText('โหลดข้อมูลไม่สำเร็จ')).not.toBeInTheDocument();
+  });
+
+  // § intents ล้มต้องเห็น error ของ intents ไม่ใช่ empty state ชวนสร้างหมวดซ้ำ — stats ยังเขียวอยู่
+  it('intents 500 แสดง error ไม่ใช่ลิงก์ไปสร้างหมวด', async () => {
+    mockIntentsFail(500, 'เซิร์ฟเวอร์ขัดข้อง กรุณาลองใหม่');
+    render(<ChatbotDashboardClient />);
+    expect(await screen.findByText('เซิร์ฟเวอร์ขัดข้อง กรุณาลองใหม่')).toBeInTheDocument();
+    expect(screen.queryByText('ไปสร้างหมวด')).not.toBeInTheDocument();
+    // KPI stats ยังต้องอยู่ครบ — error นี้เป็นของ intents อย่างเดียว
+    expect(screen.getByText('ข้อความเข้า')).toBeInTheDocument();
+  });
+
+  it('intents 403 แสดง error ไม่ใช่ empty state', async () => {
+    mockIntentsFail(403, 'สิทธิ์ไม่เพียงพอ');
+    render(<ChatbotDashboardClient />);
+    expect(await screen.findByText('สิทธิ์ไม่เพียงพอ')).toBeInTheDocument();
+    expect(screen.queryByText('ไปสร้างหมวด')).not.toBeInTheDocument();
+  });
+
+  // § stats เสร็จก่อนแต่ intents ยังค้าง — ต้องเห็น loading ไม่ใช่ flash false-empty
+  it('intents ค้างแต่ stats เสร็จยังแสดง loading', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(() => new Promise(() => {})) as unknown as typeof fetch,
+    );
+    render(<ChatbotDashboardClient />);
+    expect(await screen.findByText('กำลังโหลด...')).toBeInTheDocument();
+    expect(screen.queryByText('ไปสร้างหมวด')).not.toBeInTheDocument();
+    await act(async () => {});
   });
 });
