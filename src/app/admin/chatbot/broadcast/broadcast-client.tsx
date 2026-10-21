@@ -207,7 +207,9 @@ export function BroadcastClient() {
                     return (
                       <tr key={item.id} className="hover:bg-accent/5">
                         <td className="max-w-60 px-4 py-3">
-                          <p className="truncate text-sm font-medium text-ink">{broadcastName(item)}</p>
+                          <Link href={`/admin/chatbot/broadcast/${item.id}`} className="truncate text-sm font-medium text-accent-strong hover:underline">
+                            {broadcastName(item)}
+                          </Link>
                           <p className="mt-0.5 text-xs text-muted">
                             {item.target?.kind === 'line_user_ids'
                               ? `เฉพาะกลุ่ม ${item.target.ids.length} คน`

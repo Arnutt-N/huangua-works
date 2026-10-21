@@ -356,6 +356,8 @@ export const adminApi = {
   // ── Broadcasts ──
   listBroadcasts: (): Promise<ApiResult<ListOf<BroadcastItem>>> =>
     request<ListOf<BroadcastItem>>('/api/line/admin/broadcasts'),
+  getBroadcast: (id: string): Promise<ApiResult<BroadcastItem>> =>
+    request<BroadcastItem>(`/api/line/admin/broadcasts/${id}`),
   createBroadcast: (payload: BroadcastInput): Promise<ApiResult<OkBody>> =>
     request<OkBody>('/api/line/admin/broadcasts', withBody('POST', payload)),
   sendBroadcast: (id: string): Promise<ApiResult<OkBody>> =>
