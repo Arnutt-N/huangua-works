@@ -1,9 +1,39 @@
 'use client';
 
 import { adminApi } from '@/app/admin/_lib/admin-api';
+import type { ApiResult, ListOf } from '@/app/admin/_lib/admin-api';
 import { useResource } from '@/app/admin/_lib/use-resource';
-import { Bot, MessageSquare, HelpCircle, UserPlus } from 'lucide-react';
+import { Bot, MessageSquare, HelpCircle, UserPlus, CheckCircle2, XCircle } from 'lucide-react';
+import Link from 'next/link';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
+
+interface ReadinessIntent {
+  id: string;
+  name: string;
+  isActive: boolean;
+  keywords: { id: string }[];
+  responses: { id: string }[];
+}
+
+async function listIntentsForReadiness(): Promise<ApiResult<ListOf<ReadinessIntent>>> {
+  // § fetch อยู่ขอบระบบ: network ล้มต้องคืน ApiFail เอง — useResource ไม่มี try/catch ข้างใน
+  let res: Response;
+  try {
+    res = await fetch('/api/line/admin/intents');
+  } catch {
+    return { ok: false, error: 'เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ', status: 0 };
+  }
+  const body: unknown = await res.json().catch(() => null);
+  if (!res.ok) {
+    const envelope = (body as { error?: unknown } | null)?.error;
+    return {
+      ok: false,
+      error: typeof envelope === 'string' && envelope.length > 0 ? envelope : 'โหลดข้อมูลไม่สำเร็จ',
+      status: res.status,
+    };
+  }
+  return { ok: true, data: body as ListOf<ReadinessIntent> };
+}
 
 function KpiCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string | number; sub?: string }) {
   return (
@@ -19,11 +49,18 @@ function KpiCard({ icon, label, value, sub }: { icon: React.ReactNode; label: st
 }
 
 export function ChatbotDashboardClient() {
-  const { data: stats, loading, feedback } = useResource({
+  const { data: stats, loading: statsLoading, feedback } = useResource({
     load: adminApi.getChatbotStats,
   });
+  const { data: intentsData, loading: intentsLoading, feedback: intentsFeedback } = useResource({
+    load: listIntentsForReadiness,
+  });
+  const intents: ReadinessIntent[] = intentsData?.items ?? [];
+  // § feedback ของ intents แยกจาก stats: intents ล้มต้องไม่เหมารวมกับ stats และไม่หลอกว่าไม่มีหมวด
+  const intentsError = intentsFeedback?.type === 'error' ? intentsFeedback.msg : null;
 
-  if (loading) return <div className="py-12 text-center text-muted">กำลังโหลด...</div>;
+  // § รวม loading ทั้งสองแหล่ง — กัน flash false-empty ตอน stats เสร็จก่อน intents
+  if (statsLoading || intentsLoading) return <div className="py-12 text-center text-muted">กำลังโหลด...</div>;
   if (!stats) {
     return (
       <div className="py-12 text-center text-danger">
@@ -40,6 +77,61 @@ export function ChatbotDashboardClient() {
         <KpiCard icon={<HelpCircle className="h-4 w-4" />} label="FAQ Hit Rate" value={`${stats.faq.hitRate}%`} sub={`${stats.faq.hits} hits / ${stats.faq.active} active FAQs`} />
         <KpiCard icon={<UserPlus className="h-4 w-4" />} label="Handoff" value={stats.conversations.handoff} sub={`จาก ${stats.conversations.total} conversations`} />
       </div>
+
+      <AdminCard>
+        <AdminCardTitle>ความพร้อมบอท (Readiness)</AdminCardTitle>
+        {/* § intents ล้มต้องเห็น error ไทยเหนือการ์ดนี้ — ห้ามตกไป empty state ชวนสร้างหมวดซ้ำ */}
+        {intentsError && (
+          <div role="status" className="mb-3 rounded-lg bg-danger/10 px-4 py-3 text-sm font-medium text-danger">
+            {intentsError}
+          </div>
+        )}
+        {intentsError ? null : intents.length === 0 ? (
+          <p className="text-sm text-muted">
+            ยังไม่มีหมวดเจตนา —{' '}
+            <Link href="/admin/chatbot/auto-replies" className="font-semibold text-accent-strong hover:underline">
+              ไปสร้างหมวด
+            </Link>
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {intents.map((item) => {
+              const ready = item.isActive && item.keywords.length > 0 && item.responses.length > 0;
+              const Icon = ready ? CheckCircle2 : XCircle;
+              const reason = !item.isActive
+                ? 'ปิดใช้งาน'
+                : item.keywords.length === 0
+                  ? 'ยังไม่มี keyword'
+                  : item.responses.length === 0
+                    ? 'ยังไม่มีคำตอบ'
+                    : 'พร้อม';
+              return (
+                <Link
+                  key={item.id}
+                  href="/admin/chatbot/auto-replies"
+                  className="flex items-center gap-3 rounded-lg border border-border/50 p-3 hover:bg-accent/5"
+                >
+                  <Icon
+                    className={`h-5 w-5 flex-none ${ready ? 'text-success' : 'text-danger'}`}
+                    aria-label={ready ? 'พร้อม' : `ไม่พร้อม: ${reason}`}
+                  />
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">{item.name}</span>
+                  <span className="flex-none text-xs tabular-nums text-muted">
+                    {item.keywords.length} kw · {item.responses.length} ตอบ
+                  </span>
+                  <span
+                    className={`flex-none rounded-full px-2 py-0.5 text-xs font-medium ${
+                      ready ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'
+                    }`}
+                  >
+                    {ready ? 'พร้อม' : reason}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </AdminCard>
 
       <AdminCard>
         <AdminCardTitle>คำถามยอดนิยม (Top FAQ)</AdminCardTitle>
