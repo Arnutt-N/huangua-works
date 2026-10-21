@@ -6,6 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CannedResponse } from '@/app/admin/chat/_lib/types';
 import { CannedResponsesClient } from './canned-responses-client';
 
+// § เทสนี้รัน userEvent หลายขั้นภายใต้โหลดทั้งชุด timeout 5s ไม่พอ — 30s ตาม intake pattern
+vi.setConfig({ testTimeout: 30_000 });
+
 const fetchCannedResponses = vi.fn();
 const createCannedResponse = vi.fn();
 const updateCannedResponse = vi.fn();

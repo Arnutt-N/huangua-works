@@ -6,6 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiResult, IntentItem } from '@/app/admin/_lib/admin-api';
 import { IntentSection } from './intent-section';
 
+// § เทสนี้รัน userEvent หลายขั้นภายใต้โหลดทั้งชุด timeout 5s ไม่พอ — 30s ตาม intake pattern
+vi.setConfig({ testTimeout: 30_000 });
+
 const listIntents = vi.fn();
 const createIntent = vi.fn();
 const updateIntent = vi.fn();
