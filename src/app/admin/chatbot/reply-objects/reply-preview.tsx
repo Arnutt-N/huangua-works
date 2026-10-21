@@ -31,7 +31,8 @@ export function payloadSummary(objectType: string, payload: unknown): string {
   return keys.length > 0 ? keys.slice(0, 4).join(', ') : '—';
 }
 
-export function hasQuickReply(payload: Record<string, unknown>): boolean {
+export function hasQuickReply(payload: unknown): boolean {
+  if (!isRecord(payload)) return false;
   const qr = payload.quickReply;
   if (!isRecord(qr)) return false;
   return Array.isArray(qr.items) && qr.items.length > 0;

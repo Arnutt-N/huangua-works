@@ -1,12 +1,5 @@
-// @vitest-environment jsdom
-import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { hasQuickReply, payloadSummary, typeBadgeClass } from './reply-preview';
-
-afterEach(() => {
-  cleanup();
-});
 
 describe('reply-preview helpers', () => {
   it('text สรุปจาก text ไม่เกิน 80 ตัวอักษร', () => {
@@ -52,7 +45,14 @@ describe('reply-preview helpers', () => {
     expect(typeBadgeClass('text')).toContain('surface');
   });
 
-  it('render จริงผ่าน client ไม่ต้อง mock หนัก', async () => {
-    expect(typeof screen).toBe('object');
+  it('hasQuickReply กัน payload ผิดรูป', () => {
+    expect(hasQuickReply(null)).toBe(false);
+    expect(hasQuickReply([])).toBe(false);
+    expect(hasQuickReply('เสีย')).toBe(false);
+  });
+
+  it('payloadSummary กัน payload ผิดรูป', () => {
+    expect(payloadSummary('text', null)).toBe('—');
+    expect(payloadSummary('text', [])).toBe('—');
   });
 });
