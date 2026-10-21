@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { BroadcastItem } from '@/app/admin/_lib/admin-api';
 import { adminApi } from '@/app/admin/_lib/admin-api';
 import { useResource } from '@/app/admin/_lib/use-resource';
-import { Plus, Send, Clock, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { Plus, Send, Clock, CheckCircle2, XCircle, Loader2, Radio } from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import {
   Dialog,
@@ -16,7 +16,6 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { FieldHint, Label, Textarea } from '@/components/ui/field';
-
 /**
  * รอบการตรวจคิวส่งประกาศ (นาที) — ต้องตรงกับ schedule ที่ตั้งไว้ใน cron-job.org
  * ที่ยิง /api/cron/broadcast-send ใช้บอกผู้ใช้ว่าประกาศอาจออกช้ากว่าเวลาที่ตั้งได้แค่ไหน
@@ -31,6 +30,25 @@ const STATUS_MAP: Record<string, { label: string; icon: typeof Clock; cls: strin
   failed: { label: 'ล้มเหลว', icon: XCircle, cls: 'text-danger' },
 };
 
+const TYPE_LABELS: Record<string, string> = {
+  text: 'ข้อความ',
+  image: 'รูปภาพ',
+  flex: 'Flex Message',
+};
+
+function broadcastName(item: BroadcastItem): string {
+  const first = item.content[0];
+  if (!first) return '—';
+  if (first.type === 'text' && first.text) return first.text;
+  return `[${first.type}]`;
+}
+
+function broadcastType(item: BroadcastItem): string {
+  const first = item.content[0];
+  if (!first) return '—';
+  return TYPE_LABELS[first.type] ?? `[${first.type}]`;
+}
+
 export function BroadcastClient() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [message, setMessage] = useState('');
@@ -40,11 +58,18 @@ export function BroadcastClient() {
   const [recipientOptions, setRecipientOptions] = useState<{ id: string; displayName: string | null }[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [estimate, setEstimate] = useState<number | null>(null);
+  const [statusFilter, setStatusFilter] = useState('');
 
+  // § API ยังไม่มี query status — ส่ง status เป็น query key ของ hook เพื่อ reload
+  // เมื่อเปลี่ยนฟิลเตอร์ แล้วกรองฝั่ง client (กัน response เก่าค้างข้ามฟิลเตอร์)
   const { data, loading, feedback, notify, mutate } = useResource({
     load: adminApi.listBroadcasts,
+    query: statusFilter,
   });
-  const items = data?.items ?? [];
+  const filtered = useMemo(
+    () => (statusFilter ? (data?.items ?? []).filter((i) => i.status === statusFilter) : (data?.items ?? [])),
+    [data, statusFilter],
+  );
 
   async function openDialog() {
     setDialogOpen(true);
@@ -108,6 +133,22 @@ export function BroadcastClient() {
         </div>
       )}
 
+      <div className="flex flex-wrap items-center gap-3">
+        <select
+          aria-label="กรองสถานะ"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="min-h-touch rounded-md border border-border bg-surface-raised px-4 text-ink"
+        >
+            <option value="">ทุกสถานะ</option>
+            <option value="draft">ร่าง</option>
+            <option value="scheduled">รอส่ง</option>
+            <option value="sending">กำลังส่ง</option>
+            <option value="sent">ส่งแล้ว</option>
+            <option value="failed">ล้มเหลว</option>
+          </select>
+      </div>
+
       <AdminCard>
         <AdminCardTitle
           icon={<Send className="h-4 w-4" />}
@@ -117,7 +158,7 @@ export function BroadcastClient() {
                 href="/admin/chatbot/broadcast/new"
                 className="inline-flex min-h-touch items-center gap-1.5 rounded-md bg-accent-strong px-4 text-sm font-semibold text-on-accent"
               >
-                <Plus className="h-4 w-4" /> ตัวช่วยสร้าง
+                <Plus className="h-4 w-4" /> สร้างข้อความ
               </Link>
               <Button onClick={openDialog} variant="outline" className="min-h-touch gap-1.5">
                 <Plus className="h-4 w-4" /> ด่วน
@@ -125,43 +166,92 @@ export function BroadcastClient() {
             </span>
           }
         >
-          ประวัติ Broadcast
+          ประวัติ Broadcast ({filtered.length})
         </AdminCardTitle>
 
         {loading ? (
           <div className="py-12 text-center text-muted">กำลังโหลด...</div>
-        ) : items.length === 0 ? (
-          <div className="py-12 text-center text-muted">ยังไม่มีการส่งประกาศ</div>
         ) : (
-          <div className="space-y-3">
-            {items.map((item) => {
-              const st = STATUS_MAP[item.status] ?? STATUS_MAP.draft!;
-              const Icon = st.icon;
-              const first = item.content[0];
-              const text = first?.type === 'text' ? (first.text ?? '') : first ? `[${first.type}]` : '';
-              return (
-                <div key={item.id} className="flex items-start gap-3 rounded-lg border border-border/50 p-4">
-                  <Icon className={`mt-0.5 h-5 w-5 flex-none ${st.cls}`} />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-ink">{text}</p>
-                    <p className="mt-1 text-xs text-muted">
-                      {st.label} · สร้าง {new Date(item.createdAt).toLocaleDateString('th-TH')}
-                      {item.sentAt && ` · ส่ง ${new Date(item.sentAt).toLocaleString('th-TH')}`}
-                      {item.target?.kind === 'line_user_ids'
-                        ? ` · ผู้รับเฉพาะ ${item.target.ids.length} คน`
-                        : ' · ผู้ติดตามทุกคน'}
-                      {item.totalRecipients > 0 && ` · ทั้งหมด ${item.totalRecipients} คน สำเร็จ ${item.successCount} ล้มเหลว ${item.failedCount}`}
-                      {item.failedRecipients > 0 && ` · บันทึกผู้รับล้มเหลว ${item.failedRecipients} ราย`}
-                    </p>
-                  </div>
-                  {(item.status === 'draft' || item.status === 'scheduled') && (
-                    <Button variant="outline" onClick={() => handleSend(item)} className="min-h-touch flex-none gap-1 text-sm">
-                      <Send className="h-3.5 w-3.5" /> ส่งเลย
-                    </Button>
-                  )}
-                </div>
-              );
-            })}
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-left">
+              <thead>
+                <tr className="border-b border-border/50 text-xs font-semibold uppercase tracking-wide text-muted">
+                  <th scope="col" className="px-4 py-3">ชื่อแคมเปญ</th>
+                  <th scope="col" className="px-4 py-3">ประเภท</th>
+                  <th scope="col" className="px-4 py-3">สถานะ</th>
+                  <th scope="col" className="px-4 py-3">ผู้รับ</th>
+                  <th scope="col" className="px-4 py-3">วันที่ส่ง</th>
+                  <th scope="col" className="px-4 py-3 text-right">จัดการ</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/30">
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-12 text-center">
+                      <div className="flex flex-col items-center gap-3 text-muted">
+                        <Radio className="h-10 w-10 opacity-30" aria-hidden="true" />
+                        <p className="text-sm">ยังไม่มีข้อความ Broadcast</p>
+                        <Link
+                          href="/admin/chatbot/broadcast/new"
+                          className="inline-flex min-h-touch items-center gap-1.5 rounded-md border border-border bg-transparent px-4 text-sm font-semibold text-ink"
+                        >
+                          <Plus className="h-4 w-4" /> สร้างข้อความแรก
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((item) => {
+                    const st = STATUS_MAP[item.status] ?? STATUS_MAP.draft!;
+                    const Icon = st.icon;
+                    return (
+                      <tr key={item.id} className="hover:bg-accent/5">
+                        <td className="max-w-60 px-4 py-3">
+                          <p className="truncate text-sm font-medium text-ink">{broadcastName(item)}</p>
+                          <p className="mt-0.5 text-xs text-muted">
+                            {item.target?.kind === 'line_user_ids'
+                              ? `เฉพาะกลุ่ม ${item.target.ids.length} คน`
+                              : 'ผู้ติดตามทั้งหมด'}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-muted">{broadcastType(item)}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${st.cls}`}>
+                            <Icon className="h-3.5 w-3.5" /> {st.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-muted">
+                          {item.status === 'sent' && item.totalRecipients > 0 ? (
+                            <span>
+                              <span className="font-medium text-success">{item.successCount} สำเร็จ</span>
+                              {item.failedCount > 0 && <span className="text-danger"> / {item.failedCount} ล้มเหลว</span>}
+                            </span>
+                          ) : item.target?.kind === 'line_user_ids' ? (
+                            `${item.target.ids.length} คน`
+                          ) : (
+                            'ผู้ติดตามทุกคน'
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-xs text-muted">
+                          {item.sentAt
+                            ? new Date(item.sentAt).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })
+                            : item.scheduledAt
+                              ? new Date(item.scheduledAt).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })
+                              : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {(item.status === 'draft' || item.status === 'scheduled') && (
+                            <Button variant="outline" onClick={() => handleSend(item)} className="min-h-touch gap-1 text-sm">
+                              <Send className="h-3.5 w-3.5" /> ส่งเลย
+                            </Button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
         )}
       </AdminCard>
