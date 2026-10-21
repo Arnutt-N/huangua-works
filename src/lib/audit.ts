@@ -72,6 +72,7 @@ export const AUDIT_ACTIONS = {
   REPLY_OBJECT_UPDATE: 'reply_object_update',
   REPLY_OBJECT_DELETE: 'reply_object_delete',
   BROADCAST_CREATE: 'broadcast_create',
+  BROADCAST_VIEW: 'broadcast_view',
   BROADCAST_SEND: 'broadcast_send',
   RICH_MENU_CREATE: 'rich_menu_create',
   RICH_MENU_SYNC: 'rich_menu_sync',

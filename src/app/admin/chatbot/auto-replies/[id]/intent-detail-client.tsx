@@ -23,7 +23,7 @@ function readinessOf(item: IntentItem): { ready: boolean; reason: string } {
 }
 
 export function IntentDetailClient({ intentId }: { intentId: string }) {
-  const { data, loading, feedback, reload } = useResource({
+  const { data, loading, feedback, notify, reload } = useResource({
     load: adminApi.listIntents,
   });
   const item = (data?.items ?? []).find((i) => i.id === intentId) ?? null;
@@ -44,12 +44,21 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
         displayOrder: i,
       })),
     });
-    if (!res.ok) return;
+    if (!res.ok) {
+      notify('error', res.error);
+      return;
+    }
+    notify('success', item.isActive ? 'ปิดหมวดแล้ว' : 'เปิดหมวดแล้ว');
     await reload();
   }
 
   async function handleDeleteKeyword(keywordId: string) {
     if (!item) return;
+    // § server min(1) — ลบตัวสุดท้ายฝั่ง client ก่อนยิง ไม่ให้ 400 แล้วงง
+    if (item.keywords.length <= 1) {
+      notify('error', 'ต้องเหลือ keyword อย่างน้อย 1 คำ');
+      return;
+    }
     if (!confirm('ลบ keyword นี้?')) return;
     const res = await adminApi.updateIntent(item.id, {
       name: item.name,
@@ -63,12 +72,20 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
         displayOrder: i,
       })),
     });
-    if (!res.ok) return;
+    if (!res.ok) {
+      notify('error', res.error);
+      return;
+    }
     await reload();
   }
 
   async function handleDeleteResponse(responseId: string) {
     if (!item) return;
+    // § server min(1) — เหมือน keyword
+    if (item.responses.length <= 1) {
+      notify('error', 'ต้องเหลือคำตอบอย่างน้อย 1 ข้อ');
+      return;
+    }
     if (!confirm('ลบคำตอบนี้?')) return;
     const res = await adminApi.updateIntent(item.id, {
       name: item.name,
@@ -84,7 +101,10 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
           displayOrder: i,
         })),
     });
-    if (!res.ok) return;
+    if (!res.ok) {
+      notify('error', res.error);
+      return;
+    }
     await reload();
   }
 

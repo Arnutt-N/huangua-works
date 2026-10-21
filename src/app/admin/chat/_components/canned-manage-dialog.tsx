@@ -72,8 +72,10 @@ export function CannedManageDialog({
     onChanged();
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, title: string) => {
     if (busy) return;
+    // § ลบถาวรไม่มี undo — confirm ก่อนทุกครั้งเหมือนหน้า canned หลัก
+    if (!confirm(`ลบ "${title}" ?`)) return;
     setBusy(true);
     const ok = await deleteCannedResponse(id);
     setBusy(false);
@@ -126,7 +128,7 @@ export function CannedManageDialog({
                 </button>
                 <button
                   type="button"
-                  onClick={() => void handleDelete(item.id)}
+                  onClick={() => void handleDelete(item.id, item.title)}
                   aria-label={`ลบ ${item.title}`}
                   className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-md text-muted hover:bg-danger-soft hover:text-danger focus-visible:outline focus-visible:outline-2 focus-visible:outline-danger"
                 >

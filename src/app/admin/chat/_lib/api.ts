@@ -109,9 +109,11 @@ export async function putPrefs(
 
 // ── canned responses ──
 
-export async function fetchCannedResponses(): Promise<CannedResponse[]> {
+// § คืน null เมื่อ response ไม่ ok — caller แยก "ว่าง" ([]) กับ "โหลดล้ม" (null) ได้
+// ห้าม `?? []` ตรงนี้ ไม่งั้น loadError ตาย โหลดล้มโชว์ empty state แทน error
+export async function fetchCannedResponses(): Promise<CannedResponse[] | null> {
   const res = await fetch('/api/line/admin/canned-responses');
-  return (await jsonOrNull<CannedResponse[]>(res)) ?? [];
+  return jsonOrNull<CannedResponse[]>(res);
 }
 
 export async function createCannedResponse(body: {

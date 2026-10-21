@@ -66,6 +66,10 @@ export function validateArea(action: RichMenuArea['action']): string | null {
   if (action.type === 'uri') {
     if (!action.uri?.trim()) return 'กรุณากรอก URL';
     if (!/^https:\/\//.test(action.uri.trim())) return 'URL ต้องขึ้นต้นด้วย https://';
+    // § template ฝัง <LIFF_ID> เป็น placeholder — ต้องกันตั้งแต่ validate ไม่ให้ขึ้น LINE เป็นปุ่มพัง
+    if (/<\s*LIFF_ID\s*>/i.test(action.uri) || action.uri.includes('<') || action.uri.includes('>')) {
+      return 'กรุณาแทน <LIFF_ID> ด้วยค่า LINE_LIFF_ID จริงก่อนบันทึก';
+    }
     return null;
   }
   if (!action.text?.trim()) return 'กรุณากรอกข้อความที่จะส่ง';

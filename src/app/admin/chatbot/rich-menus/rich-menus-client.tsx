@@ -59,6 +59,11 @@ export function RichMenusClient() {
       notify('error', 'กรุณากรอกชื่อ');
       return;
     }
+    // § modal เก่าใช้ DEFAULT_CONFIG ที่มี <LIFF_ID> — กันตั้งแต่ client ไม่ให้ขึ้น LINE เป็นปุ่มพัง
+    if (/<\s*LIFF_ID\s*>/i.test(configJson) || (configJson.includes('<') && configJson.includes('LIFF'))) {
+      notify('error', 'กรุณาแทน <LIFF_ID> ด้วยค่า LINE_LIFF_ID จริงก่อนบันทึก');
+      return;
+    }
     let config: unknown;
     try {
       config = JSON.parse(configJson);

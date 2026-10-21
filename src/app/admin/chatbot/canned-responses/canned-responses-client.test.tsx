@@ -62,11 +62,24 @@ describe('CannedResponsesClient หน้าแยก', () => {
     expect(within(table).queryByText('/hello')).not.toBeInTheDocument();
   });
 
-  it('ห้องว่างแสดง empty state ไทย', async () => {
-    fetchCannedResponses.mockResolvedValue([]);
+  it('โหลดล้มเหลวแสดง error ไม่ใช่ empty state', async () => {
+    fetchCannedResponses.mockResolvedValue(null);
     render(<CannedResponsesClient />);
+    expect(await screen.findByText('โหลดข้อมูลไม่สำเร็จ')).toBeInTheDocument();
+    expect(screen.queryByText('ยังไม่มีข้อความด่วน')).not.toBeInTheDocument();
+  });
 
-    expect(await screen.findByText('ยังไม่มีข้อความด่วน')).toBeInTheDocument();
+  it('ลบต้อง confirm ก่อน — ยกเลิกไม่ยิง API', async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    fetchCannedResponses.mockResolvedValue([item()]);
+    render(<CannedResponsesClient />);
+    await screen.findByText('ทักทาย');
+
+    await user.click(screen.getByRole('button', { name: 'ลบ ทักทาย' }));
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(deleteCannedResponse).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
   });
 
   it('สร้างข้อความใหม่แล้ว reload ลิสต์', async () => {
@@ -114,6 +127,7 @@ describe('CannedResponsesClient หน้าแยก', () => {
 
   it('ลบแล้ว reload ลิสต์', async () => {
     const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     fetchCannedResponses.mockResolvedValueOnce([item()]).mockResolvedValueOnce([]);
     deleteCannedResponse.mockResolvedValue(true);
     render(<CannedResponsesClient />);
@@ -123,5 +137,6 @@ describe('CannedResponsesClient หน้าแยก', () => {
 
     await waitFor(() => expect(deleteCannedResponse).toHaveBeenCalledWith('c1'));
     expect(await screen.findByText('ยังไม่มีข้อความด่วน')).toBeInTheDocument();
+    confirmSpy.mockRestore();
   });
 });

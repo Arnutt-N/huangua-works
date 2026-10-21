@@ -100,8 +100,10 @@ export function CannedResponsesClient() {
     void reload();
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, title: string) => {
     if (busy) return;
+    // § ลบถาวรไม่มี undo — confirm ก่อนทุกครั้งเหมือนหน้าอื่น (keyword/response/alias)
+    if (!confirm(`ลบ "${title}" ?`)) return;
     setBusy(true);
     const ok = await deleteCannedResponse(id);
     setBusy(false);
@@ -132,14 +134,11 @@ export function CannedResponsesClient() {
           เรียกใช้ในช่องพิมพ์ของหน้าแชทด้วย &quot;/&quot; ตามด้วยคีย์ลัดหรือชื่อ
         </p>
 
-        {loadError && (
-          <p role="status" className="mb-3 text-sm text-danger">
-            {loadError}
-          </p>
-        )}
-
         {items === null ? (
           <p className="py-10 text-center text-sm text-muted">กำลังโหลด...</p>
+        ) : loadError ? (
+          // § โหลดล้มห้ามตก empty state — คนละเรื่องกับ "ว่าง" (items=[])
+          <p role="status" className="py-10 text-center text-sm text-danger">{loadError}</p>
         ) : items.length === 0 ? (
           <EmptyState
             icon={Zap}
@@ -183,7 +182,7 @@ export function CannedResponsesClient() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => void handleDelete(item.id)}
+                        onClick={() => void handleDelete(item.id, item.title)}
                         aria-label={`ลบ ${item.title}`}
                         className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted hover:bg-danger-soft hover:text-danger focus-visible:outline focus-visible:outline-2 focus-visible:outline-danger"
                       >

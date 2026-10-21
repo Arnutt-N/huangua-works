@@ -39,6 +39,24 @@ beforeEach(() => {
 });
 
 describe('IntentDetailClient', () => {
+  it('toggle ล้มเหลวแสดง error ไม่เงียบ', async () => {
+    updateIntent.mockResolvedValue({ ok: false, error: 'เซิร์ฟเวอร์ขัดข้อง', status: 500 });
+    render(<IntentDetailClient intentId="i1" />);
+    await screen.findByText('เวลาทำการ');
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'ปิด เวลาทำการ' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('เซิร์ฟเวอร์ขัดข้อง');
+  });
+
+  it('ห้ามลบ keyword ตัวสุดท้าย — server min(1)', async () => {
+    const user = userEvent.setup();
+    render(<IntentDetailClient intentId="i1" />);
+    await screen.findByText('กี่โมง');
+
+    await user.click(screen.getByRole('button', { name: 'ลบ keyword กี่โมง' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('ต้องเหลือ keyword อย่างน้อย 1 คำ');
+    expect(updateIntent).not.toHaveBeenCalled();
+  });
   it('แสดงชื่อ + readiness + tab keywords/responses', async () => {
     render(<IntentDetailClient intentId="i1" />);
     expect(await screen.findByText('เวลาทำการ')).toBeInTheDocument();

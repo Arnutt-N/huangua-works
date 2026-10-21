@@ -15,18 +15,15 @@ function formatThaiDateTime(iso: string | null): string {
 }
 
 export function FriendDetailClient({ friendId }: { friendId: string }) {
-  const { data, loading, reload } = useResource({ load: adminApi.listFriends });
-  const item: FriendItem | null = (data?.items ?? []).find((f) => f.id === friendId) ?? null;
-
-  // § listFriends มี pagination — detail หาใน pageSize 100 (เพื่อนไม่ถึงหลักร้อยใน อบต.)
-  const { data: full } = useResource({
+  // § hook เดียวก้อน 100 — เคยมี 2 hooks (page 20 + 100) loading ดูก้อนแรกแต่แสดงก้อนสอง
+  // เพื่อนนอก 20 แรกแวบ "ไม่พบ" เท็จ ปุ่มรีเฟรช reload ก้อนที่ไม่ได้แสดง
+  const { data, loading, reload } = useResource({
     load: () => adminApi.listFriends('page=1&pageSize=100'),
   });
-  const fullItem: FriendItem | null =
-    item ?? (full?.items ?? []).find((f) => f.id === friendId) ?? null;
+  const item: FriendItem | null = (data?.items ?? []).find((f) => f.id === friendId) ?? null;
 
-  if (loading && !fullItem) return <div className="py-12 text-center text-muted">กำลังโหลด...</div>;
-  if (!fullItem) return <div className="py-12 text-center text-muted">ไม่พบเพื่อนคนนี้</div>;
+  if (loading && !item) return <div className="py-12 text-center text-muted">กำลังโหลด...</div>;
+  if (!item) return <div className="py-12 text-center text-muted">ไม่พบเพื่อนคนนี้</div>;
 
   return (
     <div className="space-y-4">
@@ -42,14 +39,14 @@ export function FriendDetailClient({ friendId }: { friendId: string }) {
             </Button>
           }
         >
-          {fullItem.displayName ?? 'ไม่ระบุชื่อ'}
+          {item.displayName ?? 'ไม่ระบุชื่อ'}
         </AdminCardTitle>
         <dl className="grid gap-2 text-sm sm:grid-cols-2">
-          <div><dt className="text-muted">ID (ปกปิด)</dt><dd className="font-mono text-xs text-ink">{fullItem.maskedId ?? '—'}</dd></div>
-          <div><dt className="text-muted">สถานะ</dt><dd className="text-ink">{fullItem.followState === 'following' ? 'ติดตามอยู่' : 'เลิกติดตาม'}</dd></div>
-          <div><dt className="text-muted">ติดตาม / กลับมา</dt><dd className="text-ink">{fullItem.followCount} / {fullItem.refollowCount}{fullItem.refollowCount > 0 ? ` (กลับมา ${fullItem.refollowCount} ครั้ง)` : ''}</dd></div>
-          <div><dt className="text-muted">เคลื่อนไหวล่าสุด</dt><dd className="text-ink">{formatThaiDateTime(fullItem.lastActiveAt)}</dd></div>
-          <div><dt className="text-muted">Rich Menu</dt><dd className="text-ink">{fullItem.richMenuName ?? 'เมนูหลัก'}</dd></div>
+          <div><dt className="text-muted">ID (ปกปิด)</dt><dd className="font-mono text-xs text-ink">{item.maskedId ?? '—'}</dd></div>
+          <div><dt className="text-muted">สถานะ</dt><dd className="text-ink">{item.followState === 'following' ? 'ติดตามอยู่' : 'เลิกติดตาม'}</dd></div>
+          <div><dt className="text-muted">ติดตาม / กลับมา</dt><dd className="text-ink">{item.followCount} / {item.refollowCount}{item.refollowCount > 0 ? ` (กลับมา ${item.refollowCount} ครั้ง)` : ''}</dd></div>
+          <div><dt className="text-muted">เคลื่อนไหวล่าสุด</dt><dd className="text-ink">{formatThaiDateTime(item.lastActiveAt)}</dd></div>
+          <div><dt className="text-muted">Rich Menu</dt><dd className="text-ink">{item.richMenuName ?? 'เมนูหลัก'}</dd></div>
         </dl>
         <p className="mt-3 text-xs text-muted">
           กำหนด/ปลดริชเมนูที่ตารางหน้ารายการ — ID เต็มถูกปกปิดตาม PDPA (Personal Data Protection Act) ไม่แสดงที่นี่

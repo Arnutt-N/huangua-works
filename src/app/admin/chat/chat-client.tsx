@@ -71,7 +71,7 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
   }, []);
 
   const loadCanned = useCallback(() => {
-    void fetchCannedResponses().then(setCannedResponses);
+    void fetchCannedResponses().then((rows) => setCannedResponses(rows ?? []));
   }, []);
 
   useEffect(() => {
