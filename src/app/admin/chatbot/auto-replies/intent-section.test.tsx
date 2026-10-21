@@ -88,8 +88,8 @@ describe('IntentSection หมวดเจตนา', () => {
 
     await user.click(screen.getByRole('button', { name: 'เพิ่มหมวด' }));
     await user.type(screen.getByLabelText('ชื่อหมวด *'), 'เวลาทำการ');
-    await user.type(screen.getByLabelText(/Keywords/), 'กี่โมง');
-    await user.type(screen.getByLabelText(/คำตอบ/), 'เปิด 08:30-16:30');
+    await user.type(screen.getByLabelText('keyword ที่ 1'), 'กี่โมง');
+    await user.type(screen.getByLabelText('ข้อความคำตอบที่ 1'), 'เปิด 08:30-16:30');
     await user.click(screen.getByRole('button', { name: 'บันทึก' }));
 
     await waitFor(() => expect(createIntent).toHaveBeenCalled());
@@ -104,9 +104,52 @@ describe('IntentSection หมวดเจตนา', () => {
 
     await user.click(screen.getByRole('button', { name: 'เพิ่มหมวด' }));
     await user.type(screen.getByLabelText('ชื่อหมวด *'), 'เวลาทำการ');
-    await user.type(screen.getByLabelText(/คำตอบ/), 'เปิด 08:30-16:30');
+    await user.type(screen.getByLabelText('ข้อความคำตอบที่ 1'), 'เปิด 08:30-16:30');
     await user.click(screen.getByRole('button', { name: 'บันทึก' }));
 
     await waitFor(() => expect(createIntent).not.toHaveBeenCalled());
+  });
+
+  it('เปิดแก้ไขคง matchType ราย keyword และ reply_object ไว้ครบตอนบันทึก', async () => {
+    const user = userEvent.setup();
+    const existing = intent({
+      keywords: [
+        { id: 'k1', keyword: 'เวลา', matchType: 'starts_with' },
+        { id: 'k2', keyword: 'กี่โมง', matchType: 'contains' },
+      ],
+      responses: [
+        { id: 'r1', replyType: 'text', textContent: 'เปิด 08:30-16:30', replyObjectId: null, displayOrder: 0 },
+        { id: 'r2', replyType: 'reply_object', textContent: null, replyObjectId: 'obj-1', displayOrder: 1 },
+      ],
+    });
+    listIntents.mockResolvedValue({ ok: true, data: { items: [existing] } });
+    updateIntent.mockResolvedValue({ ok: true });
+    render(<IntentSection />);
+    await screen.findByText('เวลาทำการ');
+
+    await user.click(screen.getByRole('button', { name: 'แก้ไข เวลาทำการ' }));
+    expect(screen.getByLabelText('keyword ที่ 1')).toHaveValue('เวลา');
+    expect(screen.getByLabelText('วิธีจับคู่ keyword ที่ 1')).toHaveValue('starts_with');
+    expect(screen.getByLabelText('keyword ที่ 2')).toHaveValue('กี่โมง');
+    expect(screen.getByLabelText('ชนิดคำตอบที่ 2')).toHaveValue('reply_object');
+    expect(screen.getByLabelText('reply object id คำตอบที่ 2')).toHaveValue('obj-1');
+
+    await user.click(screen.getByRole('button', { name: 'บันทึก' }));
+
+    await waitFor(() => expect(updateIntent).toHaveBeenCalled());
+    const payload = updateIntent.mock.calls[0]?.[1];
+    expect(payload).toEqual({
+      name: 'เวลาทำการ',
+      description: null,
+      isActive: true,
+      keywords: [
+        { keyword: 'เวลา', matchType: 'starts_with' },
+        { keyword: 'กี่โมง', matchType: 'contains' },
+      ],
+      responses: [
+        { replyType: 'text', textContent: 'เปิด 08:30-16:30', replyObjectId: null, displayOrder: 0 },
+        { replyType: 'reply_object', textContent: null, replyObjectId: 'obj-1', displayOrder: 1 },
+      ],
+    });
   });
 });

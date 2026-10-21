@@ -25,23 +25,34 @@ const MATCH_LABELS: Record<IntentMatchType, string> = {
 
 const MATCH_TYPES: IntentMatchType[] = ['exact', 'starts_with', 'contains', 'regex'];
 
+interface KeywordRow {
+  keyword: string;
+  matchType: IntentMatchType;
+}
+
+interface ResponseRow {
+  replyType: 'text' | 'reply_object';
+  textContent: string;
+  replyObjectId: string;
+}
+
 interface IntentForm {
   name: string;
   description: string;
-  keywords: string;
-  matchType: IntentMatchType;
-  response: string;
+  keywordRows: KeywordRow[];
+  responseRows: ResponseRow[];
   isActive: boolean;
 }
 
-const EMPTY_FORM: IntentForm = {
-  name: '',
-  description: '',
-  keywords: '',
-  matchType: 'contains',
-  response: '',
-  isActive: true,
-};
+function emptyForm(): IntentForm {
+  return {
+    name: '',
+    description: '',
+    keywordRows: [{ keyword: '', matchType: 'contains' }],
+    responseRows: [{ replyType: 'text', textContent: '', replyObjectId: '' }],
+    isActive: true,
+  };
+}
 
 function readinessOf(item: IntentItem): { ready: boolean; reason: string } {
   if (item.keywords.length === 0) return { ready: false, reason: 'ยังไม่มี keyword' };
@@ -52,7 +63,7 @@ function readinessOf(item: IntentItem): { ready: boolean; reason: string } {
 export function IntentSection() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<IntentForm>(EMPTY_FORM);
+  const [form, setForm] = useState<IntentForm>(emptyForm);
   const [saving, setSaving] = useState(false);
 
   const { data, loading, feedback, notify, mutate } = useResource({
@@ -62,18 +73,29 @@ export function IntentSection() {
 
   function openCreate() {
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    setForm(emptyForm());
     setDialogOpen(true);
   }
 
+  // § เติมค่าจริงครบทุก keyword/response จาก item — เดิมยุบ matchType เหลือตัวแรก
+  // และทิ้ง reply_object จนกดบันทึกแล้วข้อมูลหายเงียบ
   function openEdit(item: IntentItem) {
     setEditingId(item.id);
     setForm({
       name: item.name,
       description: item.description ?? '',
-      keywords: item.keywords.map((k) => k.keyword).join(', '),
-      matchType: item.keywords[0]?.matchType ?? 'contains',
-      response: item.responses.find((r) => r.replyType === 'text')?.textContent ?? '',
+      keywordRows:
+        item.keywords.length > 0
+          ? item.keywords.map((k) => ({ keyword: k.keyword, matchType: k.matchType }))
+          : [{ keyword: '', matchType: 'contains' }],
+      responseRows:
+        item.responses.length > 0
+          ? item.responses.map((r) => ({
+              replyType: r.replyType,
+              textContent: r.textContent ?? '',
+              replyObjectId: r.replyObjectId ?? '',
+            }))
+          : [{ replyType: 'text', textContent: '', replyObjectId: '' }],
       isActive: item.isActive,
     });
     setDialogOpen(true);
@@ -84,16 +106,22 @@ export function IntentSection() {
       notify('error', 'กรุณากรอกชื่อหมวด');
       return;
     }
-    const keywords = form.keywords
-      .split(',')
-      .map((k) => k.trim())
-      .filter(Boolean)
-      .map((keyword) => ({ keyword, matchType: form.matchType }));
+    const keywords = form.keywordRows
+      .map((r) => ({ keyword: r.keyword.trim(), matchType: r.matchType }))
+      .filter((r) => r.keyword.length > 0);
     if (keywords.length === 0) {
       notify('error', 'กรุณากรอก keyword อย่างน้อย 1 คำ');
       return;
     }
-    if (!form.response.trim()) {
+    const responses = form.responseRows
+      .map((r, i) => ({
+        replyType: r.replyType,
+        textContent: r.replyType === 'text' ? r.textContent.trim() || null : null,
+        replyObjectId: r.replyType === 'reply_object' ? r.replyObjectId.trim() || null : null,
+        displayOrder: i,
+      }))
+      .filter((r) => (r.replyType === 'text' ? r.textContent !== null : r.replyObjectId !== null));
+    if (responses.length === 0) {
       notify('error', 'กรุณากรอกคำตอบอย่างน้อย 1 ข้อ');
       return;
     }
@@ -102,7 +130,7 @@ export function IntentSection() {
       description: form.description.trim() || null,
       isActive: form.isActive,
       keywords,
-      responses: [{ replyType: 'text' as const, textContent: form.response.trim(), displayOrder: 0 }],
+      responses,
     };
     setSaving(true);
     const ok = await mutate(
@@ -261,40 +289,158 @@ export function IntentSection() {
             </div>
 
             <div>
-              <Label htmlFor="intent-keywords">Keywords (คั่นด้วย comma) *</Label>
-              <Input
-                id="intent-keywords"
-                value={form.keywords}
-                onChange={(e) => setForm((f) => ({ ...f, keywords: e.target.value }))}
-                placeholder="เช่น เปิด, ทำการ, กี่โมง"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="intent-match">วิธีจับคู่</Label>
-              <select
-                id="intent-match"
-                value={form.matchType}
-                onChange={(e) => setForm((f) => ({ ...f, matchType: e.target.value as IntentMatchType }))}
-                className="min-h-touch w-full rounded-md border border-border bg-surface-raised px-4 text-ink"
-              >
-                {MATCH_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {MATCH_LABELS[t]}
-                  </option>
+              <Label id="intent-keywords-label">Keywords *</Label>
+              <div className="space-y-2" role="group" aria-labelledby="intent-keywords-label">
+                {form.keywordRows.map((row, i) => (
+                  <div key={i} className="flex gap-2">
+                    <Input
+                      aria-label={`keyword ที่ ${i + 1}`}
+                      value={row.keyword}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          keywordRows: f.keywordRows.map((r, j) =>
+                            j === i ? { ...r, keyword: e.target.value } : r,
+                          ),
+                        }))
+                      }
+                      placeholder="เช่น กี่โมง"
+                      className="flex-1"
+                    />
+                    <select
+                      aria-label={`วิธีจับคู่ keyword ที่ ${i + 1}`}
+                      value={row.matchType}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          keywordRows: f.keywordRows.map((r, j) =>
+                            j === i ? { ...r, matchType: e.target.value as IntentMatchType } : r,
+                          ),
+                        }))
+                      }
+                      className="min-h-touch rounded-md border border-border bg-surface-raised px-2 text-sm text-ink"
+                    >
+                      {MATCH_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {MATCH_LABELS[t]}
+                        </option>
+                      ))}
+                    </select>
+                    <Button
+                      variant="ghost"
+                      aria-label={`ลบ keyword ที่ ${i + 1}`}
+                      disabled={form.keywordRows.length <= 1}
+                      onClick={() =>
+                        setForm((f) => ({ ...f, keywordRows: f.keywordRows.filter((_, j) => j !== i) }))
+                      }
+                    >
+                      ลบ
+                    </Button>
+                  </div>
                 ))}
-              </select>
+              </div>
+              <Button
+                variant="ghost"
+                className="mt-2 gap-1"
+                onClick={() =>
+                  setForm((f) => ({
+                    ...f,
+                    keywordRows: [...f.keywordRows, { keyword: '', matchType: 'contains' }],
+                  }))
+                }
+              >
+                <Plus className="h-4 w-4" />
+                เพิ่ม keyword
+              </Button>
             </div>
 
             <div>
-              <Label htmlFor="intent-response">คำตอบ (ข้อความ) *</Label>
-              <Textarea
-                id="intent-response"
-                value={form.response}
-                onChange={(e) => setForm((f) => ({ ...f, response: e.target.value }))}
-                rows={4}
-                placeholder="เช่น เปิดทำการจันทร์-ศุกร์ 08:30-16:30 น."
-              />
+              <Label id="intent-responses-label">คำตอบ *</Label>
+              <div className="space-y-2" role="group" aria-labelledby="intent-responses-label">
+                {form.responseRows.map((row, i) => (
+                  <div key={i} className="space-y-2 rounded-md border border-border/50 p-2">
+                    <div className="flex gap-2">
+                      <select
+                        aria-label={`ชนิดคำตอบที่ ${i + 1}`}
+                        value={row.replyType}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            responseRows: f.responseRows.map((r, j) =>
+                              j === i
+                                ? { ...r, replyType: e.target.value as 'text' | 'reply_object' }
+                                : r,
+                            ),
+                          }))
+                        }
+                        className="min-h-touch rounded-md border border-border bg-surface-raised px-2 text-sm text-ink"
+                      >
+                        <option value="text">ข้อความ</option>
+                        <option value="reply_object">reply object</option>
+                      </select>
+                      <Button
+                        variant="ghost"
+                        aria-label={`ลบคำตอบที่ ${i + 1}`}
+                        disabled={form.responseRows.length <= 1}
+                        onClick={() =>
+                          setForm((f) => ({
+                            ...f,
+                            responseRows: f.responseRows.filter((_, j) => j !== i),
+                          }))
+                        }
+                      >
+                        ลบ
+                      </Button>
+                    </div>
+                    {row.replyType === 'text' ? (
+                      <Textarea
+                        aria-label={`ข้อความคำตอบที่ ${i + 1}`}
+                        value={row.textContent}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            responseRows: f.responseRows.map((r, j) =>
+                              j === i ? { ...r, textContent: e.target.value } : r,
+                            ),
+                          }))
+                        }
+                        rows={3}
+                        placeholder="เช่น เปิดทำการจันทร์-ศุกร์ 08:30-16:30 น."
+                      />
+                    ) : (
+                      <Input
+                        aria-label={`reply object id คำตอบที่ ${i + 1}`}
+                        value={row.replyObjectId}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            responseRows: f.responseRows.map((r, j) =>
+                              j === i ? { ...r, replyObjectId: e.target.value } : r,
+                            ),
+                          }))
+                        }
+                        placeholder="เช่น reply-object id"
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+              <Button
+                variant="ghost"
+                className="mt-2 gap-1"
+                onClick={() =>
+                  setForm((f) => ({
+                    ...f,
+                    responseRows: [
+                      ...f.responseRows,
+                      { replyType: 'text', textContent: '', replyObjectId: '' },
+                    ],
+                  }))
+                }
+              >
+                <Plus className="h-4 w-4" />
+                เพิ่มคำตอบ
+              </Button>
             </div>
 
             <label className="flex min-h-touch items-center gap-2">
