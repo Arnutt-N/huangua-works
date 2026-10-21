@@ -96,6 +96,21 @@ export function Composer({
       )}
 
       <div className="space-y-3 p-3">
+        {canReply && cannedResponses.length > 0 && (
+          <div className="flex flex-wrap gap-1.5" aria-label="ข้อความด่วน">
+            {cannedResponses.slice(0, 3).map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handlePick(item)}
+                className="inline-flex min-h-touch items-center gap-1 rounded-pill border border-border bg-surface px-2.5 py-1 text-xs font-medium text-muted hover:bg-accent-sunken hover:text-accent-strong"
+              >
+                <Zap className="h-3 w-3" aria-hidden="true" />
+                {item.title}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="flex items-center gap-1">
           <button
             type="button"
