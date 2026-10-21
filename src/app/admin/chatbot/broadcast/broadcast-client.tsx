@@ -76,7 +76,7 @@ export function BroadcastClient() {
         adminApi.createBroadcast({
           content: [{ type: 'text', text: message.trim() }],
           target: currentTarget(),
-          scheduledAt: scheduleAt || null,
+          scheduledAt: scheduleAt ? new Date(scheduleAt).toISOString() : null,
         }),
       scheduleAt ? 'ตั้งเวลาส่งแล้ว' : 'สร้างร่างสำเร็จ',
     );
@@ -137,7 +137,8 @@ export function BroadcastClient() {
             {items.map((item) => {
               const st = STATUS_MAP[item.status] ?? STATUS_MAP.draft!;
               const Icon = st.icon;
-              const text = item.content[0]?.text ?? '';
+              const first = item.content[0];
+              const text = first?.type === 'text' ? (first.text ?? '') : first ? `[${first.type}]` : '';
               return (
                 <div key={item.id} className="flex items-start gap-3 rounded-lg border border-border/50 p-4">
                   <Icon className={`mt-0.5 h-5 w-5 flex-none ${st.cls}`} />

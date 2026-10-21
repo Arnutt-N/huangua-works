@@ -2,20 +2,21 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { adminApi } from '@/app/admin/_lib/admin-api';
+import { adminApi, type BroadcastContent } from '@/app/admin/_lib/admin-api';
 import { AdminCard } from '@/components/admin/admin-card';
 import { Button } from '@/components/ui/button';
 import { FieldHint, Label, Textarea } from '@/components/ui/field';
-import { ArrowLeft, ArrowRight, Check, FileText, Image, Braces, LayoutGrid } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, FileText, Image, Braces } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
-type ContentType = 'text' | 'image' | 'flex' | 'object';
+// ponytail: ตัด type object ออกชั่วคราว — server ยังไม่มี resolver $objectId → LineOutgoingMessage
+// คืนได้เมื่อ broadcast-service แกะ ref ก่อนยิง LINE API
+type ContentType = 'text' | 'image' | 'flex';
 
 const TYPE_CARDS: { key: ContentType; label: string; desc: string; icon: typeof FileText }[] = [
   { key: 'text', label: 'ข้อความ', desc: 'ส่งข้อความตัวอักษรธรรมดา', icon: FileText },
   { key: 'image', label: 'รูปภาพ', desc: 'ส่งรูปภาพพร้อม URL', icon: Image },
   { key: 'flex', label: 'Flex Message', desc: 'ส่ง Flex Message ด้วย JSON', icon: Braces },
-  { key: 'object', label: 'Reply Object', desc: 'ใช้ template ที่มีอยู่แล้ว', icon: LayoutGrid },
 ];
 
 const STEPS = ['เลือกประเภท', 'เขียนข้อความ', 'เลือกกลุ่มเป้าหมาย', 'ตรวจสอบและส่ง'];
@@ -27,7 +28,7 @@ export function BroadcastWizardClient() {
   const [message, setMessage] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [flexJson, setFlexJson] = useState('{}');
-  const [objectId, setObjectId] = useState('');
+  const [flexAltText, setFlexAltText] = useState('');
   const [targetKind, setTargetKind] = useState<'all' | 'specific'>('all');
   const [recipientOptions, setRecipientOptions] = useState<{ id: string; displayName: string | null }[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -56,25 +57,36 @@ export function BroadcastWizardClient() {
     setEstimate(res.ok ? res.data.estimatedRecipients : null);
   }
 
-  function buildContent(): { content: { type: string; text?: string }[]; error: string | null } {
+  function buildContent(): { content: BroadcastContent[]; error: string | null } {
     if (contentType === 'text') {
       if (!message.trim()) return { content: [], error: 'กรุณากรอกข้อความ' };
       return { content: [{ type: 'text', text: message.trim() }], error: null };
     }
     if (contentType === 'image') {
-      if (!imageUrl.trim()) return { content: [], error: 'กรุณากรอก URL รูปภาพ' };
-      return { content: [{ type: 'text', text: imageUrl.trim() }], error: null };
-    }
-    if (contentType === 'flex') {
+      const url = imageUrl.trim();
+      if (!url) return { content: [], error: 'กรุณากรอก URL รูปภาพ' };
       try {
-        JSON.parse(flexJson);
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'https:') return { content: [], error: 'URL รูปภาพต้องขึ้นต้นด้วย https://' };
       } catch {
-        return { content: [], error: 'Flex JSON ไม่ถูกต้อง' };
+        return { content: [], error: 'URL รูปภาพไม่ถูกต้อง' };
       }
-      return { content: [{ type: 'text', text: flexJson.trim() }], error: null };
+      return { content: [{ type: 'image', originalContentUrl: url, previewImageUrl: url }], error: null };
     }
-    if (!objectId.trim()) return { content: [], error: 'กรุณากรอก Object ID' };
-    return { content: [{ type: 'text', text: `$${objectId.trim()}` }], error: null };
+    let contents: Record<string, unknown>;
+    try {
+      const parsed: unknown = JSON.parse(flexJson);
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        return { content: [], error: 'Flex JSON ต้องเป็น object' };
+      }
+      contents = parsed as Record<string, unknown>;
+    } catch {
+      return { content: [], error: 'Flex JSON ไม่ถูกต้อง' };
+    }
+    // § altText มาจาก field ที่ผู้ใช้กรอกแยก ไม่เดาจาก text field แรก — JSON เปลี่ยนรูปได้ เดาเสี่ยงว่าง/ผิด
+    const altText = flexAltText.trim();
+    if (!altText) return { content: [], error: 'กรุณากรอกข้อความสำรอง (altText)' };
+    return { content: [{ type: 'flex', altText, contents }], error: null };
   }
 
   async function handleCreate() {
@@ -92,7 +104,7 @@ export function BroadcastWizardClient() {
     const res = await adminApi.createBroadcast({
       content,
       target: currentTarget(),
-      scheduledAt: scheduleAt || null,
+      scheduledAt: scheduleAt ? new Date(scheduleAt).toISOString() : null,
     });
     setSaving(false);
     if (!res.ok) {
@@ -189,28 +201,29 @@ export function BroadcastWizardClient() {
             </div>
           )}
           {contentType === 'flex' && (
-            <div>
-              <Label htmlFor="bw-flex">Flex JSON</Label>
-              <Textarea
-                id="bw-flex"
-                rows={6}
-                value={flexJson}
-                onChange={(e) => setFlexJson(e.target.value)}
-                className="font-mono text-sm"
-              />
-            </div>
-          )}
-          {contentType === 'object' && (
-            <div>
-              <Label htmlFor="bw-obj">Object ID (ไม่ต้องใส่ $)</Label>
-              <input
-                id="bw-obj"
-                aria-label="Object ID (ไม่ต้องใส่ $)"
-                value={objectId}
-                onChange={(e) => setObjectId(e.target.value)}
-                placeholder="เช่น welcome_flex"
-                className="min-h-touch w-full rounded-md border border-border bg-surface-raised px-4 font-mono text-sm text-ink"
-              />
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="bw-flex">Flex JSON</Label>
+                <Textarea
+                  id="bw-flex"
+                  rows={6}
+                  value={flexJson}
+                  onChange={(e) => setFlexJson(e.target.value)}
+                  className="font-mono text-sm"
+                />
+              </div>
+              <div>
+                <Label htmlFor="bw-alt">ข้อความสำรอง (altText)</Label>
+                <input
+                  id="bw-alt"
+                  aria-label="ข้อความสำรอง (altText)"
+                  value={flexAltText}
+                  onChange={(e) => setFlexAltText(e.target.value)}
+                  placeholder="เช่น ประกาศจาก อบต.หัวงัว"
+                  className="min-h-touch w-full rounded-md border border-border bg-surface-raised px-4 text-ink"
+                />
+                <FieldHint>แสดงแทน Flex บนอุปกรณ์ที่ไม่รองรับ</FieldHint>
+              </div>
             </div>
           )}
         </AdminCard>
