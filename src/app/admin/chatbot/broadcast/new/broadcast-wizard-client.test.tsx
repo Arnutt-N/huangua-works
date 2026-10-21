@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BroadcastWizardClient } from './broadcast-wizard-client';
@@ -12,7 +12,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/app/admin/_lib/admin-api', () => ({
   adminApi: {
     listBroadcastRecipients: vi.fn().mockResolvedValue({ ok: true, data: { items: [] } }),
-    dryRunBroadcast: vi.fn().mockResolvedValue({ ok: true, data: { estimatedRecipients: 5 } }),
+    dryRunBroadcast: vi.fn(),
     createBroadcast: vi.fn().mockResolvedValue({ ok: true, data: {} }),
   },
 }));
@@ -47,16 +47,30 @@ describe('BroadcastWizardClient ตัวช่วยสร้าง 4 ขั้
     expect(screen.getByLabelText('URL รูปภาพ (https)')).toBeInTheDocument();
   });
 
-  it('ขั้นตรวจสอบแสดงสรุปก่อนสร้าง', async () => {
+  it('ขั้นตรวจสอบแสดง preview + dry-run ก่อนสร้าง', async () => {
     const user = userEvent.setup();
+    const dryRun = adminApi.dryRunBroadcast as ReturnType<typeof vi.fn>;
+    // § ตั้งก่อน render — mock ต้องพร้อมก่อนกดทดลองส่ง
+    dryRun.mockResolvedValue({ ok: true, data: { estimatedRecipients: 5 } });
     render(<BroadcastWizardClient />);
 
     await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
+    await user.type(screen.getByLabelText('ข้อความประกาศ'), 'น้ำประปาไม่ไหล');
     await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
     await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
 
-    expect(screen.getByText('ผู้ติดตามทุกคน')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'สร้างร่าง' })).toBeInTheDocument();
+    expect(await screen.findByText('น้ำประปาไม่ไหล')).toBeInTheDocument();
+    expect(screen.queryByText('ไม่มีสร้างงานจริง')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'ทดลองส่ง' }));
+    await waitFor(() => expect(dryRun).toHaveBeenCalledTimes(1));
+    // § "ประมาณ {n} คน — ..." แตกเป็นหลาย text node — matcher รวม textContent เฉพาะ span ผล dry-run
+    expect(
+      await screen.findByText(
+        (_, el) => el?.tagName === 'SPAN' && (el?.textContent?.includes('ไม่มีสร้างงานจริง') ?? false),
+        {},
+        { timeout: 3000 },
+      ),
+    ).toBeInTheDocument();
   });
 
   it('บล็อกเมื่อข้อความว่าง', async () => {

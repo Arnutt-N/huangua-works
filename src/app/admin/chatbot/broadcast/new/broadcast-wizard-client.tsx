@@ -306,27 +306,55 @@ export function BroadcastWizardClient() {
       )}
 
       {step === 3 && (
-        <AdminCard>
-          <dl className="space-y-2 text-sm">
-            <div className="flex gap-2">
-              <dt className="w-28 flex-none text-muted">ประเภท</dt>
-              <dd className="text-ink">{TYPE_CARDS.find((t) => t.key === contentType)?.label}</dd>
-            </div>
-            <div className="flex gap-2">
-              <dt className="w-28 flex-none text-muted">ผู้รับ</dt>
-              <dd className="text-ink">
-                {targetKind === 'all'
-                  ? 'ผู้ติดตามทุกคน'
-                  : `เฉพาะราย ${selectedIds.length} คน`}
-                {estimate !== null && ` (ประมาณ ${estimate} คน)`}
-              </dd>
-            </div>
-            <div className="flex gap-2">
-              <dt className="w-28 flex-none text-muted">กำหนดส่ง</dt>
-              <dd className="text-ink">{scheduleAt || 'สร้างเป็นร่าง (ส่งมือ)'}</dd>
-            </div>
-          </dl>
-        </AdminCard>
+        <div className="space-y-4">
+          <AdminCard>
+            <dl className="space-y-2 text-sm">
+              <div className="flex gap-2">
+                <dt className="w-28 flex-none text-muted">ประเภท</dt>
+                <dd className="text-ink">{TYPE_CARDS.find((t) => t.key === contentType)?.label}</dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="w-28 flex-none text-muted">ผู้รับ</dt>
+                <dd className="text-ink">
+                  {targetKind === 'all'
+                    ? 'ผู้ติดตามทุกคน'
+                    : `เฉพาะราย ${selectedIds.length} คน`}
+                  {estimate !== null && ` (ประมาณ ${estimate} คน)`}
+                </dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="w-28 flex-none text-muted">กำหนดส่ง</dt>
+                <dd className="text-ink">{scheduleAt || 'สร้างเป็นร่าง (ส่งมือ)'}</dd>
+              </div>
+            </dl>
+          </AdminCard>
+
+          <AdminCard>
+            <p className="mb-2 text-xs text-muted">ตัวอย่างเนื้อหา</p>
+            {contentType === 'text' && (
+              <p className="whitespace-pre-wrap text-sm text-ink">{message || '—'}</p>
+            )}
+            {contentType === 'image' && (
+              <div className="space-y-1">
+                <p className="break-all font-mono text-xs text-ink">{imageUrl || '—'}</p>
+                {imageUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={imageUrl} alt="ตัวอย่างรูปประกาศ" className="max-w-xs rounded-lg border border-border" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                )}
+              </div>
+            )}
+            {contentType === 'flex' && (
+              <pre className="max-h-48 overflow-auto font-mono text-xs text-ink">{flexJson || '{}'}</pre>
+            )}
+          </AdminCard>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Button type="button" variant="outline" onClick={refreshEstimate}>
+              ทดลองส่ง
+            </Button>
+            {estimate !== null && <span className="text-sm text-muted">ประมาณ {estimate} คน — ไม่มีสร้างงานจริง</span>}
+          </div>
+        </div>
       )}
 
       <div className="flex justify-between">
