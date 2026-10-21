@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import type { IntentItem, IntentMatchType } from '@/app/admin/_lib/admin-api';
 import { adminApi } from '@/app/admin/_lib/admin-api';
 import { useResource } from '@/app/admin/_lib/use-resource';
-import { Plus, Pencil, Trash2, Bot } from 'lucide-react';
+import { Plus, Pencil, Trash2, Bot, Eye } from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import {
   Dialog,
@@ -66,7 +67,7 @@ export function IntentSection() {
   const [form, setForm] = useState<IntentForm>(emptyForm);
   const [saving, setSaving] = useState(false);
 
-  const { data, loading, feedback, notify, mutate } = useResource({
+  const { data, loading, feedback, notify, mutate, reload } = useResource({
     load: adminApi.listIntents,
   });
   const items = data?.items ?? [];
@@ -144,6 +145,28 @@ export function IntentSection() {
   async function handleDelete(item: IntentItem) {
     if (!confirm(`ลบหมวด "${item.name}" ?`)) return;
     await mutate(() => adminApi.deleteIntent(item.id), 'ลบหมวดแล้ว');
+  }
+
+  async function handleToggle(item: IntentItem) {
+    // § toggle ส่ง full payload (server ไม่มี PATCH เฉพาะ isActive) — ดึง keyword/response เดิมใส่ครบ
+    const res = await adminApi.updateIntent(item.id, {
+      name: item.name,
+      description: item.description,
+      isActive: !item.isActive,
+      keywords: item.keywords.map((k) => ({ keyword: k.keyword, matchType: k.matchType })),
+      responses: item.responses.map((r, i) => ({
+        replyType: r.replyType,
+        textContent: r.textContent,
+        replyObjectId: r.replyObjectId,
+        displayOrder: i,
+      })),
+    });
+    if (!res.ok) {
+      notify('error', res.error);
+      return;
+    }
+    notify('success', item.isActive ? 'ปิดหมวดแล้ว' : 'เปิดหมวดแล้ว');
+    await reload();
   }
 
   return (
@@ -236,6 +259,27 @@ export function IntentSection() {
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex justify-end gap-1">
+                          <Link
+                            href={`/admin/chatbot/auto-replies/${item.id}`}
+                            className="flex min-h-touch min-w-touch items-center justify-center rounded-md hover:bg-accent/10"
+                            aria-label={`ดู ${item.name}`}
+                          >
+                            <Eye className="h-4 w-4 text-muted" />
+                          </Link>
+                          <button
+                            onClick={() => handleToggle(item)}
+                            className="flex min-h-touch items-center justify-center rounded-full px-2 text-xs font-medium hover:bg-accent/10"
+                            aria-label={`${item.isActive ? 'ปิด' : 'เปิด'} ${item.name}`}
+                            aria-pressed={item.isActive}
+                          >
+                            <span
+                              className={`inline-block rounded-full px-2 py-0.5 ${
+                                item.isActive ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'
+                              }`}
+                            >
+                              {item.isActive ? 'เปิด' : 'ปิด'}
+                            </span>
+                          </button>
                           <button
                             onClick={() => openEdit(item)}
                             className="min-h-touch min-w-touch flex items-center justify-center rounded-md hover:bg-accent/10"

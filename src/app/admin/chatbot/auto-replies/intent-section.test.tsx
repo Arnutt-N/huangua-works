@@ -53,14 +53,34 @@ beforeEach(() => {
   deleteIntent.mockReset();
 });
 
-describe('IntentSection หมวดเจตนา', () => {
-  it('ลิสต์แสดงชื่อ keyword และป้ายพร้อม', async () => {
+describe('IntentSection หมวดเจตนา JSK', () => {
+  it('ลิสต์แสดงชื่อ keyword และป้ายพร้อม + ลิงก์ดู + ปุ่มเปิดปิด', async () => {
     listIntents.mockResolvedValue({ ok: true, data: { items: [intent()] } });
     render(<IntentSection />);
 
     expect(await screen.findByText('เวลาทำการ')).toBeInTheDocument();
     expect(screen.getByText('กี่โมง')).toBeInTheDocument();
     expect(screen.getAllByText('พร้อม').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole('link', { name: 'ดู เวลาทำการ' })).toHaveAttribute(
+      'href',
+      '/admin/chatbot/auto-replies/i1',
+    );
+    expect(screen.getByRole('button', { name: 'ปิด เวลาทำการ' })).toBeInTheDocument();
+  });
+
+  it('toggle ปิดยิง update isActive=false + reload', async () => {
+    updateIntent.mockResolvedValue({ ok: true, data: { ok: true } });
+    listIntents
+      .mockResolvedValueOnce({ ok: true, data: { items: [intent()] } })
+      .mockResolvedValueOnce({ ok: true, data: { items: [intent({ isActive: false })] } });
+    render(<IntentSection />);
+    await screen.findByText('เวลาทำการ');
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'ปิด เวลาทำการ' }));
+    await waitFor(() => expect(updateIntent).toHaveBeenCalled());
+    const [id, payload] = updateIntent.mock.calls[0] as [string, Record<string, unknown>];
+    expect(id).toBe('i1');
+    expect(payload).toMatchObject({ isActive: false, name: 'เวลาทำการ' });
   });
 
   it('หมวดไม่มี keyword แสดงไม่พร้อม', async () => {

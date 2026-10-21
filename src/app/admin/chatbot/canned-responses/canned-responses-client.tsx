@@ -147,39 +147,54 @@ export function CannedResponsesClient() {
             description="กดปุ่มเพิ่มข้อความด่วนเพื่อสร้างข้อความที่ใช้บ่อย"
           />
         ) : (
-          <ul className="divide-y divide-border">
-            {items.map((item) => (
-              <li key={item.id} className="flex items-start gap-2 py-3">
-                <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-2 text-sm font-semibold text-ink">
-                    <span className="truncate">{item.title}</span>
-                    {item.shortcut && (
-                      <code className="rounded-sm bg-accent-sunken px-1.5 py-0.5 text-[10px] font-bold text-accent-strong">
-                        /{item.shortcut}
-                      </code>
-                    )}
-                  </p>
-                  <p className="line-clamp-2 text-xs text-muted">{item.content}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => startEdit(item)}
-                  aria-label={`แก้ไข ${item.title}`}
-                  className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-md text-muted hover:bg-accent-sunken hover:text-accent-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
-                >
-                  <Pencil className="h-4 w-4" aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleDelete(item.id)}
-                  aria-label={`ลบ ${item.title}`}
-                  className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-md text-muted hover:bg-danger-soft hover:text-danger focus-visible:outline focus-visible:outline-2 focus-visible:outline-danger"
-                >
-                  <Trash2 className="h-4 w-4" aria-hidden="true" />
-                </button>
-              </li>
-            ))}
-          </ul>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-left">
+              <thead>
+                <tr className="border-b border-border/50 text-xs font-semibold uppercase tracking-wide text-muted">
+                  <th scope="col" className="px-4 py-2.5">ชอร์ตคัต</th>
+                  <th scope="col" className="px-4 py-2.5">ข้อความ</th>
+                  <th scope="col" className="px-4 py-2.5 text-right">จัดการ</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/30">
+                {items.map((item) => (
+                  <tr key={item.id} className="align-top hover:bg-accent/5">
+                    <td className="whitespace-nowrap px-4 py-3">
+                      {item.shortcut ? (
+                        <code className="rounded-sm bg-accent-sunken px-1.5 py-0.5 font-mono text-xs font-bold text-accent-strong">
+                          /{item.shortcut}
+                        </code>
+                      ) : (
+                        <span className="text-xs text-muted">—</span>
+                      )}
+                    </td>
+                    <td className="max-w-md px-4 py-3">
+                      <p className="text-sm font-medium text-ink">{item.title}</p>
+                      <p className="line-clamp-2 text-xs text-muted">{item.content}</p>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => startEdit(item)}
+                        aria-label={`แก้ไข ${item.title}`}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted hover:bg-accent-sunken hover:text-accent-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
+                      >
+                        <Pencil className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleDelete(item.id)}
+                        aria-label={`ลบ ${item.title}`}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted hover:bg-danger-soft hover:text-danger focus-visible:outline focus-visible:outline-2 focus-visible:outline-danger"
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </AdminCard>
 
