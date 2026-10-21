@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { LayoutGrid, Search, UsersRound } from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import {
@@ -272,14 +273,17 @@ export function FriendsClient() {
                             </span>
                           )}
                           <div className="min-w-0">
-                            <p className="truncate font-medium text-ink">
+                            <Link
+                              href={`/admin/friends/${friend.id}`}
+                              className="truncate font-medium text-accent-strong hover:underline"
+                            >
                               {friend.displayName ?? 'ไม่ระบุชื่อ'}
-                              {friend.refollowCount > 0 && (
-                                <span className="ml-2 rounded-full bg-accent-sunken px-1.5 py-0.5 text-[10px] font-bold text-accent-strong">
-                                  กลับมา {friend.refollowCount} ครั้ง
-                                </span>
-                              )}
-                            </p>
+                            </Link>
+                            {friend.refollowCount > 0 && (
+                              <span className="ml-2 rounded-full bg-accent-sunken px-1.5 py-0.5 text-[10px] font-bold text-accent-strong">
+                                กลับมา {friend.refollowCount} ครั้ง
+                              </span>
+                            )}
                             <p className="font-mono text-xs text-muted" title="ID แบบปกปิด — ไม่ใช่ LINE id จริง">
                               {friend.maskedId ?? '—'}
                             </p>
