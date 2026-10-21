@@ -156,9 +156,15 @@ export type BroadcastTarget =
   | { kind: 'all' }
   | { kind: 'line_user_ids'; ids: string[] };
 
+export interface BroadcastContent {
+  type: string;
+  text?: string;
+  [key: string]: unknown;
+}
+
 export interface BroadcastItem {
   id: string;
-  content: { type: string; text?: string }[];
+  content: BroadcastContent[];
   status: string;
   target: BroadcastTarget;
   scheduledAt: string | null;
@@ -171,7 +177,7 @@ export interface BroadcastItem {
 }
 
 export interface BroadcastInput {
-  content: { type: string; text?: string }[];
+  content: BroadcastContent[];
   target: BroadcastTarget;
   scheduledAt: string | null;
 }

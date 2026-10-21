@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import type { BroadcastItem } from '@/app/admin/_lib/admin-api';
 import { adminApi } from '@/app/admin/_lib/admin-api';
 import { useResource } from '@/app/admin/_lib/use-resource';
@@ -75,7 +76,7 @@ export function BroadcastClient() {
         adminApi.createBroadcast({
           content: [{ type: 'text', text: message.trim() }],
           target: currentTarget(),
-          scheduledAt: scheduleAt || null,
+          scheduledAt: scheduleAt ? new Date(scheduleAt).toISOString() : null,
         }),
       scheduleAt ? 'ตั้งเวลาส่งแล้ว' : 'สร้างร่างสำเร็จ',
     );
@@ -110,7 +111,19 @@ export function BroadcastClient() {
       <AdminCard>
         <AdminCardTitle
           icon={<Send className="h-4 w-4" />}
-          action={<Button onClick={openDialog} className="min-h-touch gap-1.5"><Plus className="h-4 w-4" /> สร้างประกาศ</Button>}
+          action={
+            <span className="flex gap-2">
+              <Link
+                href="/admin/chatbot/broadcast/new"
+                className="inline-flex min-h-touch items-center gap-1.5 rounded-md bg-accent-strong px-4 text-sm font-semibold text-on-accent"
+              >
+                <Plus className="h-4 w-4" /> ตัวช่วยสร้าง
+              </Link>
+              <Button onClick={openDialog} variant="outline" className="min-h-touch gap-1.5">
+                <Plus className="h-4 w-4" /> ด่วน
+              </Button>
+            </span>
+          }
         >
           ประวัติ Broadcast
         </AdminCardTitle>
@@ -124,7 +137,8 @@ export function BroadcastClient() {
             {items.map((item) => {
               const st = STATUS_MAP[item.status] ?? STATUS_MAP.draft!;
               const Icon = st.icon;
-              const text = item.content[0]?.text ?? '';
+              const first = item.content[0];
+              const text = first?.type === 'text' ? (first.text ?? '') : first ? `[${first.type}]` : '';
               return (
                 <div key={item.id} className="flex items-start gap-3 rounded-lg border border-border/50 p-4">
                   <Icon className={`mt-0.5 h-5 w-5 flex-none ${st.cls}`} />
