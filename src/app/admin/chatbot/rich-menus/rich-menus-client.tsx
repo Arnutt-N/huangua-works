@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import type { RichMenuItem } from '@/app/admin/_lib/admin-api';
 import { adminApi } from '@/app/admin/_lib/admin-api';
 import { useResource } from '@/app/admin/_lib/use-resource';
 import { useRef } from 'react';
-import { Plus, RefreshCw, Globe, ImageUp, LayoutGrid } from 'lucide-react';
+import { Plus, RefreshCw, Globe, ImageUp, LayoutGrid, Eye, BarChart3 } from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import {
   Dialog,
@@ -164,7 +165,22 @@ export function RichMenusClient() {
       <AdminCard>
         <AdminCardTitle
           icon={<LayoutGrid className="h-4 w-4" />}
-          action={<Button onClick={() => setDialogOpen(true)} className="min-h-touch gap-1.5"><Plus className="h-4 w-4" /> สร้าง</Button>}
+          action={
+            <span className="flex gap-2">
+              <Link
+                href="/admin/chatbot/rich-menus/aliases"
+                className="inline-flex min-h-touch items-center gap-1.5 rounded-md border border-border bg-transparent px-4 text-sm font-semibold text-ink"
+              >
+                Aliases
+              </Link>
+              <Link
+                href="/admin/chatbot/rich-menus/new"
+                className="inline-flex min-h-touch items-center gap-1.5 rounded-md bg-accent-strong px-4 text-sm font-semibold text-on-accent"
+              >
+                <Plus className="h-4 w-4" /> สร้าง
+              </Link>
+            </span>
+          }
         >
           Rich Menus ({items.length})
         </AdminCardTitle>
@@ -174,43 +190,83 @@ export function RichMenusClient() {
         ) : items.length === 0 ? (
           <div className="py-12 text-center text-muted">ยังไม่มี Rich Menu — กด &quot;สร้าง&quot; เพื่อเริ่ม</div>
         ) : (
-          <div className="space-y-3">
-            {items.map((item) => (
-              <div key={item.id} className="flex items-center gap-3 rounded-lg border border-border/50 p-4">
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-ink">{item.name}</p>
-                  <p className="mt-0.5 text-xs text-muted">
-                    {item.lineRichMenuId ? `LINE ID: ${item.lineRichMenuId}` : 'ยังไม่ได้ sync'}
-                    {item.lastSyncError && <span className="text-danger"> · {item.lastSyncError}</span>}
-                  </p>
-                </div>
-                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${item.status === 'active' ? 'bg-success/10 text-success' : 'bg-muted/10 text-muted'}`}>
-                  {item.status === 'active' ? 'ใช้งาน' : item.status}
-                </span>
-                {(item.displayStartAt || item.displayEndAt) && (
-                  <span className="rounded-full bg-muted/10 px-2 py-0.5 text-xs font-medium text-muted" title="cron แสดง/ปลดเมนูตามเวลานี้อัตโนมัติ">
-                    ⏰ ตามเวลา
-                  </span>
-                )}
-                <div className="flex gap-1">
-                  <Button variant="outline" onClick={() => handleSync(item)} className="min-h-touch gap-1 text-xs">
-                    <RefreshCw className="h-3.5 w-3.5" /> Sync
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => pickImage(item)}
-                    disabled={!item.lineRichMenuId || uploadingId === item.id}
-                    title={item.lineRichMenuId ? 'อัปรูปเมนู (PNG/JPEG ไม่เกิน 1MB)' : 'ต้อง Sync ก่อนอัปโหลดรูป'}
-                    className="min-h-touch gap-1 text-xs"
-                  >
-                    <ImageUp className="h-3.5 w-3.5" /> {uploadingId === item.id ? 'กำลังอัป...' : 'อัปรูป'}
-                  </Button>
-                  <Button variant="outline" onClick={() => handlePublish(item)} className="min-h-touch gap-1 text-xs" disabled={!item.lineRichMenuId}>
-                    <Globe className="h-3.5 w-3.5" /> Publish
-                  </Button>
-                </div>
-              </div>
-            ))}
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-left">
+              <thead>
+                <tr className="border-b border-border/50 text-xs font-semibold uppercase tracking-wide text-muted">
+                  <th scope="col" className="px-4 py-3">Preview</th>
+                  <th scope="col" className="px-4 py-3">รายละเอียดเมนู</th>
+                  <th scope="col" className="px-4 py-3 text-center">สถานะ</th>
+                  <th scope="col" className="px-4 py-3 text-right">จัดการ</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/30">
+                {items.map((item) => {
+                  const live = item.status === 'active' && item.lineRichMenuId && item.syncStatus === 'synced';
+                  return (
+                    <tr key={item.id} className="hover:bg-accent/5">
+                      <td className="w-32 px-4 py-3">
+                        <div className="flex h-16 w-28 items-center justify-center rounded-lg border border-border/50 bg-surface-sunken text-xs text-muted">
+                          {item.name.slice(0, 12)}
+                        </div>
+                      </td>
+                      <td className="max-w-60 px-4 py-3">
+                        <p className="truncate text-sm font-semibold text-ink">{item.name}</p>
+                        <p className="mt-0.5 text-xs text-muted">Bar Text: &quot;{item.chatBarText}&quot;</p>
+                        <p className="mt-0.5 truncate font-mono text-[10px] text-muted">
+                          {item.lineRichMenuId ?? 'LOCAL_ONLY'}
+                        </p>
+                        {item.lastSyncError && <p className="mt-0.5 text-xs text-danger">{item.lastSyncError}</p>}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-center">
+                        {live ? (
+                          <span className="inline-block rounded-full bg-success/10 px-2.5 py-0.5 text-[10px] font-bold text-success">
+                            Live Now
+                          </span>
+                        ) : (
+                          <span className="inline-block rounded-full bg-muted/10 px-2.5 py-0.5 text-[10px] font-bold text-muted">
+                            {item.status === 'active' ? 'ใช้งาน' : item.status}
+                          </span>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right">
+                        {!item.lineRichMenuId ? (
+                          <Button variant="outline" onClick={() => handleSync(item)} className="min-h-touch gap-1 text-xs">
+                            <RefreshCw className="h-3.5 w-3.5" /> Sync
+                          </Button>
+                        ) : item.syncStatus !== 'synced' ? (
+                          <Button variant="outline" onClick={() => handleSync(item)} className="min-h-touch gap-1 text-xs">
+                            <RefreshCw className="h-3.5 w-3.5" /> ซิงค์การแก้ไข
+                          </Button>
+                        ) : item.status !== 'active' ? (
+                          <Button variant="outline" onClick={() => handlePublish(item)} className="min-h-touch gap-1 text-xs">
+                            <Globe className="h-3.5 w-3.5" /> Set Active
+                          </Button>
+                        ) : (
+                          <span className="text-[10px] font-bold text-success">Live Now</span>
+                        )}
+                        <span className="ml-2 inline-flex gap-1">
+                          <Link
+                            href={`/admin/chatbot/rich-menus/${item.id}/insights`}
+                            aria-label={`สถิติ ${item.name}`}
+                            className="inline-flex min-h-touch min-w-touch items-center justify-center rounded-md hover:bg-accent/10"
+                          >
+                            <BarChart3 className="h-4 w-4 text-muted" />
+                          </Link>
+                          <Link
+                            href={`/admin/chatbot/rich-menus/${item.id}/edit`}
+                            aria-label={`แก้ไข ${item.name}`}
+                            className="inline-flex min-h-touch min-w-touch items-center justify-center rounded-md hover:bg-accent/10"
+                          >
+                            <Eye className="h-4 w-4 text-muted" />
+                          </Link>
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </AdminCard>
