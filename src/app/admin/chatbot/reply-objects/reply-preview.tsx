@@ -1,13 +1,12 @@
-'use client';
-
 import type { ReplyObjectType } from '@/lib/line/reply-object-validation';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /** สรุป payload 1 บรรทัดสำหรับ card — ไม่ render flex เต็ม (หนัก, เสี่ยง crash กับ draft) */
-export function payloadSummary(objectType: string, payload: Record<string, unknown>): string {
+export function payloadSummary(objectType: string, payload: unknown): string {
+  if (!isRecord(payload)) return '—';
   if (objectType === 'text' || objectType === 'text_v2') {
     const text = payload.text;
     return typeof text === 'string' && text.length > 0 ? text.slice(0, 80) : '—';
