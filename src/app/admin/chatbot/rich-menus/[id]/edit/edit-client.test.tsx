@@ -42,7 +42,7 @@ beforeEach(() => {
 describe('RichMenuEditClient', () => {
   it('แสดงชื่อ + LINE ID + ปุ่มซิงค์ (ไม่แก้ชื่อที่หน้านี้)', async () => {
     render(<RichMenuEditClient menuId="m1" />);
-    expect(await screen.findByText(/แก้ไขเมนู/)).toBeInTheDocument();
+    expect(await screen.findByText(/ซิงก์\/เผยแพร่เมนู/)).toBeInTheDocument();
     expect(screen.getByText('jsk4.0-v2')).toBeInTheDocument();
     expect(screen.getByText('richmenu-abc')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'ซิงค์ไป LINE' })).toBeInTheDocument();

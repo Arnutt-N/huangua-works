@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import type { IntentItem, IntentMatchType } from '@/app/admin/_lib/admin-api';
 import { adminApi } from '@/app/admin/_lib/admin-api';
+import { readinessOf } from './readiness';
 import { useResource } from '@/app/admin/_lib/use-resource';
 import { Plus, Pencil, Trash2, Bot, Eye } from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
@@ -53,12 +54,6 @@ function emptyForm(): IntentForm {
     responseRows: [{ replyType: 'text', textContent: '', replyObjectId: '' }],
     isActive: true,
   };
-}
-
-function readinessOf(item: IntentItem): { ready: boolean; reason: string } {
-  if (item.keywords.length === 0) return { ready: false, reason: 'ยังไม่มี keyword' };
-  if (item.responses.length === 0) return { ready: false, reason: 'ยังไม่มีคำตอบ' };
-  return { ready: true, reason: 'พร้อม' };
 }
 
 export function IntentSection() {

@@ -236,9 +236,9 @@ export function BroadcastClient() {
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-xs text-muted">
                           {item.sentAt
-                            ? new Date(item.sentAt).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })
+                            ? new Date(item.sentAt).toLocaleString('th-TH', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })
                             : item.scheduledAt
-                              ? new Date(item.scheduledAt).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })
+                              ? new Date(item.scheduledAt).toLocaleString('th-TH', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })
                               : '—'}
                         </td>
                         <td className="px-4 py-3 text-right">

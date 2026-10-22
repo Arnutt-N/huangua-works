@@ -43,6 +43,14 @@ export function BroadcastWizardClient() {
   }
 
   function goStep(next: number) {
+    // § ห้ามข้าม step 1 โดย content ยังผิด — กันกดถัดไปรัวแล้ว error ไปโผล่ step สุดท้าย
+    if (next > 1) {
+      const { error: contentError } = buildContent();
+      if (contentError) {
+        setError(contentError);
+        return;
+      }
+    }
     setError(null);
     if (next === 2 && recipientOptions.length === 0) void loadRecipients();
     setStep(next);
@@ -97,6 +105,11 @@ export function BroadcastWizardClient() {
     const { content, error: contentError } = buildContent();
     if (contentError) {
       setError(contentError);
+      return;
+    }
+    // § datetime-local เป็นเวลาท้องถิ่น — ตั้งอดีตผ่านจะค้าง scheduled ไม่ส่ง (cron ยิง <= NOW)
+    if (scheduleAt && new Date(scheduleAt).getTime() <= Date.now()) {
+      setError('เวลาส่งต้องเป็นอนาคต — เลือกเวลาใหม่หรือเว้นว่างเพื่อสร้างเป็นร่าง');
       return;
     }
     setSaving(true);
@@ -350,7 +363,7 @@ export function BroadcastWizardClient() {
 
           <div className="flex flex-wrap items-center gap-3">
             <Button type="button" variant="outline" onClick={refreshEstimate}>
-              ทดลองส่ง
+              ประเมินจำนวนผู้รับ
             </Button>
             {estimate !== null && <span className="text-sm text-muted">ประมาณ {estimate} คน — ไม่มีสร้างงานจริง</span>}
           </div>

@@ -32,8 +32,8 @@ export function CannedResponsesClient() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const reload = async () => {
-    const rows = await fetchCannedResponses();
+  async function applyRows(promise: Promise<CannedResponse[] | null>) {
+    const rows = await promise;
     if (rows) {
       setItems(rows);
       setLoadError(null);
@@ -41,24 +41,15 @@ export function CannedResponsesClient() {
       setItems([]);
       setLoadError('โหลดข้อมูลไม่สำเร็จ');
     }
-  };
+  }
 
+  const reload = () => void applyRows(fetchCannedResponses());
+
+  // § เรียก reload ผ่าน timer ไม่ใช่ตรงๆ — rule set-state-in-effect จับ function ที่มี
+  // setState แม้อยู่หลัง await (pattern เดียวกับ use-resource.ts)
   useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const rows = await fetchCannedResponses();
-      if (cancelled) return;
-      if (rows) {
-        setItems(rows);
-        setLoadError(null);
-      } else {
-        setItems([]);
-        setLoadError('โหลดข้อมูลไม่สำเร็จ');
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    const timer = setTimeout(() => void applyRows(fetchCannedResponses()), 0);
+    return () => clearTimeout(timer);
   }, []);
 
   const startCreate = () => {

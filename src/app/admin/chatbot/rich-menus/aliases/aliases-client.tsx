@@ -4,6 +4,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Plus } from 'lucide-react';
 import { adminApi } from '@/app/admin/_lib/admin-api';
+import { isUsableMenu } from '../menu-predicates';
+import { AliasList } from '../alias-list';
 import { useResource } from '@/app/admin/_lib/use-resource';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import { Button } from '@/components/ui/button';
@@ -19,7 +21,7 @@ export function RichMenuAliasesClient() {
   const items = menusRes.data?.items ?? [];
   const aliases = aliasesRes.data?.items ?? [];
   const loading = menusRes.loading || aliasesRes.loading;
-  const syncedMenus = items.filter((m) => m.lineRichMenuId && m.syncStatus === 'synced');
+  const syncedMenus = items.filter(isUsableMenu);
 
   async function handleCreate() {
     if (!aliasId.trim() || !aliasTarget) {
@@ -80,31 +82,12 @@ export function RichMenuAliasesClient() {
         {loading ? (
           <p className="py-6 text-center text-sm text-muted">กำลังโหลด...</p>
         ) : (
-          <div className="mt-3 space-y-2">
-            {aliases.map((a) => (
-              <div key={a.aliasId} className="flex flex-col gap-2 rounded-lg border border-border/50 p-3 sm:flex-row sm:items-center">
-                <code className="font-mono text-sm font-medium text-ink">{a.aliasId}</code>
-                <span className="text-xs text-muted">→ {a.menuName ?? '(เมนูถูกลบ?)'}</span>
-                <div className="flex gap-1 sm:ml-auto">
-                  <select
-                    aria-label={`ย้ายเป้า ${a.aliasId}`}
-                    defaultValue=""
-                    onChange={(e) => handleRepoint(a.aliasId, e.target.value)}
-                    className="min-h-touch rounded-lg border border-border/50 bg-surface px-2 text-xs"
-                  >
-                    <option value="">ย้ายเป้า…</option>
-                    {syncedMenus.map((m) => (
-                      <option key={m.id} value={m.id}>{m.name}</option>
-                    ))}
-                  </select>
-                  <Button variant="outline" onClick={() => handleDelete(a.aliasId)} className="min-h-touch text-xs">ลบ</Button>
-                </div>
-              </div>
-            ))}
-            {aliases.length === 0 && (
-              <p className="py-4 text-center text-sm text-muted">ยังไม่มี alias — ปุ่ม richmenuswitch ในเมนูอ้างชื่อนี้เพื่อสลับ tab</p>
-            )}
-          </div>
+          <AliasList
+            aliases={aliases}
+            syncedMenus={syncedMenus}
+            onRepoint={(alias, menuId) => void handleRepoint(alias, menuId)}
+            onDelete={(alias) => void handleDelete(alias)}
+          />
         )}
       </AdminCard>
     </div>
