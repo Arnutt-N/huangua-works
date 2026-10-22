@@ -108,3 +108,9 @@ graft/
 .mcp.json
 opencode.json
 GEMINI.md
+
+.vercel
+.env*
+backups/
+.claude/worktrees/
+.audit/
