@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/field';
 import { useResource } from '@/app/admin/_lib/use-resource';
 import { adminApi, type FriendItem, type RichMenuItem } from '@/app/admin/_lib/admin-api';
+import { isUsableMenu } from '@/app/admin/chatbot/rich-menus/menu-predicates';
 
 type StatusFilter = 'all' | FriendItem['followState'];
 
@@ -119,7 +120,7 @@ export function FriendsClient() {
   const isFiltered = q.trim() !== '' || status !== 'all';
   const bulkMenusRes = useResource({ load: adminApi.listRichMenus });
   const bulkMenus = bulkMenusRes.data?.items ?? [];
-  const usableBulkMenus = bulkMenus.filter((m) => m.lineRichMenuId && m.status !== 'inactive');
+  const usableBulkMenus = bulkMenus.filter(isUsableMenu);
 
   function toggleSelect(id: string, checked: boolean) {
     setSelected((prev) => {
