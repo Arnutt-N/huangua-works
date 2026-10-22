@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { History, Search } from 'lucide-react';
+import { History, RefreshCw, Search } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import { EmptyState } from '@/components/admin/empty-state';
@@ -38,7 +38,19 @@ export function ChatHistoriesClient() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [filter, setFilter] = useState<HistoryFilter>('closed');
   const [query, setQuery] = useState('');
+  const [page, setPage] = useState(0);
   const { results: searchResults, searching } = useMessageSearch(query);
+
+  const load = useCallback(async () => {
+    const rows = await fetchConversations();
+    if (rows) {
+      setConversations(rows);
+      setLoadError(null);
+    } else {
+      setConversations([]);
+      setLoadError('โหลดข้อมูลไม่สำเร็จ');
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -84,10 +96,47 @@ export function ChatHistoriesClient() {
 
   const hasQuery = query.trim().length > 0;
 
+  const ITEMS_PER_PAGE = 20;
+  const paged = useMemo(() => {
+    const start = page * ITEMS_PER_PAGE;
+    return visible.slice(start, start + ITEMS_PER_PAGE);
+  }, [visible, page]);
+  const totalPages = Math.max(1, Math.ceil(visible.length / ITEMS_PER_PAGE));
+
+  // § เปลี่ยน filter/query กลับหน้าแรก — เรียกใน handler ไม่ใช่ effect (กัน set-state-in-effect)
+  function handleFilterChange(next: HistoryFilter) {
+    setFilter(next);
+    setPage(0);
+  }
+
+  function handleQueryChange(next: string) {
+    setQuery(next);
+    setPage(0);
+  }
+
+  function chatModeBadge(mode: string): string {
+    if (mode === 'bot_active') return 'BOT';
+    if (mode === 'human') return 'HUMAN';
+    if (mode === 'resolved') return 'ปิดเรื่อง';
+    return modeLabel(mode);
+  }
+
   return (
     <div className="space-y-4">
       <AdminCard>
-        <AdminCardTitle icon={<History className="h-4 w-4" />}>
+        <AdminCardTitle
+          icon={<History className="h-4 w-4" />}
+          action={
+            <button
+              type="button"
+              onClick={() => void load()}
+              aria-label="รีเฟรช"
+              className="inline-flex min-h-touch min-w-touch items-center justify-center rounded-md text-muted hover:bg-accent-sunken hover:text-ink"
+            >
+              <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            </button>
+          }
+        >
           ประวัติการสนทนา {conversations !== null && `(${visible.length.toLocaleString('th-TH')})`}
         </AdminCardTitle>
 
@@ -99,7 +148,7 @@ export function ChatHistoriesClient() {
           <input
             type="search"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => handleQueryChange(e.target.value)}
             placeholder="ค้นหาชื่อหรือข้อความ..."
             aria-label="ค้นหาประวัติการสนทนา"
             className={cn(
@@ -117,7 +166,7 @@ export function ChatHistoriesClient() {
               <button
                 key={chip.key}
                 type="button"
-                onClick={() => setFilter(chip.key)}
+                onClick={() => handleFilterChange(chip.key)}
                 aria-pressed={active}
                 className={cn(
                   'inline-flex flex-1 items-center justify-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-semibold',
@@ -161,56 +210,99 @@ export function ChatHistoriesClient() {
               }
             />
           ) : (
-            <ul className="divide-y divide-border">
-              {visible.map((conv) => {
-                const name = displayNameOf(conv);
-                return (
-                  <li key={conv.id}>
-                    <Link
-                      href={`/admin/chat-histories/${conv.id}`}
-                      className="flex items-center gap-3 p-3 text-left transition-colors duration-normal ease-out-expo hover:bg-accent-sunken"
-                    >
-                      <LineAvatar
-                        src={conv.pictureUrl}
-                        className="h-10 w-10 flex-none rounded-pill object-cover"
-                        fallback={
-                          <span
-                            className="inline-flex h-10 w-10 flex-none items-center justify-center rounded-pill bg-accent-sunken text-sm font-bold text-accent-strong"
-                            aria-hidden="true"
-                          >
-                            {name.slice(0, 1).toUpperCase()}
-                          </span>
-                        }
-                      />
-                      <span className="flex min-w-0 flex-1 flex-col gap-1">
-                        <span className="flex items-center gap-1.5">
-                          <span className="truncate text-sm font-semibold text-ink">{name}</span>
-                          <span className="ml-auto flex-none text-[10px] tabular-nums text-muted">
-                            {formatRelativeTime(conv.lastMessageAt)}
-                          </span>
-                        </span>
-                        <span className="flex items-center gap-1.5">
-                          <span className="truncate text-xs text-muted">
-                            {conv.lastMessageText ?? '—'}
-                          </span>
-                          <span className="ml-auto inline-flex flex-none items-center rounded-pill bg-surface-sunken px-1.5 py-0.5 text-[10px] font-medium text-muted">
-                            {modeLabel(conv.mode)}
-                          </span>
-                        </span>
-                        {conv.lineUserId && (
-                          <span
-                            className="text-[10px] tabular-nums text-muted"
-                            title="LINE user id (ปิดบังบางส่วน)"
-                          >
-                            {conv.lineUserId}
-                          </span>
-                        )}
-                      </span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-160 text-left">
+                  <thead>
+                    <tr className="border-b border-border/50 text-xs text-muted">
+                      <th scope="col" className="px-3 py-2 font-medium">ผู้ใช้</th>
+                      <th scope="col" className="px-3 py-2 font-medium">ข้อความล่าสุด</th>
+                      <th scope="col" className="px-3 py-2 font-medium">เวลา</th>
+                      <th scope="col" className="px-3 py-2 font-medium">โหมดแชท</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paged.map((conv) => {
+                      const name = displayNameOf(conv);
+                      return (
+                        <tr key={conv.id} className="border-b border-border/30 last:border-0 hover:bg-accent/5">
+                          <td className="px-3 py-2.5">
+                            <Link
+                              href={`/admin/chat-histories/${conv.id}`}
+                              className="flex items-center gap-2.5"
+                            >
+                              <LineAvatar
+                                src={conv.pictureUrl}
+                                className="h-9 w-9 flex-none rounded-pill object-cover"
+                                fallback={
+                                  <span
+                                    className="inline-flex h-9 w-9 flex-none items-center justify-center rounded-pill bg-accent-sunken text-sm font-bold text-accent-strong"
+                                    aria-hidden="true"
+                                  >
+                                    {name.slice(0, 1).toUpperCase()}
+                                  </span>
+                                }
+                              />
+                              <span className="min-w-0">
+                                <span className="block truncate text-sm font-semibold text-accent-strong">
+                                  {name}
+                                </span>
+                                {conv.lineUserId && (
+                                  <span
+                                    className="block font-mono text-[10px] tabular-nums text-muted"
+                                    title="LINE user id (ปิดบังบางส่วน)"
+                                  >
+                                    {conv.lineUserId}
+                                  </span>
+                                )}
+                              </span>
+                            </Link>
+                          </td>
+                          <td className="max-w-60 px-3 py-2.5">
+                            <span className="block truncate text-sm text-muted">
+                              {conv.lastMessageText ?? 'ยังไม่มีข้อความ'}
+                            </span>
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2.5 text-xs tabular-nums text-muted">
+                            {conv.lastMessageAt ? formatRelativeTime(conv.lastMessageAt) : '—'}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2.5">
+                            <span className="inline-flex items-center rounded-pill bg-surface-sunken px-1.5 py-0.5 text-[10px] font-medium text-muted">
+                              {chatModeBadge(conv.mode)}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex items-center justify-between pt-3 text-sm text-muted">
+                <span>
+                  {visible.length} สนทนา (หน้า {page + 1}/{totalPages})
+                </span>
+                <span className="flex gap-1">
+                  <button
+                    type="button"
+                    disabled={page <= 0}
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    aria-label="หน้าก่อนหน้า"
+                    className="inline-flex min-h-touch min-w-touch items-center justify-center rounded-md border border-border px-2 text-xs disabled:opacity-50"
+                  >
+                    ←
+                  </button>
+                  <button
+                    type="button"
+                    disabled={page >= totalPages - 1}
+                    onClick={() => setPage((p) => p + 1)}
+                    aria-label="หน้าถัดไป"
+                    className="inline-flex min-h-touch min-w-touch items-center justify-center rounded-md border border-border px-2 text-xs disabled:opacity-50"
+                  >
+                    →
+                  </button>
+                </span>
+              </div>
+            </>
           )}
         </div>
 

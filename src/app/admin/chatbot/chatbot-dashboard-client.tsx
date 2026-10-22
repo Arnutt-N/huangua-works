@@ -75,7 +75,14 @@ export function ChatbotDashboardClient() {
         <KpiCard icon={<MessageSquare className="h-4 w-4" />} label="ข้อความเข้า" value={stats.messages.totalIn} />
         <KpiCard icon={<Bot className="h-4 w-4" />} label="ข้อความออก (bot)" value={stats.messages.totalOut} />
         <KpiCard icon={<HelpCircle className="h-4 w-4" />} label="FAQ Hit Rate" value={`${stats.faq.hitRate}%`} sub={`${stats.faq.hits} hits / ${stats.faq.active} active FAQs`} />
-        <KpiCard icon={<UserPlus className="h-4 w-4" />} label="Handoff" value={stats.conversations.handoff} sub={`จาก ${stats.conversations.total} conversations`} />
+        <Link href="/admin/chat" className="block rounded-xl border border-border/50 p-4 hover:bg-accent/5">
+          <span className="flex items-center gap-2 text-muted">
+            <UserPlus className="h-4 w-4" />
+            <span className="text-xs font-medium uppercase">Handoff</span>
+          </span>
+          <span className="mt-2 block text-2xl font-bold tabular-nums text-ink">{stats.conversations.handoff}</span>
+          <span className="mt-0.5 block text-xs text-muted">จาก {stats.conversations.total} conversations — เปิด live chat →</span>
+        </Link>
       </div>
 
       <AdminCard>

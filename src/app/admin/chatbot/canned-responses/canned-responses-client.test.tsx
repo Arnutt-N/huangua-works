@@ -1,10 +1,13 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CannedResponse } from '@/app/admin/chat/_lib/types';
 import { CannedResponsesClient } from './canned-responses-client';
+
+// § เทสนี้รัน userEvent หลายขั้นภายใต้โหลดทั้งชุด timeout 5s ไม่พอ — 30s ตาม intake pattern
+vi.setConfig({ testTimeout: 30_000 });
 
 const fetchCannedResponses = vi.fn();
 const createCannedResponse = vi.fn();
@@ -39,20 +42,44 @@ beforeEach(() => {
 });
 
 describe('CannedResponsesClient หน้าแยก', () => {
-  it('ลิสต์แสดงชื่อ คีย์ลัด และเนื้อหา', async () => {
+  it('ตาราง ชอร์ตคัต/ข้อความ/จัดการ + แถว /shortcut', async () => {
     fetchCannedResponses.mockResolvedValue([item()]);
     render(<CannedResponsesClient />);
-
-    expect(await screen.findByText('ทักทาย')).toBeInTheDocument();
-    expect(screen.getByText('/hello')).toBeInTheDocument();
-    expect(screen.getByText('สวัสดีครับ ยินดีให้บริการ')).toBeInTheDocument();
+    expect(await screen.findByText('ชอร์ตคัต')).toBeInTheDocument();
+    expect(screen.getByText('ข้อความ')).toBeInTheDocument();
+    expect(screen.getByText('จัดการ')).toBeInTheDocument();
+    const table = screen.getByRole('table');
+    expect(within(table).getByText('/hello')).toBeInTheDocument();
+    expect(within(table).getByText('ทักทาย')).toBeInTheDocument();
+    expect(within(table).getByText('สวัสดีครับ ยินดีให้บริการ')).toBeInTheDocument();
   });
 
-  it('ห้องว่างแสดง empty state ไทย', async () => {
-    fetchCannedResponses.mockResolvedValue([]);
+  it('ไม่มี shortcut แสดงชื่ออย่างเดียว', async () => {
+    fetchCannedResponses.mockResolvedValue([item({ shortcut: null })]);
     render(<CannedResponsesClient />);
+    const table = await screen.findByRole('table');
+    expect(within(table).getByText('ทักทาย')).toBeInTheDocument();
+    expect(within(table).queryByText('/hello')).not.toBeInTheDocument();
+  });
 
-    expect(await screen.findByText('ยังไม่มีข้อความด่วน')).toBeInTheDocument();
+  it('โหลดล้มเหลวแสดง error ไม่ใช่ empty state', async () => {
+    fetchCannedResponses.mockResolvedValue(null);
+    render(<CannedResponsesClient />);
+    expect(await screen.findByText('โหลดข้อมูลไม่สำเร็จ')).toBeInTheDocument();
+    expect(screen.queryByText('ยังไม่มีข้อความด่วน')).not.toBeInTheDocument();
+  });
+
+  it('ลบต้อง confirm ก่อน — ยกเลิกไม่ยิง API', async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    fetchCannedResponses.mockResolvedValue([item()]);
+    render(<CannedResponsesClient />);
+    await screen.findByText('ทักทาย');
+
+    await user.click(screen.getByRole('button', { name: 'ลบ ทักทาย' }));
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(deleteCannedResponse).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
   });
 
   it('สร้างข้อความใหม่แล้ว reload ลิสต์', async () => {
@@ -82,8 +109,25 @@ describe('CannedResponsesClient หน้าแยก', () => {
     expect(screen.getByRole('button', { name: 'เพิ่ม' })).toBeDisabled();
   });
 
+  it('บันทึกซ้ำ shortcut ชนคืน 409 โชว์ใน dialog', async () => {
+    const user = userEvent.setup();
+    fetchCannedResponses.mockResolvedValue([]);
+    createCannedResponse.mockResolvedValue({ ok: false, error: 'shortcut นี้ถูกใช้แล้ว' });
+    render(<CannedResponsesClient />);
+    await screen.findByText('ยังไม่มีข้อความด่วน');
+
+    await user.click(screen.getByRole('button', { name: 'เพิ่มข้อความด่วน' }));
+    await user.type(screen.getByLabelText('ชื่อ'), 'ซ้ำ');
+    await user.type(screen.getByLabelText('เนื้อหา'), 'เนื้อหาซ้ำ');
+    await user.click(screen.getByRole('button', { name: 'เพิ่ม' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('shortcut นี้ถูกใช้แล้ว');
+    await waitFor(() => expect(createCannedResponse).toHaveBeenCalled());
+  });
+
   it('ลบแล้ว reload ลิสต์', async () => {
     const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     fetchCannedResponses.mockResolvedValueOnce([item()]).mockResolvedValueOnce([]);
     deleteCannedResponse.mockResolvedValue(true);
     render(<CannedResponsesClient />);
@@ -93,5 +137,6 @@ describe('CannedResponsesClient หน้าแยก', () => {
 
     await waitFor(() => expect(deleteCannedResponse).toHaveBeenCalledWith('c1'));
     expect(await screen.findByText('ยังไม่มีข้อความด่วน')).toBeInTheDocument();
+    confirmSpy.mockRestore();
   });
 });

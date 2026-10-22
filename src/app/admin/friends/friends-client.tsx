@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { LayoutGrid, Search, UsersRound } from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import {
@@ -34,6 +35,10 @@ export function FriendsClient() {
   const [q, setQ] = useState('');
   const [status, setStatus] = useState<StatusFilter>('all');
   const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkMenu, setBulkMenu] = useState('');
+  const [bulkSaving, setBulkSaving] = useState(false);
 
   const query = useMemo(() => {
     const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
@@ -112,6 +117,44 @@ export function FriendsClient() {
   }
 
   const isFiltered = q.trim() !== '' || status !== 'all';
+  const bulkMenusRes = useResource({ load: adminApi.listRichMenus });
+  const bulkMenus = bulkMenusRes.data?.items ?? [];
+  const usableBulkMenus = bulkMenus.filter((m) => m.lineRichMenuId && m.status !== 'inactive');
+
+  function toggleSelect(id: string, checked: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll(checked: boolean) {
+    setSelected(checked ? new Set(items.map((f) => f.id)) : new Set());
+  }
+
+  async function handleBulkAssign() {
+    if (selected.size === 0 || !bulkMenu) {
+      notify('error', 'กรุณาเลือกเพื่อนและ Rich Menu');
+      return;
+    }
+    if (!confirm(`กำหนดริชเมนูให้เพื่อน ${selected.size} คน?`)) return;
+    setBulkSaving(true);
+    const ids = [...selected];
+    let failed = 0;
+    for (const id of ids) {
+      const res = await adminApi.assignUserRichMenu(id, bulkMenu);
+      if (!res.ok) failed += 1;
+    }
+    setBulkSaving(false);
+    setBulkOpen(false);
+    setBulkMenu('');
+    setSelected(new Set());
+    if (failed > 0) notify('error', `กำหนดไม่สำเร็จ ${failed} คน`);
+    else notify('success', `กำหนดริชเมนูให้เพื่อน ${ids.length} คนแล้ว`);
+    await reload();
+  }
 
   return (
     <>
@@ -166,10 +209,30 @@ export function FriendsClient() {
           </div>
         ) : (
           <>
+            {selected.size > 0 && (
+              <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface-sunken px-3 py-2 text-sm">
+                <span className="font-medium text-ink">เลือก {selected.size} คน</span>
+                <Button variant="outline" onClick={() => setBulkOpen(true)} className="min-h-touch gap-1 text-xs">
+                  <LayoutGrid className="h-3.5 w-3.5" /> กำหนด Rich Menu
+                </Button>
+                <Button variant="ghost" onClick={() => setSelected(new Set())} className="min-h-touch text-xs">
+                  ล้างการเลือก
+                </Button>
+              </div>
+            )}
             <div className="overflow-x-auto">
               <table className="w-full min-w-160 text-left text-sm">
                 <thead>
                   <tr className="border-b border-border/50 text-xs text-muted">
+                    <th scope="col" className="px-3 py-2 font-medium">
+                      <input
+                        type="checkbox"
+                        aria-label="เลือกทั้งหมดในหน้านี้"
+                        checked={items.length > 0 && items.every((f) => selected.has(f.id))}
+                        onChange={(e) => toggleSelectAll(e.target.checked)}
+                        className="h-4 w-4"
+                      />
+                    </th>
                     <th scope="col" className="px-3 py-2 font-medium">เพื่อน</th>
                     <th scope="col" className="px-3 py-2 font-medium">สถานะ</th>
                     <th scope="col" className="px-3 py-2 font-medium">ติดตาม / กลับมา</th>
@@ -183,6 +246,15 @@ export function FriendsClient() {
                 <tbody>
                   {items.map((friend) => (
                     <tr key={friend.id} className="border-b border-border/30 last:border-0">
+                      <td className="px-3 py-2.5">
+                        <input
+                          type="checkbox"
+                          aria-label={`เลือก ${friend.displayName ?? 'เพื่อน'}`}
+                          checked={selected.has(friend.id)}
+                          onChange={(e) => toggleSelect(friend.id, e.target.checked)}
+                          className="h-4 w-4"
+                        />
+                      </td>
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-2.5">
                           {friend.pictureUrl ? (
@@ -201,9 +273,17 @@ export function FriendsClient() {
                             </span>
                           )}
                           <div className="min-w-0">
-                            <p className="truncate font-medium text-ink">
+                            <Link
+                              href={`/admin/friends/${friend.id}`}
+                              className="truncate font-medium text-accent-strong hover:underline"
+                            >
                               {friend.displayName ?? 'ไม่ระบุชื่อ'}
-                            </p>
+                            </Link>
+                            {friend.refollowCount > 0 && (
+                              <span className="ml-2 rounded-full bg-accent-sunken px-1.5 py-0.5 text-[10px] font-bold text-accent-strong">
+                                กลับมา {friend.refollowCount} ครั้ง
+                              </span>
+                            )}
                             <p className="font-mono text-xs text-muted" title="ID แบบปกปิด — ไม่ใช่ LINE id จริง">
                               {friend.maskedId ?? '—'}
                             </p>
@@ -323,6 +403,44 @@ export function FriendsClient() {
             <Button variant="ghost" onClick={closeAssign}>ยกเลิก</Button>
             <Button onClick={handleAssign} disabled={assignSaving || menusLoading || !!menusError}>
               {assignSaving ? 'กำลังบันทึก...' : 'บันทึก'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>กำหนดริชเมนู {selected.size} คน</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label htmlFor="friend-bulk-menu">เลือก Rich Menu (bulk)</Label>
+              <select
+                id="friend-bulk-menu"
+                value={bulkMenu}
+                onChange={(e) => setBulkMenu(e.target.value)}
+                className="min-h-touch w-full rounded-lg border border-border/50 bg-surface px-3 text-sm"
+              >
+                <option value="">เลือกเมนู...</option>
+                {usableBulkMenus.map((m) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+                {bulkMenus.filter((m) => !(m.lineRichMenuId && m.status !== 'inactive')).map((m) => (
+                  <option key={m.id} value={m.id} disabled>
+                    {m.name} (ใช้ไม่ได้ — ยังไม่ sync หรือปิดใช้งาน)
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-muted">
+                ยิงรายคนทีละคำสั่งผ่าน API เดิม — {selected.size} รายการ
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setBulkOpen(false)}>ยกเลิก</Button>
+            <Button onClick={handleBulkAssign} disabled={bulkSaving || !bulkMenu}>
+              {bulkSaving ? 'กำลังบันทึก...' : 'ยืนยันกำหนด'}
             </Button>
           </DialogFooter>
         </DialogContent>

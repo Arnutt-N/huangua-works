@@ -14,7 +14,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Label, Input, Textarea } from '@/components/ui/field';
+import { FieldHint, Label, Input, Textarea } from '@/components/ui/field';
 
 interface FormState {
   objectId: string;
@@ -33,9 +33,11 @@ export function ReplyObjectsClient() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const { data, loading, feedback, notify, mutate } = useResource({
+  const { data, loading, reload } = useResource({
     load: adminApi.listReplyObjects,
   });
   const items = data?.items ?? [];
@@ -43,6 +45,7 @@ export function ReplyObjectsClient() {
   function openCreate() {
     setEditingId(null);
     setForm(EMPTY_FORM);
+    setFormError(null);
     setDialogOpen(true);
   }
 
@@ -55,26 +58,32 @@ export function ReplyObjectsClient() {
       altText: item.altText ?? '',
       isActive: item.isActive,
     });
+    setFormError(null);
     setDialogOpen(true);
+  }
+
+  function handleDialogChange(open: boolean) {
+    setDialogOpen(open);
+    if (!open) setFormError(null);
   }
 
   async function handleSave() {
     if (!form.objectId.trim()) {
-      notify('error', 'กรุณากรอก Object ID');
+      setFormError('กรุณากรอก Object ID');
       return;
     }
     let payload: Record<string, unknown>;
     try {
       payload = JSON.parse(form.payloadJson);
     } catch {
-      notify('error', 'Payload JSON ไม่ถูกต้อง');
+      setFormError('Payload JSON ไม่ถูกต้อง');
       return;
     }
 
     // § ชนิดที่ LINE API ไม่รับต้อง fail ตรงนี้ ไม่ใช่ตอนบอทส่ง (PRP T4 risk)
     const payloadError = validateReplyPayload(form.objectType, payload);
     if (payloadError) {
-      notify('error', payloadError);
+      setFormError(payloadError);
       return;
     }
 
@@ -93,28 +102,52 @@ export function ReplyObjectsClient() {
       isActive: form.isActive,
     };
     setSaving(true);
-    const ok = await mutate(
-      () =>
-        editingId
-          ? adminApi.updateReplyObject(editingId, updateBody)
-          : adminApi.createReplyObject(createBody),
-      editingId ? 'แก้ไขสำเร็จ' : 'สร้างสำเร็จ',
-    );
+    // § error อยู่ใน dialog (formError) ไม่ผ่าน notify นอก dialog — ผู้ใช้มองเห็นตอนกรอก
+    const res = editingId
+      ? await adminApi.updateReplyObject(editingId, updateBody)
+      : await adminApi.createReplyObject(createBody);
     setSaving(false);
-    if (ok) setDialogOpen(false);
+    if (!res.ok) {
+      setFormError(res.error);
+      return;
+    }
+    setDialogOpen(false);
+    setFormError(null);
+    await reload();
+  }
+
+  async function handleToggleActive(item: ReplyObject) {
+    const res = await adminApi.updateReplyObject(item.id, {
+      objectType: item.objectType,
+      payload: item.payload,
+      altText: item.altText,
+      isActive: !item.isActive,
+    });
+    if (!res.ok) {
+      setListError(res.error);
+      return;
+    }
+    setListError(null);
+    await reload();
   }
 
   async function handleDelete(item: ReplyObject) {
     if (!confirm(`ลบ "$${item.objectId}" ?`)) return;
     // server คืน 409 { error: 'ไม่สามารถลบได้ — ถูกอ้างอยู่ใน N ที่ …' } — ต้องโชว์ให้เห็น
-    await mutate(() => adminApi.deleteReplyObject(item.id), 'ลบสำเร็จ');
+    const res = await adminApi.deleteReplyObject(item.id);
+    if (!res.ok) {
+      setListError(res.error);
+      return;
+    }
+    setListError(null);
+    await reload();
   }
 
   return (
     <>
-      {feedback && (
-        <div role="status" className={`rounded-lg px-4 py-3 text-sm font-medium ${feedback.type === 'success' ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}>
-          {feedback.msg}
+      {listError && (
+        <div role="status" className="rounded-lg bg-danger/10 px-4 py-3 text-sm font-medium text-danger">
+          {listError}
         </div>
       )}
 
@@ -129,7 +162,13 @@ export function ReplyObjectsClient() {
         {loading ? (
           <div className="py-12 text-center text-muted">กำลังโหลด...</div>
         ) : items.length === 0 ? (
-          <div className="py-12 text-center text-muted">ยังไม่มี reply object — กด &quot;สร้าง&quot; เพื่อเริ่ม</div>
+          <div className="flex flex-col items-center gap-3 py-12 text-center text-muted">
+            <LayoutGrid className="h-10 w-10 opacity-30" aria-hidden="true" />
+            <p>ยังไม่มี reply object</p>
+            <Button variant="outline" onClick={openCreate} className="gap-1.5">
+              <Plus className="h-4 w-4" /> สร้างข้อความแรก
+            </Button>
+          </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {items.map((item) => (
@@ -154,11 +193,15 @@ export function ReplyObjectsClient() {
                       quick reply
                     </span>
                   )}
-                  <span
-                    className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${item.isActive ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}
+                  <button
+                    type="button"
+                    onClick={() => handleToggleActive(item)}
+                    aria-label={`${item.isActive ? 'ปิด' : 'เปิด'} ${item.objectId}`}
+                    aria-pressed={item.isActive}
+                    className={`inline-block min-h-touch rounded-full px-2 py-0.5 text-[10px] font-medium ${item.isActive ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}
                   >
                     {item.isActive ? 'ใช้งาน' : 'ปิด'}
-                  </span>
+                  </button>
                 </p>
                 {item.altText && (
                   <p className="line-clamp-1 text-xs text-muted">{item.altText}</p>
@@ -177,11 +220,17 @@ export function ReplyObjectsClient() {
         )}
       </AdminCard>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{editingId ? 'แก้ไข Reply Object' : 'สร้าง Reply Object'}</DialogTitle>
           </DialogHeader>
+
+          {formError && (
+            <div role="alert" className="rounded-lg bg-danger/10 px-4 py-3 text-sm font-medium text-danger">
+              {formError}
+            </div>
+          )}
 
           <div className="space-y-4 py-2">
             {!editingId && (
@@ -210,6 +259,9 @@ export function ReplyObjectsClient() {
             <div>
               <Label htmlFor="ro-payload">Payload (JSON)</Label>
               <Textarea id="ro-payload" rows={6} value={form.payloadJson} onChange={(e) => setForm((f) => ({ ...f, payloadJson: e.target.value }))} className="font-mono text-sm" />
+              <FieldHint>
+                อ้างในคำตอบด้วยรหัส <code className="font-mono">$</code><code className="font-mono">{form.objectId || 'object_id'}</code> (วางท้ายข้อความ คั่นด้วยเว้นวรรค) — หลีกเลี่ยงตัวเลขหลัง $ เช่น <code className="font-mono">$100</code> (จะหายไป)
+              </FieldHint>
             </div>
 
             <div>

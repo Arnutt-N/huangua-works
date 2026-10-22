@@ -48,6 +48,12 @@ describe('rich-menu-templates', () => {
     expect(validateArea({ type: 'message', text: 'สวัสดี' })).toBeNull();
   });
 
+  it('validateArea บล็อก placeholder LIFF_ID', () => {
+    expect(validateArea({ type: 'uri', uri: 'https://liff.line.me/<LIFF_ID>/intake' })).toBe(
+      'กรุณาแทน <LIFF_ID> ด้วยค่า LINE_LIFF_ID จริงก่อนบันทึก',
+    );
+  });
+
   it('areaStyle แปลง bounds เป็น percent', () => {
     const s = areaStyle(
       { x: 0, y: 0, width: 833, height: 843 },
