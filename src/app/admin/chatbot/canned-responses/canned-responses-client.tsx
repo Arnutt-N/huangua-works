@@ -45,11 +45,27 @@ export function CannedResponsesClient() {
 
   const reload = () => void applyRows(fetchCannedResponses());
 
-  // § เรียก reload ผ่าน timer ไม่ใช่ตรงๆ — rule set-state-in-effect จับ function ที่มี
-  // setState แม้อยู่หลัง await (pattern เดียวกับ use-resource.ts)
+  // § setTimeout กัน set-state-in-effect + mounted flag กัน setState หลัง unmount
+  // (copy timer จาก use-resource อย่างเดียวแล้วลืม guard — interrogate)
   useEffect(() => {
-    const timer = setTimeout(() => void applyRows(fetchCannedResponses()), 0);
-    return () => clearTimeout(timer);
+    let mounted = true;
+    const timer = setTimeout(() => {
+      void (async () => {
+        const rows = await fetchCannedResponses();
+        if (!mounted) return;
+        if (rows) {
+          setItems(rows);
+          setLoadError(null);
+        } else {
+          setItems([]);
+          setLoadError('โหลดข้อมูลไม่สำเร็จ');
+        }
+      })();
+    }, 0);
+    return () => {
+      mounted = false;
+      clearTimeout(timer);
+    };
   }, []);
 
   const startCreate = () => {

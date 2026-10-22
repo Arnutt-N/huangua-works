@@ -66,14 +66,21 @@ describe('Composer quick replies JSK', () => {
     expect(screen.getByLabelText('พิมพ์ข้อความ')).toHaveFocus();
   });
 
-  it('พิมพ์ / ค้างไว้หลังปิด picker — ไม่กลืนหาย', async () => {
+  it('พิมพ์ / ค้างไว้หลังปิด picker — ไม่กลืนหาย + listbox ปิดจริง', async () => {
     const user = userEvent.setup();
     render(<Composer {...base} canReply cannedResponses={[canned()]} />);
     const box = screen.getByLabelText('พิมพ์ข้อความ');
     await user.type(box, '/ทัก');
     expect(screen.getByRole('listbox')).toBeInTheDocument();
     await user.keyboard('{Escape}');
+    // § เดิมเช็คแค่ value — listbox ค้างแต่ test ผ่าน (interrogate probe: ต้องเช็คปิดจริง)
     expect(box).toHaveValue('/ทัก');
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+
+    // ลบ "/" ออกแล้วพิมพ์ใหม่ — picker กลับมาเปิดได้
+    await user.clear(box);
+    await user.type(box, '/อีก');
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
   });
 
   it('มีปุ่มจัดการข้อความสำเร็จรูป — เรียก onManageCanned', async () => {
