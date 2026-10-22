@@ -6,6 +6,9 @@ import { toLocalISODate } from '@/lib/validation';
 import { buildSlotAvailability } from './slots';
 import { QueueBookingForm } from './queue-booking-form';
 
+// § เทส race 3 เคสนี้ flaky ภายใต้โหลดทั้งชุด (timeout 5s) — 30s ตาม intake pattern
+vi.setConfig({ testTimeout: 30_000 });
+
 /** วันราชการล่วงหน้า n วัน (จ–ศ) — ใช้เป็นวันที่จองที่ server mock ยอมรับแน่ ๆ */
 function nextBusinessDays(count: number): string[] {
   const out: string[] = [];
