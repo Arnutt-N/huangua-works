@@ -90,6 +90,9 @@ describe('IntentDetailClient', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'ปิด เวลาทำการ' }));
     await waitFor(() => expect(updateIntent).toHaveBeenCalled());
     const payload = updateIntent.mock.calls[0]?.[1] as Record<string, unknown>;
-    expect(payload).toMatchObject({ isActive: false, name: 'เวลาทำการ' });
+    expect(payload).toMatchObject({ isActive: false });
+    // § field-only — ไม่ส่ง keywords/responses ทั้งก้อน (ลด race)
+    expect(payload).not.toHaveProperty('keywords');
+    expect(payload).not.toHaveProperty('responses');
   });
 });

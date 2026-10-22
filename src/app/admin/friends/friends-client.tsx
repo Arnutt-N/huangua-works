@@ -143,16 +143,23 @@ export function FriendsClient() {
     if (!confirm(`กำหนดริชเมนูให้เพื่อน ${selected.size} คน?`)) return;
     setBulkSaving(true);
     const ids = [...selected];
-    let failed = 0;
-    for (const id of ids) {
-      const res = await adminApi.assignUserRichMenu(id, bulkMenu);
-      if (!res.ok) failed += 1;
-    }
+    // § allSettled แทน for-await serial — เร็วขึ้น + เก็บชื่อคนที่ล้มมาโชว์
+    const results = await Promise.allSettled(
+      ids.map((id) => adminApi.assignUserRichMenu(id, bulkMenu)),
+    );
+    const failedNames: string[] = [];
+    results.forEach((r, i) => {
+      const ok = r.status === 'fulfilled' && r.value.ok;
+      if (!ok) {
+        const friend = items.find((f) => f.id === ids[i]);
+        failedNames.push(friend?.displayName ?? friend?.maskedId ?? ids[i] ?? '?');
+      }
+    });
     setBulkSaving(false);
     setBulkOpen(false);
     setBulkMenu('');
     setSelected(new Set());
-    if (failed > 0) notify('error', `กำหนดไม่สำเร็จ ${failed} คน`);
+    if (failedNames.length > 0) notify('error', `กำหนดไม่สำเร็จ ${failedNames.length} คน: ${failedNames.join(', ')}`);
     else notify('success', `กำหนดริชเมนูให้เพื่อน ${ids.length} คนแล้ว`);
     await reload();
   }
