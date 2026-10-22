@@ -22,7 +22,6 @@ function menu(over: Partial<RichMenuItem> = {}): RichMenuItem {
 describe('isUsableMenu — ตรง server guard POST friends/:id/rich-menu', () => {
   it('ใช้ได้เมื่อมี lineRichMenuId และไม่ถูกปิด', () => {
     expect(isUsableMenu(menu())).toBe(true);
-    // § sync error ก็ผูกเพื่อนได้ — server ไม่เช็ค syncStatus เส้นนี้
     expect(isUsableMenu(menu({ syncStatus: 'error' }))).toBe(true);
   });
 
@@ -41,7 +40,6 @@ describe('isSyncedMenu — ตรง resolveAliasTarget (alias create/repoint)',
   });
 
   it('ใช้ไม่ได้เมื่อ sync ค้าง error แม้ lineRichMenuId ยังอยู่', () => {
-    // § regression จาก PR #143: dropdown เสนอเมนูที่ alias จะ 422
     expect(isSyncedMenu(menu({ syncStatus: 'error', lastSyncError: 'boom' }))).toBe(false);
     expect(isSyncedMenu(menu({ syncStatus: 'local' }))).toBe(false);
   });

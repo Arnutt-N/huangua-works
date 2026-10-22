@@ -6,7 +6,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CannedResponse } from '../_lib/types';
 import { CannedManageDialog } from './canned-manage-dialog';
 
-// § userEvent หลายขั้น — timeout 30s ตาม pattern wizard/intake
 vi.setConfig({ testTimeout: 30_000 });
 
 const deleteCannedResponse = vi.fn();

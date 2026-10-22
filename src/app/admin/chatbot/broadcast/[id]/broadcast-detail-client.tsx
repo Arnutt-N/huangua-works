@@ -130,8 +130,7 @@ export function BroadcastDetailClient({ broadcastId }: { broadcastId: string }) 
             <TimelineItem done label="สร้างแบบร่าง" date={item.createdAt} />
             {item.scheduledAt && <TimelineItem done={item.status !== 'draft'} label="ตั้งเวลาส่ง" date={item.scheduledAt} />}
             {item.sentAt && <TimelineItem done label="ส่งสำเร็จ" date={item.sentAt} />}
-            {/* § failed ไม่มี sentAt — ใช้ updatedAt (GET broadcasts คืน ...row มี updated_at) */}
-            {item.status === 'failed' && <TimelineItem done label="ส่งล้มเหลว" date={item.updatedAt ?? item.sentAt} />}
+            {item.status === 'failed' && <TimelineItem done label="ส่งล้มเหลว" date={item.updatedAt} />}
           </div>
         </AdminCard>
 

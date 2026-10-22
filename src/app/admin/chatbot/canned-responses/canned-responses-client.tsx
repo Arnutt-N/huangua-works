@@ -45,8 +45,6 @@ export function CannedResponsesClient() {
 
   const reload = () => void applyRows(fetchCannedResponses());
 
-  // § setTimeout กัน set-state-in-effect + mounted flag กัน setState หลัง unmount
-  // (copy timer จาก use-resource อย่างเดียวแล้วลืม guard — interrogate)
   useEffect(() => {
     let mounted = true;
     const timer = setTimeout(() => {

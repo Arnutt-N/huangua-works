@@ -208,7 +208,6 @@ export function RichMenusClient() {
               </thead>
               <tbody className="divide-y divide-border/30">
                 {items.map((item) => {
-                  // § live = synced เท่านั้น — เดิมหลุดตอนใช้ isUsableMenu ร่วม (ป้ายหลอก)
                   const live = item.status === 'active' && isSyncedMenu(item);
                   return (
                     <tr key={item.id} className="hover:bg-accent/5">

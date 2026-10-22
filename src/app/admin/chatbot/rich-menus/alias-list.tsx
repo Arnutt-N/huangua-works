@@ -1,12 +1,6 @@
 import type { RichMenuAliasItem, RichMenuItem } from '@/app/admin/_lib/admin-api';
 import { Button } from '@/components/ui/button';
 
-/**
- * รายการ alias ร่วม 2 หน้า (rich-menus + aliases) — JSX เดียว
- *
- * § ฟอร์มสร้างไม่รวม: หน้า aliases ใช้ formError ในฟอร์ม ส่วนหน้า rich-menus ใช้
- * notify ของ useResource — รวมฟอร์มด้วยจะยึดช่องแสดง error ข้างหนึ่ง
- */
 export function AliasList({
   aliases,
   syncedMenus,

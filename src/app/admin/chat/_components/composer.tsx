@@ -31,8 +31,6 @@ export function Composer({
 }) {
   const [input, setInput] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
-  // § "/" ค้างเปิด picker ตลอดจนล้างตัวอักษร — เก็บ dismissed แยกต่างหาก
-  // (interrogate: เดิม onClose เซ็ต pickerOpen อย่างเดียวแต่ startsWith('/') ยัง true)
   const [slashDismissed, setSlashDismissed] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -53,7 +51,6 @@ export function Composer({
 
   const handleInput = (next: string) => {
     setInput(next);
-    // ล้าง "/" ออก → reset ให้พิมพ์ "/" ใหม่เปิด picker ได้อีก
     if (!next.startsWith('/')) setSlashDismissed(false);
   };
 

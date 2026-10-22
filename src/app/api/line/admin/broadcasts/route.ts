@@ -62,8 +62,6 @@ export async function GET(request: Request) {
     .limit(pageSize)
     .offset((page - 1) * pageSize);
 
-  // § จำนวนผู้รับที่ล้มเฉพาะ broadcast ในหน้านี้ — hash อย่างเดียว ไม่คืนรายละเอียดผู้รับ
-  // (เดิม GROUP BY ทั้งตารางทุก request — interrogate)
   const failedById = new Map<string, number>();
   if (rows.length > 0) {
     const failedRows = await db
