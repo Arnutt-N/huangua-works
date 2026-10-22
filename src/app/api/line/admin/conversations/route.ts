@@ -15,7 +15,6 @@ import { STAFF_ROLES } from '@/lib/auth/roles';
 
 export const runtime = 'nodejs';
 
-// § limit cap ป้องกัน unbounded query — เดิมไม่มี limit เลย
 const querySchema = z.object({
   limit: z.coerce.number().int().min(1).max(500).optional().default(500),
 });

@@ -81,7 +81,6 @@ export interface IntentPayload {
   }[];
 }
 
-/** PATCH /intents/:id — ทุก field optional (ตรง updateSchema) — ส่งเฉพาะที่เปลี่ยน ลด race */
 export type IntentPatch = Partial<IntentPayload>;
 
 export interface ReplyObject {

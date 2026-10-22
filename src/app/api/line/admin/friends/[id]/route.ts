@@ -14,7 +14,6 @@ export type FriendFollowState = 'following' | 'unfollowed';
 
 type RouteParams = { params: Promise<{ id: string }> };
 
-/** ดูเพื่อนรายคน — ไม่ต้องโหลด list ทั้งก้อน (เดิม friend-detail โหลด 100 แถวแล้ว find) */
 export async function GET(_request: Request, { params }: RouteParams) {
   const authz = await requireStaffApi(ADMIN_ROLES);
   if (!authz.ok) return authz.response;

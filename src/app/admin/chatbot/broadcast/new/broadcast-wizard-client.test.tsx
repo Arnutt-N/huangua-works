@@ -83,7 +83,6 @@ describe('BroadcastWizardClient ตัวช่วยสร้าง 4 ขั้
     await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
     await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
 
-    // § guard goStep ตรวจ buildContent ก่อนออก step 1 — ไม่หลุดไป step สุดท้าย
     expect(await screen.findByText('กรุณากรอกข้อความ')).toBeInTheDocument();
     expect(screen.getByLabelText('ข้อความประกาศ')).toBeInTheDocument();
   });

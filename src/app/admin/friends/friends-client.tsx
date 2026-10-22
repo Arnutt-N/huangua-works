@@ -143,7 +143,7 @@ export function FriendsClient() {
     if (!confirm(`กำหนดริชเมนูให้เพื่อน ${selected.size} คน?`)) return;
     setBulkSaving(true);
     const ids = [...selected];
-    // § chunk ละ 10 แทน allSettled ก้อนเดียว — LINE 429 ถ้ายิงรัว (interrogate)
+    // § chunk ละ 10 — LINE 429 ถ้ายิงรัว
     const CHUNK = 10;
     const failedNames: string[] = [];
     for (let i = 0; i < ids.length; i += CHUNK) {

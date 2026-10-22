@@ -43,7 +43,6 @@ export function BroadcastWizardClient() {
   }
 
   function goStep(next: number) {
-    // § ห้ามข้าม step 1 โดย content ยังผิด — กันกดถัดไปรัวแล้ว error ไปโผล่ step สุดท้าย
     if (next > 1) {
       const { error: contentError } = buildContent();
       if (contentError) {

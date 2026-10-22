@@ -6,7 +6,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CannedResponse } from '@/app/admin/chat/_lib/types';
 import { Composer } from './composer';
 
-// § userEvent หลายขั้น — timeout 30s ตาม pattern wizard/intake
 vi.setConfig({ testTimeout: 30_000 });
 
 function canned(over: Partial<CannedResponse> = {}): CannedResponse {
@@ -73,11 +72,9 @@ describe('Composer quick replies JSK', () => {
     await user.type(box, '/ทัก');
     expect(screen.getByRole('listbox')).toBeInTheDocument();
     await user.keyboard('{Escape}');
-    // § เดิมเช็คแค่ value — listbox ค้างแต่ test ผ่าน (interrogate probe: ต้องเช็คปิดจริง)
     expect(box).toHaveValue('/ทัก');
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
 
-    // ลบ "/" ออกแล้วพิมพ์ใหม่ — picker กลับมาเปิดได้
     await user.clear(box);
     await user.type(box, '/อีก');
     expect(screen.getByRole('listbox')).toBeInTheDocument();
