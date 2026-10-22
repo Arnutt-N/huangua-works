@@ -1,4 +1,8 @@
 import { NextResponse } from 'next/server';
+import { asc, eq } from 'drizzle-orm';
+import { getDb } from '@/lib/db';
+import { chatIntents, chatIntentKeywords, chatIntentResponses } from '@/lib/db/schema';
+import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { requireStaffApi } from '@/lib/auth/require-staff';
 import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit';
@@ -28,6 +32,34 @@ const updateSchema = z.object({
   keywords: z.array(keywordSchema).min(1).max(50).optional(),
   responses: z.array(responseSchema).min(1).max(10).optional(),
 });
+
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const authz = await requireStaffApi(ADMIN_ROLES);
+  if (!authz.ok) return authz.response;
+
+  const { id } = await params;
+  const db = await getDb();
+
+  const intent = await firstOrUndefined(
+    db.select().from(chatIntents).where(eq(chatIntents.id, id)).limit(1),
+  );
+  if (!intent) {
+    return NextResponse.json({ error: 'ไม่พบหมวดเจตนา' }, { status: 404 });
+  }
+
+  const keywords = await db
+    .select()
+    .from(chatIntentKeywords)
+    .where(eq(chatIntentKeywords.intentId, id))
+    .orderBy(asc(chatIntentKeywords.createdAt));
+  const responses = await db
+    .select()
+    .from(chatIntentResponses)
+    .where(eq(chatIntentResponses.intentId, id))
+    .orderBy(asc(chatIntentResponses.displayOrder));
+
+  return NextResponse.json({ ...intent, keywords, responses });
+}
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const authz = await requireStaffApi(ADMIN_ROLES);

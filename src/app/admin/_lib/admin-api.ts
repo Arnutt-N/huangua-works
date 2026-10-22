@@ -309,6 +309,8 @@ export const adminApi = {
   // ── Intents / หมวดหมู่เจตนา ──
   listIntents: (): Promise<ApiResult<ListOf<IntentItem>>> =>
     request<ListOf<IntentItem>>('/api/line/admin/intents'),
+  getIntent: (id: string): Promise<ApiResult<IntentItem>> =>
+    request<IntentItem>(`/api/line/admin/intents/${id}`),
   createIntent: (payload: IntentPayload): Promise<ApiResult<OkBody>> =>
     request<OkBody>('/api/line/admin/intents', withBody('POST', payload)),
   updateIntent: (id: string, payload: IntentPatch): Promise<ApiResult<OkBody>> =>
@@ -352,6 +354,8 @@ export const adminApi = {
   // ── Friends ──
   listFriends: (query: string): Promise<ApiResult<FriendsPage>> =>
     request<FriendsPage>(`/api/line/admin/friends?${query}`),
+  getFriend: (id: string): Promise<ApiResult<FriendItem>> =>
+    request<FriendItem>(`/api/line/admin/friends/${id}`),
   assignUserRichMenu: (friendId: string, richMenuId: string): Promise<ApiResult<OkBody>> =>
     request<OkBody>(`/api/line/admin/friends/${friendId}/rich-menu`, withBody('POST', { richMenuId })),
   unassignUserRichMenu: (friendId: string): Promise<ApiResult<OkBody>> =>

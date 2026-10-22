@@ -18,10 +18,9 @@ const MATCH_LABELS: Record<IntentMatchType, string> = {
 };
 
 export function IntentDetailClient({ intentId }: { intentId: string }) {
-  const { data, loading, feedback, notify, reload } = useResource({
-    load: adminApi.listIntents,
+  const { data: item, loading, feedback, notify, reload } = useResource({
+    load: () => adminApi.getIntent(intentId),
   });
-  const item = (data?.items ?? []).find((i) => i.id === intentId) ?? null;
 
   const [activeTab, setActiveTab] = useState<'keywords' | 'responses'>('keywords');
 
