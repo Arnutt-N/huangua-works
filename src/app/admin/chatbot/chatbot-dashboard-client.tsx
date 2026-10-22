@@ -1,39 +1,11 @@
 'use client';
 
 import { adminApi } from '@/app/admin/_lib/admin-api';
-import type { ApiResult, ListOf } from '@/app/admin/_lib/admin-api';
 import { useResource } from '@/app/admin/_lib/use-resource';
+import { readinessOf } from './auto-replies/readiness';
 import { Bot, MessageSquare, HelpCircle, UserPlus, CheckCircle2, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
-
-interface ReadinessIntent {
-  id: string;
-  name: string;
-  isActive: boolean;
-  keywords: { id: string }[];
-  responses: { id: string }[];
-}
-
-async function listIntentsForReadiness(): Promise<ApiResult<ListOf<ReadinessIntent>>> {
-  // § fetch อยู่ขอบระบบ: network ล้มต้องคืน ApiFail เอง — useResource ไม่มี try/catch ข้างใน
-  let res: Response;
-  try {
-    res = await fetch('/api/line/admin/intents');
-  } catch {
-    return { ok: false, error: 'เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ', status: 0 };
-  }
-  const body: unknown = await res.json().catch(() => null);
-  if (!res.ok) {
-    const envelope = (body as { error?: unknown } | null)?.error;
-    return {
-      ok: false,
-      error: typeof envelope === 'string' && envelope.length > 0 ? envelope : 'โหลดข้อมูลไม่สำเร็จ',
-      status: res.status,
-    };
-  }
-  return { ok: true, data: body as ListOf<ReadinessIntent> };
-}
 
 function KpiCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string | number; sub?: string }) {
   return (
@@ -53,9 +25,9 @@ export function ChatbotDashboardClient() {
     load: adminApi.getChatbotStats,
   });
   const { data: intentsData, loading: intentsLoading, feedback: intentsFeedback } = useResource({
-    load: listIntentsForReadiness,
+    load: adminApi.listIntents,
   });
-  const intents: ReadinessIntent[] = intentsData?.items ?? [];
+  const intents = intentsData?.items ?? [];
   // § feedback ของ intents แยกจาก stats: intents ล้มต้องไม่เหมารวมกับ stats และไม่หลอกว่าไม่มีหมวด
   const intentsError = intentsFeedback?.type === 'error' ? intentsFeedback.msg : null;
 
@@ -103,15 +75,8 @@ export function ChatbotDashboardClient() {
         ) : (
           <div className="space-y-2">
             {intents.map((item) => {
-              const ready = item.isActive && item.keywords.length > 0 && item.responses.length > 0;
+              const { ready, reason } = readinessOf(item);
               const Icon = ready ? CheckCircle2 : XCircle;
-              const reason = !item.isActive
-                ? 'ปิดใช้งาน'
-                : item.keywords.length === 0
-                  ? 'ยังไม่มี keyword'
-                  : item.responses.length === 0
-                    ? 'ยังไม่มีคำตอบ'
-                    : 'พร้อม';
               return (
                 <Link
                   key={item.id}

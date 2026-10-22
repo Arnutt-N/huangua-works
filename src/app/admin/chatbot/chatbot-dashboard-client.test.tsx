@@ -4,10 +4,11 @@ import { act, cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/app/admin/_lib/admin-api', () => ({
-  adminApi: { getChatbotStats: vi.fn() },
+  adminApi: { getChatbotStats: vi.fn(), listIntents: vi.fn() },
 }));
 
 import { adminApi } from '@/app/admin/_lib/admin-api';
+import type { IntentItem } from '@/app/admin/_lib/admin-api';
 import { ChatbotDashboardClient } from './chatbot-dashboard-client';
 
 const STATS = {
@@ -17,45 +18,33 @@ const STATS = {
   topFaq: [{ question: 'เปิดกี่โมง', hitCount: 5 }],
 };
 
-function intent(over = {}) {
+function intent(over: Partial<IntentItem> = {}): IntentItem {
   return {
     id: 'i1',
     name: 'เวลาทำการ',
     description: null,
     isActive: true,
-    keywords: [{ id: 'k1', keyword: 'กี่โมง', matchType: 'contains' }],
-    responses: [{ id: 'r1', replyType: 'text', textContent: 'เปิด 08:30', replyObjectId: null, displayOrder: 0 }],
+    keywords: [{ id: 'k1', keyword: 'กี่โมง', matchType: 'contains' as const }],
+    responses: [{ id: 'r1', replyType: 'text' as const, textContent: 'เปิด 08:30', replyObjectId: null, displayOrder: 0 }],
     ...over,
   };
 }
 
 const mockStats = vi.mocked(adminApi.getChatbotStats);
+const mockIntents = vi.mocked(adminApi.listIntents);
 
-function mockIntentsOk(items: unknown[]) {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ items }),
-    } as Response) as unknown as typeof fetch,
-  );
+function mockIntentsOk(items: IntentItem[]) {
+  mockIntents.mockResolvedValue({ ok: true, data: { items } });
 }
 
 function mockIntentsFail(status: number, error: string) {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn().mockResolvedValue({
-      ok: false,
-      status,
-      json: () => Promise.resolve({ error }),
-    } as Response) as unknown as typeof fetch,
-  );
+  mockIntents.mockResolvedValue({ ok: false, error, status });
 }
 
 afterEach(() => {
   cleanup();
   mockStats.mockReset();
-  vi.unstubAllGlobals();
+  mockIntents.mockReset();
 });
 
 beforeEach(() => {
@@ -120,10 +109,7 @@ describe('ChatbotDashboardClient error', () => {
 
   // § stats เสร็จก่อนแต่ intents ยังค้าง — ต้องเห็น loading ไม่ใช่ flash false-empty
   it('intents ค้างแต่ stats เสร็จยังแสดง loading', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockImplementation(() => new Promise(() => {})) as unknown as typeof fetch,
-    );
+    mockIntents.mockImplementation(() => new Promise(() => {}));
     render(<ChatbotDashboardClient />);
     expect(await screen.findByText('กำลังโหลด...')).toBeInTheDocument();
     expect(screen.queryByText('ไปสร้างหมวด')).not.toBeInTheDocument();

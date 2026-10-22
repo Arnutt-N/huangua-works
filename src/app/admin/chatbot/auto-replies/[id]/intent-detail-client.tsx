@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Key, MessageSquare, Plus, Pencil, Trash2 } from 'lucide-react';
-import type { IntentItem, IntentMatchType } from '@/app/admin/_lib/admin-api';
+import type { IntentMatchType } from '@/app/admin/_lib/admin-api';
 import { adminApi } from '@/app/admin/_lib/admin-api';
+import { readinessOf } from '../readiness';
 import { useResource } from '@/app/admin/_lib/use-resource';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import { Button } from '@/components/ui/button';
@@ -15,12 +16,6 @@ const MATCH_LABELS: Record<IntentMatchType, string> = {
   contains: 'มีคำนี้',
   regex: 'regex',
 };
-
-function readinessOf(item: IntentItem): { ready: boolean; reason: string } {
-  if (item.keywords.length === 0) return { ready: false, reason: 'ยังไม่มี keyword' };
-  if (item.responses.length === 0) return { ready: false, reason: 'ยังไม่มีคำตอบ' };
-  return { ready: true, reason: 'พร้อม' };
-}
 
 export function IntentDetailClient({ intentId }: { intentId: string }) {
   const { data, loading, feedback, notify, reload } = useResource({
