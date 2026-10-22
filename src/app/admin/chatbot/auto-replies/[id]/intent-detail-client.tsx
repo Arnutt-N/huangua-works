@@ -18,27 +18,16 @@ const MATCH_LABELS: Record<IntentMatchType, string> = {
 };
 
 export function IntentDetailClient({ intentId }: { intentId: string }) {
-  const { data, loading, feedback, notify, reload } = useResource({
-    load: adminApi.listIntents,
+  const { data: item, loading, feedback, notify, reload } = useResource({
+    load: () => adminApi.getIntent(intentId),
   });
-  const item = (data?.items ?? []).find((i) => i.id === intentId) ?? null;
 
   const [activeTab, setActiveTab] = useState<'keywords' | 'responses'>('keywords');
 
   async function handleToggle() {
     if (!item) return;
-    const res = await adminApi.updateIntent(item.id, {
-      name: item.name,
-      description: item.description,
-      isActive: !item.isActive,
-      keywords: item.keywords.map((k) => ({ keyword: k.keyword, matchType: k.matchType })),
-      responses: item.responses.map((r, i) => ({
-        replyType: r.replyType,
-        textContent: r.textContent,
-        replyObjectId: r.replyObjectId,
-        displayOrder: i,
-      })),
-    });
+    // § ส่งเฉพาะ isActive — ลด read-modify-write (ดู intent-section)
+    const res = await adminApi.updateIntent(item.id, { isActive: !item.isActive });
     if (!res.ok) {
       notify('error', res.error);
       return;
@@ -55,17 +44,9 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
       return;
     }
     if (!confirm('ลบ keyword นี้?')) return;
+    // § ส่งเฉพาะ keywords ที่เปลี่ยน — ไม่ทับ responses/name ที่อาจมีคนอื่นแก้พร้อมกัน
     const res = await adminApi.updateIntent(item.id, {
-      name: item.name,
-      description: item.description,
-      isActive: item.isActive,
       keywords: item.keywords.filter((k) => k.id !== keywordId).map((k) => ({ keyword: k.keyword, matchType: k.matchType })),
-      responses: item.responses.map((r, i) => ({
-        replyType: r.replyType,
-        textContent: r.textContent,
-        replyObjectId: r.replyObjectId,
-        displayOrder: i,
-      })),
     });
     if (!res.ok) {
       notify('error', res.error);
@@ -82,11 +63,8 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
       return;
     }
     if (!confirm('ลบคำตอบนี้?')) return;
+    // § ส่งเฉพาะ responses ที่เปลี่ยน — ไม่ทับ keywords/name
     const res = await adminApi.updateIntent(item.id, {
-      name: item.name,
-      description: item.description,
-      isActive: item.isActive,
-      keywords: item.keywords.map((k) => ({ keyword: k.keyword, matchType: k.matchType })),
       responses: item.responses
         .filter((r) => r.id !== responseId)
         .map((r, i) => ({

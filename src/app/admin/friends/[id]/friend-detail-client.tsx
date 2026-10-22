@@ -18,9 +18,9 @@ export function FriendDetailClient({ friendId }: { friendId: string }) {
   // § hook เดียวก้อน 100 — เคยมี 2 hooks (page 20 + 100) loading ดูก้อนแรกแต่แสดงก้อนสอง
   // เพื่อนนอก 20 แรกแวบ "ไม่พบ" เท็จ ปุ่มรีเฟรช reload ก้อนที่ไม่ได้แสดง
   const { data, loading, reload } = useResource({
-    load: () => adminApi.listFriends('page=1&pageSize=100'),
+    load: () => adminApi.getFriend(friendId),
   });
-  const item: FriendItem | null = (data?.items ?? []).find((f) => f.id === friendId) ?? null;
+  const item: FriendItem | null = data ?? null;
 
   if (loading && !item) return <div className="py-12 text-center text-muted">กำลังโหลด...</div>;
   if (!item) return <div className="py-12 text-center text-muted">ไม่พบเพื่อนคนนี้</div>;

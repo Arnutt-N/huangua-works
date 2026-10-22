@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { z } from 'zod';
 import { getDb } from '@/lib/db';
 import {
   chatAdminPrefs,
@@ -14,9 +15,25 @@ import { STAFF_ROLES } from '@/lib/auth/roles';
 
 export const runtime = 'nodejs';
 
-export async function GET() {
+// § limit cap ป้องกัน unbounded query — เดิมไม่มี limit เลย
+const querySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(500).optional().default(500),
+});
+
+export async function GET(request: Request) {
   const authz = await requireStaffApi(STAFF_ROLES);
   if (!authz.ok) return authz.response;
+
+  const url = new URL(request.url);
+  const parsed = querySchema.safeParse({
+    limit: url.searchParams.get('limit') ?? undefined,
+  });
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? 'พารามิเตอร์ไม่ถูกต้อง' },
+      { status: 400 },
+    );
+  }
 
   const db = await getDb();
 
@@ -48,7 +65,8 @@ export async function GET() {
         eq(chatAdminPrefs.adminUserId, authz.ctx.user.id),
       ),
     )
-    .orderBy(desc(chatConversations.lastMessageAt));
+    .orderBy(desc(chatConversations.lastMessageAt))
+    .limit(parsed.data.limit);
 
   // tags: query แยกแล้วประกอบใน JS — เลี่ยง json_agg ผ่าน drizzle
   const conversationIds = conversations.map((c) => c.id);

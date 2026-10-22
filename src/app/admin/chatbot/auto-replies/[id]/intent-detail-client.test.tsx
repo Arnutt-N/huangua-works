@@ -6,11 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IntentItem } from '@/app/admin/_lib/admin-api';
 import { IntentDetailClient } from './intent-detail-client';
 
-const listIntents = vi.fn();
+const getIntent = vi.fn();
 const updateIntent = vi.fn();
 vi.mock('@/app/admin/_lib/admin-api', () => ({
   adminApi: {
-    listIntents: (...args: unknown[]) => listIntents(...args),
+    getIntent: (...args: unknown[]) => getIntent(...args),
     updateIntent: (...args: unknown[]) => updateIntent(...args),
   },
 }));
@@ -32,9 +32,9 @@ function intent(over: Partial<IntentItem> = {}): IntentItem {
 afterEach(() => cleanup());
 
 beforeEach(() => {
-  listIntents.mockReset();
+  getIntent.mockReset();
   updateIntent.mockReset();
-  listIntents.mockResolvedValue({ ok: true, data: { items: [intent()] } });
+  getIntent.mockResolvedValue({ ok: true, data: intent() });
   updateIntent.mockResolvedValue({ ok: true, data: { ok: true } });
 });
 
@@ -69,27 +69,30 @@ describe('IntentDetailClient', () => {
   });
 
   it('หมวดไม่พร้อมแสดงเหตุผล', async () => {
-    listIntents.mockResolvedValue({ ok: true, data: { items: [intent({ keywords: [] })] } });
+    getIntent.mockResolvedValue({ ok: true, data: intent({ keywords: [] }) });
     render(<IntentDetailClient intentId="i1" />);
     expect(await screen.findByText('ไม่พร้อม (ยังไม่มี keyword)')).toBeInTheDocument();
   });
 
   it('ไม่มีหมวดแสดงข้อความไทย', async () => {
-    listIntents.mockResolvedValue({ ok: true, data: { items: [] } });
+    getIntent.mockResolvedValue({ ok: false, error: 'ไม่พบหมวดนี้', status: 404 });
     render(<IntentDetailClient intentId="nope" />);
     expect(await screen.findByText('ไม่พบหมวดนี้')).toBeInTheDocument();
   });
 
   it('toggle ปิดยิง update isActive=false', async () => {
-    listIntents
-      .mockResolvedValueOnce({ ok: true, data: { items: [intent()] } })
-      .mockResolvedValueOnce({ ok: true, data: { items: [intent({ isActive: false })] } });
+    getIntent
+      .mockResolvedValueOnce({ ok: true, data: intent() })
+      .mockResolvedValueOnce({ ok: true, data: intent({ isActive: false }) });
     render(<IntentDetailClient intentId="i1" />);
     await screen.findByText('เวลาทำการ');
 
     await userEvent.setup().click(screen.getByRole('button', { name: 'ปิด เวลาทำการ' }));
     await waitFor(() => expect(updateIntent).toHaveBeenCalled());
     const payload = updateIntent.mock.calls[0]?.[1] as Record<string, unknown>;
-    expect(payload).toMatchObject({ isActive: false, name: 'เวลาทำการ' });
+    expect(payload).toMatchObject({ isActive: false });
+    // § field-only — ไม่ส่ง keywords/responses ทั้งก้อน (ลด race)
+    expect(payload).not.toHaveProperty('keywords');
+    expect(payload).not.toHaveProperty('responses');
   });
 });

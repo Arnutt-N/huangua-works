@@ -143,19 +143,9 @@ export function IntentSection() {
   }
 
   async function handleToggle(item: IntentItem) {
-    // § toggle ส่ง full payload (server ไม่มี PATCH เฉพาะ isActive) — ดึง keyword/response เดิมใส่ครบ
-    const res = await adminApi.updateIntent(item.id, {
-      name: item.name,
-      description: item.description,
-      isActive: !item.isActive,
-      keywords: item.keywords.map((k) => ({ keyword: k.keyword, matchType: k.matchType })),
-      responses: item.responses.map((r, i) => ({
-        replyType: r.replyType,
-        textContent: r.textContent,
-        replyObjectId: r.replyObjectId,
-        displayOrder: i,
-      })),
-    });
+    // § ส่งเฉพาะ isActive — server updateSchema ทุก field optional ไม่ต้อง read-modify-write
+    // keywords/responses ทั้งก้อน (race กับ edit อื่น)
+    const res = await adminApi.updateIntent(item.id, { isActive: !item.isActive });
     if (!res.ok) {
       notify('error', res.error);
       return;

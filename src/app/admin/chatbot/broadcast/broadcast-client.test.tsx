@@ -29,6 +29,7 @@ function item(over: Partial<BroadcastItem> = {}): BroadcastItem {
     target: { kind: 'all' },
     scheduledAt: null,
     sentAt: null,
+    updatedAt: '2026-01-01T00:00:00Z',
     totalRecipients: 0,
     successCount: 0,
     failedCount: 0,

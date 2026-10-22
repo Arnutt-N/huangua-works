@@ -83,7 +83,10 @@ describe('IntentSection หมวดเจตนา JSK', () => {
     await waitFor(() => expect(updateIntent).toHaveBeenCalled());
     const [id, payload] = updateIntent.mock.calls[0] as [string, Record<string, unknown>];
     expect(id).toBe('i1');
-    expect(payload).toMatchObject({ isActive: false, name: 'เวลาทำการ' });
+    expect(payload).toMatchObject({ isActive: false });
+    // § field-only — ไม่ส่ง keywords/responses ทั้งก้อน (ลด race)
+    expect(payload).not.toHaveProperty('keywords');
+    expect(payload).not.toHaveProperty('responses');
   });
 
   it('หมวดไม่มี keyword แสดงไม่พร้อม', async () => {

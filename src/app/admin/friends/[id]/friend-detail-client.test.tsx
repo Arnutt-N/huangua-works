@@ -5,9 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FriendItem } from '@/app/admin/_lib/admin-api';
 import { FriendDetailClient } from './friend-detail-client';
 
-const listFriends = vi.fn();
+const getFriend = vi.fn();
 vi.mock('@/app/admin/_lib/admin-api', () => ({
-  adminApi: { listFriends: (...args: unknown[]) => listFriends(...args) },
+  adminApi: { getFriend: (...args: unknown[]) => getFriend(...args) },
 }));
 
 function friend(over: Partial<FriendItem> = {}): FriendItem {
@@ -29,8 +29,8 @@ function friend(over: Partial<FriendItem> = {}): FriendItem {
 afterEach(() => cleanup());
 
 beforeEach(() => {
-  listFriends.mockReset();
-  listFriends.mockResolvedValue({ ok: true, data: { items: [friend()], total: 1, page: 1, pageSize: 20 } });
+  getFriend.mockReset();
+  getFriend.mockResolvedValue({ ok: true, data: friend() });
 });
 
 describe('FriendDetailClient', () => {
@@ -44,7 +44,7 @@ describe('FriendDetailClient', () => {
   });
 
   it('ไม่มีเพื่อนแสดงข้อความไทย', async () => {
-    listFriends.mockResolvedValue({ ok: true, data: { items: [], total: 0, page: 1, pageSize: 20 } });
+    getFriend.mockResolvedValue({ ok: false, error: 'ไม่พบเพื่อนคนนี้', status: 404 });
     render(<FriendDetailClient friendId="nope" />);
     expect(await screen.findByText('ไม่พบเพื่อนคนนี้')).toBeInTheDocument();
   });
