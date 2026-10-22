@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { desc, sql } from 'drizzle-orm';
+import { count, desc, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { chatBroadcasts, chatBroadcastFailedRecipients } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
@@ -28,16 +28,39 @@ const createSchema = z.object({
   scheduledAt: z.string().datetime().nullable().optional(),
 });
 
-export async function GET() {
+const querySchema = z.object({
+  page: z.coerce.number().int().min(1).optional().default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).optional().default(50),
+});
+
+export async function GET(request: Request) {
   const authz = await requireStaffApi(ADMIN_ROLES);
   if (!authz.ok) return authz.response;
 
+  const url = new URL(request.url);
+  const parsed = querySchema.safeParse({
+    page: url.searchParams.get('page') ?? undefined,
+    pageSize: url.searchParams.get('pageSize') ?? undefined,
+  });
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? 'พารามิเตอร์ไม่ถูกต้อง' },
+      { status: 400 },
+    );
+  }
+  const { page, pageSize } = parsed.data;
+
   const db = await getDb();
+
+  const [countRow] = await db.select({ value: count() }).from(chatBroadcasts);
+  const total = countRow?.value ?? 0;
+
   const rows = await db
     .select()
     .from(chatBroadcasts)
     .orderBy(desc(chatBroadcasts.createdAt))
-    .limit(50);
+    .limit(pageSize)
+    .offset((page - 1) * pageSize);
 
   // § จำนวนผู้รับที่ล้มต่อ broadcast สำหรับสรุปในรายการ — hash อย่างเดียว ไม่คืนรายละเอียดผู้รับ
   const failedRows = await db
@@ -48,6 +71,9 @@ export async function GET() {
 
   return NextResponse.json({
     items: rows.map((row) => ({ ...row, failedRecipients: failedById.get(row.id) ?? 0 })),
+    total,
+    page,
+    pageSize,
   });
 }
 
