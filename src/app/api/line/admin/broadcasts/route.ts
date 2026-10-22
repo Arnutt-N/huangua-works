@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { count, desc, sql } from 'drizzle-orm';
+import { count, desc, inArray, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { chatBroadcasts, chatBroadcastFailedRecipients } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
@@ -62,12 +62,19 @@ export async function GET(request: Request) {
     .limit(pageSize)
     .offset((page - 1) * pageSize);
 
-  // § จำนวนผู้รับที่ล้มต่อ broadcast สำหรับสรุปในรายการ — hash อย่างเดียว ไม่คืนรายละเอียดผู้รับ
-  const failedRows = await db
-    .select({ broadcastId: chatBroadcastFailedRecipients.broadcastId, failedRecipients: sql<number>`count(*)::int` })
-    .from(chatBroadcastFailedRecipients)
-    .groupBy(chatBroadcastFailedRecipients.broadcastId);
-  const failedById = new Map(failedRows.map((r) => [r.broadcastId, r.failedRecipients]));
+  // § จำนวนผู้รับที่ล้มเฉพาะ broadcast ในหน้านี้ — hash อย่างเดียว ไม่คืนรายละเอียดผู้รับ
+  // (เดิม GROUP BY ทั้งตารางทุก request — interrogate)
+  const failedById = new Map<string, number>();
+  if (rows.length > 0) {
+    const failedRows = await db
+      .select({ broadcastId: chatBroadcastFailedRecipients.broadcastId, failedRecipients: sql<number>`count(*)::int` })
+      .from(chatBroadcastFailedRecipients)
+      .where(
+        inArray(chatBroadcastFailedRecipients.broadcastId, rows.map((r) => r.id)),
+      )
+      .groupBy(chatBroadcastFailedRecipients.broadcastId);
+    for (const r of failedRows) failedById.set(r.broadcastId, r.failedRecipients);
+  }
 
   return NextResponse.json({
     items: rows.map((row) => ({ ...row, failedRecipients: failedById.get(row.id) ?? 0 })),

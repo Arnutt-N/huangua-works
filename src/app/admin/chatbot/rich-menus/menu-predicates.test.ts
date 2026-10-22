@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { isUsableMenu } from './menu-predicates';
+import { isSyncedMenu, isUsableMenu } from './menu-predicates';
+import type { RichMenuItem } from '@/app/admin/_lib/admin-api';
 
-function menu(over: Record<string, unknown> = {}) {
+function menu(over: Partial<RichMenuItem> = {}): RichMenuItem {
   return {
     id: 'm1',
     name: 'เมนูหลัก',
@@ -19,15 +20,33 @@ function menu(over: Record<string, unknown> = {}) {
 }
 
 describe('isUsableMenu — ตรง server guard POST friends/:id/rich-menu', () => {
-  it('ใช้ได้เมื่อ sync ขึ้น LINE แล้วและไม่ถูกปิด', () => {
+  it('ใช้ได้เมื่อมี lineRichMenuId และไม่ถูกปิด', () => {
     expect(isUsableMenu(menu())).toBe(true);
+    // § sync error ก็ผูกเพื่อนได้ — server ไม่เช็ค syncStatus เส้นนี้
+    expect(isUsableMenu(menu({ syncStatus: 'error' }))).toBe(true);
   });
 
-  it('ใช้ไม่ได้เมื่อยังไม่ sync', () => {
+  it('ใช้ไม่ได้เมื่อยังไม่ sync ขึ้น LINE', () => {
     expect(isUsableMenu(menu({ lineRichMenuId: null, syncStatus: 'local' }))).toBe(false);
   });
 
   it('ใช้ไม่ได้เมื่อถูกปิดใช้งาน (server คืน 422 ข้อความเดียวกัน)', () => {
     expect(isUsableMenu(menu({ status: 'inactive' }))).toBe(false);
+  });
+});
+
+describe('isSyncedMenu — ตรง resolveAliasTarget (alias create/repoint)', () => {
+  it('ใช้ได้เฉพาะเมนูที่ sync สำเร็จ', () => {
+    expect(isSyncedMenu(menu())).toBe(true);
+  });
+
+  it('ใช้ไม่ได้เมื่อ sync ค้าง error แม้ lineRichMenuId ยังอยู่', () => {
+    // § regression จาก PR #143: dropdown เสนอเมนูที่ alias จะ 422
+    expect(isSyncedMenu(menu({ syncStatus: 'error', lastSyncError: 'boom' }))).toBe(false);
+    expect(isSyncedMenu(menu({ syncStatus: 'local' }))).toBe(false);
+  });
+
+  it('ใช้ไม่ได้เมื่อไม่มี lineRichMenuId', () => {
+    expect(isSyncedMenu(menu({ lineRichMenuId: null, syncStatus: 'local' }))).toBe(false);
   });
 });

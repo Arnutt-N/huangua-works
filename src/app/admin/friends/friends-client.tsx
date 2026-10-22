@@ -143,18 +143,22 @@ export function FriendsClient() {
     if (!confirm(`กำหนดริชเมนูให้เพื่อน ${selected.size} คน?`)) return;
     setBulkSaving(true);
     const ids = [...selected];
-    // § allSettled แทน for-await serial — เร็วขึ้น + เก็บชื่อคนที่ล้มมาโชว์
-    const results = await Promise.allSettled(
-      ids.map((id) => adminApi.assignUserRichMenu(id, bulkMenu)),
-    );
+    // § chunk ละ 10 แทน allSettled ก้อนเดียว — LINE 429 ถ้ายิงรัว (interrogate)
+    const CHUNK = 10;
     const failedNames: string[] = [];
-    results.forEach((r, i) => {
-      const ok = r.status === 'fulfilled' && r.value.ok;
-      if (!ok) {
-        const friend = items.find((f) => f.id === ids[i]);
-        failedNames.push(friend?.displayName ?? friend?.maskedId ?? ids[i] ?? '?');
-      }
-    });
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const chunk = ids.slice(i, i + CHUNK);
+      const results = await Promise.allSettled(
+        chunk.map((id) => adminApi.assignUserRichMenu(id, bulkMenu)),
+      );
+      results.forEach((r, j) => {
+        const ok = r.status === 'fulfilled' && r.value.ok;
+        if (!ok) {
+          const friend = items.find((f) => f.id === chunk[j]);
+          failedNames.push(friend?.displayName ?? friend?.maskedId ?? chunk[j] ?? '?');
+        }
+      });
+    }
     setBulkSaving(false);
     setBulkOpen(false);
     setBulkMenu('');
@@ -388,7 +392,7 @@ export function FriendsClient() {
                 >
                   <option value="">เลือกเมนู...</option>
                   {(menus ?? []).map((m) => {
-                    const usable = m.lineRichMenuId && m.status !== 'inactive';
+                    const usable = isUsableMenu(m);
                     return (
                       <option key={m.id} value={m.id} disabled={!usable}>
                         {m.name}{usable ? '' : ' (ใช้ไม่ได้ — ยังไม่ sync หรือปิดใช้งาน)'}
@@ -434,7 +438,7 @@ export function FriendsClient() {
                 {usableBulkMenus.map((m) => (
                   <option key={m.id} value={m.id}>{m.name}</option>
                 ))}
-                {bulkMenus.filter((m) => !(m.lineRichMenuId && m.status !== 'inactive')).map((m) => (
+                {bulkMenus.filter((m) => !isUsableMenu(m)).map((m) => (
                   <option key={m.id} value={m.id} disabled>
                     {m.name} (ใช้ไม่ได้ — ยังไม่ sync หรือปิดใช้งาน)
                   </option>

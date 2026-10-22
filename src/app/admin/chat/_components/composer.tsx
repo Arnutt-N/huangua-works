@@ -31,6 +31,9 @@ export function Composer({
 }) {
   const [input, setInput] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
+  // § "/" ค้างเปิด picker ตลอดจนล้างตัวอักษร — เก็บ dismissed แยกต่างหาก
+  // (interrogate: เดิม onClose เซ็ต pickerOpen อย่างเดียวแต่ startsWith('/') ยัง true)
+  const [slashDismissed, setSlashDismissed] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -44,7 +47,15 @@ export function Composer({
 
   // picker เปิดเมื่อ input ขึ้นต้นด้วย "/" — filter คือข้อความหลัง "/"
   const pickerFilter = input.startsWith('/') ? input.slice(1) : '';
-  const showPicker = pickerOpen || (canReply && input.startsWith('/'));
+  const showPicker = input.startsWith('/')
+    ? canReply && !slashDismissed
+    : pickerOpen;
+
+  const handleInput = (next: string) => {
+    setInput(next);
+    // ล้าง "/" ออก → reset ให้พิมพ์ "/" ใหม่เปิด picker ได้อีก
+    if (!next.startsWith('/')) setSlashDismissed(false);
+  };
 
   const handleSend = () => {
     const text = input.trim();
@@ -56,6 +67,7 @@ export function Composer({
   const handlePick = (item: CannedResponse) => {
     setInput(item.content);
     setPickerOpen(false);
+    setSlashDismissed(true);
     textareaRef.current?.focus();
   };
 
@@ -114,7 +126,15 @@ export function Composer({
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => (showPicker ? setPickerOpen(false) : setPickerOpen(true))}
+            onClick={() => {
+              if (showPicker) {
+                setPickerOpen(false);
+                setSlashDismissed(true);
+              } else {
+                setPickerOpen(true);
+                setSlashDismissed(false);
+              }
+            }}
             disabled={!canReply}
             aria-label="ข้อความสำเร็จรูป"
             title='ข้อความสำเร็จรูป (พิมพ์ "/" ก็ได้)'
@@ -153,7 +173,10 @@ export function Composer({
               items={cannedResponses}
               filter={pickerFilter}
               onPick={handlePick}
-              onClose={() => setPickerOpen(false)}
+              onClose={() => {
+                setPickerOpen(false);
+                setSlashDismissed(true);
+              }}
             />
           )}
           <div className="flex items-end gap-2">
@@ -163,7 +186,7 @@ export function Composer({
                 aria-label="พิมพ์ข้อความ"
                 value={input}
                 rows={expanded ? 4 : 1}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => handleInput(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey && !showPicker) {
                     e.preventDefault();

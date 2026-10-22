@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Plus } from 'lucide-react';
 import { adminApi } from '@/app/admin/_lib/admin-api';
-import { isUsableMenu } from '../menu-predicates';
+import { isSyncedMenu } from '../menu-predicates';
 import { AliasList } from '../alias-list';
 import { useResource } from '@/app/admin/_lib/use-resource';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
@@ -21,7 +21,7 @@ export function RichMenuAliasesClient() {
   const items = menusRes.data?.items ?? [];
   const aliases = aliasesRes.data?.items ?? [];
   const loading = menusRes.loading || aliasesRes.loading;
-  const syncedMenus = items.filter(isUsableMenu);
+  const syncedMenus = items.filter(isSyncedMenu);
 
   async function handleCreate() {
     if (!aliasId.trim() || !aliasTarget) {

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import type { RichMenuItem } from '@/app/admin/_lib/admin-api';
 import { adminApi } from '@/app/admin/_lib/admin-api';
-import { isUsableMenu } from './menu-predicates';
+import { isSyncedMenu } from './menu-predicates';
 import { AliasList } from './alias-list';
 import { useResource } from '@/app/admin/_lib/use-resource';
 import { useRef } from 'react';
@@ -60,7 +60,7 @@ export function RichMenusClient() {
   const aliasesRes = useResource({ load: adminApi.listMenuAliases });
   const aliases = aliasesRes.data?.items ?? [];
   const reloadAliases = aliasesRes.reload;
-  const syncedMenus = items.filter(isUsableMenu);
+  const syncedMenus = items.filter(isSyncedMenu);
 
   async function handleCreateAlias() {
     if (!aliasId.trim() || !aliasTarget) {
@@ -208,7 +208,8 @@ export function RichMenusClient() {
               </thead>
               <tbody className="divide-y divide-border/30">
                 {items.map((item) => {
-                  const live = item.status === 'active' && isUsableMenu(item);
+                  // § live = synced เท่านั้น — เดิมหลุดตอนใช้ isUsableMenu ร่วม (ป้ายหลอก)
+                  const live = item.status === 'active' && isSyncedMenu(item);
                   return (
                     <tr key={item.id} className="hover:bg-accent/5">
                       <td className="w-32 px-4 py-3">
