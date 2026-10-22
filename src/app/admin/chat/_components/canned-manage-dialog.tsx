@@ -84,6 +84,7 @@ export function CannedManageDialog({
       return;
     }
     if (editingId === id) setFormOpen(false);
+    setError(null);
     onChanged();
   };
 

@@ -36,10 +36,11 @@ beforeEach(() => {
 });
 
 describe('RichMenuInsightsClient', () => {
-  it('แสดงชื่อ + สถานะ sync + โน้ต Official Manager', async () => {
+  it('แสดงชื่อ + สถานะเมนู + โน้ต coming soon + Official Manager', async () => {
     render(<RichMenuInsightsClient menuId="m1" />);
-    expect(await screen.findByText('jsk4.0-v2')).toBeInTheDocument();
+    expect(await screen.findByText('สถานะเมนู: jsk4.0-v2')).toBeInTheDocument();
     expect(screen.getByText('synced')).toBeInTheDocument();
+    expect(screen.getByText(/coming soon/)).toBeInTheDocument();
     expect(screen.getByText(/Official Account Manager/)).toBeInTheDocument();
   });
 

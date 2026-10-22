@@ -97,7 +97,7 @@ export function Composer({
 
       <div className="space-y-3 p-3">
         {canReply && cannedResponses.length > 0 && (
-          <div className="flex flex-wrap gap-1.5" aria-label="ข้อความด่วน">
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="ข้อความด่วน">
             {cannedResponses.slice(0, 3).map((item) => (
               <button
                 key={item.id}
@@ -118,7 +118,6 @@ export function Composer({
             disabled={!canReply}
             aria-label="ข้อความสำเร็จรูป"
             title='ข้อความสำเร็จรูป (พิมพ์ "/" ก็ได้)'
-            onDoubleClick={onManageCanned}
             className={cn(
               'inline-flex items-center justify-center rounded-sm p-2',
               'transition-colors duration-normal ease-out-expo',
@@ -131,6 +130,21 @@ export function Composer({
           >
             <Zap className="h-5 w-5" aria-hidden="true" />
           </button>
+          <button
+            type="button"
+            onClick={onManageCanned}
+            disabled={!canReply}
+            aria-label="จัดการข้อความสำเร็จรูป"
+            title="จัดการข้อความสำเร็จรูป"
+            className={cn(
+              'inline-flex min-h-touch items-center gap-1 rounded-sm px-2 py-1 text-xs font-medium',
+              'text-muted hover:bg-surface-sunken hover:text-ink',
+              'disabled:pointer-events-none disabled:opacity-50',
+              'focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong',
+            )}
+          >
+            จัดการ
+          </button>
         </div>
 
         <div className="relative">
@@ -139,10 +153,7 @@ export function Composer({
               items={cannedResponses}
               filter={pickerFilter}
               onPick={handlePick}
-              onClose={() => {
-                setPickerOpen(false);
-                if (input.startsWith('/')) setInput('');
-              }}
+              onClose={() => setPickerOpen(false)}
             />
           )}
           <div className="flex items-end gap-2">

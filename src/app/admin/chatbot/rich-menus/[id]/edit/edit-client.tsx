@@ -43,7 +43,7 @@ export function RichMenuEditClient({ menuId }: { menuId: string }) {
         <p role="alert" className="rounded-lg bg-danger/10 px-4 py-3 text-sm font-medium text-danger">{formError}</p>
       )}
       <AdminCard>
-        <AdminCardTitle>แก้ไขเมนู: {item.name}</AdminCardTitle>
+        <AdminCardTitle>ซิงก์/เผยแพร่เมนู: {item.name}</AdminCardTitle>
         <dl className="grid gap-2 text-sm sm:grid-cols-2">
           <div><dt className="text-muted">ชื่อเมนู</dt><dd className="font-medium text-ink">{item.name}</dd></div>
           <div><dt className="text-muted">Chat Bar Text</dt><dd className="text-ink">{item.chatBarText}</dd></div>

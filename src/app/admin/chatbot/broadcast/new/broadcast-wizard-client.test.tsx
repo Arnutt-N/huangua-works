@@ -64,7 +64,7 @@ describe('BroadcastWizardClient ตัวช่วยสร้าง 4 ขั้
 
     expect(await screen.findByText('น้ำประปาไม่ไหล')).toBeInTheDocument();
     expect(screen.queryByText('ไม่มีสร้างงานจริง')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'ทดลองส่ง' }));
+    await user.click(screen.getByRole('button', { name: 'ประเมินจำนวนผู้รับ' }));
     await waitFor(() => expect(dryRun).toHaveBeenCalledTimes(1));
     // § "ประมาณ {n} คน — ..." แตกเป็นหลาย text node — matcher รวม textContent เฉพาะ span ผล dry-run
     expect(
@@ -76,16 +76,16 @@ describe('BroadcastWizardClient ตัวช่วยสร้าง 4 ขั้
     ).toBeInTheDocument();
   });
 
-  it('บล็อกเมื่อข้อความว่าง', async () => {
+  it('บล็อกเมื่อข้อความว่าง — หยุดตั้งแต่หน้าเขียน', async () => {
     const user = userEvent.setup();
     render(<BroadcastWizardClient />);
 
     await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
     await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
-    await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
-    await user.click(screen.getByRole('button', { name: 'สร้างร่าง' }));
 
+    // § guard goStep ตรวจ buildContent ก่อนออก step 1 — ไม่หลุดไป step สุดท้าย
     expect(await screen.findByText('กรุณากรอกข้อความ')).toBeInTheDocument();
+    expect(screen.getByLabelText('ข้อความประกาศ')).toBeInTheDocument();
   });
 
   it('image ส่ง payload ชนิด image พร้อม URL คู่', async () => {
@@ -113,17 +113,47 @@ describe('BroadcastWizardClient ตัวช่วยสร้าง 4 ขั้
     );
   });
 
-  it('flex ว่าง altText ถูกบล็อก', async () => {
+  it('flex ว่าง altText ถูกบล็อก — หยุดตั้งแต่หน้าเขียน', async () => {
     const user = userEvent.setup();
     render(<BroadcastWizardClient />);
 
     await user.click(screen.getByRole('button', { name: /Flex Message/ }));
     await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
     await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
-    await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
-    await user.click(screen.getByRole('button', { name: 'สร้างร่าง' }));
 
     expect(await screen.findByText('กรุณากรอกข้อความสำรอง (altText)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Flex JSON')).toBeInTheDocument();
+  });
+
+  it('ข้าม step ไม่ได้เมื่อ content ยังผิด — error ค้างหน้าเดิม', async () => {
+    const user = userEvent.setup();
+    render(<BroadcastWizardClient />);
+
+    await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
+    await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
+
+    expect(await screen.findByText('กรุณากรอกข้อความ')).toBeInTheDocument();
+    expect(screen.getByLabelText('ข้อความประกาศ')).toBeInTheDocument();
+  });
+
+  it('ตั้งเวลาอดีตถูกบล็อก', async () => {
+    const user = userEvent.setup();
+    const create = adminApi.createBroadcast as ReturnType<typeof vi.fn>;
+    render(<BroadcastWizardClient />);
+
+    await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
+    await user.type(screen.getByLabelText('ข้อความประกาศ'), 'สวัสดี');
+    await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
+    await user.click(screen.getByLabelText('ตั้งเวลาส่ง (เว้นว่าง = สร้างเป็นร่าง)'));
+    await user.type(
+      screen.getByLabelText('ตั้งเวลาส่ง (เว้นว่าง = สร้างเป็นร่าง)'),
+      '2020-01-01T10:00',
+    );
+    await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
+    await user.click(screen.getByRole('button', { name: /ตั้งเวลาส่ง/ }));
+
+    expect(await screen.findByText(/เวลาส่งต้องเป็นอนาคต/)).toBeInTheDocument();
+    expect(create).not.toHaveBeenCalled();
   });
 
   it('schedule แปลงเป็น ISO มี offset', async () => {
@@ -136,7 +166,7 @@ describe('BroadcastWizardClient ตัวช่วยสร้าง 4 ขั้
     await user.click(screen.getByLabelText('ตั้งเวลาส่ง (เว้นว่าง = สร้างเป็นร่าง)'));
     await user.type(
       screen.getByLabelText('ตั้งเวลาส่ง (เว้นว่าง = สร้างเป็นร่าง)'),
-      '2026-10-22T10:00',
+      '2099-10-22T10:00',
     );
     await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
     await user.click(screen.getByRole('button', { name: /ตั้งเวลาส่ง/ }));

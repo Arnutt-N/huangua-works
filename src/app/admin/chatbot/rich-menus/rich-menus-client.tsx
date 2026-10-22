@@ -254,14 +254,14 @@ export function RichMenusClient() {
                         <span className="ml-2 inline-flex gap-1">
                           <Link
                             href={`/admin/chatbot/rich-menus/${item.id}/insights`}
-                            aria-label={`สถิติ ${item.name}`}
+                            aria-label={`สถานะเมนู ${item.name}`}
                             className="inline-flex min-h-touch min-w-touch items-center justify-center rounded-md hover:bg-accent/10"
                           >
                             <BarChart3 className="h-4 w-4 text-muted" />
                           </Link>
                           <Link
                             href={`/admin/chatbot/rich-menus/${item.id}/edit`}
-                            aria-label={`แก้ไข ${item.name}`}
+                            aria-label={`ซิงก์/เผยแพร่ ${item.name}`}
                             className="inline-flex min-h-touch min-w-touch items-center justify-center rounded-md hover:bg-accent/10"
                           >
                             <Eye className="h-4 w-4 text-muted" />

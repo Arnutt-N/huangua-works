@@ -76,11 +76,11 @@ describe('RichMenusClient ตาราง JSK', () => {
     await screen.findAllByText('jsk4.0-v2');
     expect(screen.getByRole('link', { name: 'Aliases' })).toHaveAttribute('href', '/admin/chatbot/rich-menus/aliases');
     expect(screen.getByRole('link', { name: /สร้าง/ })).toHaveAttribute('href', '/admin/chatbot/rich-menus/new');
-    expect(screen.getByRole('link', { name: 'แก้ไข jsk4.0-v2' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'ซิงก์/เผยแพร่ jsk4.0-v2' })).toHaveAttribute(
       'href',
       '/admin/chatbot/rich-menus/m1/edit',
     );
-    expect(screen.getByRole('link', { name: 'สถิติ jsk4.0-v2' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'สถานะเมนู jsk4.0-v2' })).toHaveAttribute(
       'href',
       '/admin/chatbot/rich-menus/m1/insights',
     );

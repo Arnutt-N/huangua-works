@@ -31,7 +31,7 @@ function TimelineItem({ done, label, date }: { done: boolean; label: string; dat
         <span className={`block text-sm font-medium ${done ? 'text-ink' : 'text-muted'}`}>{label}</span>
         {date && (
           <span className="block text-xs text-muted">
-            {new Date(date).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
+            {new Date(date).toLocaleString('th-TH', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
           </span>
         )}
       </span>
@@ -85,20 +85,20 @@ export function BroadcastDetailClient({ broadcastId }: { broadcastId: string }) 
           </p>
           <p><span className="text-muted">สร้าง: </span>
             <span className="inline-flex items-center gap-1"><Calendar className="h-3.5 w-3.5 text-muted" />
-              {new Date(item.createdAt).toLocaleDateString('th-TH', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              {new Date(item.createdAt).toLocaleString('th-TH', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
             </span>
           </p>
           {item.sentAt && (
             <p><span className="text-muted">วันที่ส่ง: </span>
               <span className="font-medium text-success">
-                {new Date(item.sentAt).toLocaleDateString('th-TH', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                {new Date(item.sentAt).toLocaleString('th-TH', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
               </span>
             </p>
           )}
           {item.scheduledAt && item.status === 'scheduled' && (
             <p><span className="text-muted">กำหนดส่ง: </span>
               <span className="font-medium text-warning">
-                {new Date(item.scheduledAt).toLocaleDateString('th-TH', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                {new Date(item.scheduledAt).toLocaleString('th-TH', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
               </span>
             </p>
           )}
