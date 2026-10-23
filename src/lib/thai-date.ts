@@ -104,3 +104,78 @@ export function formatThaiDateTimeShort(date: Date): string {
 export function getFiscalYearBE(date: Date): number {
   return getFiscalYear(date) + 543;
 }
+
+const ISO_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+function parseValidIsoYmd(isoDate: string): { year: number; month: number; day: number } | null {
+  const m = ISO_DATE_PATTERN.exec(isoDate.trim());
+  if (!m) return null;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const probe = new Date(Date.UTC(year, month - 1, day));
+  if (
+    probe.getUTCFullYear() !== year ||
+    probe.getUTCMonth() + 1 !== month ||
+    probe.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return { year, month, day };
+}
+
+export function parseThaiDateStart(isoDate: string | null | undefined): Date | null {
+  if (!isoDate) return null;
+  const ymd = parseValidIsoYmd(isoDate);
+  if (!ymd) return null;
+  const mm = String(ymd.month).padStart(2, '0');
+  const dd = String(ymd.day).padStart(2, '0');
+  return new Date(`${ymd.year}-${mm}-${dd}T00:00:00.000+07:00`);
+}
+
+export function parseThaiDateEnd(isoDate: string | null | undefined): Date | null {
+  if (!isoDate) return null;
+  const ymd = parseValidIsoYmd(isoDate);
+  if (!ymd) return null;
+  const mm = String(ymd.month).padStart(2, '0');
+  const dd = String(ymd.day).padStart(2, '0');
+  return new Date(`${ymd.year}-${mm}-${dd}T23:59:59.999+07:00`);
+}
+
+export const THAI_MONTHS_SHORT = [
+  'ม.ค.',
+  'ก.พ.',
+  'มี.ค.',
+  'เม.ย.',
+  'พ.ค.',
+  'มิ.ย.',
+  'ก.ค.',
+  'ส.ค.',
+  'ก.ย.',
+  'ต.ค.',
+  'พ.ย.',
+  'ธ.ค.',
+] as const;
+
+export const THAI_MONTHS_FULL = [
+  'มกราคม',
+  'กุมภาพันธ์',
+  'มีนาคม',
+  'เมษายน',
+  'พฤษภาคม',
+  'มิถุนายน',
+  'กรกฎาคม',
+  'สิงหาคม',
+  'กันยายน',
+  'ตุลาคม',
+  'พฤศจิกายน',
+  'ธันวาคม',
+] as const;
+
+export function formatIsoToThaiShort(isoDate: string | null | undefined): string {
+  if (!isoDate) return '';
+  const ymd = parseValidIsoYmd(isoDate);
+  if (!ymd) return '';
+  return `${ymd.day} ${THAI_MONTHS_SHORT[ymd.month - 1]} ${ymd.year + 543}`;
+}

@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { ThaiDatePicker } from '@/components/ui/thai-date-picker';
 import { ALL_STATUSES, STATUS_LABELS_TH } from '@/lib/cases/state-machine';
 
 /**
@@ -53,11 +54,15 @@ export function CaseFilterBar({ categories }: { categories: CategoryOption[] }) 
   const currentStatus = searchParams.get('status') ?? 'all';
   const currentCategory = searchParams.get('category') ?? 'all';
   const currentPriority = searchParams.get('priority') ?? 'all';
+  const currentFrom = searchParams.get('from') ?? '';
+  const currentTo = searchParams.get('to') ?? '';
 
   const hasActiveFilter =
     currentStatus !== 'all' ||
     currentCategory !== 'all' ||
     currentPriority !== 'all' ||
+    !!currentFrom ||
+    !!currentTo ||
     !!searchParams.get('q');
 
   // สร้าง URL ใหม่จาก filter ปัจจุบัน + ล้าง page
@@ -182,6 +187,21 @@ export function CaseFilterBar({ categories }: { categories: CategoryOption[] }) 
               </SelectContent>
             </Select>
           </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <ThaiDatePicker
+            label="ตั้งแต่วันที่"
+            placeholder="ตั้งแต่วันที่"
+            value={currentFrom}
+            onChange={(v) => updateFilter('from', v)}
+          />
+          <ThaiDatePicker
+            label="ถึงวันที่"
+            placeholder="ถึงวันที่"
+            value={currentTo}
+            onChange={(v) => updateFilter('to', v)}
+          />
         </div>
 
         <div className="flex items-center justify-between gap-3">

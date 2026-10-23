@@ -23,6 +23,10 @@ function getTransport() {
   });
 }
 
+export function isMailDeliverable(): boolean {
+  return process.env.MAIL_CONSOLE === 'true' || Boolean(process.env.SMTP_HOST?.trim());
+}
+
 export async function sendMail(to: string, subject: string, html: string): Promise<void> {
   if (process.env.MAIL_CONSOLE === 'true') {
     console.warn(`[mail:console] to=${to} subject=${subject}\n${html}`);

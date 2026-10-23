@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { AlertTriangle, Clock, ChevronRight, MapPin, Inbox } from 'lucide-react';
 import type { Metadata } from 'next';
-import { and, desc, eq, ilike, or, count, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, ilike, lte, or, count, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { cases, caseFeedback, categories, users } from '@/lib/db/schema';
 import { requireStaff } from '@/lib/auth/require-staff';
@@ -12,6 +12,7 @@ import { Pagination } from '@/components/admin/pagination';
 import { CaseFilterBar } from '@/components/admin/case-filter-bar';
 import { CaseStatusBadge } from '@/components/ui/case-status-badge';
 import { OPEN_STATUSES, isCaseStatus, type CaseStatus } from '@/lib/cases/state-machine';
+import { parseThaiDateEnd, parseThaiDateStart } from '@/lib/thai-date';
 import { cn } from '@/lib/cn';
 
 export const metadata: Metadata = { title: 'จัดการเรื่อง' };
@@ -26,6 +27,8 @@ interface SearchParams {
   status?: string;
   category?: string;
   priority?: string;
+  from?: string;
+  to?: string;
   q?: string;
   page?: string;
 }
@@ -53,6 +56,8 @@ export default async function CaseManagementPage({
   const priorityFilter =
     params.priority && VALID_PRIORITIES.has(params.priority) ? params.priority : null;
   const categoryFilter = params.category ?? null;
+  const fromStart = parseThaiDateStart(params.from);
+  const toEnd = parseThaiDateEnd(params.to);
   const q = params.q?.trim() ?? '';
   const page = Math.max(1, parseInt(params.page ?? '1', 10) || 1);
 
@@ -64,6 +69,12 @@ export default async function CaseManagementPage({
   }
   if (categoryFilter) {
     filters.push(eq(cases.categoryId, categoryFilter));
+  }
+  if (fromStart) {
+    filters.push(gte(cases.createdAt, fromStart));
+  }
+  if (toEnd) {
+    filters.push(lte(cases.createdAt, toEnd));
   }
   if (q) {
     // ILIKE สำหรับ case-insensitive search — postgres native
@@ -137,7 +148,7 @@ export default async function CaseManagementPage({
     feedbackAvg: fb?.avg === null || fb?.avg === undefined ? null : Number(fb.avg).toFixed(1),
     feedbackCount: fb?.count ?? 0,
   };
-  const isFiltered = !!(statusFilter || priorityFilter || categoryFilter || q);
+  const isFiltered = !!(statusFilter || priorityFilter || categoryFilter || fromStart || toEnd || q);
 
   return (
     <AdminShell user={staffUser} active="reports" title="จัดการเรื่อง">

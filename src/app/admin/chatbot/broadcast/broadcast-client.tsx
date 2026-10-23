@@ -186,7 +186,7 @@ export function BroadcastClient() {
               </thead>
               <tbody className="divide-y divide-border/30">
                 {filtered.length === 0 ? (
-                  <tr>
+                  <tr aria-label="ไม่มีข้อมูล">
                     <td colSpan={6} className="px-4 py-12 text-center">
                       <div className="flex flex-col items-center gap-3 text-muted">
                         <Radio className="h-10 w-10 opacity-30" aria-hidden="true" />
@@ -288,14 +288,14 @@ export function BroadcastClient() {
                     <label key={opt.id} className="flex items-center gap-2 text-sm">
                       <input
                         type="checkbox"
-                        aria-label={opt.displayName ?? opt.id}
+                        aria-label={opt.displayName || opt.id}
                         checked={selectedIds.includes(opt.id)}
                         onChange={(e) => {
                           setEstimate(null);
                           setSelectedIds((prev) => e.target.checked ? [...prev, opt.id] : prev.filter((x) => x !== opt.id));
                         }}
                       />
-                      {opt.displayName ?? '(ไม่มีชื่อ)'}
+                      <span>{opt.displayName || '(ไม่มีชื่อ)'}</span>
                     </label>
                   ))}
                 </div>

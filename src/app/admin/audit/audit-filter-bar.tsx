@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { ThaiDatePicker } from '@/components/ui/thai-date-picker';
 
 /**
  * AuditFilterBar — filter สำหรับ /admin/audit
@@ -40,10 +41,14 @@ export function AuditFilterBar({ actions }: AuditFilterBarProps) {
 
   const currentAction = searchParams.get('action') ?? 'all';
   const currentResource = searchParams.get('resource') ?? 'all';
+  const currentFrom = searchParams.get('from') ?? '';
+  const currentTo = searchParams.get('to') ?? '';
 
   const hasActiveFilter =
     currentAction !== 'all' ||
     currentResource !== 'all' ||
+    !!currentFrom ||
+    !!currentTo ||
     !!searchParams.get('q');
 
   function updateFilter(key: string, value: string) {
@@ -54,8 +59,9 @@ export function AuditFilterBar({ actions }: AuditFilterBarProps) {
       params.set(key, value);
     }
     params.delete('page');
+    const query = params.toString();
     startTransition(() => {
-      router.push(`/admin/audit?${params.toString()}`);
+      router.push(query ? `/admin/audit?${query}` : '/admin/audit');
     });
   }
 
@@ -140,6 +146,21 @@ export function AuditFilterBar({ actions }: AuditFilterBarProps) {
               </SelectContent>
             </Select>
           </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <ThaiDatePicker
+            label="ตั้งแต่วันที่"
+            placeholder="ตั้งแต่วันที่"
+            value={currentFrom}
+            onChange={(v) => updateFilter('from', v)}
+          />
+          <ThaiDatePicker
+            label="ถึงวันที่"
+            placeholder="ถึงวันที่"
+            value={currentTo}
+            onChange={(v) => updateFilter('to', v)}
+          />
         </div>
 
         <div className="flex items-center justify-between gap-3">

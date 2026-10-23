@@ -26,6 +26,7 @@ const settingsSchema = z.object({
     .transform((hours) => ({ ...hours, days: [...new Set(hours.days)].sort((a, b) => a - b) }))
     .optional(),
   bot_enabled: z.boolean().optional(),
+  line_notify_enabled: z.boolean().optional(),
   chat_sla: z
     .object({
       queueWaitMinutes: z.number().positive(),
@@ -39,11 +40,12 @@ export async function GET() {
   const authz = await requireStaffApi(ADMIN_ROLES);
   if (!authz.ok) return authz.response;
 
-  const [welcome, keywords, hours, enabled, sla] = await Promise.all([
+  const [welcome, keywords, hours, enabled, lineNotifyEnabled, sla] = await Promise.all([
     getChatSetting('welcome_message'),
     getChatSetting('handoff_keywords'),
     getChatSetting('business_hours'),
     getChatSetting('bot_enabled'),
+    getChatSetting('line_notify_enabled'),
     getChatSetting('chat_sla'),
   ]);
 
@@ -58,6 +60,7 @@ export async function GET() {
     handoff_keywords: keywords,
     business_hours: hours,
     bot_enabled: enabled,
+    line_notify_enabled: lineNotifyEnabled,
     chat_sla: sla,
     line: lineStatus,
   });

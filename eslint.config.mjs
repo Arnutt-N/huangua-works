@@ -19,6 +19,7 @@ const config = [
     ignores: [
       'node_modules/**',
       '.next/**',
+      '.claude/worktrees/**',
       'storybook-static/**',
       'dist/**',
       'coverage/**',

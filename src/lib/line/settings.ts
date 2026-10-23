@@ -16,6 +16,7 @@ export interface ChatSettingsDefaults {
   business_hours: BusinessHours;
   bot_enabled: boolean;
   bot_engine_v2: boolean;
+  line_notify_enabled: boolean;
   chat_sla: ChatSla;
 }
 
@@ -36,6 +37,7 @@ const DEFAULTS: ChatSettingsDefaults = {
   business_hours: { start: '08:30', end: '16:30', days: [1, 2, 3, 4, 5] },
   bot_enabled: true,
   bot_engine_v2: false,
+  line_notify_enabled: true,
   chat_sla: { queueWaitMinutes: 30, firstResponseMinutes: 15, resolutionHours: 24 },
 };
 
@@ -55,7 +57,7 @@ function isClock(value: unknown): value is string {
 
 /** normalize ค่าเก่าตอนอ่าน — ไม่ทำ schema migration; ชนิดเสีย fallback เป็น default ของ key นั้น */
 function normalizeSetting(key: keyof ChatSettingsDefaults, value: unknown): ChatSettingsDefaults[typeof key] | undefined {
-  if (key === 'bot_enabled' || key === 'bot_engine_v2') {
+  if (key === 'bot_enabled' || key === 'bot_engine_v2' || key === 'line_notify_enabled') {
     return typeof value === 'boolean' ? value : undefined;
   }
   if (key === 'handoff_keywords') {
