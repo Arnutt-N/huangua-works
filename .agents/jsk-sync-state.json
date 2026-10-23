@@ -1,0 +1,24 @@
+{
+  "jskRepoPath": "D:\\genAI\\jsk-app",
+  "jskSessionLogDir": "D:\\genAI\\jsk-app\\project-log-md\\pi",
+  "lastSyncedSessionFile": "session-summary-20261023-0209.md",
+  "lastSyncedJskHead": "333cfdc",
+  "lastSyncedAt": "2026-10-23T08:06:00+07:00",
+  "portedItems": [
+    {
+      "jskPr": "#280, #281",
+      "summary": "LINE Quota Readout (5-min cache, circuit breaker, clamp >= 0) + line_notify_enabled toggle",
+      "huanguaBranch": "feat/jsk-port-quota-datepicker"
+    },
+    {
+      "jskPr": "#284 (partial)",
+      "summary": "Password reset undeliverable guard (isMailDeliverable check before createResetToken)",
+      "huanguaBranch": "feat/jsk-port-quota-datepicker"
+    },
+    {
+      "jskPr": "#285, #286, #287",
+      "summary": "Shared ThaiDatePicker (Portal + 32px touch clear button + responsive width) + /admin/reports and /admin/audit date range filters",
+      "huanguaBranch": "feat/jsk-port-quota-datepicker"
+    }
+  ]
+}

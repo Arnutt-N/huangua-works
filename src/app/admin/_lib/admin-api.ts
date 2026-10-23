@@ -217,11 +217,19 @@ export interface HealthData {
   timestamp: string;
 }
 
+export interface LineQuotaData {
+  type: 'limited' | 'none';
+  limit: number | null;
+  used: number;
+  remaining: number | null;
+}
+
 export interface SettingsData {
   welcome_message: string;
   handoff_keywords: string[];
   business_hours: { start: string; end: string; days: number[] };
   bot_enabled: boolean;
+  line_notify_enabled?: boolean;
   line: { configured: boolean; maskedToken: string | null };
 }
 
@@ -391,6 +399,10 @@ export const adminApi = {
     request<SettingsData>('/api/line/admin/settings'),
   saveSettings: (payload: SettingsInput): Promise<ApiResult<OkBody>> =>
     request<OkBody>('/api/line/admin/settings', withBody('PUT', payload)),
+  getLineQuota: (): Promise<ApiResult<LineQuotaData>> =>
+    request<LineQuotaData>('/api/line/admin/quota'),
+  refreshLineQuota: (): Promise<ApiResult<LineQuotaData>> =>
+    request<LineQuotaData>('/api/line/admin/quota?refresh=1'),
   getSystemSettings: (): Promise<ApiResult<SystemSettingsData>> =>
     request<SystemSettingsData>('/api/admin/system-settings'),
   saveSystemSettings: (payload: SystemSettingsInput): Promise<ApiResult<OkBody>> =>

@@ -1,13 +1,22 @@
 'use client';
 
 import { useState } from 'react';
-import { adminApi } from '@/app/admin/_lib/admin-api';
+import { adminApi, type LineQuotaData } from '@/app/admin/_lib/admin-api';
 import { useResource } from '@/app/admin/_lib/use-resource';
-import { Settings, Save, Wifi, WifiOff } from 'lucide-react';
+import { Settings, Save, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import { Button } from '@/components/ui/button';
 import { Label, Input, Textarea } from '@/components/ui/field';
 import { BUSINESS_DAY_LABELS as DAY_LABELS } from '@/lib/line/business-hours';
+
+function formatQuotaLabel(quota: LineQuotaData | null, errorMsg: string | null): string {
+  if (errorMsg) return errorMsg;
+  if (!quota) return 'กำลังโหลดโควต้า...';
+  if (quota.type === 'none' || quota.limit === null || quota.remaining === null) {
+    return `โควต้า LINE: ไม่จำกัด (ใช้ไป ${quota.used.toLocaleString('th-TH')} ข้อความ)`;
+  }
+  return `โควต้า LINE คงเหลือ ${quota.remaining.toLocaleString('th-TH')} / ${quota.limit.toLocaleString('th-TH')} ข้อความ`;
+}
 
 export function SettingsClient() {
   const { data, loading, feedback, clearFeedback, mutate, setData } = useResource({
@@ -16,6 +25,8 @@ export function SettingsClient() {
   // § ตั้งค่ากลางโหลดแยกอีกก้อน รูปเดียวกับบอท: derive ค่าจาก server แทน useEffect setState
   const system = useResource({ load: adminApi.getSystemSettings });
   const conns = useResource({ load: adminApi.listApiConnections });
+  const quota = useResource({ load: adminApi.getLineQuota });
+  const [quotaRefreshing, setQuotaRefreshing] = useState(false);
   const [sysSaving, setSysSaving] = useState(false);
   const [maintenance, setMaintenance] = useState<boolean | null>(null);
   const [retentionText, setRetentionText] = useState<string | null>(null);
@@ -38,11 +49,22 @@ export function SettingsClient() {
           handoff_keywords: keywords.split(',').map((k) => k.trim()).filter(Boolean),
           business_hours: data.business_hours,
           bot_enabled: data.bot_enabled,
+          line_notify_enabled: data.line_notify_enabled ?? true,
         }),
       'บันทึกตั้งค่าสำเร็จ',
       { reload: false }, // คงค่าที่ผู้ใช้แก้ค้างไว้ในหน้า — ไม่ดึงทับจาก server
     );
     setSaving(false);
+  }
+
+  async function handleRefreshQuota() {
+    setQuotaRefreshing(true);
+    quota.clearFeedback();
+    const res = await adminApi.refreshLineQuota();
+    if (res.ok) {
+      quota.setData(() => res.data);
+    }
+    setQuotaRefreshing(false);
   }
 
   async function handleSystemSave() {
@@ -178,21 +200,49 @@ export function SettingsClient() {
         <AdminCardTitle icon={<Settings className="h-4 w-4" />}>
           สถานะ LINE Channel
         </AdminCardTitle>
-        <div className="flex items-center gap-3">
-          {data.line.configured ? (
-            <>
-              <Wifi className="h-5 w-5 text-success" />
-              <span className="text-sm text-ink">
-                เชื่อมต่อแล้ว (token: {data.line.maskedToken})
-              </span>
-            </>
-          ) : (
-            <>
-              <WifiOff className="h-5 w-5 text-danger" />
-              <span className="text-sm text-danger">
-                ยังไม่ได้ตั้งค่า LINE_CHANNEL_ACCESS_TOKEN ใน environment
-              </span>
-            </>
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            {data.line.configured ? (
+              <>
+                <Wifi className="h-5 w-5 text-success" />
+                <span className="text-sm text-ink">
+                  เชื่อมต่อแล้ว (token: {data.line.maskedToken})
+                </span>
+              </>
+            ) : (
+              <>
+                <WifiOff className="h-5 w-5 text-danger" />
+                <span className="text-sm text-danger">
+                  ยังไม่ได้ตั้งค่า LINE_CHANNEL_ACCESS_TOKEN ใน environment
+                </span>
+              </>
+            )}
+          </div>
+          {data.line.configured && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border px-3 py-2">
+              <div className="text-sm">
+                <span className="font-medium text-ink">
+                  {formatQuotaLabel(
+                    quota.data,
+                    quota.feedback?.type === 'error' ? quota.feedback.msg : null,
+                  )}
+                </span>
+                <p className="text-xs text-muted">
+                  ยอดโควต้าจาก LINE อาจอัปเดตล่าช้าประมาณ 1 นาที (แคช 5 นาที)
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleRefreshQuota}
+                disabled={quotaRefreshing || quota.loading}
+                aria-label="รีเฟรชโควต้า LINE"
+                className="min-h-touch gap-1.5"
+              >
+                <RefreshCw className={`h-4 w-4 ${quotaRefreshing ? 'animate-spin' : ''}`} aria-hidden="true" />
+                รีเฟรชโควต้า
+              </Button>
+            </div>
           )}
         </div>
       </AdminCard>
@@ -209,6 +259,19 @@ export function SettingsClient() {
               className="h-5 w-5 rounded border-border accent-accent"
             />
             <span className="text-sm font-medium text-ink">เปิดใช้งานบอทตอบอัตโนมัติ</span>
+          </label>
+
+          <label className="flex min-h-touch items-center gap-3">
+            <input
+              type="checkbox"
+              aria-label="แจ้งเตือนทาง LINE"
+              checked={data.line_notify_enabled ?? true}
+              onChange={(e) =>
+                setData((prev) => (prev ? { ...prev, line_notify_enabled: e.target.checked } : prev))
+              }
+              className="h-5 w-5 rounded border-border accent-accent"
+            />
+            <span className="text-sm font-medium text-ink">แจ้งเตือนทาง LINE (ส่งข้อความ Push อัตโนมัติ)</span>
           </label>
 
           <div>

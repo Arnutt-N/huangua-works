@@ -14,7 +14,7 @@ import {
   createResetToken,
   validateResetToken,
 } from '@/lib/auth/reset-token';
-import { sendMail, buildResetEmailHtml } from '@/lib/mail';
+import { sendMail, buildResetEmailHtml, isMailDeliverable } from '@/lib/mail';
 import {
   forgotPasswordRequestSchema,
   forgotPasswordResetSchema,
@@ -96,6 +96,20 @@ export async function requestPasswordReset(
   const eligible = !!user && user.role !== 'citizen' && user.isActive;
 
   if (eligible && user) {
+    // § ไม่ mint token เมื่อระบบยังส่งอีเมลไม่ได้ (JSK PR #284) — createResetToken จะเผา
+    // token เก่าทั้งหมดของ user ทันที ถ้าส่งเมลไม่ออกจะเท่ากับทำลายลิงก์เก่าโดยไม่มีลิงก์ใหม่ไปแทน
+    if (!isMailDeliverable()) {
+      console.warn('[requestPasswordReset] mail not configured — skipping token mint');
+      await logAudit({
+        action: AUDIT_ACTIONS.PASSWORD_RESET_FAILURE,
+        resource: 'auth',
+        userId: user.id,
+        ipAddress: ip,
+        userAgent,
+        metadata: { reason: 'mail_not_configured' },
+      });
+      return { error: null, success: true };
+    }
     try {
       const plaintext = await createResetToken(user.id);
       const resetUrl = `${getBaseUrl()}/admin/reset-password?token=${plaintext}`;

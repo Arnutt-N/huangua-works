@@ -1,11 +1,14 @@
 import { describe, expect, test } from 'vitest';
 import {
+  formatIsoToThaiShort,
   formatThaiDate,
   formatThaiDateLong,
   formatThaiDateTime,
   formatThaiDateTimeShort,
   getFiscalYear,
   getFiscalYearBE,
+  parseThaiDateEnd,
+  parseThaiDateStart,
   toBuddhistYear,
   toGregorianYear,
   toThaiDateString,
@@ -102,5 +105,22 @@ describe('getFiscalYearBE', () => {
   test('returns the fiscal year in Buddhist era for an Oct-Dec date', () => {
     // fiscal year for a November 2026 date is calendar 2027 -> BE 2570
     expect(getFiscalYearBE(new Date(2026, 10, 1))).toBe(2570);
+  });
+});
+
+describe('parseThaiDateStart / parseThaiDateEnd / formatIsoToThaiShort', () => {
+  test('แปลง YYYY-MM-DD เป็นขอบเขตวันตามเวลาไทย (+07:00)', () => {
+    const start = parseThaiDateStart('2026-10-23');
+    const end = parseThaiDateEnd('2026-10-23');
+    expect(start?.toISOString()).toBe('2026-10-22T17:00:00.000Z');
+    expect(end?.toISOString()).toBe('2026-10-23T16:59:59.999Z');
+    expect(formatIsoToThaiShort('2026-10-23')).toBe('23 ต.ค. 2569');
+  });
+
+  test('คืน null หรือค่าว่างเมื่อรูปแบบวันที่ไม่ถูกต้องหรือไม่มีอยู่จริงในปฏิทิน', () => {
+    expect(parseThaiDateStart('')).toBeNull();
+    expect(parseThaiDateStart('2026-02-30')).toBeNull();
+    expect(parseThaiDateEnd('invalid')).toBeNull();
+    expect(formatIsoToThaiShort('2026-13-01')).toBe('');
   });
 });

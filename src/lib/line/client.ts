@@ -337,3 +337,65 @@ export async function unlinkUserRichMenu(rawLineUserId: string): Promise<void> {
     }
   });
 }
+
+export interface LineMessageQuota {
+  type: 'limited' | 'none';
+  limit: number | null;
+  used: number;
+  remaining: number | null;
+}
+
+/**
+ * ดึงโควต้าข้อความ LINE รายเดือน + ยอดใช้ไปแล้ว
+ * § ใช้ circuit breaker แยก key '/message/quota' ไม่ปนกับ '/message/push'
+ * § clamp remaining >= 0 กันกรณีใช้เกินโควต้าแล้วแสดงตัวเลขติดลบ (JSK PR #281)
+ */
+export async function getLineMessageQuota(): Promise<LineMessageQuota> {
+  const endpoint = '/message/quota';
+  return withLineCircuit(endpoint, async () => {
+    const [quotaRes, usageRes] = await Promise.all([
+      fetch(`${LINE_API_BASE}/message/quota`, {
+        headers: getHeaders(),
+        signal: AbortSignal.timeout(5_000),
+      }),
+      fetch(`${LINE_API_BASE}/message/quota/consumption`, {
+        headers: getHeaders(),
+        signal: AbortSignal.timeout(5_000),
+      }),
+    ]);
+
+    if (!quotaRes.ok) {
+      const detail = await quotaRes.text().catch(() => '');
+      throw new LineApiError('/message/quota', quotaRes.status, detail.slice(0, 500));
+    }
+    if (!usageRes.ok) {
+      const detail = await usageRes.text().catch(() => '');
+      throw new LineApiError('/message/quota/consumption', usageRes.status, detail.slice(0, 500));
+    }
+
+    const quotaBody = (await quotaRes.json()) as { type?: unknown; value?: unknown };
+    const usageBody = (await usageRes.json()) as { totalUsage?: unknown };
+
+    const rawUsed = Number(usageBody?.totalUsage ?? 0);
+    const used = Number.isFinite(rawUsed) && rawUsed >= 0 ? Math.trunc(rawUsed) : 0;
+
+    if (quotaBody?.type === 'limited') {
+      const rawLimit = Number(quotaBody?.value ?? 0);
+      const limit = Number.isFinite(rawLimit) && rawLimit >= 0 ? Math.trunc(rawLimit) : 0;
+      const remaining = Math.max(0, limit - used);
+      return {
+        type: 'limited',
+        limit,
+        used,
+        remaining,
+      };
+    }
+
+    return {
+      type: 'none',
+      limit: null,
+      used,
+      remaining: null,
+    };
+  });
+}

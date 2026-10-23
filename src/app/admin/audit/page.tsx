@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { desc, eq, ilike, or, count, and } from 'drizzle-orm';
+import { desc, eq, gte, ilike, lte, or, count, and } from 'drizzle-orm';
 import { ScrollText, Globe, Fingerprint, Clock, FileJson } from 'lucide-react';
 import { getDb } from '@/lib/db';
 import { auditLogs, users } from '@/lib/db/schema';
@@ -10,7 +10,7 @@ import { AdminCard } from '@/components/admin/admin-card';
 import { EmptyState } from '@/components/admin/empty-state';
 import { Pagination } from '@/components/admin/pagination';
 import { RoleBadge } from '@/components/admin/role-badge';
-import { formatThaiDateTime } from '@/lib/thai-date';
+import { formatThaiDateTime, parseThaiDateEnd, parseThaiDateStart } from '@/lib/thai-date';
 import { AuditFilterBar } from './audit-filter-bar';
 
 export const metadata: Metadata = { title: 'ประวัติการกระทำ' };
@@ -21,6 +21,8 @@ const PAGE_SIZE = 30;
 interface SearchParams {
   action?: string;
   resource?: string;
+  from?: string;
+  to?: string;
   q?: string;
   page?: string;
 }
@@ -57,6 +59,8 @@ export default async function AuditPage({
   const actionFilter = params.action?.trim() || null;
   const resourceFilter =
     params.resource && VALID_RESOURCES.has(params.resource) ? params.resource : null;
+  const fromStart = parseThaiDateStart(params.from);
+  const toEnd = parseThaiDateEnd(params.to);
   const q = params.q?.trim() ?? '';
   const page = Math.max(1, parseInt(params.page ?? '1', 10) || 1);
 
@@ -67,6 +71,12 @@ export default async function AuditPage({
   }
   if (resourceFilter) {
     filters.push(eq(auditLogs.resource, resourceFilter));
+  }
+  if (fromStart) {
+    filters.push(gte(auditLogs.createdAt, fromStart));
+  }
+  if (toEnd) {
+    filters.push(lte(auditLogs.createdAt, toEnd));
   }
   if (q) {
     // search by user email/name via sub-query OR by resourceId/IP
