@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireStaff } from '@/lib/auth/require-staff';
 import { CASE_SUPERVISOR_ROLES } from '@/lib/auth/roles';
+import { notifyCitizenStatusChange } from '@/lib/cases/line-notify';
 import { applyCaseUpdate, type CaseActor } from '@/lib/cases/operations';
 import {
   changeStatusFormSchema,
@@ -48,6 +49,11 @@ export async function changeStatus(
   }, toActor(auth));
 
   if (!result.ok) return { error: result.error };
+
+  const publicChange = isPublic === 'true';
+  if (publicChange) {
+    await notifyCitizenStatusChange(caseId, status);
+  }
 
   revalidatePath(`/admin/cases/${caseId}`);
   revalidatePath('/admin');

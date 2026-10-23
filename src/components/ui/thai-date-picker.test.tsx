@@ -8,7 +8,7 @@ afterEach(() => {
   cleanup();
 });
 
-describe('ThaiDatePicker (JSK PR #285/#287 Portal + Touch Hardening)', () => {
+describe('ThaiDatePicker', () => {
   it('แสดงค่าเริ่มต้นและเปิดปฏิทิน พ.ศ. ใน document.body (Portal) ได้', () => {
     const onChange = vi.fn();
     render(

@@ -345,11 +345,7 @@ export interface LineMessageQuota {
   remaining: number | null;
 }
 
-/**
- * ดึงโควต้าข้อความ LINE รายเดือน + ยอดใช้ไปแล้ว
- * § ใช้ circuit breaker แยก key '/message/quota' ไม่ปนกับ '/message/push'
- * § clamp remaining >= 0 กันกรณีใช้เกินโควต้าแล้วแสดงตัวเลขติดลบ (JSK PR #281)
- */
+// § แยก circuit breaker key '/message/quota' เพื่อไม่ให้การดึงโควต้าล้มไปเปิดวงจรของ '/message/push'
 export async function getLineMessageQuota(): Promise<LineMessageQuota> {
   const endpoint = '/message/quota';
   return withLineCircuit(endpoint, async () => {

@@ -1,11 +1,3 @@
-/**
- * ตรวจสอบความเปลี่ยนแปลงใหม่จากโปรเจคต้นแบบ JSK-App (D:\genAI\jsk-app)
- * เทียบกับจุดซิงค์ล่าสุดใน .agents/jsk-sync-state.json
- *
- * วิธีรัน:
- *   npx tsx scripts/check-jsk-sync.ts
- */
-
 import fs from 'node:fs';
 import path from 'node:path';
 

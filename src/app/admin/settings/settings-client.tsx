@@ -3,19 +3,21 @@
 import { useState } from 'react';
 import { adminApi, type LineQuotaData } from '@/app/admin/_lib/admin-api';
 import { useResource } from '@/app/admin/_lib/use-resource';
+import { describeLineQuota } from '@/lib/line/quota';
 import { Settings, Save, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import { Button } from '@/components/ui/button';
 import { Label, Input, Textarea } from '@/components/ui/field';
 import { BUSINESS_DAY_LABELS as DAY_LABELS } from '@/lib/line/business-hours';
 
-function formatQuotaLabel(quota: LineQuotaData | null, errorMsg: string | null): string {
+function formatQuotaLabel(
+  quota: LineQuotaData | null,
+  loading: boolean,
+  errorMsg: string | null,
+): string {
   if (errorMsg) return errorMsg;
-  if (!quota) return 'กำลังโหลดโควต้า...';
-  if (quota.type === 'none' || quota.limit === null || quota.remaining === null) {
-    return `โควต้า LINE: ไม่จำกัด (ใช้ไป ${quota.used.toLocaleString('th-TH')} ข้อความ)`;
-  }
-  return `โควต้า LINE คงเหลือ ${quota.remaining.toLocaleString('th-TH')} / ${quota.limit.toLocaleString('th-TH')} ข้อความ`;
+  if (loading && !quota) return 'กำลังโหลดโควต้า...';
+  return describeLineQuota(quota);
 }
 
 export function SettingsClient() {
@@ -49,7 +51,7 @@ export function SettingsClient() {
           handoff_keywords: keywords.split(',').map((k) => k.trim()).filter(Boolean),
           business_hours: data.business_hours,
           bot_enabled: data.bot_enabled,
-          line_notify_enabled: data.line_notify_enabled ?? true,
+          line_notify_enabled: data.line_notify_enabled,
         }),
       'บันทึกตั้งค่าสำเร็จ',
       { reload: false }, // คงค่าที่ผู้ใช้แก้ค้างไว้ในหน้า — ไม่ดึงทับจาก server
@@ -63,6 +65,9 @@ export function SettingsClient() {
     const res = await adminApi.refreshLineQuota();
     if (res.ok) {
       quota.setData(() => res.data);
+    } else {
+      quota.setData(() => null);
+      quota.notify('error', res.error);
     }
     setQuotaRefreshing(false);
   }
@@ -224,6 +229,7 @@ export function SettingsClient() {
                 <span className="font-medium text-ink">
                   {formatQuotaLabel(
                     quota.data,
+                    quota.loading || quotaRefreshing,
                     quota.feedback?.type === 'error' ? quota.feedback.msg : null,
                   )}
                 </span>
@@ -265,7 +271,7 @@ export function SettingsClient() {
             <input
               type="checkbox"
               aria-label="แจ้งเตือนทาง LINE"
-              checked={data.line_notify_enabled ?? true}
+              checked={data.line_notify_enabled}
               onChange={(e) =>
                 setData((prev) => (prev ? { ...prev, line_notify_enabled: e.target.checked } : prev))
               }

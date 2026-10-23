@@ -96,8 +96,8 @@ export async function requestPasswordReset(
   const eligible = !!user && user.role !== 'citizen' && user.isActive;
 
   if (eligible && user) {
-    // § ไม่ mint token เมื่อระบบยังส่งอีเมลไม่ได้ (JSK PR #284) — createResetToken จะเผา
-    // token เก่าทั้งหมดของ user ทันที ถ้าส่งเมลไม่ออกจะเท่ากับทำลายลิงก์เก่าโดยไม่มีลิงก์ใหม่ไปแทน
+    // § ห้ามเรียก createResetToken เมื่อส่งอีเมลไม่ได้ — createResetToken เผา token เก่าทั้งหมดของ user ทันที
+    // ถ้าส่งเมลไม่ออกจะเท่ากับทำลายลิงก์เก่าโดยไม่มีลิงก์ใหม่ไปแทน
     if (!isMailDeliverable()) {
       console.warn('[requestPasswordReset] mail not configured — skipping token mint');
       await logAudit({

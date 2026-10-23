@@ -39,7 +39,7 @@ import { createResetToken } from '@/lib/auth/reset-token';
 import { isMailDeliverable, sendMail } from '@/lib/mail';
 import { requestPasswordReset } from './reset';
 
-describe('requestPasswordReset undeliverable guard (JSK PR #284)', () => {
+describe('requestPasswordReset undeliverable guard', () => {
   afterEach(() => {
     vi.clearAllMocks();
   });

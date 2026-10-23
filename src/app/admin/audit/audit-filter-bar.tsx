@@ -59,8 +59,9 @@ export function AuditFilterBar({ actions }: AuditFilterBarProps) {
       params.set(key, value);
     }
     params.delete('page');
+    const query = params.toString();
     startTransition(() => {
-      router.push(`/admin/audit?${params.toString()}`);
+      router.push(query ? `/admin/audit?${query}` : '/admin/audit');
     });
   }
 

@@ -28,7 +28,14 @@ function parseIsoOrToday(value: string): { year: number; month: number; day: num
     const month = Number(m[2]) - 1;
     const day = Number(m[3]);
     if (month >= 0 && month <= 11 && day >= 1 && day <= 31) {
-      return { year, month, day };
+      const probe = new Date(Date.UTC(year, month, day));
+      if (
+        probe.getUTCFullYear() === year &&
+        probe.getUTCMonth() === month &&
+        probe.getUTCDate() === day
+      ) {
+        return { year, month, day };
+      }
     }
   }
   const now = new Date();
@@ -105,7 +112,7 @@ export function ThaiDatePicker({
   useEffect(() => {
     if (!open) return;
 
-    function handlePointerDown(e: MouseEvent) {
+    function handlePointerDown(e: PointerEvent) {
       const target = e.target as Node | null;
       if (!target) return;
       if (containerRef.current?.contains(target) || popoverRef.current?.contains(target)) {
@@ -121,10 +128,10 @@ export function ThaiDatePicker({
       }
     }
 
-    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('pointerdown', handlePointerDown);
     document.addEventListener('keydown', handleKeyDown);
     return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('pointerdown', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [open]);

@@ -125,9 +125,6 @@ function parseValidIsoYmd(isoDate: string): { year: number; month: number; day: 
   return { year, month, day };
 }
 
-/**
- * แปลง YYYY-MM-DD (ค.ศ.) เป็นเวลาเริ่มต้นของวันตามเวลาไทย (00:00:00.000+07:00)
- */
 export function parseThaiDateStart(isoDate: string | null | undefined): Date | null {
   if (!isoDate) return null;
   const ymd = parseValidIsoYmd(isoDate);
@@ -137,9 +134,6 @@ export function parseThaiDateStart(isoDate: string | null | undefined): Date | n
   return new Date(`${ymd.year}-${mm}-${dd}T00:00:00.000+07:00`);
 }
 
-/**
- * แปลง YYYY-MM-DD (ค.ศ.) เป็นเวลาสิ้นสุดของวันตามเวลาไทย (23:59:59.999+07:00)
- */
 export function parseThaiDateEnd(isoDate: string | null | undefined): Date | null {
   if (!isoDate) return null;
   const ymd = parseValidIsoYmd(isoDate);
@@ -179,9 +173,6 @@ export const THAI_MONTHS_FULL = [
   'ธันวาคม',
 ] as const;
 
-/**
- * แปลง YYYY-MM-DD เป็นข้อความวันที่ไทยแบบสั้น เช่น "23 ต.ค. 2569"
- */
 export function formatIsoToThaiShort(isoDate: string | null | undefined): string {
   if (!isoDate) return '';
   const ymd = parseValidIsoYmd(isoDate);

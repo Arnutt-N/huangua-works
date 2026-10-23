@@ -107,5 +107,15 @@ describe('SettingsClient initial error', () => {
         expect.objectContaining({ line_notify_enabled: false }),
       );
     });
+
+    vi.mocked(adminApi.refreshLineQuota).mockResolvedValueOnce({
+      ok: false,
+      error: 'ไม่สามารถดึงข้อมูลโควต้าจาก LINE ได้ชั่วคราว',
+      status: 502,
+    });
+    fireEvent.click(refreshBtn);
+    expect(
+      await screen.findByText('ไม่สามารถดึงข้อมูลโควต้าจาก LINE ได้ชั่วคราว'),
+    ).toBeInTheDocument();
   });
 });

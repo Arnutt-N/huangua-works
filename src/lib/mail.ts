@@ -23,10 +23,6 @@ function getTransport() {
   });
 }
 
-/**
- * ตรวจว่าระบบพร้อมส่งอีเมลออกได้หรือไม่ (SMTP_HOST หรือโหมด MAIL_CONSOLE)
- * § ใช้ตรวจก่อน mint reset token — ถ้าส่งเมลไม่ได้ห้ามสร้าง token ใหม่ไปทับใบเดิม (JSK PR #284)
- */
 export function isMailDeliverable(): boolean {
   return process.env.MAIL_CONSOLE === 'true' || Boolean(process.env.SMTP_HOST?.trim());
 }

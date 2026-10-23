@@ -1,12 +1,5 @@
 import { getLineMessageQuota, type LineMessageQuota } from './client';
 
-/**
- * แคชโควต้า LINE ระดับโปรเซส (5 นาที) + ตัวแปลงข้อความแสดงผลภาษาไทย
- * § พอร์ตจาก JSK-App PR #280/#281:
- *   - แคช 5 นาทีลดการยิง LINE API ซ้ำทุกครั้งที่เปิดหน้าตั้งค่า
- *   - ถ้า forceRefresh แล้วดึงล้มเหลว ต้องล้างค่าแคชเก่าทิ้งเพื่อไม่ให้โชว์ข้อมูลค้างหลอกตา
- */
-
 export const LINE_QUOTA_CACHE_TTL_MS = 5 * 60 * 1000;
 
 interface QuotaCacheEntry {

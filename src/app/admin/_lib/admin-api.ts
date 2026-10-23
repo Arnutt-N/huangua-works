@@ -229,7 +229,7 @@ export interface SettingsData {
   handoff_keywords: string[];
   business_hours: { start: string; end: string; days: number[] };
   bot_enabled: boolean;
-  line_notify_enabled?: boolean;
+  line_notify_enabled: boolean;
   line: { configured: boolean; maskedToken: string | null };
 }
 
