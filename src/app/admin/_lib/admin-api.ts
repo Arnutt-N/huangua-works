@@ -137,6 +137,10 @@ export interface FriendItem {
   followState: 'following' | 'unfollowed';
   followCount: number;
   refollowCount: number;
+  /** วันที่เริ่มติดตาม (follow ล่าสุด) — คอลัมน์ "Since" ตาม jsk */
+  since: string | null;
+  /** โหมดห้องแชทปัจจุบัน (jsk "Chat Mode") — null = ยังไม่มีห้อง */
+  chatMode: string | null;
   lastActiveAt: string | null;
   richMenuId: string | null;
   richMenuName: string | null;
@@ -146,6 +150,16 @@ export interface FriendsPage extends ListOf<FriendItem> {
   total: number;
   page: number;
   pageSize: number;
+}
+
+export interface FriendEventItem {
+  id: string;
+  lineUserId: string;
+  event: 'follow' | 'unfollow';
+  createdAt: string;
+  displayName: string | null;
+  pictureUrl: string | null;
+  maskedId: string | null;
 }
 
 export interface RichMenuAliasItem {
@@ -166,6 +180,8 @@ export interface BroadcastContent {
 
 export interface BroadcastItem {
   id: string;
+  /** ชื่อแคมเปญ — null บนแถวยุคก่อนเพิ่มคอลัมน์ UI fallback เป็นข้อความแรก */
+  title: string | null;
   content: BroadcastContent[];
   status: string;
   target: BroadcastTarget;
@@ -180,9 +196,16 @@ export interface BroadcastItem {
 }
 
 export interface BroadcastInput {
+  title?: string | null;
   content: BroadcastContent[];
   target: BroadcastTarget;
   scheduledAt: string | null;
+}
+
+export interface BroadcastPage extends ListOf<BroadcastItem> {
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 export interface BroadcastRecipientOption {
@@ -318,8 +341,8 @@ export const adminApi = {
     request<ListOf<IntentItem>>('/api/line/admin/intents'),
   getIntent: (id: string): Promise<ApiResult<IntentItem>> =>
     request<IntentItem>(`/api/line/admin/intents/${id}`),
-  createIntent: (payload: IntentPayload): Promise<ApiResult<OkBody>> =>
-    request<OkBody>('/api/line/admin/intents', withBody('POST', payload)),
+  createIntent: (payload: IntentPayload): Promise<ApiResult<OkBody & { id?: string }>> =>
+    request<OkBody & { id?: string }>('/api/line/admin/intents', withBody('POST', payload)),
   updateIntent: (id: string, payload: IntentPatch): Promise<ApiResult<OkBody>> =>
     request<OkBody>(`/api/line/admin/intents/${id}`, withBody('PATCH', payload)),
   deleteIntent: (id: string): Promise<ApiResult<OkBody>> =>
@@ -363,20 +386,27 @@ export const adminApi = {
     request<FriendsPage>(`/api/line/admin/friends?${query}`),
   getFriend: (id: string): Promise<ApiResult<FriendItem>> =>
     request<FriendItem>(`/api/line/admin/friends/${id}`),
+  listFriendEvents: (lineUserId?: string): Promise<ApiResult<ListOf<FriendEventItem>>> =>
+    request<ListOf<FriendEventItem>>(
+      `/api/line/admin/friend-events${lineUserId ? `?lineUserId=${encodeURIComponent(lineUserId)}` : ''}`,
+    ),
   assignUserRichMenu: (friendId: string, richMenuId: string): Promise<ApiResult<OkBody>> =>
     request<OkBody>(`/api/line/admin/friends/${friendId}/rich-menu`, withBody('POST', { richMenuId })),
   unassignUserRichMenu: (friendId: string): Promise<ApiResult<OkBody>> =>
     request<OkBody>(`/api/line/admin/friends/${friendId}/rich-menu`, { method: 'DELETE' }),
 
   // ── Broadcasts ──
-  listBroadcasts: (): Promise<ApiResult<ListOf<BroadcastItem>>> =>
-    request<ListOf<BroadcastItem>>('/api/line/admin/broadcasts'),
+  listBroadcasts: (query?: string): Promise<ApiResult<BroadcastPage>> =>
+    request<BroadcastPage>(`/api/line/admin/broadcasts${query ? `?${query}` : ''}`),
   getBroadcast: (id: string): Promise<ApiResult<BroadcastItem>> =>
     request<BroadcastItem>(`/api/line/admin/broadcasts/${id}`),
-  createBroadcast: (payload: BroadcastInput): Promise<ApiResult<OkBody>> =>
-    request<OkBody>('/api/line/admin/broadcasts', withBody('POST', payload)),
+  createBroadcast: (payload: BroadcastInput): Promise<ApiResult<OkBody & { id?: string }>> =>
+    request<OkBody & { id?: string }>('/api/line/admin/broadcasts', withBody('POST', payload)),
   sendBroadcast: (id: string): Promise<ApiResult<OkBody>> =>
     request<OkBody>(`/api/line/admin/broadcasts/${id}/send`, { method: 'POST' }),
+  /** ยกเลิกแบบ soft — API คืน 409 เมื่อสถานะส่งแล้ว/กำลังส่ง */
+  cancelBroadcast: (id: string): Promise<ApiResult<OkBody>> =>
+    request<OkBody>(`/api/line/admin/broadcasts/${id}`, { method: 'DELETE' }),
   listBroadcastRecipients: (): Promise<ApiResult<ListOf<BroadcastRecipientOption>>> =>
     request<ListOf<BroadcastRecipientOption>>('/api/line/admin/broadcasts/recipients'),
   dryRunBroadcast: (target: BroadcastTarget): Promise<ApiResult<{ estimatedRecipients: number }>> =>

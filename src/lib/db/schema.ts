@@ -905,6 +905,7 @@ export const broadcastStatusEnum = pgEnum('broadcast_status', [
   'sending',
   'sent',
   'failed',
+  'cancelled',
 ]);
 
 export const richMenuStatusEnum = pgEnum('rich_menu_status', [
@@ -1004,6 +1005,8 @@ export const chatBroadcasts = pgTable(
     updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
 
     content: jsonb('content').notNull(),
+    // § ชื่อแคมเปญ (jsk "title") — null ได้สำหรับแถวยุคก่อนเพิ่มคอลัมน์ UI fallback เป็นข้อความแรก
+    title: text('title'),
     status: broadcastStatusEnum().notNull().default('draft'),
     // § target เป็น JSON discriminated union (all | line_user_ids ของ PK ภายใน) เดิมเป็น text 'all'
     target: jsonb('target').$type<BroadcastTarget>().notNull().default({ kind: 'all' }),

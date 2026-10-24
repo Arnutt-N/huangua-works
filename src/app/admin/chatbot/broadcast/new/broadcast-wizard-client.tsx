@@ -6,12 +6,17 @@ import { adminApi, type BroadcastContent } from '@/app/admin/_lib/admin-api';
 import { AdminCard } from '@/components/admin/admin-card';
 import { Button } from '@/components/ui/button';
 import { FieldHint, Label, Textarea } from '@/components/ui/field';
-import { ArrowLeft, ArrowRight, Check, FileText, Image, Braces } from 'lucide-react';
+import { ThaiDatePicker } from '@/components/ui/thai-date-picker';
+import { ArrowLeft, ArrowRight, Check, FileText, Image, Braces, Send } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
 // ponytail: ตัด type object ออกชั่วคราว — server ยังไม่มี resolver $objectId → LineOutgoingMessage
 // คืนได้เมื่อ broadcast-service แกะ ref ก่อนยิง LINE API
 type ContentType = 'text' | 'image' | 'flex';
+
+// § ตาม zod schema ฝั่ง server — text เดียวห้ามเกิน 5000 ตัวอักษร
+const TEXT_MAX = 5000;
+const TITLE_MAX = 100;
 
 const TYPE_CARDS: { key: ContentType; label: string; desc: string; icon: typeof FileText }[] = [
   { key: 'text', label: 'ข้อความ', desc: 'ส่งข้อความตัวอักษรธรรมดา', icon: FileText },
@@ -25,6 +30,7 @@ export function BroadcastWizardClient() {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [contentType, setContentType] = useState<ContentType>('text');
+  const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [flexJson, setFlexJson] = useState('{}');
@@ -33,9 +39,15 @@ export function BroadcastWizardClient() {
   const [recipientOptions, setRecipientOptions] = useState<{ id: string; displayName: string | null }[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [estimate, setEstimate] = useState<number | null>(null);
-  const [scheduleAt, setScheduleAt] = useState('');
+  // § แยก date/time เพื่อใช้ ThaiDatePicker (date) + input time แทน datetime-local —
+  // ค่ารวม = `${scheduleDate}T${scheduleTime}` รูปเดียวกับที่ API ต้องการ
+  const [scheduleDate, setScheduleDate] = useState('');
+  const [scheduleTime, setScheduleTime] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const scheduleAt =
+    scheduleDate && scheduleTime ? `${scheduleDate}T${scheduleTime}` : '';
 
   async function loadRecipients() {
     const res = await adminApi.listBroadcastRecipients();
@@ -67,6 +79,9 @@ export function BroadcastWizardClient() {
   function buildContent(): { content: BroadcastContent[]; error: string | null } {
     if (contentType === 'text') {
       if (!message.trim()) return { content: [], error: 'กรุณากรอกข้อความ' };
+      if (message.length > TEXT_MAX) {
+        return { content: [], error: `ข้อความยาวเกิน ${TEXT_MAX.toLocaleString('th-TH')} ตัวอักษร` };
+      }
       return { content: [{ type: 'text', text: message.trim() }], error: null };
     }
     if (contentType === 'image') {
@@ -96,7 +111,7 @@ export function BroadcastWizardClient() {
     return { content: [{ type: 'flex', altText, contents }], error: null };
   }
 
-  async function handleCreate() {
+  async function handleCreate(opts?: { sendNow?: boolean }) {
     if (targetKind === 'specific' && selectedIds.length === 0) {
       setError('กรุณาเลือกผู้รับอย่างน้อย 1 คน');
       return;
@@ -114,10 +129,20 @@ export function BroadcastWizardClient() {
     setSaving(true);
     setError(null);
     const res = await adminApi.createBroadcast({
+      title: title.trim() || null,
       content,
       target: currentTarget(),
       scheduledAt: scheduleAt ? new Date(scheduleAt).toISOString() : null,
     });
+    if (res.ok && opts?.sendNow && res.data.id) {
+      // § "ส่งเลย" = สร้างร่างก่อนค่อยยิง send — API ส่งรับได้เฉพาะ draft/scheduled
+      const sent = await adminApi.sendBroadcast(res.data.id);
+      if (!sent.ok) {
+        setSaving(false);
+        setError(`สร้างแล้วแต่ส่งไม่สำเร็จ: ${sent.error} — เปิดรายการแล้วกดส่งได้อีกครั้ง`);
+        return;
+      }
+    }
     setSaving(false);
     if (!res.ok) {
       setError(res.error);
@@ -187,16 +212,35 @@ export function BroadcastWizardClient() {
 
       {step === 1 && (
         <AdminCard>
+          {/* § ชื่อแคมเปญตาม jsk — ใช้ตั้งชื่อในตาราง ไม่บังคับ (ว่างได้ fallback เป็นข้อความ) */}
+          <div className="mb-4">
+            <Label htmlFor="bw-title">ชื่อแคมเปญ</Label>
+            <input
+              id="bw-title"
+              aria-label="ชื่อแคมเปญ"
+              maxLength={TITLE_MAX}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="เช่น ประกาศปิดทำการวันที่ 12 ส.ค."
+              className="min-h-touch w-full rounded-md border border-border bg-surface-raised px-4 text-ink"
+            />
+            <FieldHint>ชื่อที่ใช้แสดงในตาราง — ถ้าเว้นว่างจะใช้ข้อความประกาศแทน</FieldHint>
+          </div>
           {contentType === 'text' && (
             <div>
               <Label htmlFor="bw-msg">ข้อความประกาศ</Label>
               <Textarea
                 id="bw-msg"
                 rows={4}
+                maxLength={TEXT_MAX}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="เช่น ประกาศ: อบต.หัวงัวปิดทำการวันที่ 12 ส.ค."
               />
+              {/* § ตัวนับ 5000 ตาม jsk — LINE จำกัดข้อความ broadcast ต่อครั้ง */}
+              <p className="mt-1 text-right text-xs tabular-nums text-muted">
+                {message.length.toLocaleString('th-TH')} / {TEXT_MAX.toLocaleString('th-TH')}
+              </p>
             </div>
           )}
           {contentType === 'image' && (
@@ -302,16 +346,28 @@ export function BroadcastWizardClient() {
             </Button>
             {estimate !== null && <span className="text-sm text-muted">ประมาณ {estimate} คน</span>}
           </div>
-          <div className="mt-4">
-            <Label htmlFor="bw-schedule">ตั้งเวลาส่ง (เว้นว่าง = สร้างเป็นร่าง)</Label>
-            <input
-              id="bw-schedule"
-              aria-label="ตั้งเวลาส่ง (เว้นว่าง = สร้างเป็นร่าง)"
-              type="datetime-local"
-              value={scheduleAt}
-              onChange={(e) => setScheduleAt(e.target.value)}
-              className="min-h-touch w-full rounded-md border border-border bg-surface-raised px-4 text-ink"
+          <div className="mt-4 space-y-3">
+            {/* § ปฏิทินไทย (ThaiDatePicker) + ช่องเวลาแยก — แทน datetime-local
+                ให้ปี พ.ศ. ตามที่ผู้ใช้ไทยคุ้น */}
+            <ThaiDatePicker
+              id="bw-schedule-date"
+              label="วันที่ส่ง (เว้นว่าง = สร้างเป็นร่าง)"
+              value={scheduleDate}
+              onChange={setScheduleDate}
+              placeholder="เลือกวันที่"
             />
+            <div>
+              <Label htmlFor="bw-schedule-time">เวลาส่ง</Label>
+              <input
+                id="bw-schedule-time"
+                aria-label="เวลาส่ง"
+                type="time"
+                value={scheduleTime}
+                onChange={(e) => setScheduleTime(e.target.value)}
+                disabled={!scheduleDate}
+                className="min-h-touch w-full rounded-md border border-border bg-surface-raised px-4 text-ink disabled:opacity-50"
+              />
+            </div>
             <FieldHint>ระบบตรวจคิวทุก 30 นาที ประกาศอาจออกช้ากว่าเวลาที่ตั้ง</FieldHint>
           </div>
         </AdminCard>
@@ -321,6 +377,10 @@ export function BroadcastWizardClient() {
         <div className="space-y-4">
           <AdminCard>
             <dl className="space-y-2 text-sm">
+              <div className="flex gap-2">
+                <dt className="w-28 flex-none text-muted">ชื่อแคมเปญ</dt>
+                <dd className="text-ink">{title || '(ใช้ข้อความประกาศเป็นชื่อ)'}</dd>
+              </div>
               <div className="flex gap-2">
                 <dt className="w-28 flex-none text-muted">ประเภท</dt>
                 <dd className="text-ink">{TYPE_CARDS.find((t) => t.key === contentType)?.label}</dd>
@@ -336,40 +396,54 @@ export function BroadcastWizardClient() {
               </div>
               <div className="flex gap-2">
                 <dt className="w-28 flex-none text-muted">กำหนดส่ง</dt>
-                <dd className="text-ink">{scheduleAt || 'สร้างเป็นร่าง (ส่งมือ)'}</dd>
+                <dd className="text-ink">
+                  {scheduleAt ? `${scheduleDate} ${scheduleTime}` : 'สร้างเป็นร่าง (ส่งมือ)'}
+                </dd>
               </div>
             </dl>
           </AdminCard>
 
-          <AdminCard>
-            <p className="mb-2 text-xs text-muted">ตัวอย่างเนื้อหา</p>
-            {contentType === 'text' && (
-              <p className="whitespace-pre-wrap text-sm text-ink">{message || '—'}</p>
-            )}
-            {contentType === 'image' && (
-              <div className="space-y-1">
-                <p className="break-all font-mono text-xs text-ink">{imageUrl || '—'}</p>
-                {imageUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={imageUrl} alt="ตัวอย่างรูปประกาศ" className="max-w-xs rounded-lg border border-border" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                )}
-              </div>
-            )}
-            {contentType === 'flex' && (
-              <pre className="max-h-48 overflow-auto font-mono text-xs text-ink">{flexJson || '{}'}</pre>
-            )}
-          </AdminCard>
+          {/* § preview แบบ split — เนื้อหาซ้าย/กลุ่มเป้าหมายขวา ตาม jsk step 3 */}
+          <div className="grid gap-4 lg:grid-cols-2">
+            <AdminCard>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">ตัวอย่างเนื้อหา</p>
+              {contentType === 'text' && (
+                <p className="whitespace-pre-wrap text-sm text-ink">{message || '—'}</p>
+              )}
+              {contentType === 'image' && (
+                <div className="space-y-1">
+                  <p className="break-all font-mono text-xs text-ink">{imageUrl || '—'}</p>
+                  {imageUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={imageUrl} alt="ตัวอย่างรูปประกาศ" className="max-w-xs rounded-lg border border-border" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  )}
+                </div>
+              )}
+              {contentType === 'flex' && (
+                <pre className="max-h-48 overflow-auto font-mono text-xs text-ink">{flexJson || '{}'}</pre>
+              )}
+            </AdminCard>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <Button type="button" variant="outline" onClick={refreshEstimate}>
-              ประเมินจำนวนผู้รับ
-            </Button>
-            {estimate !== null && <span className="text-sm text-muted">ประมาณ {estimate} คน — ไม่มีสร้างงานจริง</span>}
+            <AdminCard>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">กลุ่มเป้าหมาย</p>
+              <p className="text-sm text-ink">
+                {targetKind === 'all' ? 'ผู้ติดตาม LINE OA ทุกคน' : `เลือกเฉพาะราย ${selectedIds.length} คน`}
+              </p>
+              {estimate !== null && (
+                <p className="mt-1 text-xs text-muted">ประมาณ {estimate} คน</p>
+              )}
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <Button type="button" variant="outline" onClick={refreshEstimate}>
+                  ประเมินจำนวนผู้รับ
+                </Button>
+                <span className="text-xs text-muted">ทดลองส่ง — นับผู้รับเท่านั้น ไม่ส่งจริง</span>
+              </div>
+            </AdminCard>
           </div>
         </div>
       )}
 
-      <div className="flex justify-between">
+      <div className="flex justify-between gap-2">
         <Button type="button" variant="outline" disabled={step === 0} onClick={() => goStep(step - 1)}>
           <ArrowLeft className="h-4 w-4" /> ย้อนกลับ
         </Button>
@@ -378,9 +452,16 @@ export function BroadcastWizardClient() {
             ถัดไป <ArrowRight className="h-4 w-4" />
           </Button>
         ) : (
-          <Button type="button" onClick={handleCreate} disabled={saving}>
-            {saving ? 'กำลังบันทึก...' : scheduleAt ? 'ตั้งเวลาส่ง' : 'สร้างร่าง'}
-          </Button>
+          // § ปุ่มคู่ตาม jsk — "บันทึกแบบร่าง" (สร้างอย่างเดียว) / "ส่งเลย" (สร้างแล้วยิง send ทันที)
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" onClick={() => void handleCreate()} disabled={saving}>
+              {saving ? 'กำลังบันทึก...' : 'บันทึกแบบร่าง'}
+            </Button>
+            <Button type="button" onClick={() => void handleCreate({ sendNow: true })} disabled={saving} className="gap-1.5">
+              <Send className="h-4 w-4" />
+              {saving ? 'กำลังส่ง...' : 'ส่งเลย'}
+            </Button>
+          </div>
         )}
       </div>
     </div>

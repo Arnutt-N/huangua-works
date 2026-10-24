@@ -4,9 +4,27 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { adminApi, type BroadcastItem } from '@/app/admin/_lib/admin-api';
 import { useResource } from '@/app/admin/_lib/use-resource';
-import { ArrowLeft, Send, Clock, CheckCircle2, XCircle, Loader2, Calendar, Users, Radio } from 'lucide-react';
+import {
+  ArrowLeft,
+  Send,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  Calendar,
+  Users,
+  Radio,
+  Trash2,
+} from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 const STATUS: Record<string, { label: string; icon: typeof Clock; cls: string }> = {
   draft: { label: 'ร่าง', icon: Clock, cls: 'text-muted' },
@@ -14,13 +32,71 @@ const STATUS: Record<string, { label: string; icon: typeof Clock; cls: string }>
   sending: { label: 'กำลังส่ง', icon: Loader2, cls: 'text-accent-strong' },
   sent: { label: 'ส่งแล้ว', icon: CheckCircle2, cls: 'text-success' },
   failed: { label: 'ล้มเหลว', icon: XCircle, cls: 'text-danger' },
+  cancelled: { label: 'ยกเลิก', icon: XCircle, cls: 'text-muted' },
 };
 
 function contentText(item: BroadcastItem): string {
+  if (item.title) return item.title;
   const first = item.content[0];
   if (!first) return '—';
   if (first.type === 'text' && first.text) return first.text;
   return `[${first.type}]`;
+}
+
+const THAI_DATETIME: Intl.DateTimeFormatOptions = {
+  day: '2-digit',
+  month: 'long',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+};
+
+function formatThai(iso: string): string {
+  return new Date(iso).toLocaleString('th-TH', THAI_DATETIME);
+}
+
+/** preview เนื้อหาตามชนิด — text / image / flex / multi (หลายชิ้น) */
+function ContentPreview({ item }: { item: BroadcastItem }) {
+  if (item.content.length === 0) return <p className="text-sm text-muted">—</p>;
+  return (
+    <div className="space-y-3">
+      {item.content.map((c, i) => {
+        if (c.type === 'text') {
+          return (
+            <p key={i} className="whitespace-pre-wrap text-sm text-ink">
+              {c.text}
+            </p>
+          );
+        }
+        if (c.type === 'image') {
+          const url = String(c.originalContentUrl ?? '');
+          const preview = String(c.previewImageUrl ?? url);
+          return (
+            <div key={i} className="space-y-1">
+              <p className="break-all font-mono text-xs text-muted">{url}</p>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={preview}
+                alt="ตัวอย่างรูปประกาศ"
+                className="max-w-xs rounded-lg border border-border"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            </div>
+          );
+        }
+        return (
+          <div key={i} className="space-y-1">
+            <p className="text-xs text-muted">altText: {String(c.altText ?? '')}</p>
+            <pre className="max-h-64 overflow-auto rounded-md bg-surface-sunken p-2 font-mono text-xs text-ink">
+              {JSON.stringify(c.contents ?? {}, null, 2)}
+            </pre>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function TimelineItem({ done, label, date }: { done: boolean; label: string; date: string | null }) {
@@ -41,7 +117,9 @@ function TimelineItem({ done, label, date }: { done: boolean; label: string; dat
 
 export function BroadcastDetailClient({ broadcastId }: { broadcastId: string }) {
   const [sending, setSending] = useState(false);
-  const { data, loading, feedback, mutate } = useResource({
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const { data, loading, feedback, mutate, notify } = useResource({
     load: () => adminApi.getBroadcast(broadcastId),
   });
   const item = data ?? null;
@@ -52,6 +130,21 @@ export function BroadcastDetailClient({ broadcastId }: { broadcastId: string }) 
     setSending(true);
     await mutate(() => adminApi.sendBroadcast(item.id), 'ส่งประกาศสำเร็จ');
     setSending(false);
+  }
+
+  // § ยกเลิก = soft-delete (สถานะ cancelled) ตามนโยบาย jsk PR #291 — ถามก่อนเสมอ
+  async function handleCancel() {
+    if (!item) return;
+    setCancelling(true);
+    const res = await adminApi.cancelBroadcast(item.id);
+    setCancelling(false);
+    setCancelOpen(false);
+    if (!res.ok) {
+      notify('error', res.error);
+      return;
+    }
+    notify('success', 'ยกเลิกประกาศแล้ว');
+    await mutate(() => adminApi.getBroadcast(broadcastId), '');
   }
 
   if (loading) return <div className="py-12 text-center text-muted">กำลังโหลด...</div>;
@@ -85,20 +178,20 @@ export function BroadcastDetailClient({ broadcastId }: { broadcastId: string }) 
           </p>
           <p><span className="text-muted">สร้าง: </span>
             <span className="inline-flex items-center gap-1"><Calendar className="h-3.5 w-3.5 text-muted" />
-              {new Date(item.createdAt).toLocaleString('th-TH', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              {formatThai(item.createdAt)}
             </span>
           </p>
           {item.sentAt && (
             <p><span className="text-muted">วันที่ส่ง: </span>
               <span className="font-medium text-success">
-                {new Date(item.sentAt).toLocaleString('th-TH', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                {formatThai(item.sentAt)}
               </span>
             </p>
           )}
           {item.scheduledAt && item.status === 'scheduled' && (
             <p><span className="text-muted">กำหนดส่ง: </span>
               <span className="font-medium text-warning">
-                {new Date(item.scheduledAt).toLocaleString('th-TH', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                {formatThai(item.scheduledAt)}
               </span>
             </p>
           )}
@@ -138,13 +231,58 @@ export function BroadcastDetailClient({ broadcastId }: { broadcastId: string }) 
           <AdminCardTitle icon={<Radio className="h-4 w-4" />}>การดำเนินการ</AdminCardTitle>
           <div className="space-y-2">
             {(item.status === 'draft' || item.status === 'scheduled') && (
-              <Button onClick={handleSend} disabled={sending} className="w-full gap-2">
-                <Send className="h-4 w-4" /> {sending ? 'กำลังส่ง...' : 'ส่ง'}
-              </Button>
+              <>
+                <Button onClick={handleSend} disabled={sending} className="w-full gap-2">
+                  <Send className="h-4 w-4" /> {sending ? 'กำลังส่ง...' : 'ส่ง'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setCancelOpen(true)}
+                  disabled={cancelling}
+                  className="w-full gap-2 text-danger"
+                >
+                  <Trash2 className="h-4 w-4" /> ยกเลิกประกาศ
+                </Button>
+              </>
+            )}
+            {item.status === 'cancelled' && (
+              <p className="text-sm text-muted">
+                ประกาศนี้ถูกยกเลิกแล้ว — แถวยังอยู่ในระบบเพื่อดูย้อนหลัง ไม่ถูกลบ
+              </p>
+            )}
+            {item.status === 'sent' && (
+              <p className="text-sm text-muted">ส่งแล้ว — ยกเลิกหรือแก้ไขไม่ได้</p>
             )}
           </div>
         </AdminCard>
       </div>
+
+      <AdminCard>
+        <AdminCardTitle icon={<Send className="h-4 w-4" />}>เนื้อหาที่ส่ง</AdminCardTitle>
+        <ContentPreview item={item} />
+      </AdminCard>
+
+      <Dialog open={cancelOpen} onOpenChange={setCancelOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>ยกเลิกประกาศ</DialogTitle>
+          </DialogHeader>
+          <p className="py-2 text-sm text-muted">
+            ยกเลิก &quot;{contentText(item)}&quot;? ประกาศจะเปลี่ยนสถานะเป็น &quot;ยกเลิก&quot;
+            และไม่ถูกส่ง — แถวยังคงอยู่เพื่อดูย้อนหลัง
+          </p>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setCancelOpen(false)}>กลับ</Button>
+            <Button
+              onClick={() => void handleCancel()}
+              disabled={cancelling}
+              className="bg-danger text-on-accent hover:bg-danger/90"
+            >
+              {cancelling ? 'กำลังยกเลิก...' : 'ยืนยันยกเลิก'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

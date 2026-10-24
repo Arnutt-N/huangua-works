@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { and, count, ilike, inArray, sql, type SQL } from 'drizzle-orm';
+import { and, count, eq, ilike, inArray, sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '@/lib/db';
-import { lineFriendEvents, lineUsers, richMenus } from '@/lib/db/schema';
+import { lineFriendEvents, lineUsers, richMenus, chatConversations } from '@/lib/db/schema';
 import { escapeLike } from '@/lib/db/like';
 import { countFollowStats } from '@/lib/line/friend-events';
 import { requireStaffApi } from '@/lib/auth/require-staff';
@@ -71,8 +71,12 @@ export async function GET(request: Request) {
       metadata: lineUsers.metadata,
       maskedId: sql<string | null>`left(${lineUsers.lineUserIdEnc}, 8)`,
       latestEvent,
+      // § chatMode จากห้องของคนนี้ (jsk "Chat Mode" คอลัมน์ BOT/HUMAN) —
+      // ห้องเดียวต่อคน (unique lineUserIdHash) เลย leftJoin ตรงได้
+      chatMode: chatConversations.mode,
     })
     .from(lineUsers)
+    .leftJoin(chatConversations, eq(chatConversations.lineUserIdHash, lineUsers.lineUserIdHash))
     .where(where)
     .orderBy(sql`${lineUsers.lastMessageAt} DESC NULLS LAST`, lineUsers.id)
     .limit(pageSize)
@@ -109,6 +113,9 @@ export async function GET(request: Request) {
       followState,
       followCount: stats.followCount,
       refollowCount: stats.refollowCount,
+      // § since = follow ล่าสุด (jsk "Since") — ไม่ใช่ createdAt ของแถว เพราะ refollow ใหม่เป็นจุดเริ่มความสัมพันธ์ปัจจุบัน
+      since: stats.lastFollowAt ? stats.lastFollowAt.toISOString() : null,
+      chatMode: r.chatMode ?? null,
       lastActiveAt: r.lastMessageAt,
       richMenuId: getAssignedMenuId(r.metadata),
     };

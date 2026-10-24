@@ -36,6 +36,8 @@ export async function GET() {
   const authz = await requireStaffApi(ADMIN_ROLES);
   if (!authz.ok) return authz.response;
 
+  // § ไม่กรอง is_active — แถว soft-delete (DELETE = isActive=false) ต้องยังแสดง
+  // ให้ผู้ใช้กู้ด้วยสวิตช์เปิดได้ ถ้ากรองออกจะ "ลบแล้วเปิดไม่ได้" กลายเป็น hard-delete ที่ซ่อน
   const db = await getDb();
   const intents = await db.select().from(chatIntents).orderBy(asc(chatIntents.name));
 
