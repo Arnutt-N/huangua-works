@@ -39,10 +39,6 @@ function chatModeBadge(mode: string): string {
   return modeLabel(mode);
 }
 
-/**
- * จับกลุ่มผลค้นหาข้อความต่อคน — ตาม jsk searchGrouped (chat-histories/page.tsx)
- * หนึ่งแถวต่อหนึ่งผู้ใช้ โชว์ข้อความแรก + นับ "พบ N ผลลัพธ์"
- */
 function groupSearchResults(results: MessageSearchResult[]): {
   key: string;
   displayName: string | null;
@@ -63,7 +59,7 @@ function groupSearchResults(results: MessageSearchResult[]): {
   }));
 }
 
-/** § skeleton ประกอบตาราง 5 แถวตาม jsk loading state (div ปล้อง rule a11y ที่ตีความ tr เป็น control) */
+/** § skeleton เป็น div ไม่ใช่ tr — rule a11y (control-has-associated-label) ตีความ tr เป็น control */
 function TableSkeleton() {
   return (
     <div aria-hidden="true">
@@ -163,7 +159,6 @@ export function ChatHistoriesClient() {
 
   return (
     <div className="space-y-4">
-      {/* § หัวหน้าหน้าตาม jsk screenshot — title/subtitle คนละส่วน ปุ่มรีเฟรชชิดขวาบน */}
       <PageHeader title="ประวัติแชท" subtitle="ประวัติการสนทนาทั้งหมด">
         <button
           type="button"
@@ -234,8 +229,6 @@ export function ChatHistoriesClient() {
       </AdminCard>
 
       <AdminCard>
-        {/* § skeleton !== ตาราง วางไว้บน table (ไม่ผิด HTML) — แถว skeleton เป็น div ไม่มีชื่อ
-            การเรนเดอร์ดูเหมือนตารางพองอยู่พักจนข้อมูลโหลดเสร็จ */}
         {conversations === null ? (
           <TableSkeleton />
         ) : (
@@ -297,7 +290,6 @@ export function ChatHistoriesClient() {
                         </Link>
                       </td>
                       <td className="max-w-60 px-3 py-2.5">
-                        {/* § "ยังไม่มีข้อความ" ตัวเอียงตาม jsk — ไม่ใช่ข้อความปกติที่อ่านแล้วเหมือนมีเนื้อหา */}
                         {conv.lastMessageText ? (
                           <span className="block truncate text-sm text-muted">{conv.lastMessageText}</span>
                         ) : (
@@ -321,8 +313,6 @@ export function ChatHistoriesClient() {
           </div>
         )}
 
-        {/* § ผลค้นหาจับกลุ่มต่อคน + "พบ N ผลลัพธ์" ตาม jsk searchGrouped — ต่อท้ายตาราง
-            ไม่แทนที่ list ปกติ เพราะ filter/กรอง client-side ยังมีประโยชน์คู่ขนาน */}
         {hasQuery && searchGroups.length > 0 && (
           <div className="mt-3 border-t border-border pt-3">
             <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted">
@@ -392,7 +382,7 @@ interface HistoryHeader {
   lastMessageAt: string | null;
 }
 
-/** ชื่อไฟล์ export — ตัดอักขระที่ Windows ห้ามออก เหมือน jsk handleExport */
+/** § ตัดอักขระที่ Windows ห้ามในชื่อไฟล์ออก */
 function exportFileName(displayName: string | null, ext: 'txt' | 'csv'): string {
   const base = (displayName || 'chat').replace(/[^\w฀-๿-]/g, '_');
   return `chat-${base}-${new Date().toISOString().slice(0, 10)}.${ext}`;
@@ -413,7 +403,6 @@ function senderLabelOf(sender: string): string {
   return 'เจ้าหน้าที่';
 }
 
-/** export TXT — บรรทัดละข้อความ [เวลา] ผู้ส่ง: เนื้อหา (ตาม jsk handleExport) */
 function exportTxt(messages: Message[], displayName: string | null) {
   if (messages.length === 0) return;
   const lines = messages.map((m) => {
@@ -428,11 +417,7 @@ function exportTxt(messages: Message[], displayName: string | null) {
   );
 }
 
-/**
- * export CSV — สร้างฝั่ง client พร้อม UTF-8 BOM
- * § jsk ยิง endpoint backend แต่ huangua ไม่มี — สร้างจาก messages ที่โหลดแล้ว
- * BOM จำเป็นเพื่อให้ Excel เปิดอ่านภาษาไทยได้ถูกต้อง
- */
+/** § BOM จำเป็นเพื่อให้ Excel เปิดอ่านภาษาไทยได้ถูกต้อง */
 function exportCsv(messages: Message[], displayName: string | null) {
   if (messages.length === 0) return;
   const esc = (s: string) => `"${s.replace(/"/g, '""')}"`;

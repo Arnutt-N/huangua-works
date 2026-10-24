@@ -34,10 +34,6 @@ export const EMPTY_REPLY_OBJECT_FORM: ReplyObjectFormData = {
   altText: '',
 };
 
-/**
- * ฟอร์มสร้าง/แก้ Reply Object — โครงเดียวกับ ReplyObjectForm.tsx ของ jsk
- * CONTENT เป็น JSON ตรง ๆ (ไม่มี structured editor) + live preview คู่กัน
- */
 export function ReplyObjectForm({
   initial,
   lockObjectId,
@@ -46,7 +42,6 @@ export function ReplyObjectForm({
   onCancel,
 }: {
   initial: ReplyObjectFormData;
-  /** โหมดแก้ไขล็อก universal ID (มันคือ record key) */
   lockObjectId: boolean;
   submitLabel: string;
   /** parent ยิง API เอง — คืน true เมื่อสำเร็จ */
@@ -61,9 +56,7 @@ export function ReplyObjectForm({
         if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
           return JSON.stringify(ensureEditorKeys(parsed as Record<string, unknown>), null, 2);
         }
-      } catch {
-        // เก็บ JSON เสียไว้ตามเดิม — validation ตอน submit จะรายงาน
-      }
+      } catch {}
       return initial.payload;
     })(),
   }));
@@ -111,7 +104,6 @@ export function ReplyObjectForm({
       setError('Invalid JSON payload');
       return;
     }
-    // § defense-in-depth — กัน uri นอก allowlist ก่อนถึง API (server ตรวจรูป payload แต่ไม่ตรวจ scheme)
     const invalidUri = findInvalidActionUri(parsed);
     if (invalidUri) {
       setError(`${URI_SCHEME_ERROR_TH} (${invalidUri})`);

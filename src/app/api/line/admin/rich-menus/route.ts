@@ -36,8 +36,6 @@ export async function GET() {
   if (!authz.ok) return authz.response;
 
   const db = await getDb();
-  // § นับเพื่อนที่ผูกเมนูรายคนจาก metadata.richMenuId — jsonb ไม่มี index แต่ตารางเล็ก
-  // และต้องแม่นกว่าเก็บตัวนับซ้ำ (assign/unassign เขียน metadata ที่เดียว)
   const rows = await db
     .select({
       id: richMenus.id,

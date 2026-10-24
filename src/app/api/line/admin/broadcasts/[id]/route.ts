@@ -62,7 +62,6 @@ export async function GET(
 /**
  * DELETE = ยกเลิกแบบ soft (เปลี่ยนสถานะเป็น cancelled ไม่ลบแถว) — แถวประวัติการส่ง
  * ต้องอยู่ต่อเพื่อ audit; draft กับ scheduled ยกเลิกได้ ของส่งแล้ว/กำลังส่งให้ 409
- * (ตามนโยบาย jsk PR #291: ไม่มี hard-delete ฝั่ง broadcast)
  */
 export async function DELETE(
   _request: Request,

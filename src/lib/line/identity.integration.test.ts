@@ -5,9 +5,6 @@ import { lineUsers } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import { eq } from 'drizzle-orm';
 
-// § ชุด resolver แตะ DB จริง (Postgres :5433) — ต้องตั้งชื่อไฟล์ *.integration.test.ts
-// ให้รันตอน Docker stack ขึ้นเท่านั้น (เดิมอยู่ใน identity.test.ts ตัวเดียว ทำ unit run หัวทุกครั้ง)
-
 const TEST_KEY = 'test-line-id-hmac-key-0123456789abcdef';
 
 afterEach(() => {

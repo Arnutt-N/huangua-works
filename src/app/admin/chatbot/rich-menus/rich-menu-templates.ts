@@ -31,7 +31,7 @@ function area(
   return { label, bounds, action: { type: 'uri', uri: '' } };
 }
 
-// § 11 เทมเพลตตาม LINE OA Manager (Large 7 + Compact 4) — ผังเดียวกับ jsk-app
+// § 11 เทมเพลตตาม LINE OA Manager (Large 7 + Compact 4)
 export const RICH_MENU_TEMPLATES: RichMenuTemplate[] = [
   {
     key: 'large-6',
@@ -164,7 +164,7 @@ export function validateArea(action: RichMenuAreaAction): string | null {
   if (action.type === 'uri') {
     if (!action.uri?.trim()) return 'กรุณากรอก URL';
     if (!/^https:\/\//.test(action.uri.trim())) return 'URL ต้องขึ้นต้นด้วย https://';
-    // § template ฝัง <LIFF_ID> เป็น placeholder — กันตั้งแต่ validate ไม่ให้ขึ้น LINE เป็นปุ่มพัง
+    // § <LIFF_ID> คือ placeholder — LIFF id ต่างกันทุก environment ห้ามปล่อยขึ้น LINE ดิบ
     if (/<\s*LIFF_ID\s*>/i.test(action.uri) || action.uri.includes('<') || action.uri.includes('>')) {
       return 'กรุณาแทน <LIFF_ID> ด้วยค่า LINE_LIFF_ID จริงก่อนบันทึก';
     }
@@ -187,7 +187,6 @@ export function areaStyle(
   };
 }
 
-/** action แบบสั้นสำหรับเก็บลง LINE config (ตัด field ของ UI ออก) */
 export function toLineAction(action: RichMenuAreaAction): RichMenuAreaAction {
   if (action.type === 'uri') return { type: 'uri', uri: action.uri?.trim() ?? '' };
   if (action.type === 'richmenuswitch') {

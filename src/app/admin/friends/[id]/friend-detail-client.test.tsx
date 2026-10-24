@@ -71,7 +71,6 @@ describe('FriendDetailClient', () => {
     await screen.findByText('ประวัติเหตุการณ์');
     const list = screen.getByLabelText('ประวัติเหตุการณ์ของเพื่อน');
     const texts = within(list).getAllByText(/เริ่มติดตาม|ยกเลิกติดตาม/).map((el) => el.textContent);
-    // เรียงใหม่ก่อน: e3 (follow 5/2) → e2 (unfollow 5/1) → e1 (follow 4/5)
     expect(texts).toEqual(['เริ่มติดตาม', 'ยกเลิกติดตาม', 'เริ่มติดตาม']);
     expect(screen.getByLabelText('ประวัติเหตุการณ์ของเพื่อน').textContent).not.toContain('U0123456789');
   });

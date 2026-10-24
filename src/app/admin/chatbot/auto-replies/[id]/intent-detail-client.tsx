@@ -23,7 +23,6 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
   });
 
   const [activeTab, setActiveTab] = useState<'keywords' | 'responses'>('keywords');
-  // § แก้ชื่อ/คำอธิบาย/Active ที่หน้านี้ได้ (ไม่ต้องกลับรายการ) — ตาม jsk intent detail
   const [nameDraft, setNameDraft] = useState<string | null>(null);
   const [descDraft, setDescDraft] = useState<string | null>(null);
   const [newKeyword, setNewKeyword] = useState('');
@@ -85,7 +84,6 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
     await reload();
   }
 
-  // § แก้ชื่อ/คำอธิบายจากหน้านี้ — payload ส่งเฉพาะสองฟิลด์ PATCH merge ฝั่ง server
   async function saveMeta() {
     if (!item || nameDraft === null) return;
     const trimmed = nameDraft.trim();
@@ -107,7 +105,6 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
     await reload();
   }
 
-  // § เพิ่ม keyword ตรงหน้า detail — รวมกับรายการเดิมแล้วยิง PATCH ครั้งเดียว
   async function addKeyword() {
     if (!item) return;
     const kw = newKeyword.trim();
@@ -129,7 +126,6 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
     await reload();
   }
 
-  // § เพิ่มคำตอบ (text หรือ reply object) ตรงหน้า detail
   async function addResponse() {
     if (!item) return;
     const value = newResponseText.trim();
@@ -196,7 +192,6 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
         >
           {item.name}
         </AdminCardTitle>
-        {/* § แก้ชื่อ/คำอธิบายได้ตรงนี้ — nameDraft null = ยังไม่เริ่มแก้ ใช้ค่าจาก item */}
         {nameDraft === null ? (
           <div className="flex flex-wrap items-center gap-2">
             {item.description && <p className="text-sm text-muted">{item.description}</p>}
@@ -282,7 +277,6 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
               ))}
             </ul>
           )}
-          {/* § เพิ่ม keyword ตรงหน้า detail — 4 match types ตาม jsk */}
           <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-border/50 pt-3">
             <div className="min-w-40 flex-1">
               <label htmlFor="add-keyword" className="text-xs text-muted">keyword ใหม่</label>
@@ -344,7 +338,6 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
               ))}
             </ul>
           )}
-          {/* § เพิ่มคำตอบตรงหน้า detail — text หรือ reply object */}
           <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-border/50 pt-3">
             <div className="min-w-40 flex-1">
               <label htmlFor="add-response" className="text-xs text-muted">คำตอบใหม่</label>

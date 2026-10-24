@@ -98,7 +98,6 @@ describe('BroadcastWizardClient ตัวช่วยสร้าง 4 ขั้
 
     await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
     await user.click(screen.getByLabelText('ข้อความประกาศ'));
-    // § paste ทาง clipboard เร็วกว่าพิมพ์ 5001 ตัว — maxLength ตัดให้เหลือ 5000
     await user.paste('ก'.repeat(5001));
 
     const textarea = screen.getByLabelText('ข้อความประกาศ') as HTMLTextAreaElement;
@@ -180,8 +179,6 @@ describe('BroadcastWizardClient ตัวช่วยสร้าง 4 ขั้
     await user.type(screen.getByLabelText('ข้อความประกาศ'), 'สวัสดี');
     await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
 
-    // § ThaiDatePicker เลือกผ่าน popover — วันสุดท้ายของเดือนปัจจุบันอยู่อนาคตเสมอ
-    // (ห้ามเลือกวันย้อนหลัง เพราะ wizard บล็อกเวลาอดีต — เทสต์จะพังเมื่อรันวันหลังวันที่เลือก)
     await user.click(screen.getByLabelText('วันที่ส่ง (เว้นว่าง = สร้างเป็นร่าง)'));
     await user.click(screen.getByRole('button', { name: 'เดือนถัดไป' }));
     await user.click(screen.getByRole('button', { name: '5' }));

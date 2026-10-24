@@ -224,7 +224,6 @@ export function AdminLayout({
         <main id="main" className="flex-1">{children}</main>
       </div>
 
-      {/* เตือนเซสชันหมดอายุจาก inactivity — ทุกหน้าแอดมิน (แบบ jsk layout) */}
       <SessionTimeoutWarning />
     </div>
   );

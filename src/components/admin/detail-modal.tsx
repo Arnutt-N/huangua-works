@@ -21,12 +21,6 @@ interface DetailModalAction {
   variant?: 'primary' | 'outline' | 'ghost' | 'destructive';
 }
 
-/**
- * DetailModal — modal ดูรายละเอียดแบบ label/value rows
- *
- * § ยกแบบมาจาก jsk DetailModal.tsx (PR #290 ที่ dedupe view modal ซ้ำทุกหน้า)
- * ใช้ Dialog ของหัวงัวแทน Modal ของ jsk
- */
 export function DetailModal({
   title,
   description,
@@ -41,7 +35,6 @@ export function DetailModal({
   open: boolean;
   onClose: () => void;
   rows: DetailRow[];
-  /** บล็อกเสริมใต้ rows (JSON viewer, รูป, preview...) */
   renderExtra?: ReactNode;
   actions?: DetailModalAction[];
 }) {

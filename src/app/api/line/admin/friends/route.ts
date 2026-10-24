@@ -71,8 +71,7 @@ export async function GET(request: Request) {
       metadata: lineUsers.metadata,
       maskedId: sql<string | null>`left(${lineUsers.lineUserIdEnc}, 8)`,
       latestEvent,
-      // § chatMode จากห้องของคนนี้ (jsk "Chat Mode" คอลัมน์ BOT/HUMAN) —
-      // ห้องเดียวต่อคน (unique lineUserIdHash) เลย leftJoin ตรงได้
+      // § ห้องเดียวต่อคน (uniqueIndex chat_conversations_line_user_id_hash_idx) — leftJoin ตรงได้ไม่ทำแถวซ้ำ
       chatMode: chatConversations.mode,
     })
     .from(lineUsers)
@@ -113,7 +112,6 @@ export async function GET(request: Request) {
       followState,
       followCount: stats.followCount,
       refollowCount: stats.refollowCount,
-      // § since = follow ล่าสุด (jsk "Since") — ไม่ใช่ createdAt ของแถว เพราะ refollow ใหม่เป็นจุดเริ่มความสัมพันธ์ปัจจุบัน
       since: stats.lastFollowAt ? stats.lastFollowAt.toISOString() : null,
       chatMode: r.chatMode ?? null,
       lastActiveAt: r.lastMessageAt,

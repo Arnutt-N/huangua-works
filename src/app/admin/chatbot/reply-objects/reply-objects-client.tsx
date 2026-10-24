@@ -71,7 +71,6 @@ export function ReplyObjectsClient() {
 
   async function handleDelete(item: ReplyObject) {
     if (!confirm(`ลบ "$${item.objectId}" ?`)) return;
-    // § server คืน 409 { error: 'ไม่สามารถลบได้ — ถูกอ้างอยู่ใน N ที่ …' } — ต้องโชว์ให้เห็น
     const res = await adminApi.deleteReplyObject(item.id);
     if (!res.ok) {
       notify('error', res.error);

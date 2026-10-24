@@ -14,7 +14,6 @@ import { cn } from '@/lib/cn';
 // คืนได้เมื่อ broadcast-service แกะ ref ก่อนยิง LINE API
 type ContentType = 'text' | 'image' | 'flex';
 
-// § ตาม zod schema ฝั่ง server — text เดียวห้ามเกิน 5000 ตัวอักษร
 const TEXT_MAX = 5000;
 const TITLE_MAX = 100;
 
@@ -39,8 +38,6 @@ export function BroadcastWizardClient() {
   const [recipientOptions, setRecipientOptions] = useState<{ id: string; displayName: string | null }[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [estimate, setEstimate] = useState<number | null>(null);
-  // § แยก date/time เพื่อใช้ ThaiDatePicker (date) + input time แทน datetime-local —
-  // ค่ารวม = `${scheduleDate}T${scheduleTime}` รูปเดียวกับที่ API ต้องการ
   const [scheduleDate, setScheduleDate] = useState('');
   const [scheduleTime, setScheduleTime] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -135,7 +132,6 @@ export function BroadcastWizardClient() {
       scheduledAt: scheduleAt ? new Date(scheduleAt).toISOString() : null,
     });
     if (res.ok && opts?.sendNow && res.data.id) {
-      // § "ส่งเลย" = สร้างร่างก่อนค่อยยิง send — API ส่งรับได้เฉพาะ draft/scheduled
       const sent = await adminApi.sendBroadcast(res.data.id);
       if (!sent.ok) {
         setSaving(false);
@@ -212,7 +208,6 @@ export function BroadcastWizardClient() {
 
       {step === 1 && (
         <AdminCard>
-          {/* § ชื่อแคมเปญตาม jsk — ใช้ตั้งชื่อในตาราง ไม่บังคับ (ว่างได้ fallback เป็นข้อความ) */}
           <div className="mb-4">
             <Label htmlFor="bw-title">ชื่อแคมเปญ</Label>
             <input
@@ -237,7 +232,7 @@ export function BroadcastWizardClient() {
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="เช่น ประกาศ: อบต.หัวงัวปิดทำการวันที่ 12 ส.ค."
               />
-              {/* § ตัวนับ 5000 ตาม jsk — LINE จำกัดข้อความ broadcast ต่อครั้ง */}
+              {/* § LINE จำกัดข้อความ broadcast ต่อครั้งที่ 5000 ตัวอักษร */}
               <p className="mt-1 text-right text-xs tabular-nums text-muted">
                 {message.length.toLocaleString('th-TH')} / {TEXT_MAX.toLocaleString('th-TH')}
               </p>
@@ -347,8 +342,6 @@ export function BroadcastWizardClient() {
             {estimate !== null && <span className="text-sm text-muted">ประมาณ {estimate} คน</span>}
           </div>
           <div className="mt-4 space-y-3">
-            {/* § ปฏิทินไทย (ThaiDatePicker) + ช่องเวลาแยก — แทน datetime-local
-                ให้ปี พ.ศ. ตามที่ผู้ใช้ไทยคุ้น */}
             <ThaiDatePicker
               id="bw-schedule-date"
               label="วันที่ส่ง (เว้นว่าง = สร้างเป็นร่าง)"
@@ -403,7 +396,6 @@ export function BroadcastWizardClient() {
             </dl>
           </AdminCard>
 
-          {/* § preview แบบ split — เนื้อหาซ้าย/กลุ่มเป้าหมายขวา ตาม jsk step 3 */}
           <div className="grid gap-4 lg:grid-cols-2">
             <AdminCard>
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">ตัวอย่างเนื้อหา</p>
@@ -452,7 +444,6 @@ export function BroadcastWizardClient() {
             ถัดไป <ArrowRight className="h-4 w-4" />
           </Button>
         ) : (
-          // § ปุ่มคู่ตาม jsk — "บันทึกแบบร่าง" (สร้างอย่างเดียว) / "ส่งเลย" (สร้างแล้วยิง send ทันที)
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" onClick={() => void handleCreate()} disabled={saving}>
               {saving ? 'กำลังบันทึก...' : 'บันทึกแบบร่าง'}

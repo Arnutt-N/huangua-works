@@ -7,9 +7,6 @@ import {
   LINE_ID_HASH_VERSION,
 } from './identity';
 
-// § เหลือเฉพาะ pure pseudonym (ไม่แตะ DB) — ชุด resolver ที่แตะ Postgres จริงย้ายไป
-// identity.integration.test.ts เพื่อ unit run (`npx vitest run`) ไม่ต้องลาก Docker
-
 const TEST_KEY = 'test-line-id-hmac-key-0123456789abcdef';
 
 afterEach(() => {

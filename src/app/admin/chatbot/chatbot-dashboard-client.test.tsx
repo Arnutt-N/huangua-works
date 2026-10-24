@@ -75,11 +75,8 @@ describe('ChatbotDashboardClient overview', () => {
     expect(await screen.findByText('Reply Objects')).toBeInTheDocument();
     expect(screen.getByText('Intent Categories')).toBeInTheDocument();
     expect(screen.getByText('Active Responses')).toBeInTheDocument();
-    // 2 reply objects
     expect(screen.getByText('2')).toBeInTheDocument();
-    // 3 intents (1 inactive) → hint 2 หมวดที่เปิดใช้
     expect(screen.getByText('2 หมวดที่เปิดใช้')).toBeInTheDocument();
-    // active responses = 1 (เฉพาะ intent ที่เปิดใช้และมี response)
     expect(screen.getByText('คำตอบในหมวดที่เปิดใช้')).toBeInTheDocument();
   });
 
@@ -128,7 +125,6 @@ describe('ChatbotDashboardClient error', () => {
 
     expect(await screen.findByText('เซิร์ฟเวอร์ขัดข้อง กรุณาลองใหม่')).toBeInTheDocument();
     expect(screen.queryByText('ไปสร้างหมวด')).not.toBeInTheDocument();
-    // reply objects ยังแสดงปกติ
     expect(screen.getByText('Welcome Message')).toBeInTheDocument();
   });
 

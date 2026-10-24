@@ -2,17 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-/**
- * useSessionTimeout — เตือนก่อนเซสชันหมดอายุจาก inactivity
- *
- * § ยกกลไกมาจาก jsk useSessionTimeout.ts (30 นาทีไม่มีการใช้งาน เตือนก่อนหมด 5 นาที)
- *
- * § แต่เซสชันของหัวงัวคุมด้วย token.expiresAt ใน jwt callback (1 ชม. / 30 วัน
- * "จดจำฉัน") ไม่ใช่ inactivity — extendSession ที่นี่จึง "เลื่อนแค่ตัวเตือน" ไม่ต่อ
- * อายุ JWT จริง ห้ามเอาไปผูกกับ session refresh เด็ดขาด ไม่งั้น modal จะหลอกว่า
- * ต่อเวลาแล้วทั้งที่ token จะเด้งออกตอนครบอายุของตัวมันเอง
- */
-
 const INACTIVITY_TIMEOUT = 30 * 60 * 1000;
 const WARNING_BEFORE = 5 * 60 * 1000;
 
@@ -71,13 +60,11 @@ export function useSessionTimeout(onLogout: () => void): SessionTimeoutState {
     const events = ['mousemove', 'keypress', 'click', 'scroll', 'touchstart'] as const;
 
     const handleActivity = () => {
-      // § ระหว่าง modal โชว์ ห้ามนับใหม่ — ไม่งั้นผู้ใช้ขยับเมาส์แล้วตัวเตือนหายเอง
       if (!showWarningRef.current) resetTimer();
     };
 
     for (const event of events) window.addEventListener(event, handleActivity);
-    // § เลื่อน resetTimer ออกจาก effect body ตรง ๆ (react-hooks/set-state-in-effect) —
-    // setTimeout 0 ให้ setState ทำงานหลัง effect เสร็จ แบบเดียวกับ jsk ต้นฉบับ
+    // § setTimeout 0 — setState ของ resetTimer ต้องอยู่ใน callback (rule react-hooks/set-state-in-effect)
     const initTimer = setTimeout(resetTimer, 0);
 
     return () => {

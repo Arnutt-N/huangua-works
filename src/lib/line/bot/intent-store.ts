@@ -149,10 +149,6 @@ export async function updateIntent(id: string, patch: UpdateIntentInput): Promis
 
 export async function deleteIntent(id: string): Promise<IntentWriteResult> {
   const db = await getDb();
-  // § soft-delete ตามนโยบาย jsk PR #291 — ตั้ง is_active=false ไม่ลบแถว
-  // คำตอบ/keywords อยู่ครบ กู้ด้วยสวิตช์เปิด/ปิด (PUT isActive=true) ได้ทันที
-  // § where isActive=true ด้วย — ลบซ้ำต้องได้ not_found (idempotent repeat-DELETE
-  // แบบ jsk) ไม่ใช่ update แถวที่ซ่อนอยู่แล้วแล้วตอบ ok
   const deleted = await db
     .update(chatIntents)
     .set({ isActive: false, updatedAt: new Date() })

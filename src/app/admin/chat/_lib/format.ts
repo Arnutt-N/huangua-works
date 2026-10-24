@@ -23,13 +23,6 @@ export function formatDateSeparator(iso: string): string {
   return date.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-/**
- * เวลาสัมพัทธ์สำหรับรายการสนทนา — "เมื่อสักครู่ / 5 นาทีที่แล้ว / 3 วันที่แล้ว"
- *
- * § ใช้สเกล/ถ้อยคำตาม jsk relativeTime (chat-histories page.tsx) ทั้งหมด ไม่ตัดเหลือ "5 นาที"
- * แบบเก่า เพราะข้อความไม่มี "ที่แล้ว" อ่านแล้วเหมือน duration ไม่ใช่เวลาที่ผ่านไป
- * และไม่ตัดกลับเป็นวันที่สั้นเมื่อเกินสัปดาห์ — ผู้ใช้คุ้นกับ "N เดือนที่แล้ว / N ปีที่แล้ว"
- */
 export function formatRelativeTime(iso: string | null): string {
   if (!iso) return '';
   const diffMs = Math.max(0, Date.now() - new Date(iso).getTime());

@@ -14,8 +14,6 @@ const querySchema = z.object({
 });
 
 /**
- * GET /api/line/admin/friend-events — timeline เหตุการณ์ เพิ่ม/ยกเลิกติดตาม
- *
  * § คืน maskedId (8 ตัวแรกของ Enc) เท่านั้น — ห้ามเผย raw LINE id ตรง convention
  *   mask-audit ของ conversations/friends route
  */

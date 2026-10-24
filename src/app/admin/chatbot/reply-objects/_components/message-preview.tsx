@@ -3,10 +3,6 @@
 import { payloadSummary } from '../reply-preview';
 import type { Payload } from '../_lib/payload-utils';
 
-/**
- * Live preview แบบเบา — ไม่ render flex เต็ม (หนักและ crash ง่ายกับ draft)
- * § ตาม jsk: preview ไม่ต้องสมบูรณ์แบบ แค่บอกว่า payload ใช้ได้หรือ "invalid flex"
- */
 export function MessagePreview({
   objectType,
   payload,
@@ -30,14 +26,12 @@ export function MessagePreview({
     if (!url) {
       return <Placeholder label={`ไม่มี ${objectType} url`} />;
     }
-    // § preview ใช้ <img> ตรง ๆ (ไม่ผ่าน next/image) — url มาจากผู้ใช้และไม่ต้อง optimize
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img src={url} alt={altText || 'ตัวอย่างรูป'} className="max-h-64 w-full rounded-xl object-contain" />
     );
   }
 
-  // § ชนิดอื่น (flex/template/imagemap/sticker/...) — สรุป 1 บรรทัด ไม่เดาว่าจะ render อะไร
   const summary = payloadSummary(objectType, payload);
   if (summary === '—') {
     return <Placeholder label="invalid flex" />;

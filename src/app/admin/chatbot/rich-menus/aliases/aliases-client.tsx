@@ -12,7 +12,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 
-// § pattern เดียวกับ backend (isValidAliasId) — ตรวจฝั่ง client เพื่อบอกก่อนยิง
 const ALIAS_ID_PATTERN = /^[a-zA-Z0-9_-]{1,50}$/;
 
 export function RichMenuAliasesClient() {

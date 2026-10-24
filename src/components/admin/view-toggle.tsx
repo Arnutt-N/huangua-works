@@ -9,12 +9,6 @@ export interface ViewToggleOption<T extends string> {
   icon?: ReactNode;
 }
 
-/**
- * ViewToggle — สลับ grid/list (หรือ list/calendar) แบบ segmented
- *
- * § ยกแบบมาจาก jsk ViewToggle.tsx (PR #290) ให้ทุกหน้าใช้สไตล์เดียว
- * สี active ใช้ accent ของหัวงัว ไม่เอา brand-500 ของ jsk
- */
 export function ViewToggle<T extends string>({
   options,
   value,

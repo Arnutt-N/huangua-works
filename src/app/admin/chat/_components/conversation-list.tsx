@@ -53,7 +53,6 @@ export function ConversationList({
   onToggleMute,
   onMarkRead,
 }: {
-  /** พับทั้งคอลัมน์ (desktop) — ค่า true = ซ่อนจนกดปุ่มเปิดใน ChatArea */
   collapsed: boolean;
   onToggleCollapsed: () => void;
   visible: Conversation[];

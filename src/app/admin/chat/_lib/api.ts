@@ -153,7 +153,6 @@ export async function deleteCannedResponse(id: string): Promise<boolean> {
   return res.ok;
 }
 
-/** ตัวนับการใช้ — fire-and-forget จาก composer, ล้มเหลวไม่ต้องรบกวนผู้ใช้ */
 export function markCannedResponseUsed(id: string): void {
   void fetch(`/api/line/admin/canned-responses/${id}/use`, { method: 'POST' }).catch(() => {});
 }

@@ -136,13 +136,11 @@ describe('deleteIntent', () => {
   test('soft-delete: keywords อยู่ครบ แต่ isActive=false และลบซ้ำได้ not_found', async () => {
     const id = await create('delete');
     await expect(deleteIntent(id)).resolves.toEqual({ ok: true, id });
-    // § soft-delete ตามนโยบาย jsk PR #291 — แถว/keywords เดิมต้องอยู่ กู้ด้วย PUT isActive=true
     const db = await getDb();
     const [row] = await db.select().from(chatIntents).where(eq(chatIntents.id, id));
     expect(row?.isActive).toBe(false);
     expect(await keywordsOf(id)).toEqual([`it-kw-delete-${RUN}`]);
     await expect(deleteIntent(id)).resolves.toEqual({ ok: false, reason: 'not_found' });
-    // กู้: isActive=true แล้วคืนค่าเดิม
     await updateIntent(id, { isActive: true });
     const [restored] = await db.select().from(chatIntents).where(eq(chatIntents.id, id));
     expect(restored?.isActive).toBe(true);

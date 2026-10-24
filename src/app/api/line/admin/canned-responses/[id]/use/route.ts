@@ -7,12 +7,6 @@ import { STAFF_ROLES } from '@/lib/auth/roles';
 
 export const runtime = 'nodejs';
 
-/**
- * POST /api/line/admin/canned-responses/[id]/use — เพิ่มตัวนับการใช้ 1 ครั้ง
- *
- * § atomic increment ใน SQL (`usage_count + 1`) ไม่ใช่ read-modify-write — composer
- * ยิงพร้อมกันหลายแท็บได้ ค่าจึงไม่หาย; ตอบ 204 เสมอไม่ต้องรอผล (fire-and-forget)
- */
 export async function POST(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },

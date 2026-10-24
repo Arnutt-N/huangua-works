@@ -1,8 +1,5 @@
 import type { RichMenuDisplayMode } from '@/app/admin/_lib/admin-api';
 
-// § ที่เดียวที่ตีความ sync/display state — badge, ปุ่ม และหน้า list/edit ใช้ตัวเดียวกัน
-// เพื่อไม่ให้สถานะเพี้ยนกัน (แบบ lib/rich-menu.ts ของ jsk-app)
-
 export const SYNC_SYNCED = 'synced';
 export const SYNC_PENDING = 'pending';
 export const SYNC_FAILED = 'error';
@@ -12,12 +9,10 @@ export interface RichMenuSyncFields {
   syncStatus: string;
 }
 
-/** publish ได้เฉพาะเมนูที่อยู่บน LINE และ sync ล่าสุดสำเร็จ — FAILED ต้อง re-sync ก่อน */
 export function canPublish(menu: RichMenuSyncFields): boolean {
   return !!menu.lineRichMenuId && menu.syncStatus === SYNC_SYNCED;
 }
 
-/** แก้ไขในระบบแล้วแต่ยังไม่ถึง LINE — ต้องบอก "รอซิงค์" ไม่ใช่หลอกว่า live */
 export function needsResync(menu: RichMenuSyncFields): boolean {
   return !!menu.lineRichMenuId && menu.syncStatus === SYNC_PENDING;
 }
@@ -59,7 +54,6 @@ export interface RichMenuPillFields extends RichMenuSyncFields {
   lastSyncError: string | null;
 }
 
-/** ลำดับความสำคัญ: sync state มาก่อน แล้วจึง display mode */
 export function menuStatusPill(menu: RichMenuPillFields): RichMenuPill {
   if (menu.status === 'active' && !needsResync(menu)) {
     return { label: 'ACTIVE', tone: 'active' };

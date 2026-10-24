@@ -13,10 +13,7 @@ import {
 } from '../_lib/payload-utils';
 import { ActionEditor } from './action-editor';
 
-/**
- * QuickReplyEditor — modifier `payload.quickReply` ที่แนบได้กับทุก payload
- * เพดาน 13 ปุ่มตามโควตา LINE (LINE_QUICK_REPLY_MAX_ITEMS ตัวเดียวกับที่ server ตรวจ)
- */
+/** § เพดาน 13 ปุ่มตามโควตา LINE — LINE_QUICK_REPLY_MAX_ITEMS ตัวเดียวกับที่ server ตรวจ */
 export function QuickReplyEditor({
   value,
   onChange,

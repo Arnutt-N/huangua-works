@@ -67,7 +67,6 @@ export function Composer({
     setPickerOpen(false);
     setSlashDismissed(true);
     textareaRef.current?.focus();
-    // § fire-and-forget — ตัวนับ "ใช้ไป" ของหน้า admin ไม่ควรทำให้ช่องพิมพ์ค้าง
     markCannedResponseUsed(item.id);
   };
 

@@ -142,7 +142,6 @@ export function RichMenuBuilderClient() {
       return;
     }
 
-    // § ต้อง sync ก่อนอัปโหลดรูป — endpoint upload ผูกกับ lineRichMenuId
     const synced = await adminApi.syncRichMenu(id);
     if (!synced.ok) {
       setBusy(null);
@@ -152,7 +151,6 @@ export function RichMenuBuilderClient() {
 
     try {
       const fitted = await ensureRichMenuImage(file!);
-      // § ไฟล์ที่พอดีอยู่แล้วส่งต่อทั้ง PNG (alpha ไม่หาย) — เฉพาะที่ถูกย่อจึงเป็น JPEG
       const uploadFile =
         fitted.file instanceof File && !fitted.converted
           ? fitted.file

@@ -23,7 +23,6 @@ import {
 } from '@/app/admin/chat/_lib/api';
 import type { CannedResponse } from '@/app/admin/chat/_lib/types';
 
-// § key ตรงกับ CANNED_RESPONSE_CATEGORIES ใน src/lib/validation.ts — label ไทยอยู่ที่ UI เท่านั้น
 const CATEGORY_OPTIONS = [
   { value: 'info', label: 'ข้อมูลทั่วไป' },
   { value: 'greeting', label: 'ทักทาย' },
@@ -44,7 +43,6 @@ function categoryLabel(value: string | undefined): string {
 
 export function CannedResponsesClient() {
   const { data, loading, notify, reload } = useResource({
-    // § ห่อ raw array จาก chat api ให้เป็น ApiResult — ยังใช้ useResource ตัวเดียวกับหน้าอื่น
     load: async () => {
       const rows = await fetchCannedResponses(true);
       return rows
@@ -117,7 +115,6 @@ export function CannedResponsesClient() {
 
   const handleDelete = async (item: CannedResponse) => {
     if (busy) return;
-    // § ลบแบบ soft-delete — confirm ก่อนทุกครั้งเหมือนหน้าอื่น (keyword/response/alias)
     if (!confirm(`ลบ "${item.title}" ?`)) return;
     setBusy(true);
     const ok = await deleteCannedResponse(item.id);
@@ -143,8 +140,7 @@ export function CannedResponsesClient() {
       </PageHeader>
 
       {loading ? (
-        // § skeleton เป็น div นอก <table> — lint jsx-a11y/control-has-associated-label
-        // false-positive กับ <td> ที่ไม่มี text node ตรง ๆ
+        // § skeleton เป็น div นอก <table> — rule a11y control-has-associated-label ตีความ td ที่ไม่มี text เป็น control
         <div className="space-y-2 rounded-xl border border-border/50 p-4">
           {[...Array(5)].map((_, i) => (
             <div key={i} className="flex animate-pulse gap-3 py-2">
@@ -157,7 +153,6 @@ export function CannedResponsesClient() {
           ))}
         </div>
       ) : data === null ? (
-        // § โหลดล้มห้ามตก empty state — คนละเรื่องกับ "ว่าง" (data = { items: [] })
         <p role="status" className="py-10 text-center text-sm text-danger">โหลดข้อมูลไม่สำเร็จ</p>
       ) : data.items.length === 0 ? (
         <EmptyState
@@ -202,7 +197,6 @@ export function CannedResponsesClient() {
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-center">
-                      {/* § jsk ย้ายสวิตช์เปิด/ปิดมาอยู่คอลัมน์สถานะ (ใต้ badge) ไม่ใช่คอลัมน์จัดการ */}
                       <div className="flex flex-col items-center gap-2">
                         <span
                           className={`inline-block rounded-pill px-2 py-0.5 text-xs font-medium ${

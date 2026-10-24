@@ -108,7 +108,6 @@ export function RichMenuEditClient({ menuId }: { menuId: string }) {
     const file = e.target.files?.[0];
     if (!file) return;
     setImageFile(file);
-    // § คืน blob URL เก่าก่อนสร้างใหม่ กัน memory leak ต่อการเลือกหนึ่งครั้ง
     if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
     objectUrlRef.current = URL.createObjectURL(file);
     setImagePreview(objectUrlRef.current);
@@ -194,8 +193,8 @@ export function RichMenuEditClient({ menuId }: { menuId: string }) {
       }
     }
 
-    // § อัปรูปเฉพาะตอน "บันทึกและซิงค์" — ถ้าอัปไปที่เมนูเดิมแล้วภายหลัง sync
-    // recreate เมนูใหม่ รูปจะหายและต้องอัปซ้ำ (sync service เตือนอยู่แล้ว)
+    // § อัปรูปเฉพาะตอน "บันทึกและซิงค์" — LINE อัปเดตเมนูเดิมไม่ได้ sync ครั้งถัดไปจะ recreate
+    // รูปที่อัปไปก่อนหน้าจะหายไปกับเมนูเดิม
     if (andSync) {
       const uploadError = await uploadImage();
       if (uploadError) {

@@ -78,12 +78,6 @@ export interface AdminNavGroup {
  *
  * (ปัจจุบันทุกเมนูในกลุ่มนี้เป็น supervisorOnly — /admin/audit ถูกจำกัดเพิ่มเพราะ
  * มี email/ชื่อเจ้าหน้าที่ IP address และเลขติดตามของประชาชนอยู่ในตาราง)
- *
- * § ทำไม ไฟล์สื่อ/ย่อรูป/สุขภาพระบบ/ตั้งค่า ไม่อยู่ในกลุ่ม CHATBOT MANAGEMENT
- * ทั้งสี่ตัวไม่ได้ผูกกับบอทโดยเฉพาะ — ไฟล์สื่อใช้กับ Rich Menu ก็จริงแต่ใช้กับ
- * งานอื่นได้ด้วย, ย่อรูปเป็นเครื่องมือทั่วไป, สุขภาพระบบตรวจ DB/Redis/LINE ทั้งระบบ
- * และ /admin/settings จะมีการตั้งค่าอื่นนอกจากบอทตามมา จึงเลี่ยงชื่อ "ตั้งค่าบอท"
- * ที่ผูกกับบอทเกินจริง
  */
 export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
   {
@@ -94,11 +88,6 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     ],
   },
   {
-    /**
-     * § กลุ่มเมนู LINE — เรียง/ป้าย/icon ตาม jsk layout.tsx:193-201 (CHATBOT MANAGEMENT)
-     * ยุบ "การสนทนา" เข้ากลุ่มเดียวกันตามคำตัดสินผู้ใช้ 2026-10-23 (parity กับ jsk)
-     * officer เห็นแค่ Live Chat ในกลุ่มนี้ — ตรงกับ jsk ที่ AGENT เห็นแค่ Live Chat
-     */
     label: 'CHATBOT MANAGEMENT',
     items: [
       { key: 'chatbot', label: 'Chatbot Overview', href: '/admin/chatbot', icon: Bot, supervisorOnly: true },

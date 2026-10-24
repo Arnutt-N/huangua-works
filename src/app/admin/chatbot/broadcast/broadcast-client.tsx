@@ -101,7 +101,6 @@ export function BroadcastClient() {
   const [cancelTarget, setCancelTarget] = useState<BroadcastItem | null>(null);
   const [actionSaving, setActionSaving] = useState(false);
 
-  // § server-side filter + pagination — query เป็น deps ของ useResource อยู่แล้ว
   const query = useMemo(() => {
     const params = new URLSearchParams({ page: String(page + 1), pageSize: String(PAGE_SIZE) });
     if (statusFilter) params.set('status', statusFilter);
@@ -184,7 +183,6 @@ export function BroadcastClient() {
     }
     notify('success', 'ยกเลิกประกาศแล้ว');
     setCancelTarget(null);
-    // กันค้างหน้าที่ filter = draft แล้วแถวย้ายไป cancelled — กลับหน้าแรก
     setPage(0);
     await mutate(() => adminApi.listBroadcasts(query), '');
   }
@@ -197,7 +195,6 @@ export function BroadcastClient() {
         </div>
       )}
 
-      {/* § หัวหน้าหน้าตาม jsk screenshot — ปุ่มสร้างชิดขวาบน */}
       <PageHeader title="ส่งข้อความแบบกระจาย" subtitle="สร้างและจัดการข้อความ Broadcast ถึงผู้ติดตาม LINE OA">
         <Link
           href="/admin/chatbot/broadcast/new"
@@ -233,8 +230,7 @@ export function BroadcastClient() {
       </AdminCard>
 
       <AdminCard>
-        {/* § โครงตาม chat-histories: skeleton/empty เป็น div นอก table — rule a11y
-            jsx-a11y/control-has-associated-label ตีความ tr ที่ไม่มี text เป็น control */}
+        {/* § skeleton/empty เป็น div นอก table — rule a11y control-has-associated-label ตีความ tr ที่ไม่มี text เป็น control */}
         {loading ? (
           <div aria-hidden="true">
             {Array.from({ length: 5 }, (_, i) => (
@@ -355,7 +351,6 @@ export function BroadcastClient() {
           </div>
         )}
 
-        {/* § footer นับรวม + pagination ตาม jsk — "ทั้งหมด N รายการ" */}
         <div className="flex items-center justify-between border-t border-border/50 pt-3 text-xs text-muted">
           <span>ทั้งหมด {total.toLocaleString('th-TH')} รายการ</span>
           <span className="flex items-center gap-1">
@@ -382,7 +377,6 @@ export function BroadcastClient() {
         </div>
       </AdminCard>
 
-      {/* ยกเลิก = soft-delete — ถามก่อนเสมอตามนโยบาย jsk PR #291 */}
       <Dialog open={cancelTarget !== null} onOpenChange={(open) => { if (!open) setCancelTarget(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>

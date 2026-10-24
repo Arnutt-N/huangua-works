@@ -6,7 +6,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReplyObject } from '@/app/admin/_lib/admin-api';
 import { ReplyObjectsClient } from './reply-objects-client';
 
-// § userEvent หลายสิบขั้น (quick reply 13 ปุ่ม) ต้อง timeout ยาวกว่าค่า default
 vi.setConfig({ testTimeout: 30_000 });
 
 const listReplyObjects = vi.fn();

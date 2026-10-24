@@ -1,10 +1,3 @@
-/**
- * ตัวช่วยฟอร์ม Reply Object — parsed payload, internal keys, URI allowlist
- *
- * § payload จริงคือ JSON string ใน state ฟอร์ม; helper พวกนี้แปลงไป/กลับ object
- * ที่ editor กับ live preview ใช้ โดยไม่ throw ตอนผู้ใช้พิมพ์ยังไม่จบ
- */
-
 export const FIELD_CLS =
   'w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong';
 
@@ -45,10 +38,6 @@ export function safeParsePayload(json: string): Payload {
 export function makeEmptyAction(type = 'message'): LineAction {
   return { type, label: '' };
 }
-
-// --- internal reconciliation keys -------------------------------------------
-// § รายการใน editor (quick reply) ถือ `_key` เพื่อให้ React ใช้ key ที่นิ่ง
-// key สร้างใน event handler เท่านั้น และถูกถอดออกก่อนบันทึก — payload ที่ส่ง LINE ไม่เปลี่ยนรูป
 
 const INTERNAL_KEY = '_key';
 
@@ -109,9 +98,6 @@ export function stripEditorKeys<T>(value: T): T {
   return value;
 }
 
-// --- URI scheme allowlist ---------------------------------------------------
-
-/** scheme ที่ LINE uri action ใช้ได้ — กัน javascript:/data: หลุดไปถึงผู้รับ */
 export const ALLOWED_ACTION_URI_SCHEMES = ['https:', 'http:', 'tel:', 'mailto:', 'line:'] as const;
 
 export const URI_SCHEME_ERROR_TH =
@@ -126,7 +112,6 @@ export function isAllowedActionUri(uri: string): boolean {
   }
 }
 
-/** คืน uri แรกที่ไม่ผ่าน allowlist หรือ null เมื่อผ่านหมด — ครอบทั้ง editor และ raw JSON */
 export function findInvalidActionUri(value: unknown): string | null {
   if (Array.isArray(value)) {
     for (const item of value) {

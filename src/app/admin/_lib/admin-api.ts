@@ -134,7 +134,6 @@ export interface RichMenuItem {
   displayStartAt: string | null;
   displayEndAt: string | null;
   createdAt: string;
-  /** จำนวนเพื่อนที่ผูกเมนูนี้รายคน (metadata.richMenuId) */
   userLinkCount?: number;
 }
 
@@ -205,9 +204,7 @@ export interface FriendItem {
   followState: 'following' | 'unfollowed';
   followCount: number;
   refollowCount: number;
-  /** วันที่เริ่มติดตาม (follow ล่าสุด) — คอลัมน์ "Since" ตาม jsk */
   since: string | null;
-  /** โหมดห้องแชทปัจจุบัน (jsk "Chat Mode") — null = ยังไม่มีห้อง */
   chatMode: string | null;
   lastActiveAt: string | null;
   richMenuId: string | null;
@@ -249,7 +246,6 @@ export interface BroadcastContent {
 
 export interface BroadcastItem {
   id: string;
-  /** ชื่อแคมเปญ — null บนแถวยุคก่อนเพิ่มคอลัมน์ UI fallback เป็นข้อความแรก */
   title: string | null;
   content: BroadcastContent[];
   status: string;

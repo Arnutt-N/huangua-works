@@ -56,7 +56,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!result.ok) return result.response;
 
   const db = await getDb();
-  // § อ่านแถวก่อน (ไม่มี → 404) แล้ว validate ค่ารวม ไม่ใช่แค่ค่าที่ส่งมา
   const [stored] = await db
     .select({
       id: richMenus.id,
@@ -105,7 +104,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   // § LINE config ฝัง name/chatBarText/areas/selected — แก้ฟิลด์ไหนต้องเขียนลง config ด้วย
-  // ไม่งั้น sync ครั้งถัดไปจะ recreate ด้วยค่าเก่า
+  // ไม่งั้น sync ครั้งถัดไป (recreate) จะใช้ค่าเก่า
   const prevConfig = (stored.config ?? {}) as Record<string, unknown>;
   const nextName = name ?? stored.name;
   const nextBar = chatBarText ?? stored.chatBarText;
@@ -141,7 +140,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (displayMode !== undefined) patch.displayMode = displayMode;
   if (start !== undefined) patch.displayStartAt = start;
   if (end !== undefined) patch.displayEndAt = end;
-  // § LINE อัปเดตเมนูไม่ได้ — ต้อง recreate ตอน sync ครั้งถัดไป จึงติด PENDING ให้ UI เตือน
+  // § LINE อัปเดตเมนูเดิมไม่ได้ ต้อง recreate ตอน sync ครั้งถัดไป — ติด PENDING ให้ UI เตือน
   if (configChanged && stored.lineRichMenuId) patch.syncStatus = 'pending';
 
   await db.update(richMenus).set(patch).where(eq(richMenus.id, id));

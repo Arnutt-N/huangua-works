@@ -50,7 +50,6 @@ beforeEach(() => {
 describe('BroadcastDetailClient', () => {
   it('แสดงสถิติ + ไทม์ไลน์ + ปุ่มส่งเมื่อ draft', async () => {
     render(<BroadcastDetailClient broadcastId="b1" />);
-    // § "ประกาศน้ำประปา" ปรากฏทั้งหัวเรื่อง (title) และ preview เนื้อหา — ใช้ getAll
     expect((await screen.findAllByText('ประกาศน้ำประปา')).length).toBeGreaterThan(0);
     expect(screen.getByText('สถิติการส่ง')).toBeInTheDocument();
     expect(screen.getByText('ไทม์ไลน์')).toBeInTheDocument();

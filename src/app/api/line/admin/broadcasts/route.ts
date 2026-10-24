@@ -23,7 +23,6 @@ const contentSchema = z.discriminatedUnion('type', [
 ]);
 
 const createSchema = z.object({
-  // § ชื่อแคมเปญใหม่ทุกแถวยังไม่บังคับ (แถวยุคก่อนไม่มี) — แต่ UI แนะนำให้กรอกเสมอ
   title: z.string().trim().max(100, 'ชื่อแคมเปญยาวเกินไป').optional(),
   content: z.array(contentSchema).min(1).max(5),
   target: broadcastTargetSchema.default({ kind: 'all' }),

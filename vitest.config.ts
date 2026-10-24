@@ -4,9 +4,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'node',
-    // § `npx vitest run` = unit ทุกเคส ห้ามจ่อ DB จริง — ไฟล์ *.integration.test.ts ถูก
-    // exclude ไว้ รันเมื่อ Docker ขึ้นด้วย `npx vitest run src/**/xxx.integration.test.ts` เอง
-    // (default exclude ของ vitest มี node_modules ต้องรวมไว้ด้วยหรือมันจะกวาด node_modules)
+    // § default exclude ของ vitest มี node_modules — ต้องรวมไว้ด้วยหรือมันจะกวาด node_modules
     include: ['src/**/*.test.{ts,tsx}'],
     exclude: ['**/node_modules/**', '**/*.integration.test.ts'],
     // integration test (*.integration.test.ts) ต้องมี local Postgres + Redis

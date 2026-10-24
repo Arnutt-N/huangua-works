@@ -66,7 +66,6 @@ export function ChatArea({
 
   return (
     <main className={cn('min-w-0 flex-1 flex-col bg-surface md:flex', selectedId ? 'flex' : 'hidden')}>
-      {/* console bar — หัวหน้า "Live Chat" + สถานะ SSE ที่ใช้ร่วมทั้งหน้า */}
       <div className="flex h-10 flex-none items-center justify-between gap-3 border-b border-border bg-surface px-3">
         <div className="flex min-w-0 items-center gap-2">
           {listCollapsed && (

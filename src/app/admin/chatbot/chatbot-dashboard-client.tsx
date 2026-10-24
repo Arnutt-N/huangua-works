@@ -8,11 +8,6 @@ import { PageHeader } from '@/components/admin/page-header';
 import { KpiCard } from '@/components/admin/kpi-card';
 import { readinessOf } from './auto-replies/readiness';
 
-/**
- * Chatbot Overview — parity กับ jsk `chatbot/page.tsx`
- * § KPI เดิม (ข้อความเข้า/FAQ hit rate/Top FAQ) ตัดออกตามแผน Tranche 5 —
- * หน้านี้ตอบคำถาม "มีอะไรพร้อมใช้อยู่" ไม่ใช่รายงานสถิติ (สถิติอยู่ในหน้า reports)
- */
 export function ChatbotDashboardClient() {
   const replyObjectsRes = useResource({ load: adminApi.listReplyObjects });
   const intentsRes = useResource({ load: adminApi.listIntents });

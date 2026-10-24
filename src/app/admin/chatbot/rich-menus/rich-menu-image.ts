@@ -13,7 +13,6 @@ export interface RichMenuFitAttempt {
   quality: number;
 }
 
-/** ลำดับการย่อ: ลด quality ก่อน แล้วค่อยลดขนาด */
 export function planRichMenuFit(fileSize: number): {
   fits: boolean;
   attempts: RichMenuFitAttempt[];
@@ -28,7 +27,6 @@ export function planRichMenuFit(fileSize: number): {
   return { fits: false, attempts };
 }
 
-/** ใหญ่สุดที่พอดีกรอบ คงสัดส่วน และไม่ขยายเกินต้นฉบับ */
 export function scaledToFit(
   width: number,
   height: number,
@@ -68,9 +66,7 @@ async function decodeSource(
         height: bitmap.height,
         release: () => bitmap.close(),
       };
-    } catch {
-      // fall through
-    }
+    } catch {}
   }
   const url = URL.createObjectURL(file);
   try {
@@ -142,7 +138,6 @@ export async function ensureRichMenuImage(file: File): Promise<EnsureRichMenuIma
       }
     }
     if (!best) throw new Error(RICH_MENU_FIT_GUIDANCE);
-    // ยังเกินเพดาน — ส่งอันเล็กสุด ให้ server 413 เป็นคำตัดสินสุดท้าย
     return { file: best, filename: jpegFilename(file.name), converted: true };
   } finally {
     decoded.release();

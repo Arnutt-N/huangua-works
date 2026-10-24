@@ -10,10 +10,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 
-/**
- * ConfirmDialog — ยืนยันก่อนทำลาย (ลบ/ยกเลิก)
- * § เดิมแต่ละหน้าใช้ window.confirm() ซึ่ง style ไม่ได้และทดสอบยาก
- */
 export function ConfirmDialog({
   open,
   onClose,

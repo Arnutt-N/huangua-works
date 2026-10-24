@@ -62,8 +62,7 @@ beforeEach(() => {
 describe('BroadcastClient ตาราง JSK', () => {
   it('หัวตาราง 6 คอลัมน์ + PageHeader + footer ทั้งหมด N รายการ', async () => {
     render(<BroadcastClient />);
-    // § รอแถวจริงก่อน — findByRole('table') คืนได้ตั้งแต่ยังไม่มีแถว (thead มีอยู่แล้ว)
-    // ทำให้ assertion แถวพังแบบ flaky เมื่อรันพร้อมไฟล์อื่น
+    // § findByRole('table') คืนได้ตั้งแต่ thead โผล่ — ต้องรอแถวจริงกัน assertion แถวพังแบบ flaky
     expect(await screen.findByText('ประกาศน้ำประปา')).toBeInTheDocument();
     expect(screen.getByText('ชื่อแคมเปญ')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'ส่งข้อความแบบกระจาย' })).toBeInTheDocument();
@@ -146,7 +145,6 @@ describe('BroadcastClient ตาราง JSK', () => {
   it('skeleton 5 บล็อกตอนโหลด — ไม่ใช่ข้อความ "กำลังโหลด..." ลอย', async () => {
     listBroadcasts.mockReturnValue(new Promise(() => {}));
     render(<BroadcastClient />);
-    // § skeleton เป็น div นอก table (โครงตาม chat-histories) — ไม่มี role table ตอน loading
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
     expect(screen.queryByText(/กำลังโหลด/)).not.toBeInTheDocument();
     expect(document.querySelectorAll('.animate-pulse').length).toBeGreaterThanOrEqual(5);

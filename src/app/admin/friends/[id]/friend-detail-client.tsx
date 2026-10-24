@@ -21,8 +21,6 @@ export function FriendDetailClient({ friendId }: { friendId: string }) {
     load: () => adminApi.getFriend(friendId),
   });
   const item: FriendItem | null = friend.data ?? null;
-  // § timeline ของคนนี้ — listFriendEvents กรองตาม lineUserId (PK เดียวกันกับ friend.id)
-  // เรียงใหม่ใหม่ก่อนฝั่ง client (route คืน DESC แล้ว แต่กันกรณี cache/mock เรียงอื่น)
   const events = useResource({ load: () => adminApi.listFriendEvents(friendId) });
   const timeline = [...(events.data?.items ?? [])].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),

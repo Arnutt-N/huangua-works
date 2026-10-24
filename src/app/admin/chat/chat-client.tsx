@@ -17,7 +17,6 @@ import { TransferDialog } from './_components/transfer-dialog';
 export function ChatClient({ adminUserId }: { adminUserId: string }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(true);
-  // § พับรายการสนทนาได้ (desktop) — main sidebar ของ AdminShell พับได้อยู่แล้ว
   const [listOpen, setListOpen] = useState(true);
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);

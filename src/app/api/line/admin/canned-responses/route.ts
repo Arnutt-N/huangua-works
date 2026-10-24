@@ -15,7 +15,6 @@ export async function GET(request: Request) {
   const authz = await requireStaffApi(STAFF_ROLES);
   if (!authz.ok) return authz.response;
 
-  // § หน้า admin ต้องเห็นของที่ปิดใช้งานด้วย — composer เรียกแบบไม่ส่ง param จึงได้เฉพาะ active
   const includeInactive = new URL(request.url).searchParams.get('include_inactive') === 'true';
 
   const db = await getDb();

@@ -14,7 +14,6 @@ export interface LiffSdk {
   login(): void;
   getIDToken(): string | null;
   getProfile(): Promise<{ displayName?: string; pictureUrl?: string }>;
-  /** ปิดหน้าต่าง LIFF — ใช้โดย leave-confirm (ถามก่อนปิด) */
   closeWindow?: () => void;
 }
 

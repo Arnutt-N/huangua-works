@@ -1,14 +1,6 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 
-/**
- * PageHeader — h1 + subtitle + ปุ่ม action ชิดขวาบน
- *
- * § ยกแบบมาจาก jsk PageHeader.tsx เพื่อให้ทุกหน้าเมนู LINE ได้โครงหน้าเดียวกับ
- * ต้นฉบับ (เดิม huangua ย้ายชื่อหน้าไป topbar ของ AdminShell แล้วหัวเนื้อหาเป็น
- * AdminCardTitle ทำให้รูปทรงหน้าไม่ตรง screenshot ตั้งแต่บรรทัดแรก)
- * สีใช้ token หัวงัว (text-ink/text-muted) ไม่เอา navy ของ jsk
- */
 export function PageHeader({
   title,
   subtitle,

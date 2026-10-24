@@ -11,10 +11,8 @@ import {
 } from '@/components/ui/dialog';
 
 /**
- * useLiffLeave + LeaveConfirmDialog — ถามก่อนปิด/ออกจากฟอร์ม LIFF
- *
- * § ยกกลไกมาจาก jsk (PR #291) — ใน LINE ปุ่มยกเลิก = ปิดหน้าต่าง LIFF นอก LINE
- * = กลับหน้าแรก ทั้งคู่ต้องถามก่อนเพราะข้อมูลที่กรอกจะหาย
+ * § ใน LINE ปุ่มยกเลิก = ปิดหน้าต่าง LIFF (closeWindow) นอก LINE = กลับหน้าแรก —
+ * LIFF บังคับสองพาธนี้ closeWindow ใช้ได้เฉพาะตอนอยู่ใน LINE client
  */
 export interface LiffLeave {
   leaveOpen: boolean;
@@ -35,10 +33,7 @@ export function useLiffLeave(homePath = '/'): LiffLeave {
       try {
         window.liff.closeWindow();
         return;
-      } catch {
-        // § ปิดหน้าต่างไม่สำเร็จ — ปล่อยตกไป navigate กลับหน้าแรกด้านล่าง
-        // ไม่ return เฉย ๆ เพราะผู้ใช้จะกดยืนยันแล้วไม่มีอะไรเกิดขึ้น
-      }
+      } catch {}
     }
     window.location.href = homePath;
   }, [homePath]);

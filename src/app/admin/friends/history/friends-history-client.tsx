@@ -17,11 +17,7 @@ function nameOf(e: FriendEventItem): string {
   return e.displayName ?? `เพื่อน ${e.maskedId ?? 'ไม่ระบุ'}`;
 }
 
-/**
- * § timeline เหตุการณ์เพิ่ม/ยกเลิกติดตาม — ตามโครง "ประวัติ" ของ jsk แต่ map กับข้อมูลจริง
- * ของ huangua (lineFriendEvents มีแค่ follow/unfollow; LINE ไม่ส่ง block event เข้า webhook
- * ของเรา) จึงมีสองประเภทเท่านั้น
- */
+/** § lineFriendEvents มีแค่ follow/unfollow — LINE ไม่ส่ง block event เข้า webhook ของเรา */
 export function FriendsHistoryClient() {
   const { data, loading } = useResource({ load: adminApi.listFriendEvents });
   const items = data?.items ?? [];

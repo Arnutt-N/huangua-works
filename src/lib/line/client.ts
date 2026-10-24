@@ -192,7 +192,6 @@ export async function uploadLineRichMenuImage(richMenuId: string, imageBuffer: B
   }
 }
 
-/** ดึงรูปเมนูที่อยู่บน LINE — ใช้เป็น thumbnail ในหน้า admin โดยไม่ต้องเก็บสำเนาใน S3 */
 export async function getLineRichMenuImage(
   richMenuId: string,
 ): Promise<{ bytes: Uint8Array; contentType: string }> {
@@ -238,7 +237,6 @@ export async function deleteLineRichMenu(richMenuId: string): Promise<void> {
   }
 }
 
-// ─── Rich menu insight (LINE Insight API) ────────────────────────────────
 // § LINE ไม่ส่ง impression/clicks กลับมาเมื่อผู้ใช้ไม่ถึง 20 คน — caller
 // จึงต้องตีความ `impression` ที่หายไปเป็น privacy_restricted เอง
 async function getRichMenuInsight(

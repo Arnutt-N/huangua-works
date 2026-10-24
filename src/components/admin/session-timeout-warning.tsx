@@ -11,13 +11,6 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-/**
- * SessionTimeoutWarning — modal เตือนเซสชันใกล้หมดจาก inactivity
- *
- * § ยกแบบมาจาก jsk SessionTimeoutWarning.tsx เปลี่ยน logout เป็น server action
- * ของหัวงัว (ซึ่งล้าง cookie แล้ว redirect) ส่วน "Stay Logged In" ต่อแค่ตัวเตือน
- * ตามที่ § ใน use-session-timeout กำกับ — ไม่แตะอายุ JWT
- */
 export function SessionTimeoutWarning() {
   const { showWarning, remainingSeconds, extendSession } = useSessionTimeout(() => {
     void logout();

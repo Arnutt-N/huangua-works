@@ -240,7 +240,6 @@ export const chatReplySchema = z.object({
  * POST/PATCH /api/line/admin/canned-responses — ข้อความสำเร็จรูป
  * shortcut เป็น natural key สำหรับพิมพ์ "/xxx" ใน composer
  */
-/** หมวดหมู่ข้อความสำเร็จรูป — key เดียวกับที่ jsk seed (label ไทยอยู่ที่ UI) */
 export const CANNED_RESPONSE_CATEGORIES = ['info', 'greeting', 'closing', 'escalation'] as const;
 
 const cannedTitle = z.string().trim().min(1, 'กรุณากรอกชื่อ').max(100, 'ชื่อยาวเกิน 100 ตัวอักษร');

@@ -5,8 +5,6 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiResult, IntentItem } from '@/app/admin/_lib/admin-api';
 import { IntentSection } from './intent-section';
-
-// § เทสนี้รัน userEvent หลายขั้นภายใต้โหลดทั้งชุด timeout 5s ไม่พอ — 30s ตาม intake pattern
 vi.setConfig({ testTimeout: 30_000 });
 
 vi.mock('next/navigation', () => ({
@@ -67,7 +65,6 @@ describe('IntentSection หมวดเจตนา JSK', () => {
 
     expect(await screen.findByText('เวลาทำการ')).toBeInTheDocument();
     expect(screen.getByText('กี่โมง')).toBeInTheDocument();
-    // § สวิตช์ role=switch ตาม jsk — aria-checked บอกสถานะเปิด/ปิด
     expect(screen.getByRole('switch', { name: 'ปิด เวลาทำการ' })).toHaveAttribute(
       'aria-checked',
       'true',

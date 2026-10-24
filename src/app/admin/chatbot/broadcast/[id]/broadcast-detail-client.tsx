@@ -55,7 +55,6 @@ function formatThai(iso: string): string {
   return new Date(iso).toLocaleString('th-TH', THAI_DATETIME);
 }
 
-/** preview เนื้อหาตามชนิด — text / image / flex / multi (หลายชิ้น) */
 function ContentPreview({ item }: { item: BroadcastItem }) {
   if (item.content.length === 0) return <p className="text-sm text-muted">—</p>;
   return (
@@ -132,7 +131,6 @@ export function BroadcastDetailClient({ broadcastId }: { broadcastId: string }) 
     setSending(false);
   }
 
-  // § ยกเลิก = soft-delete (สถานะ cancelled) ตามนโยบาย jsk PR #291 — ถามก่อนเสมอ
   async function handleCancel() {
     if (!item) return;
     setCancelling(true);

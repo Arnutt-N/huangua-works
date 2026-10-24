@@ -814,9 +814,7 @@ export const chatCannedResponses = pgTable(
     title: text('title').notNull(),
     shortcut: text('shortcut'),
     content: text('content').notNull(),
-    // § หมวดหมู่ตาม jsk (info/greeting/closing/escalation) — เก็บเป็น key ไม่ใช่ label ไทย
     category: text('category').notNull().default('info'),
-    // § ตัวนับการใช้จาก composer — เพิ่มผ่าน POST /[id]/use เท่านั้น (atomic increment)
     usageCount: integer('usage_count').notNull().default(0),
     createdBy: text('created_by'),
     isActive: boolean('is_active').notNull().default(true),
@@ -932,9 +930,7 @@ export const chatReplyObjects = pgTable(
     updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
 
     objectId: text('object_id').notNull().unique(),
-    // § ชื่อที่มนุษย์อ่าน (jsk: Internal Name) — null ได้เพื่อไม่ต้อง backfill แถวเก่า
     name: text('name'),
-    // § กลุ่มการใช้งานอิสระ (jsk: Grouping Category เช่น "Marketing / Support")
     category: text('category'),
     objectType: replyObjectTypeEnum('object_type').notNull(),
     payload: jsonb('payload').notNull(),
@@ -1013,7 +1009,6 @@ export const chatBroadcasts = pgTable(
     updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
 
     content: jsonb('content').notNull(),
-    // § ชื่อแคมเปญ (jsk "title") — null ได้สำหรับแถวยุคก่อนเพิ่มคอลัมน์ UI fallback เป็นข้อความแรก
     title: text('title'),
     status: broadcastStatusEnum().notNull().default('draft'),
     // § target เป็น JSON discriminated union (all | line_user_ids ของ PK ภายใน) เดิมเป็น text 'all'
@@ -1068,8 +1063,6 @@ export const richMenus = pgTable(
     lineRichMenuId: text('line_rich_menu_id').unique(),
     imageUrl: text('image_url'),
     status: richMenuStatusEnum().notNull().default('draft'),
-    // § โหมดแสดงผลตาม jsk — ALWAYS (sync แล้ว publish ทันที) / SCHEDULED (cron ตามช่วงเวลา) /
-    // MANUAL (sync แต่ไม่ตั้งเป็น default ใช้กับ alias หรือผูก รายคน) map ลง `selected` ของ LINE config
     displayMode: text('display_mode').notNull().default('ALWAYS'),
     syncStatus: text('sync_status').notNull().default('pending'),
     lastSyncError: text('last_sync_error'),

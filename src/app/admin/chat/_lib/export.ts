@@ -1,8 +1,5 @@
 import type { Message } from './types';
 
-// § export ฝั่ง client ล้วน — ไม่มี endpoint ใหม่ (jsk ใช้ backend /export/*)
-// ข้อความในห้องที่โหลดมาแล้วเท่านั้น (หน้าที่ยาวจะ export เฉพาะที่เห็น) ระบุใน UI
-
 const SENDER_LABEL: Record<string, string> = {
   user: 'ผู้ใช้',
   admin: 'เจ้าหน้าที่',
@@ -24,7 +21,7 @@ export function messagesToCsv(messages: Message[]): string {
     m.messageType,
     m.textContent ?? (m.messageType === 'text' ? '' : `[${m.messageType}]`),
   ]);
-  // BOM ให้ Excel อ่านไทยถูก (เหมือน export ของ chat-histories)
+  // BOM ให้ Excel อ่านไทยถูก
   return '﻿' + [header, ...rows].map((r) => r.map(csvCell).join(',')).join('\r\n');
 }
 
@@ -42,10 +39,6 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-/**
- * § PDF = สั่งพิมพ์หน้าต่างใหม่แล้วให้ผู้ใช้ "Save as PDF" — ไม่เพิ่ม library PDF
- * (Thai font embedding ใน pdf-lib ต้องแนบฟอนต์เพิ่มหลาย MB เพื่อหน้าเดียว)
- */
 export function printConversation(
   title: string,
   messages: Message[],

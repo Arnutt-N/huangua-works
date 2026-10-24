@@ -29,7 +29,6 @@ export function CustomerPanel({
   conversation: Conversation | null;
   detail: ConversationDetail | null;
   staff: StaffMember[];
-  /** ข้อความที่โหลดอยู่ — ใช้ export CSV/PDF (เฉพาะหน้า/ช่วงที่โหลดมาแล้ว) */
   messages: Message[];
   onTagsSaved: () => void;
   /** ปุ่มปิด — desktop = พับ panel, mobile = ปิด dialog */
@@ -132,7 +131,6 @@ export function CustomerPanel({
           </dl>
         </div>
 
-        {/* export — เฉพาะข้อความที่โหลดมาแล้วในหน้าปัจจุบัน */}
         <div className="space-y-2">
           <h3 className="text-xs font-bold uppercase tracking-wide text-muted">EXPORT</h3>
           <div className="flex gap-2">

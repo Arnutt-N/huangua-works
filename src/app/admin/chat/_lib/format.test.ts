@@ -1,9 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { formatRelativeTime } from './format';
 
-// § ปักหมุดถ้อยคำตาม jsk — หน้าประวัติแชทต้องขึ้น "N นาทีที่แล้ว" ไม่ใช่ "5 นาที" เปล่า ๆ
-// อ้างเวลาฐานคงที่กัน flake เมื่อเทสต์วิ่งข้ามเที่ยงคืน
-const NOW = Date.UTC(2026, 9, 23, 4, 0, 0); // 2026-10-23T04:00:00Z
+const NOW = Date.UTC(2026, 9, 23, 4, 0, 0);
 function ago(ms: number): string {
   return new Date(NOW - ms).toISOString();
 }

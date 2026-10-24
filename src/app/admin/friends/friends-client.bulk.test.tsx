@@ -60,7 +60,6 @@ describe('FriendsClient bulk JSK', () => {
     const table = await screen.findByRole('table');
     expect(within(table).getAllByRole('checkbox').length).toBeGreaterThanOrEqual(2);
     expect(within(table).getAllByText('กลับมา 2 ครั้ง').length).toBe(2);
-    // § ปักหมุดหัวคอลัมน์ตามภาพ jsk (EN) — กันเผลอเปลี่ยนชื่อคอลัมน์กลับภาษาไทยเดิม
     for (const head of ['User', 'Status', 'Chat Mode', 'Since', 'Last Active']) {
       expect(within(table).getByText(head)).toBeInTheDocument();
     }

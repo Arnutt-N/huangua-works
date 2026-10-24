@@ -22,7 +22,6 @@ type StatusFilter = 'all' | FriendItem['followState'];
 
 const PAGE_SIZE = 20;
 
-/** วันที่สั้นไทยสำหรับคอลัมน์ Since/Last Active ตามภาพ jsk — "8 ม.ย. 2569" */
 function formatThaiDate(iso: string | null): string {
   if (!iso) return '-';
   const d = new Date(iso);
@@ -30,7 +29,6 @@ function formatThaiDate(iso: string | null): string {
   return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-/** ป้ายคอลัมน์ Chat Mode — BOT/HUMAN ตรงภาพ jsk */
 function chatModeLabel(mode: string | null): string {
   if (mode === null) return '-';
   if (mode === 'human_active' || mode === 'waiting_handoff') return 'HUMAN';
@@ -188,7 +186,6 @@ export function FriendsClient() {
         </div>
       )}
 
-      {/* § หัวหน้าหน้าตาม jsk screenshot — "ปุ่มประวัติ" ชิดขวาบน (route ไปหน้า timeline) */}
       <PageHeader title="ประวัติเพื่อน" subtitle="ประวัติการเพิ่มเพื่อนและการเปลี่ยนแปลง">
         <Link
           href="/admin/friends/history"
@@ -223,8 +220,6 @@ export function FriendsClient() {
             }}
             className="min-h-touch rounded-lg border border-border/50 bg-surface px-3 text-sm"
           >
-            {/* § jsk ภาพขึ้น "All Status"...BLOCKED แต่ huangua ไม่มี block/unblock event
-                (schema จำกัด follow/unfollow เท่านั้น) — คงชุดสถานะที่มีข้อมูลจริง */}
             <option value="all">All Status</option>
             <option value="following">ติดตามอยู่</option>
             <option value="unfollowed">เลิกติดตาม</option>
@@ -266,7 +261,7 @@ export function FriendsClient() {
                     <th scope="col" className="px-3 py-2 font-medium">User</th>
                     <th scope="col" className="w-20 px-3 py-2 font-medium">Rich Menu</th>
                     <th scope="col" className="px-3 py-2 font-medium">Status</th>
-                    {/* § w-16 ให้ "Chat Mode" ตัดสองบรรทัดเหมือนภาพ jsk — <br> ทำ getByText หาไม่เจอ */}
+                    {/* § w-16 ให้ "Chat Mode" ตัดสองบรรทัด — ห้ามใช้ <br> (getByText หาไม่เจอ) */}
                     <th scope="col" className="w-16 px-3 py-2 font-medium">Chat Mode</th>
                     <th scope="col" className="px-3 py-2 font-medium">Since</th>
                     <th scope="col" className="px-3 py-2 font-medium">Last Active</th>

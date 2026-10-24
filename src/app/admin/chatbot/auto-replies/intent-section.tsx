@@ -101,10 +101,6 @@ export function IntentSection() {
     setDialogOpen(true);
   }
 
-  /**
-   * mode: 'configure' = สร้างแล้วเปิดหน้า detail ตั้งค่าต่อ (jsk ปุ่ม "สร้างและตั้งค่าต่อ"),
-   * 'only' = สร้างเสร็จปิด dialog (jsk "สร้างอย่างเดียว"), 'save' = แก้ไขแบบเดิม
-   */
   async function handleSave(mode: 'configure' | 'only' | 'save' = 'save') {
     if (!form.name.trim()) {
       notify('error', 'กรุณากรอกชื่อหมวด');
@@ -143,9 +139,7 @@ export function IntentSection() {
     if (res.ok) {
       notify('success', editingId ? 'แก้ไขหมวดสำเร็จ' : 'เพิ่มหมวดสำเร็จ');
       setDialogOpen(false);
-      // § union ของ update คืน OkBody ไม่มี id — narrow ด้วย 'in' ก่อนใช้
       if (!editingId && mode === 'configure' && 'id' in res.data && res.data.id) {
-        // § ไปหน้า detail ตั้งค่าต่อ
         router.push(`/admin/chatbot/auto-replies/${res.data.id}`);
         return;
       }
@@ -217,8 +211,6 @@ export function IntentSection() {
                 <tr className="border-b border-border text-xs uppercase text-muted">
                   <th className="px-3 py-2 font-medium">Category</th>
                   <th className="px-3 py-2 font-medium">Keywords</th>
-                  {/* § ตามภาพ jsk — คอลัมน์สถานะเป็นสวิตช์เปิด/ปิด ไม่ใช่ badge ข้อความ
-                      และตัดคอลัมน์ "ตอบ" ออกเพราะจำนวนคำตอบดูได้ในหน้า detail */}
                   <th className="px-3 py-2 text-center font-medium">สถานะ</th>
                   <th className="px-3 py-2 text-right font-medium">จัดการ</th>
                 </tr>
@@ -251,8 +243,6 @@ export function IntentSection() {
                         </div>
                       </td>
                       <td className="px-3 py-3 text-center">
-                        {/* § สวิตช์เปิด/ปิด — role="switch" ให้ a11y อ่านถูกและเทสต์จับได้
-                            title = reason จาก readinessOf บอกว่าทำไมยังไม่พร้อม */}
                         <button
                           type="button"
                           role="switch"
@@ -306,7 +296,6 @@ export function IntentSection() {
         )}
       </AdminCard>
 
-      {/* § ConfirmDialog แทน window.confirm — ตาม jsk และคุมข้อความ/ปุ่มได้ */}
       <Dialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -531,7 +520,6 @@ export function IntentSection() {
                 {saving ? 'กำลังบันทึก...' : 'บันทึก'}
               </Button>
             ) : (
-              /* § ปุ่มคู่ตาม jsk dialog "เพิ่ม Category" — สร้างแล้วเปิดหน้าตั้งค่าต่อ / สร้างจบ */
               <div className="flex flex-wrap justify-end gap-2">
                 <Button variant="outline" onClick={() => void handleSave('only')} disabled={saving}>
                   สร้างอย่างเดียว

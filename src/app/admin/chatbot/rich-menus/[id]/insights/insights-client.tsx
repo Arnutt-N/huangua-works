@@ -28,7 +28,6 @@ function displayDate(v: string): string {
   return v.length === 8 ? `${v.slice(6, 8)}/${v.slice(4, 6)}` : v;
 }
 
-/** กราฟเส้นอย่างง่าย — ไม่เพิ่ม dependency (recharts) เพื่อหน้าเดียว */
 function ImpressionsChart({
   points,
 }: {

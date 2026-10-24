@@ -10,8 +10,8 @@ import { getLineRichMenuImage } from '@/lib/line/client';
 export const runtime = 'nodejs';
 
 /**
- * § thumbnail ของ rich menu — ดึงรูปจริงจาก LINE แทนเก็บสำเนาใน S3
- * (LINE ผูกรูปกับ line_rich_menu_id ซึ่งเปลี่ยนทุกครั้งที่ recreate จึงเป็นแหล่งความจริงเดียว)
+ * § ดึงรูปจริงจาก LINE — LINE ผูกรูปกับ line_rich_menu_id ซึ่งเปลี่ยนทุกครั้งที่ recreate
+ * จึงเป็นแหล่งความจริงเดียว (สำเนาใน S3 จะเก่าหลัง recreate)
  */
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const authz = await requireStaffApi(ADMIN_ROLES);
@@ -36,7 +36,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     return new NextResponse(new Uint8Array(bytes), {
       headers: {
         'Content-Type': contentType,
-        // § no-store: หลังอัปรูป/ซิงค์ ต้องเห็นรูปใหม่ทันที (ไม่มี etag ให้ revalidate)
+        // § no-store — LINE ไม่ส่ง etag/validator มาให้ revalidate หลังอัปรูป/ซิงค์ ต้องเห็นรูปใหม่ทันที
         'Cache-Control': 'private, no-store',
       },
     });
