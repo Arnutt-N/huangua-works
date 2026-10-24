@@ -202,13 +202,33 @@ export function CannedResponsesClient() {
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-center">
-                      <span
-                        className={`inline-block rounded-pill px-2 py-0.5 text-xs font-medium ${
-                          isActive ? 'bg-success/10 text-success' : 'bg-surface-sunken text-muted'
-                        }`}
-                      >
-                        {isActive ? 'ใช้งานอยู่' : 'ปิดใช้งาน'}
-                      </span>
+                      {/* § jsk ย้ายสวิตช์เปิด/ปิดมาอยู่คอลัมน์สถานะ (ใต้ badge) ไม่ใช่คอลัมน์จัดการ */}
+                      <div className="flex flex-col items-center gap-2">
+                        <span
+                          className={`inline-block rounded-pill px-2 py-0.5 text-xs font-medium ${
+                            isActive ? 'bg-success/10 text-success' : 'bg-surface-sunken text-muted'
+                          }`}
+                        >
+                          {isActive ? 'ใช้งานอยู่' : 'ปิดใช้งาน'}
+                        </span>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={isActive}
+                          aria-label={`${isActive ? 'ปิด' : 'เปิด'}ใช้งาน ${item.title}`}
+                          onClick={() => void handleToggleActive(item)}
+                          className={`relative inline-flex h-5 w-9 flex-none items-center rounded-pill transition-colors duration-normal ${
+                            isActive ? 'bg-accent-strong' : 'bg-surface-sunken'
+                          }`}
+                        >
+                          <span
+                            aria-hidden="true"
+                            className={`inline-block h-4 w-4 rounded-pill bg-white shadow transition-transform duration-normal ${
+                              isActive ? 'translate-x-4' : 'translate-x-0.5'
+                            }`}
+                          />
+                        </button>
+                      </div>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-center text-sm text-muted">
                       {item.usageCount ?? 0}
@@ -230,23 +250,6 @@ export function CannedResponsesClient() {
                           className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted hover:bg-accent-sunken hover:text-accent-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
                         >
                           <Pencil className="h-4 w-4" aria-hidden="true" />
-                        </button>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={isActive}
-                          aria-label={`${isActive ? 'ปิด' : 'เปิด'}ใช้งาน ${item.title}`}
-                          onClick={() => void handleToggleActive(item)}
-                          className={`relative inline-flex h-5 w-9 flex-none items-center rounded-pill transition-colors duration-normal ${
-                            isActive ? 'bg-accent-strong' : 'bg-surface-sunken'
-                          }`}
-                        >
-                          <span
-                            aria-hidden="true"
-                            className={`inline-block h-4 w-4 rounded-pill bg-white shadow transition-transform duration-normal ${
-                              isActive ? 'translate-x-4' : 'translate-x-0.5'
-                            }`}
-                          />
                         </button>
                         <button
                           type="button"
