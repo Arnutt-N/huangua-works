@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { chatCannedResponses } from '@/lib/db/schema';
 import { parseBody } from '@/lib/api-helpers';
@@ -53,10 +53,11 @@ export async function DELETE(
 
   // soft delete — เก็บไว้เผื่อข้อความเก่าอ้างถึง + กัน id ถูก reuse
   // ปล่อย shortcut คืน (partial unique index ครอบทุกแถวที่ shortcut ไม่ null)
+  // § where isActive=true — ลบซ้ำต้อง 404 (idempotent repeat-DELETE) ไม่ใช่ตอบ ok
   const [deleted] = await db
     .update(chatCannedResponses)
     .set({ isActive: false, shortcut: null, updatedAt: new Date() })
-    .where(eq(chatCannedResponses.id, id))
+    .where(and(eq(chatCannedResponses.id, id), eq(chatCannedResponses.isActive, true)))
     .returning({ id: chatCannedResponses.id });
 
   if (!deleted) return NextResponse.json({ error: 'Not found' }, { status: 404 });
