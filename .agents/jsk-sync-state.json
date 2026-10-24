@@ -1,9 +1,9 @@
 {
   "jskRepoPath": "D:\\genAI\\jsk-app",
   "jskSessionLogDir": "D:\\genAI\\jsk-app\\project-log-md\\pi",
-  "lastSyncedSessionFile": "session-summary-20261024-1126.md",
-  "lastSyncedJskHead": "1d86937",
-  "lastSyncedAt": "2026-10-24T19:32:04+07:00",
+  "lastSyncedSessionFile": "session-summary-20261025-0102.md",
+  "lastSyncedJskHead": "2c56454",
+  "lastSyncedAt": "2026-10-25T01:13:15+07:00",
   "portedItems": [
     {
       "jskPr": "#280, #281",
@@ -42,6 +42,14 @@
     {
       "jskPr": "—",
       "summary": "แสดงสวิตช์ในคอลัมน์สถานะ: canned แก้แล้ว, auto-replies มีอยู่แล้ว, reply objects เป็นการ์ดจึงคงสวิตช์ในแถวปุ่ม"
+    },
+    {
+      "jskPr": "#296",
+      "summary": "Canned switch อยู่คอลัมน์สถานะ — พอร์ตแล้วใน 0583b02; Files preview ใช้ S3 public URL ของหัวงัว ไม่พบปัญหา broken image แบบ jsk; Users LINE short form N/A (users คือ staff); skn_menu→jsk_menu / StatsCard navy N/A"
+    },
+    {
+      "jskPr": "#296",
+      "summary": "ยังไม่พอร์ต (รอคำตัดสิน): Viewer read-only role (ALL_ROLES ของหัวงัวยังไม่มี viewer) และ reply-objects edit ย้ายจาก modal เป็น full page ตาม jsk"
     }
   ]
 }
