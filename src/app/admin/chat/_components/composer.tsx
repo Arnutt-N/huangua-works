@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Bot, Lock, Maximize2, Minimize2, Send, Zap } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import type { CannedResponse } from '../_lib/types';
+import { markCannedResponseUsed } from '../_lib/api';
 import { CannedPicker } from './canned-picker';
 
 const MAX_HEIGHT = 120;
@@ -66,6 +67,8 @@ export function Composer({
     setPickerOpen(false);
     setSlashDismissed(true);
     textareaRef.current?.focus();
+    // § fire-and-forget — ตัวนับ "ใช้ไป" ของหน้า admin ไม่ควรทำให้ช่องพิมพ์ค้าง
+    markCannedResponseUsed(item.id);
   };
 
   const canSubmit = !!input.trim() && !input.startsWith('/') && canReply;

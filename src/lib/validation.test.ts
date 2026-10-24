@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   chatReplySchema,
+  cannedResponseSchema,
+  cannedResponseUpdateSchema,
   submitCaseSchema,
   updateConversationSchema,
   validateOrError,
@@ -92,5 +94,39 @@ describe('submitCaseSchema — attachments[].url', () => {
 describe('CONVERSATION_MODES', () => {
   it('is the source of the conversation_mode pgEnum', () => {
     expect(conversationModeEnum.enumValues).toEqual([...CONVERSATION_MODES]);
+  });
+});
+
+describe('cannedResponseSchema', () => {
+  it('default category เป็น info เมื่อไม่ส่งมา', () => {
+    const result = validateOrError(cannedResponseSchema, {
+      title: 'ทักทาย',
+      shortcut: 'hello',
+      content: 'สวัสดีครับ',
+    });
+    expect(result).toEqual({
+      success: true,
+      data: { title: 'ทักทาย', shortcut: 'hello', content: 'สวัสดีครับ', category: 'info' },
+    });
+  });
+
+  it('ปฏิเสธหมวดหมู่นอกรายการ', () => {
+    const result = validateOrError(cannedResponseSchema, {
+      title: 'ทักทาย',
+      content: 'สวัสดีครับ',
+      category: 'marketing',
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('cannedResponseUpdateSchema', () => {
+  it('PATCH isActive อย่างเดียวต้องไม่เติม category มาด้วย (กันรีเซ็ตหมวดหมู่)', () => {
+    const result = validateOrError(cannedResponseUpdateSchema, { isActive: false });
+    expect(result).toEqual({ success: true, data: { isActive: false } });
+  });
+
+  it('ปฏิเสธ body ว่าง', () => {
+    expect(validateOrError(cannedResponseUpdateSchema, {}).success).toBe(false);
   });
 });

@@ -6,6 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReplyObject } from '@/app/admin/_lib/admin-api';
 import { ReplyObjectsClient } from './reply-objects-client';
 
+// § userEvent หลายสิบขั้น (quick reply 13 ปุ่ม) ต้อง timeout ยาวกว่าค่า default
+vi.setConfig({ testTimeout: 30_000 });
+
 const listReplyObjects = vi.fn();
 const createReplyObject = vi.fn();
 const updateReplyObject = vi.fn();
@@ -23,6 +26,8 @@ function item(over: Partial<ReplyObject> = {}): ReplyObject {
   return {
     id: 'r1',
     objectId: 'welcome_flex',
+    name: 'Welcome Message 2.0',
+    category: 'Marketing / Support',
     objectType: 'flex',
     payload: { type: 'bubble', body: { type: 'box' } },
     altText: 'ยินดีต้อนรับ',
@@ -43,39 +48,22 @@ beforeEach(() => {
 });
 
 describe('ReplyObjectsClient กริด JSK', () => {
-  it('การ์ดแสดงรหัส $$object_id + badge type + alt text', async () => {
+  it('การ์ดแสดง $$object_id + name + category + badge type', async () => {
     render(<ReplyObjectsClient />);
     expect(await screen.findByText('$$welcome_flex')).toBeInTheDocument();
+    expect(screen.getByText('Welcome Message 2.0')).toBeInTheDocument();
+    expect(screen.getByText('Marketing / Support')).toBeInTheDocument();
     expect(screen.getByText('flex')).toBeInTheDocument();
-    expect(screen.getByText('ยินดีต้อนรับ')).toBeInTheDocument();
   });
 
-  it('payload text แสดงสรุป 1 บรรทัด ไม่ dump JSON เต็ม', async () => {
+  it('name ว่างใช้ objectId แทน', async () => {
     listReplyObjects.mockResolvedValue({
       ok: true,
-      data: { items: [item({ objectId: 'hello', objectType: 'text', payload: { text: 'สวัสดีครับ' } })] },
+      data: { items: [item({ objectId: 'hello', name: null, category: null })] },
     });
     render(<ReplyObjectsClient />);
     expect(await screen.findByText('$$hello')).toBeInTheDocument();
-    expect(screen.getByText('สวัสดีครับ')).toBeInTheDocument();
-  });
-
-  it('quick reply แสดง badge', async () => {
-    listReplyObjects.mockResolvedValue({
-      ok: true,
-      data: {
-        items: [
-          item({
-            payload: {
-              text: 'เลือกเมนู',
-              quickReply: { items: [{ type: 'action', action: { type: 'message', label: 'a', text: 'a' } }] },
-            },
-          }),
-        ],
-      },
-    });
-    render(<ReplyObjectsClient />);
-    expect(await screen.findByText('quick reply')).toBeInTheDocument();
+    expect(screen.getAllByText('hello').length).toBeGreaterThan(0);
   });
 
   it('ห้องว่างแสดง empty state ไทย', async () => {
@@ -84,22 +72,61 @@ describe('ReplyObjectsClient กริด JSK', () => {
     expect(await screen.findByText('ยังไม่มี reply object')).toBeInTheDocument();
   });
 
-  it('payload ผิด type ถูก block พร้อมข้อความไทย ไม่ยิง API', async () => {
-    const user = userEvent.setup();
-    listReplyObjects.mockResolvedValue({ ok: true, data: { items: [] } });
+  it('ปุ่ม New Template ชี้ไปหน้า /new', async () => {
     render(<ReplyObjectsClient />);
-    await screen.findByText('ยังไม่มี reply object');
+    await screen.findByText('$$welcome_flex');
+    expect(screen.getByRole('link', { name: /New Template/ })).toHaveAttribute(
+      'href',
+      '/admin/chatbot/reply-objects/new',
+    );
+  });
 
-    await user.click(screen.getByRole('button', { name: 'สร้าง' }));
-    await user.type(screen.getByLabelText('Object ID (ใช้ใน $object_id)'), 'bad_text');
-    // § userEvent.type แปล {..} เป็น keyboard tag — paste ใส่ค่า JSON ตรง ไม่ผ่าน keyboard parser
-    const payloadBox = screen.getByLabelText('Payload (JSON)');
+  it('preview แสดง "invalid flex" เมื่อ payload ว่าง', async () => {
+    const user = userEvent.setup();
+    listReplyObjects.mockResolvedValue({
+      ok: true,
+      data: { items: [item({ payload: {} })] },
+    });
+    render(<ReplyObjectsClient />);
+    await screen.findByText('$$welcome_flex');
+
+    await user.click(screen.getByRole('button', { name: 'แก้ไข welcome_flex' }));
+    expect(await screen.findByText('invalid flex')).toBeInTheDocument();
+  });
+
+  it('uri นอก allowlist ถูกบล็อกก่อนถึง API', async () => {
+    const user = userEvent.setup();
+    render(<ReplyObjectsClient />);
+    await screen.findByText('$$welcome_flex');
+
+    await user.click(screen.getByRole('button', { name: 'แก้ไข welcome_flex' }));
+    const payloadBox = await screen.findByLabelText('Content');
+    await user.clear(payloadBox);
     await user.click(payloadBox);
-    await user.paste('{"nope":1}');
-    await user.click(screen.getByRole('button', { name: 'บันทึก' }));
+    await user.paste(
+      '{"type":"bubble","footer":{"contents":[{"type":"button","action":{"type":"uri","uri":"javascript:alert(1)"}}]}}',
+    );
+    await user.click(screen.getByRole('button', { name: 'Save Modifications' }));
 
-    expect(createReplyObject).not.toHaveBeenCalled();
-    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(updateReplyObject).not.toHaveBeenCalled();
+    expect(await screen.findByText(/ลิงก์ไม่ปลอดภัยหรือไม่รองรับ/)).toBeInTheDocument();
+  });
+
+  it('quick reply เพิ่มได้สูงสุด 13 ปุ่มแล้วปุ่มเพิ่มปิด', async () => {
+    const user = userEvent.setup();
+    render(<ReplyObjectsClient />);
+    await screen.findByText('$$welcome_flex');
+
+    await user.click(screen.getByRole('button', { name: 'แก้ไข welcome_flex' }));
+    await user.click(await screen.findByRole('checkbox', { name: /Quick reply/ }));
+    expect(screen.getByText('1/13 ปุ่ม')).toBeInTheDocument();
+
+    const addBtn = screen.getByRole('button', { name: /เพิ่มปุ่ม/ });
+    for (let i = 0; i < 12; i += 1) {
+      await user.click(addBtn);
+    }
+    expect(screen.getByText('13/13 ปุ่ม')).toBeInTheDocument();
+    expect(addBtn).toBeDisabled();
   });
 
   it('ลบแล้ว reload ลิสต์', async () => {

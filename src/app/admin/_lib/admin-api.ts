@@ -86,6 +86,8 @@ export type IntentPatch = Partial<IntentPayload>;
 export interface ReplyObject {
   id: string;
   objectId: string;
+  name: string | null;
+  category: string | null;
   objectType: string;
   payload: Record<string, unknown>;
   altText: string | null;
@@ -95,6 +97,8 @@ export interface ReplyObject {
 
 export interface ReplyObjectInput {
   objectId: string;
+  name?: string;
+  category?: string;
   objectType: string;
   payload: Record<string, unknown>;
   altText?: string; // create schema รับ string optional เท่านั้น — ไม่รับ null (route.ts createSchema)
@@ -102,6 +106,8 @@ export interface ReplyObjectInput {
 }
 
 export interface ReplyObjectPatch {
+  name?: string | null;
+  category?: string | null;
   objectType: string;
   payload: Record<string, unknown>;
   altText?: string | null; // update schema รับ null ได้ (route.ts updateSchema)

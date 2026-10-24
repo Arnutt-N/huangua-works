@@ -814,6 +814,10 @@ export const chatCannedResponses = pgTable(
     title: text('title').notNull(),
     shortcut: text('shortcut'),
     content: text('content').notNull(),
+    // § หมวดหมู่ตาม jsk (info/greeting/closing/escalation) — เก็บเป็น key ไม่ใช่ label ไทย
+    category: text('category').notNull().default('info'),
+    // § ตัวนับการใช้จาก composer — เพิ่มผ่าน POST /[id]/use เท่านั้น (atomic increment)
+    usageCount: integer('usage_count').notNull().default(0),
     createdBy: text('created_by'),
     isActive: boolean('is_active').notNull().default(true),
   },
@@ -928,6 +932,10 @@ export const chatReplyObjects = pgTable(
     updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
 
     objectId: text('object_id').notNull().unique(),
+    // § ชื่อที่มนุษย์อ่าน (jsk: Internal Name) — null ได้เพื่อไม่ต้อง backfill แถวเก่า
+    name: text('name'),
+    // § กลุ่มการใช้งานอิสระ (jsk: Grouping Category เช่น "Marketing / Support")
+    category: text('category'),
     objectType: replyObjectTypeEnum('object_type').notNull(),
     payload: jsonb('payload').notNull(),
     altText: text('alt_text'),

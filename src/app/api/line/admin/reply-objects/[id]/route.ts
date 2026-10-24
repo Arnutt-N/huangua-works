@@ -13,6 +13,8 @@ import { replyObjectTypeSchema, validateReplyPayload } from '@/lib/line/reply-ob
 export const runtime = 'nodejs';
 
 const updateSchema = z.object({
+  name: z.string().trim().min(1, 'กรุณากรอกชื่อ').max(120).nullable().optional(),
+  category: z.string().trim().max(60).nullable().optional(),
   objectType: replyObjectTypeSchema.optional(),
   payload: z.record(z.string(), z.unknown()).optional(),
   altText: z.string().max(200).nullable().optional(),
