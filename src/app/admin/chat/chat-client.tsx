@@ -17,6 +17,8 @@ import { TransferDialog } from './_components/transfer-dialog';
 export function ChatClient({ adminUserId }: { adminUserId: string }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(true);
+  // § พับรายการสนทนาได้ (desktop) — main sidebar ของ AdminShell พับได้อยู่แล้ว
+  const [listOpen, setListOpen] = useState(true);
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const [cannedManageOpen, setCannedManageOpen] = useState(false);
@@ -80,7 +82,7 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
     loadSlaBreaches();
   }, [loadCanned, loadSlaBreaches]);
 
-  useChatSse({
+  const { connected } = useChatSse({
     onOpen: () => {
       loadConversations();
       if (selectedId) loadMessages(selectedId);
@@ -156,6 +158,8 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
           <p role="status" className="px-3 py-2 text-sm text-danger">{feedback.msg}</p>
         )}
         <ConversationList
+          collapsed={!listOpen}
+          onToggleCollapsed={() => setListOpen((v) => !v)}
           visible={visible}
           counts={counts}
           loading={loading}
@@ -178,6 +182,11 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
           }}
         />
         <ChatArea
+          connected={connected}
+          counts={counts}
+          listCollapsed={!listOpen}
+          onToggleList={() => setListOpen((v) => !v)}
+          onQuickFilter={setFilter}
           selectedId={selectedId}
           customerName={customerName}
           customerPicture={selectedConv?.pictureUrl ?? null}
@@ -206,6 +215,7 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
               conversation={selectedConv}
               detail={detail}
               staff={staff}
+              messages={messages}
               onTagsSaved={loadConversations}
               onClose={() => setPanelOpen(false)}
             />
@@ -221,6 +231,7 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
             conversation={selectedConv}
             detail={detail}
             staff={staff}
+            messages={messages}
             onTagsSaved={loadConversations}
           />
         </DialogContent>

@@ -240,25 +240,43 @@ export const chatReplySchema = z.object({
  * POST/PATCH /api/line/admin/canned-responses — ข้อความสำเร็จรูป
  * shortcut เป็น natural key สำหรับพิมพ์ "/xxx" ใน composer
  */
+/** หมวดหมู่ข้อความสำเร็จรูป — key เดียวกับที่ jsk seed (label ไทยอยู่ที่ UI) */
+export const CANNED_RESPONSE_CATEGORIES = ['info', 'greeting', 'closing', 'escalation'] as const;
+
+const cannedTitle = z.string().trim().min(1, 'กรุณากรอกชื่อ').max(100, 'ชื่อยาวเกิน 100 ตัวอักษร');
+const cannedShortcut = z
+  .string()
+  .trim()
+  .regex(/^[a-z0-9-]{1,30}$/, 'shortcut ใช้ได้เฉพาะ a-z, 0-9 และ - (ยาวไม่เกิน 30)')
+  .optional()
+  .or(z.literal('').transform(() => undefined));
+const cannedContent = z
+  .string()
+  .trim()
+  .min(1, 'กรุณากรอกข้อความ')
+  .max(5000, 'ข้อความยาวเกิน 5,000 ตัวอักษร');
+const cannedCategory = z.enum(CANNED_RESPONSE_CATEGORIES);
+
 export const cannedResponseSchema = z.object({
-  title: z.string().trim().min(1, 'กรุณากรอกชื่อ').max(100, 'ชื่อยาวเกิน 100 ตัวอักษร'),
-  shortcut: z
-    .string()
-    .trim()
-    .regex(/^[a-z0-9-]{1,30}$/, 'shortcut ใช้ได้เฉพาะ a-z, 0-9 และ - (ยาวไม่เกิน 30)')
-    .optional()
-    .or(z.literal('').transform(() => undefined)),
-  content: z
-    .string()
-    .trim()
-    .min(1, 'กรุณากรอกข้อความ')
-    .max(5000, 'ข้อความยาวเกิน 5,000 ตัวอักษร'),
+  title: cannedTitle,
+  shortcut: cannedShortcut,
+  content: cannedContent,
+  category: cannedCategory.default('info'),
 });
 
-export const cannedResponseUpdateSchema = cannedResponseSchema.partial().refine(
-  (v) => Object.values(v).some((x) => x !== undefined),
-  { message: 'ต้องระบุอย่างน้อย 1 ฟิลด์' },
-);
+// § ห้ามใช้ cannedResponseSchema.partial() — Zod 4 ยังเติม .default() ของ category
+// แม้ฟิลด์ไม่อยู่ใน body ทำให้ PATCH isActive ไปรีเซ็ต category เป็น 'info' ทุกครั้ง
+export const cannedResponseUpdateSchema = z
+  .object({
+    title: cannedTitle.optional(),
+    shortcut: cannedShortcut.optional(),
+    content: cannedContent.optional(),
+    category: cannedCategory.optional(),
+    isActive: z.boolean().optional(),
+  })
+  .refine((v) => Object.values(v).some((x) => x !== undefined), {
+    message: 'ต้องระบุอย่างน้อย 1 ฟิลด์',
+  });
 
 /** PUT /api/line/admin/conversations/[id]/prefs — pin/mute ต่อแอดมิน */
 export const chatPrefsSchema = z

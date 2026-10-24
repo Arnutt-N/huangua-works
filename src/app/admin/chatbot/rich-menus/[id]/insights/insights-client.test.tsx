@@ -2,51 +2,89 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { RichMenuItem } from '@/app/admin/_lib/admin-api';
 import { RichMenuInsightsClient } from './insights-client';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
-const listRichMenus = vi.fn();
+const getRichMenuInsightSummary = vi.fn();
+const getRichMenuInsightDaily = vi.fn();
 vi.mock('@/app/admin/_lib/admin-api', () => ({
-  adminApi: { listRichMenus: (...args: unknown[]) => listRichMenus(...args) },
+  adminApi: {
+    getRichMenuInsightSummary: (...args: unknown[]) => getRichMenuInsightSummary(...args),
+    getRichMenuInsightDaily: (...args: unknown[]) => getRichMenuInsightDaily(...args),
+  },
 }));
-
-function menu(over: Partial<RichMenuItem> = {}): RichMenuItem {
-  return {
-    id: 'm1',
-    name: 'jsk4.0-v2',
-    chatBarText: 'เปิด/ปิด เมนู',
-    lineRichMenuId: 'richmenu-abc',
-    status: 'active',
-    syncStatus: 'synced',
-    lastSyncError: null,
-    displayStartAt: null,
-    displayEndAt: null,
-    createdAt: '2026-01-01T00:00:00Z',
-    ...over,
-  };
-}
 
 afterEach(() => cleanup());
 
 beforeEach(() => {
-  listRichMenus.mockReset();
-  listRichMenus.mockResolvedValue({ ok: true, data: { items: [menu()] } });
+  getRichMenuInsightSummary.mockReset();
+  getRichMenuInsightDaily.mockReset();
+  getRichMenuInsightSummary.mockResolvedValue({
+    ok: true,
+    data: {
+      rich_menu_id: 'richmenu-abc',
+      metrics_from: '20261001',
+      metrics_to: '20261024',
+      impression: { count: 1200, unique_users: 340 },
+      clicks: [{ bound: '0', count: 120, unique_users: 90 }],
+      privacy_restricted: false,
+    },
+  });
+  getRichMenuInsightDaily.mockResolvedValue({
+    ok: true,
+    data: {
+      rich_menu_id: 'richmenu-abc',
+      metrics_from: '20261001',
+      metrics_to: '20261024',
+      impression: { metrics: [{ date: '20261024', count: 40, unique_users: 20 }] },
+      clicks: null,
+      privacy_restricted: false,
+    },
+  });
 });
 
 describe('RichMenuInsightsClient', () => {
-  it('แสดงชื่อ + สถานะเมนู + โน้ต coming soon + Official Manager', async () => {
+  it('แสดง KPI + คลิกตามปุ่มจาก LINE Insight', async () => {
     render(<RichMenuInsightsClient menuId="m1" />);
-    expect(await screen.findByText('สถานะเมนู: jsk4.0-v2')).toBeInTheDocument();
-    expect(screen.getByText('synced')).toBeInTheDocument();
-    expect(screen.getByText(/coming soon/)).toBeInTheDocument();
-    expect(screen.getByText(/Official Account Manager/)).toBeInTheDocument();
+    expect(await screen.findByText('สถิติ Rich Menu')).toBeInTheDocument();
+    expect(await screen.findByText('1,200')).toBeInTheDocument();
+    expect(screen.getByText('340')).toBeInTheDocument();
+    expect(screen.getAllByText('120').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('สรุปคลิกตามปุ่ม')).toBeInTheDocument();
   });
 
-  it('ไม่มีเมนูแสดงข้อความไทย', async () => {
-    listRichMenus.mockResolvedValue({ ok: true, data: { items: [] } });
-    render(<RichMenuInsightsClient menuId="nope" />);
-    expect(await screen.findByText('ไม่พบเมนูนี้')).toBeInTheDocument();
+  it('แสดงคำเตือนเมื่อ LINE ซ่อนสถิติเพราะผู้ใช้ไม่ถึง 20 คน', async () => {
+    getRichMenuInsightSummary.mockResolvedValue({
+      ok: true,
+      data: {
+        rich_menu_id: 'richmenu-abc',
+        metrics_from: null,
+        metrics_to: null,
+        impression: null,
+        clicks: null,
+        privacy_restricted: true,
+      },
+    });
+    getRichMenuInsightDaily.mockResolvedValue({
+      ok: true,
+      data: {
+        rich_menu_id: 'richmenu-abc',
+        metrics_from: null,
+        metrics_to: null,
+        impression: null,
+        clicks: null,
+        privacy_restricted: true,
+      },
+    });
+    render(<RichMenuInsightsClient menuId="m1" />);
+    expect(await screen.findByText('ข้อมูลไม่เพียงพอ')).toBeInTheDocument();
+    expect(screen.getByText(/อย่างน้อย 20 คน/)).toBeInTheDocument();
+  });
+
+  it('API ล้มเหลวแสดง error ไทย', async () => {
+    getRichMenuInsightSummary.mockResolvedValue({ ok: false, error: 'ต้อง sync เมนูไป LINE ก่อนดูสถิติ', status: 409 });
+    render(<RichMenuInsightsClient menuId="m1" />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('ต้อง sync เมนูไป LINE ก่อนดูสถิติ');
   });
 });

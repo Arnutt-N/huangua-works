@@ -29,5 +29,6 @@ export async function POST(
     userAgent: authz.ctx.userAgent,
   });
 
-  return NextResponse.json({ ok: true });
+  // § recreated = LINE อัปเดตเมนูไม่ได้ จึงสร้างใหม่แทน — UI ต้องบอกผู้ใช้ว่าคือการอัปเดตจริง
+  return NextResponse.json({ ok: true, recreated: result.recreated === true });
 }

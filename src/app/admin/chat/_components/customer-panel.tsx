@@ -1,11 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { ExternalLink, UserRound, X } from 'lucide-react';
+import { Download, ExternalLink, FileText, UserRound, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { formatRelativeTime } from '../_lib/format';
 import { FALLBACK_BADGE, MODE_BADGE, MODE_LABELS } from '../_lib/labels';
-import type { Conversation, ConversationDetail, StaffMember } from '../_lib/types';
+import type { Conversation, ConversationDetail, Message, StaffMember } from '../_lib/types';
+import { downloadFile, messagesToCsv, printConversation } from '../_lib/export';
 import { useNoteAutosave } from '../_hooks/use-note-autosave';
 import { LineAvatar } from './line-avatar';
 import { TagPicker } from './tag-picker';
@@ -21,12 +22,15 @@ export function CustomerPanel({
   conversation,
   detail,
   staff,
+  messages,
   onTagsSaved,
   onClose,
 }: {
   conversation: Conversation | null;
   detail: ConversationDetail | null;
   staff: StaffMember[];
+  /** ข้อความที่โหลดอยู่ — ใช้ export CSV/PDF (เฉพาะหน้า/ช่วงที่โหลดมาแล้ว) */
+  messages: Message[];
   onTagsSaved: () => void;
   /** ปุ่มปิด — desktop = พับ panel, mobile = ปิด dialog */
   onClose?: () => void;
@@ -46,7 +50,7 @@ export function CustomerPanel({
   return (
     <div className="flex h-full flex-col overflow-y-auto">
       <div className="flex h-14 flex-none items-center justify-between gap-2 border-b border-border px-4">
-        <h2 className="text-xs font-bold uppercase tracking-widest text-ink">ข้อมูลลูกค้า</h2>
+        <h2 className="text-xs font-bold uppercase tracking-widest text-ink">CUSTOMER INFO</h2>
         {onClose && (
           <button
             type="button"
@@ -105,8 +109,14 @@ export function CustomerPanel({
 
         {/* กิจกรรมล่าสุด */}
         <div className="space-y-2">
-          <h3 className="text-xs font-bold uppercase tracking-wide text-muted">กิจกรรมล่าสุด</h3>
+          <h3 className="text-xs font-bold uppercase tracking-wide text-muted">ACTIVITY</h3>
           <dl className="space-y-1 text-xs">
+            <div className="flex justify-between gap-2">
+              <dt className="text-muted">Session</dt>
+              <dd className="font-mono font-medium text-ink" title={detail.id}>
+                {detail.id.slice(-8).toUpperCase()}
+              </dd>
+            </div>
             <div className="flex justify-between gap-2">
               <dt className="text-muted">ข้อความล่าสุด</dt>
               <dd className="font-medium text-ink">
@@ -120,6 +130,36 @@ export function CustomerPanel({
               <dd className="font-medium text-ink">{formatRelativeTime(detail.createdAt)}</dd>
             </div>
           </dl>
+        </div>
+
+        {/* export — เฉพาะข้อความที่โหลดมาแล้วในหน้าปัจจุบัน */}
+        <div className="space-y-2">
+          <h3 className="text-xs font-bold uppercase tracking-wide text-muted">EXPORT</h3>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                downloadFile(
+                  messagesToCsv(messages),
+                  `${(conversation.displayName ?? 'conversation').replace(/[^\w฀-๿-]/g, '_')}.csv`,
+                  'text/csv;charset=utf-8',
+                )
+              }
+              className="inline-flex min-h-touch flex-1 items-center justify-center gap-1 rounded-md border border-border px-2 py-1.5 text-xs font-semibold text-ink hover:bg-accent-sunken"
+            >
+              <Download className="h-3.5 w-3.5" aria-hidden="true" /> CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => printConversation(`บทสนทนากับ ${name}`, messages)}
+              className="inline-flex min-h-touch flex-1 items-center justify-center gap-1 rounded-md border border-border px-2 py-1.5 text-xs font-semibold text-ink hover:bg-accent-sunken"
+            >
+              <FileText className="h-3.5 w-3.5" aria-hidden="true" /> PDF
+            </button>
+          </div>
+          <p className="text-[10px] text-muted">
+            PDF = สั่งพิมพ์แล้วเลือก &quot;บันทึกเป็น PDF&quot; · ครอบคลุม {messages.length} ข้อความที่โหลดแล้ว
+          </p>
         </div>
 
         <TagPicker

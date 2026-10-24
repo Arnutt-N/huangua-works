@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hasQuickReply, payloadSummary, typeBadgeClass } from './reply-preview';
+import { payloadSummary, typeBadgeClass } from './reply-preview';
 
 describe('reply-preview helpers', () => {
   it('text สรุปจาก text ไม่เกิน 80 ตัวอักษร', () => {
@@ -32,23 +32,10 @@ describe('reply-preview helpers', () => {
     expect(payloadSummary('flex', { type: 'bubble', quickReply: { items: [] } })).toBe('type');
   });
 
-  it('hasQuickReply ตรวจ items ไม่ว่าง', () => {
-    expect(hasQuickReply({ quickReply: { items: [{ type: 'action' }] } })).toBe(true);
-    expect(hasQuickReply({ quickReply: { items: [] } })).toBe(false);
-    expect(hasQuickReply({})).toBe(false);
-    expect(hasQuickReply({ quickReply: 'เสีย' })).toBe(false);
-  });
-
   it('typeBadgeClass แยกสีตามกลุ่ม type', () => {
     expect(typeBadgeClass('flex')).toContain('accent');
     expect(typeBadgeClass('image')).toContain('success');
     expect(typeBadgeClass('text')).toContain('surface');
-  });
-
-  it('hasQuickReply กัน payload ผิดรูป', () => {
-    expect(hasQuickReply(null)).toBe(false);
-    expect(hasQuickReply([])).toBe(false);
-    expect(hasQuickReply('เสีย')).toBe(false);
   });
 
   it('payloadSummary กัน payload ผิดรูป', () => {

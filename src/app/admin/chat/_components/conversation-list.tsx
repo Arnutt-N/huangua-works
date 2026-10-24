@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowDownWideNarrow, Inbox, Search } from 'lucide-react';
+import { ArrowDownWideNarrow, Inbox, PanelLeftClose, Search } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import type { ConversationFilter, ConversationSort } from '../_hooks/use-conversations';
 import type { Conversation, MessageSearchResult } from '../_lib/types';
@@ -33,6 +33,8 @@ function SkeletonRows() {
 }
 
 export function ConversationList({
+  collapsed,
+  onToggleCollapsed,
   visible,
   counts,
   loading,
@@ -51,6 +53,9 @@ export function ConversationList({
   onToggleMute,
   onMarkRead,
 }: {
+  /** พับทั้งคอลัมน์ (desktop) — ค่า true = ซ่อนจนกดปุ่มเปิดใน ChatArea */
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
   visible: Conversation[];
   counts: { all: number; waiting: number; active: number };
   loading: boolean;
@@ -89,12 +94,24 @@ export function ConversationList({
       aria-label="การสนทนา LINE"
       className={cn(
         'w-full flex-none flex-col overflow-hidden border-r border-border',
-        'bg-surface-raised text-ink md:flex md:w-80',
-        selectedId ? 'hidden md:flex' : 'flex',
+        'bg-surface-raised text-ink md:w-80',
+        collapsed ? 'hidden' : selectedId ? 'hidden md:flex' : 'flex',
       )}
     >
       <div className="flex h-full flex-col">
         <div className="flex-none space-y-2.5 px-3 pb-3 pt-3">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-bold text-ink">Live Chat</h2>
+            <button
+              type="button"
+              onClick={onToggleCollapsed}
+              aria-label="ซ่อนรายการสนทนา"
+              title="ซ่อนรายการสนทนา"
+              className="hidden items-center justify-center rounded-md p-1.5 text-muted transition-colors duration-normal ease-out-expo hover:bg-surface-sunken hover:text-ink md:inline-flex"
+            >
+              <PanelLeftClose className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
           <div className="relative">
             <Search
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"

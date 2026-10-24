@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Menu, X, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { BrandMark } from '@/components/site/brand-mark';
 import { UserMenu } from '@/components/admin/user-menu';
+import { SessionTimeoutWarning } from '@/components/admin/session-timeout-warning';
 import {
   visibleNavGroups,
   type AdminNavItem,
@@ -222,6 +223,9 @@ export function AdminLayout({
 
         <main id="main" className="flex-1">{children}</main>
       </div>
+
+      {/* เตือนเซสชันหมดอายุจาก inactivity — ทุกหน้าแอดมิน (แบบ jsk layout) */}
+      <SessionTimeoutWarning />
     </div>
   );
 }

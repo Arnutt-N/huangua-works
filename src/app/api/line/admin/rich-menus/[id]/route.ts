@@ -12,7 +12,20 @@ import { logAudit, AUDIT_ACTIONS } from '@/lib/audit';
 
 export const runtime = 'nodejs';
 
+const displayModeSchema = z.enum(['ALWAYS', 'SCHEDULED', 'MANUAL']);
+
+const areaSchema = z.object({
+  bounds: z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }),
+  action: z
+    .object({ type: z.string(), text: z.string().optional(), uri: z.string().optional(), richMenuAliasId: z.string().optional() })
+    .passthrough(),
+});
+
 const patchSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  chatBarText: z.string().min(1).max(20).optional(),
+  areas: z.array(areaSchema).min(1).optional(),
+  displayMode: displayModeSchema.optional(),
   displayStartAt: z.string().datetime({ offset: true }).nullable().optional(),
   displayEndAt: z.string().datetime({ offset: true }).nullable().optional(),
 });
@@ -21,6 +34,17 @@ function toDate(v: string | null | undefined): Date | null | undefined {
   if (v === undefined) return undefined;
   if (v === null) return null;
   return new Date(v);
+}
+
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const authz = await requireStaffApi(ADMIN_ROLES);
+  if (!authz.ok) return authz.response;
+
+  const { id } = await params;
+  const db = await getDb();
+  const [row] = await db.select().from(richMenus).where(eq(richMenus.id, id)).limit(1);
+  if (!row) return NextResponse.json({ error: 'ไม่พบ rich menu' }, { status: 404 });
+  return NextResponse.json(row);
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -32,10 +56,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!result.ok) return result.response;
 
   const db = await getDb();
-  // § อ่านแถวก่อน (ไม่มี → 404 ก่อน parse แพง) แล้ว validate คู่รวม ไม่ใช่แค่คู่ที่ส่งมา
+  // § อ่านแถวก่อน (ไม่มี → 404) แล้ว validate ค่ารวม ไม่ใช่แค่ค่าที่ส่งมา
   const [stored] = await db
     .select({
       id: richMenus.id,
+      name: richMenus.name,
+      chatBarText: richMenus.chatBarText,
+      config: richMenus.config,
+      lineRichMenuId: richMenus.lineRichMenuId,
+      displayMode: richMenus.displayMode,
       displayStartAt: richMenus.displayStartAt,
       displayEndAt: richMenus.displayEndAt,
     })
@@ -46,27 +75,74 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'ไม่พบ rich menu' }, { status: 404 });
   }
 
+  const { name, chatBarText, areas, displayMode } = result.data;
   const start = toDate(result.data.displayStartAt);
   const end = toDate(result.data.displayEndAt);
-  if (start === undefined && end === undefined) {
+
+  if (
+    name === undefined &&
+    chatBarText === undefined &&
+    areas === undefined &&
+    displayMode === undefined &&
+    start === undefined &&
+    end === undefined
+  ) {
     return NextResponse.json({ error: 'ไม่มีอะไรให้แก้' }, { status: 400 });
   }
+
   const effectiveStart = start !== undefined ? start : stored.displayStartAt;
   const effectiveEnd = end !== undefined ? end : stored.displayEndAt;
+  const effectiveMode = displayMode ?? stored.displayMode;
   // § เทียบด้วย getTime (string ต่าง offset เรียงผิด — interrogate C-1)
-  if (
-    effectiveStart &&
-    effectiveEnd &&
-    effectiveEnd.getTime() <= effectiveStart.getTime()
-  ) {
+  if (effectiveStart && effectiveEnd && effectiveEnd.getTime() <= effectiveStart.getTime()) {
     return NextResponse.json({ error: 'วันสิ้นสุดต้องหลังวันเริ่มแสดง' }, { status: 400 });
   }
+  if (effectiveMode === 'SCHEDULED' && (!effectiveStart || !effectiveEnd)) {
+    return NextResponse.json(
+      { error: 'โหมด "ตามช่วงเวลา" ต้องระบุวันเวลาเริ่มต้นและสิ้นสุด' },
+      { status: 400 },
+    );
+  }
 
-  const patch: { displayStartAt?: Date | null; displayEndAt?: Date | null; updatedAt: Date } = {
-    updatedAt: new Date(),
-  };
+  // § LINE config ฝัง name/chatBarText/areas/selected — แก้ฟิลด์ไหนต้องเขียนลง config ด้วย
+  // ไม่งั้น sync ครั้งถัดไปจะ recreate ด้วยค่าเก่า
+  const prevConfig = (stored.config ?? {}) as Record<string, unknown>;
+  const nextName = name ?? stored.name;
+  const nextBar = chatBarText ?? stored.chatBarText;
+  const nextMode = effectiveMode;
+  const configChanged =
+    name !== undefined ||
+    chatBarText !== undefined ||
+    areas !== undefined ||
+    displayMode !== undefined;
+  const nextConfig = configChanged
+    ? {
+        ...prevConfig,
+        name: nextName,
+        chatBarText: nextBar,
+        areas: areas ?? prevConfig.areas,
+        selected: nextMode === 'ALWAYS',
+      }
+    : prevConfig;
+
+  const patch: {
+    name?: string;
+    chatBarText?: string;
+    config?: Record<string, unknown>;
+    displayMode?: string;
+    displayStartAt?: Date | null;
+    displayEndAt?: Date | null;
+    syncStatus?: string;
+    updatedAt: Date;
+  } = { updatedAt: new Date() };
+  if (name !== undefined) patch.name = name;
+  if (chatBarText !== undefined) patch.chatBarText = chatBarText;
+  if (configChanged) patch.config = nextConfig;
+  if (displayMode !== undefined) patch.displayMode = displayMode;
   if (start !== undefined) patch.displayStartAt = start;
   if (end !== undefined) patch.displayEndAt = end;
+  // § LINE อัปเดตเมนูไม่ได้ — ต้อง recreate ตอน sync ครั้งถัดไป จึงติด PENDING ให้ UI เตือน
+  if (configChanged && stored.lineRichMenuId) patch.syncStatus = 'pending';
 
   await db.update(richMenus).set(patch).where(eq(richMenus.id, id));
 
@@ -78,8 +154,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     ipAddress: authz.ctx.ipAddress,
     userAgent: authz.ctx.userAgent,
     metadata: {
-      before: { displayStartAt: stored.displayStartAt, displayEndAt: stored.displayEndAt },
+      before: {
+        name: stored.name,
+        chatBarText: stored.chatBarText,
+        displayMode: stored.displayMode,
+        displayStartAt: stored.displayStartAt,
+        displayEndAt: stored.displayEndAt,
+      },
       after: {
+        name: nextName,
+        chatBarText: nextBar,
+        displayMode: nextMode,
         displayStartAt: patch.displayStartAt ?? stored.displayStartAt,
         displayEndAt: patch.displayEndAt ?? stored.displayEndAt,
       },

@@ -125,6 +125,15 @@ export function ChatHeader({
               </button>
               <button
                 type="button"
+                onClick={() => onModeChange('bot_active')}
+                title="คืนห้องให้ทีม/บอทดูแลต่อ (เลิกถือห้อง)"
+                className="inline-flex items-center gap-1 rounded-md border border-border-strong px-2.5 py-1.5 text-xs font-bold text-ink transition-colors duration-normal ease-out-expo hover:bg-accent-sunken focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
+              >
+                <Bot className="h-3.5 w-3.5" aria-hidden="true" />
+                คืนให้ทีม
+              </button>
+              <button
+                type="button"
                 onClick={() => onModeChange('resolved')}
                 className="inline-flex items-center gap-1 rounded-md border border-border-strong px-2.5 py-1.5 text-xs font-bold text-accent-strong transition-colors duration-normal ease-out-expo hover:bg-accent-sunken focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
               >

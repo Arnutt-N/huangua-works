@@ -64,6 +64,11 @@ export interface CannedResponse {
   title: string;
   shortcut: string | null;
   content: string;
+  /** หมวดหมู่ (info/greeting/closing/escalation) — แถวเก่าก่อน migration อาจไม่มี */
+  category?: string;
+  usageCount?: number;
+  isActive?: boolean;
+  updatedAt?: string;
 }
 
 export interface StaffMember {

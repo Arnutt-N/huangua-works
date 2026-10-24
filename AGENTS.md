@@ -119,7 +119,7 @@ gh pr merge --squash
 | Typecheck | `npx tsc --noEmit` |
 | Lint | `npx eslint .` |
 | Unit + contrast tests | `npx vitest run` |
-| Unit only (skip integration) | `npx vitest run --exclude '**/*.integration.test.ts'` |
+| Integration tests (ต้องมี Docker ขึ้นก่อน) | `npx vitest run --config vitest.integration.config.ts` |
 | Single test file | `npx vitest run src/lib/cases/state-machine.test.ts` |
 | Single test by name | `npx vitest run -t "ชื่อ test"` |
 | E2E (all) | `npx playwright test` |
@@ -142,7 +142,7 @@ npx drizzle-kit push && npx tsx scripts/seed.ts
 npx next dev                                    # host mode → http://localhost:3000
 ```
 
-`up-redis` is a REST proxy that speaks the Upstash REST API in front of plain Redis — `@upstash/redis` only talks REST, so a bare Redis container will not work. Integration tests (`*.integration.test.ts`) and E2E both hit this live stack via `.env.local`.
+`up-redis` is a REST proxy that speaks the Upstash REST API in front of plain Redis — `@upstash/redis` only talks REST, so a bare Redis container will not work. Integration tests (`*.integration.test.ts`) and E2E both hit this live stack via `.env.local`. **รันด้วย `npx vitest run --config vitest.integration.config.ts`** — `npx vitest run` ธรรมดาจะ skip ชุดนี้โดยอัตโนมัติ (แยก config กันไว้ให้ unit รันได้โดยไม่ต้องลาก Docker)
 
 ### Verification gates
 
@@ -153,7 +153,7 @@ The real gates are local plus Vercel:
 ```bash
 npx tsc --noEmit     # typecheck
 npx eslint .         # lint
-npx vitest run       # integration tests need Docker Desktop started (Postgres :5433 + Redis)
+npx vitest run       # unit only — ไม่ต้องใช้ Docker
 ```
 
 Plus the Vercel / Vercel Preview Comments checks on the PR.

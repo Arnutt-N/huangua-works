@@ -21,6 +21,8 @@ export const runtime = 'nodejs';
 
 const createSchema = z.object({
   objectId: z.string().min(1).max(50).regex(/^[a-z0-9_-]+$/, 'ใช้ a-z, 0-9, -, _ เท่านั้น'),
+  name: z.string().trim().min(1, 'กรุณากรอกชื่อ').max(120, 'ชื่อยาวเกิน 120 ตัวอักษร').optional(),
+  category: z.string().trim().max(60, 'หมวดหมู่ยาวเกิน 60 ตัวอักษร').optional(),
   objectType: replyObjectTypeSchema,
   payload: z.record(z.string(), z.unknown()),
   altText: z.string().max(200).optional(),
@@ -58,6 +60,8 @@ export async function POST(request: Request) {
     await db.insert(chatReplyObjects).values({
       id,
       objectId: result.data.objectId,
+      name: result.data.name ?? null,
+      category: result.data.category ?? null,
       objectType: result.data.objectType,
       payload: result.data.payload,
       altText: result.data.altText ?? null,

@@ -419,16 +419,16 @@ export async function deleteMenuAlias(
 }
 
 export async function listMenuAliases(): Promise<
-  Array<{ aliasId: string; richMenuId: string; menuName: string | null }>
+  Array<{ aliasId: string; richMenuId: string; menuName: string | null; syncStatus: string | null }>
 > {
   const db = await getDb();
-  const rows = await db
+  return db
     .select({
       aliasId: richMenuAliases.aliasId,
       richMenuId: richMenuAliases.richMenuId,
       menuName: richMenus.name,
+      syncStatus: richMenus.syncStatus,
     })
     .from(richMenuAliases)
     .leftJoin(richMenus, eq(richMenus.id, richMenuAliases.richMenuId));
-  return rows;
 }
