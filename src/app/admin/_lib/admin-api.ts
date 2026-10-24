@@ -114,25 +114,87 @@ export interface ReplyObjectPatch {
   isActive: boolean;
 }
 
+export type RichMenuDisplayMode = 'ALWAYS' | 'SCHEDULED' | 'MANUAL';
+
+export interface RichMenuAreaInput {
+  bounds: { x: number; y: number; width: number; height: number };
+  action: { type: string; uri?: string; text?: string; richMenuAliasId?: string };
+}
+
 export interface RichMenuItem {
   id: string;
   name: string;
   chatBarText: string;
   lineRichMenuId: string | null;
   status: string;
+  displayMode: string;
   syncStatus: string;
   lastSyncError: string | null;
+  imageUrl: string | null;
   displayStartAt: string | null;
   displayEndAt: string | null;
   createdAt: string;
+  /** จำนวนเพื่อนที่ผูกเมนูนี้รายคน (metadata.richMenuId) */
+  userLinkCount?: number;
+}
+
+export interface RichMenuConfig {
+  size: { width: number; height: number };
+  selected?: boolean;
+  name?: string;
+  chatBarText?: string;
+  areas?: RichMenuAreaInput[];
+}
+
+export interface RichMenuItemDetail extends RichMenuItem {
+  config: RichMenuConfig;
 }
 
 export interface RichMenuInput {
   name: string;
   chatBarText: string;
   config: unknown;
+  displayMode?: RichMenuDisplayMode;
   displayStartAt?: string;
   displayEndAt?: string;
+}
+
+export interface RichMenuPatch {
+  name?: string;
+  chatBarText?: string;
+  areas?: RichMenuAreaInput[];
+  displayMode?: RichMenuDisplayMode;
+  displayStartAt?: string | null;
+  displayEndAt?: string | null;
+}
+
+export interface RichMenuInsightMetric {
+  count: number;
+  unique_users: number;
+}
+
+export interface RichMenuInsightSummary {
+  rich_menu_id: string;
+  metrics_from: string | null;
+  metrics_to: string | null;
+  impression: RichMenuInsightMetric | null;
+  clicks: { bound: string; count: number; unique_users: number }[] | null;
+  privacy_restricted: boolean;
+}
+
+export interface RichMenuInsightDailyPoint {
+  date: string;
+  count: number;
+  unique_users: number;
+}
+
+export interface RichMenuInsightDaily {
+  rich_menu_id: string;
+  metrics_from: string | null;
+  metrics_to: string | null;
+  impression: { metrics: RichMenuInsightDailyPoint[] } | null;
+  clicks: { bound: string; metrics: RichMenuInsightDailyPoint[] }[] | null;
+  privacy_restricted: boolean;
 }
 
 export interface FriendItem {
@@ -172,6 +234,7 @@ export interface RichMenuAliasItem {
   aliasId: string;
   richMenuId: string;
   menuName: string | null;
+  syncStatus: string | null;
 }
 
 export type BroadcastTarget =
@@ -367,8 +430,30 @@ export const adminApi = {
   // ── Rich menus ──
   listRichMenus: (): Promise<ApiResult<ListOf<RichMenuItem>>> =>
     request<ListOf<RichMenuItem>>('/api/line/admin/rich-menus'),
-  createRichMenu: (payload: RichMenuInput): Promise<ApiResult<OkBody>> =>
-    request<OkBody>('/api/line/admin/rich-menus', withBody('POST', payload)),
+  getRichMenu: (id: string): Promise<ApiResult<RichMenuItemDetail>> =>
+    request<RichMenuItemDetail>(`/api/line/admin/rich-menus/${id}`),
+  createRichMenu: (payload: RichMenuInput): Promise<ApiResult<OkBody & { id?: string }>> =>
+    request<OkBody & { id?: string }>('/api/line/admin/rich-menus', withBody('POST', payload)),
+  updateRichMenu: (id: string, payload: RichMenuPatch): Promise<ApiResult<OkBody>> =>
+    request<OkBody>(`/api/line/admin/rich-menus/${id}`, withBody('PATCH', payload)),
+  deleteRichMenu: (id: string): Promise<ApiResult<OkBody>> =>
+    request<OkBody>(`/api/line/admin/rich-menus/${id}`, { method: 'DELETE' }),
+  getRichMenuInsightSummary: (
+    id: string,
+    from: string,
+    to: string,
+  ): Promise<ApiResult<RichMenuInsightSummary>> =>
+    request<RichMenuInsightSummary>(
+      `/api/line/admin/rich-menus/${id}/insights/summary?from=${from}&to=${to}`,
+    ),
+  getRichMenuInsightDaily: (
+    id: string,
+    from: string,
+    to: string,
+  ): Promise<ApiResult<RichMenuInsightDaily>> =>
+    request<RichMenuInsightDaily>(
+      `/api/line/admin/rich-menus/${id}/insights/daily?from=${from}&to=${to}`,
+    ),
   syncRichMenu: (id: string): Promise<ApiResult<OkBody>> =>
     request<OkBody>(`/api/line/admin/rich-menus/${id}/sync`, { method: 'POST' }),
   publishRichMenu: (id: string): Promise<ApiResult<OkBody>> =>

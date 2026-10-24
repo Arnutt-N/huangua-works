@@ -1068,6 +1068,9 @@ export const richMenus = pgTable(
     lineRichMenuId: text('line_rich_menu_id').unique(),
     imageUrl: text('image_url'),
     status: richMenuStatusEnum().notNull().default('draft'),
+    // § โหมดแสดงผลตาม jsk — ALWAYS (sync แล้ว publish ทันที) / SCHEDULED (cron ตามช่วงเวลา) /
+    // MANUAL (sync แต่ไม่ตั้งเป็น default ใช้กับ alias หรือผูก รายคน) map ลง `selected` ของ LINE config
+    displayMode: text('display_mode').notNull().default('ALWAYS'),
     syncStatus: text('sync_status').notNull().default('pending'),
     lastSyncError: text('last_sync_error'),
     createdBy: text('created_by'),

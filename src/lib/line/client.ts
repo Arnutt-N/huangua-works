@@ -166,11 +166,22 @@ export async function createLineRichMenu(config: unknown): Promise<string> {
   return data.richMenuId;
 }
 
+/**
+ * § LINE ตรวจ Content-Type กับ magic bytes ของรูป — client-side auto-fit แปลงเป็น JPEG
+ * ได้ จึงต้อง sniff จาก buffer ไม่ใช่ hardcode image/png (ไม่งั้น 400 ทั้งที่รูปถูกต้อง)
+ */
+function sniffImageContentType(buf: Uint8Array): 'image/png' | 'image/jpeg' {
+  if (buf.length >= 4 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {
+    return 'image/png';
+  }
+  return 'image/jpeg';
+}
+
 export async function uploadLineRichMenuImage(richMenuId: string, imageBuffer: Buffer): Promise<void> {
   const res = await fetch(`${LINE_DATA_BASE}/richmenu/${richMenuId}/content`, {
     method: 'POST',
     headers: {
-      'Content-Type': 'image/png',
+      'Content-Type': sniffImageContentType(imageBuffer),
       Authorization: `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`,
     },
     body: new Uint8Array(imageBuffer),
@@ -179,6 +190,24 @@ export async function uploadLineRichMenuImage(richMenuId: string, imageBuffer: B
     const detail = await res.text().catch(() => '');
     throw new LineApiError(`/richmenu/${richMenuId}/content`, res.status, detail.slice(0, 500));
   }
+}
+
+/** ดึงรูปเมนูที่อยู่บน LINE — ใช้เป็น thumbnail ในหน้า admin โดยไม่ต้องเก็บสำเนาใน S3 */
+export async function getLineRichMenuImage(
+  richMenuId: string,
+): Promise<{ bytes: Uint8Array; contentType: string }> {
+  return withLineCircuit('/richmenu/content/get', async () => {
+    const res = await fetch(`${LINE_DATA_BASE}/richmenu/${richMenuId}/content`, {
+      headers: { Authorization: `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      throw new LineApiError(`/richmenu/${richMenuId}/content`, res.status, detail.slice(0, 500));
+    }
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    return { bytes, contentType: res.headers.get('content-type') ?? 'image/png' };
+  });
 }
 
 export async function getLineRichMenu(richMenuId: string): Promise<Record<string, unknown> | null> {
@@ -207,6 +236,44 @@ export async function deleteLineRichMenu(richMenuId: string): Promise<void> {
     const detail = await res.text().catch(() => '');
     throw new LineApiError(`/richmenu/${richMenuId}`, res.status, detail.slice(0, 500));
   }
+}
+
+// ─── Rich menu insight (LINE Insight API) ────────────────────────────────
+// § LINE ไม่ส่ง impression/clicks กลับมาเมื่อผู้ใช้ไม่ถึง 20 คน — caller
+// จึงต้องตีความ `impression` ที่หายไปเป็น privacy_restricted เอง
+async function getRichMenuInsight(
+  richMenuId: string,
+  kind: 'summary' | 'daily',
+  from: string,
+  to: string,
+): Promise<Record<string, unknown>> {
+  const url = `${LINE_API_BASE}/insight/richmenu/${encodeURIComponent(richMenuId)}/${kind}?from=${from}&to=${to}`;
+  const res = await fetch(url, {
+    headers: getHeaders(),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new LineApiError(`/insight/richmenu/${kind}`, res.status, detail.slice(0, 500));
+  }
+  const data = (await res.json()) as Record<string, unknown>;
+  return { ...data, privacy_restricted: !('impression' in data) };
+}
+
+export function getRichMenuInsightSummary(
+  richMenuId: string,
+  from: string,
+  to: string,
+): Promise<Record<string, unknown>> {
+  return getRichMenuInsight(richMenuId, 'summary', from, to);
+}
+
+export function getRichMenuInsightDaily(
+  richMenuId: string,
+  from: string,
+  to: string,
+): Promise<Record<string, unknown>> {
+  return getRichMenuInsight(richMenuId, 'daily', from, to);
 }
 
 export async function getDefaultLineRichMenu(): Promise<string | null> {
