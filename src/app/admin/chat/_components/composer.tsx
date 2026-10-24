@@ -95,7 +95,7 @@ export function Composer({
       {!canReply && !ownershipBanner && mode === 'bot_active' && (
         <div className="flex items-center justify-center gap-2 border-b border-accent-strong/20 bg-accent-sunken px-3 py-1.5">
           <Bot className="h-3.5 w-3.5 flex-none text-accent-strong" aria-hidden="true" />
-          <p className="text-xs font-semibold text-accent-strong">Bot กำลังตอบอัตโนมัติ</p>
+          <p className="text-xs font-semibold text-accent-strong">Bot กำลังคุยกับลูกค้าอยู่</p>
         </div>
       )}
       {actionError && (

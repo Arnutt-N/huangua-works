@@ -1,22 +1,15 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/app/admin/_lib/admin-api', () => ({
-  adminApi: { getChatbotStats: vi.fn(), listIntents: vi.fn() },
+  adminApi: { listReplyObjects: vi.fn(), listIntents: vi.fn() },
 }));
 
 import { adminApi } from '@/app/admin/_lib/admin-api';
-import type { IntentItem } from '@/app/admin/_lib/admin-api';
+import type { IntentItem, ReplyObject } from '@/app/admin/_lib/admin-api';
 import { ChatbotDashboardClient } from './chatbot-dashboard-client';
-
-const STATS = {
-  messages: { totalIn: 10, totalOut: 8 },
-  faq: { total: 2, active: 2, hits: 5, hitRate: 80 },
-  conversations: { total: 4, active: 1, handoff: 1 },
-  topFaq: [{ question: 'เปิดกี่โมง', hitCount: 5 }],
-};
 
 function intent(over: Partial<IntentItem> = {}): IntentItem {
   return {
@@ -25,94 +18,126 @@ function intent(over: Partial<IntentItem> = {}): IntentItem {
     description: null,
     isActive: true,
     keywords: [{ id: 'k1', keyword: 'กี่โมง', matchType: 'contains' as const }],
-    responses: [{ id: 'r1', replyType: 'text' as const, textContent: 'เปิด 08:30', replyObjectId: null, displayOrder: 0 }],
+    responses: [
+      { id: 'r1', replyType: 'text' as const, textContent: 'เปิด 08:30', replyObjectId: null, displayOrder: 0 },
+    ],
     ...over,
   };
 }
 
-const mockStats = vi.mocked(adminApi.getChatbotStats);
+function replyObject(over: Partial<ReplyObject> = {}): ReplyObject {
+  return {
+    id: 'o1',
+    objectId: 'flex_welcome',
+    name: 'Welcome Message',
+    category: null,
+    objectType: 'flex',
+    payload: {},
+    altText: null,
+    isActive: true,
+    createdAt: '2026-01-01T00:00:00Z',
+    ...over,
+  };
+}
+
+const mockReplyObjects = vi.mocked(adminApi.listReplyObjects);
 const mockIntents = vi.mocked(adminApi.listIntents);
-
-function mockIntentsOk(items: IntentItem[]) {
-  mockIntents.mockResolvedValue({ ok: true, data: { items } });
-}
-
-function mockIntentsFail(status: number, error: string) {
-  mockIntents.mockResolvedValue({ ok: false, error, status });
-}
 
 afterEach(() => {
   cleanup();
-  mockStats.mockReset();
+  mockReplyObjects.mockReset();
   mockIntents.mockReset();
 });
 
 beforeEach(() => {
-  mockStats.mockResolvedValue({ ok: true, data: STATS });
+  mockReplyObjects.mockResolvedValue({ ok: true, data: { items: [replyObject()] } });
+  mockIntents.mockResolvedValue({ ok: true, data: { items: [intent()] } });
 });
 
-describe('ChatbotDashboardClient readiness', () => {
-  it('หมวดพร้อมแสดงพร้อมและ KPI เดิมอยู่ครบ', async () => {
-    mockIntentsOk([intent()]);
+describe('ChatbotDashboardClient overview', () => {
+  it('แสดง 3 KPI: Reply Objects / Intent Categories / Active Responses', async () => {
+    mockReplyObjects.mockResolvedValue({
+      ok: true,
+      data: { items: [replyObject(), replyObject({ id: 'o2', objectId: 'flex_bye' })] },
+    });
+    mockIntents.mockResolvedValue({
+      ok: true,
+      data: {
+        items: [
+          intent(),
+          intent({ id: 'i2', responses: [] }),
+          intent({ id: 'i3', isActive: false }),
+        ],
+      },
+    });
     render(<ChatbotDashboardClient />);
 
-    expect(await screen.findByText('เวลาทำการ')).toBeInTheDocument();
-    expect(screen.getByText('พร้อม')).toBeInTheDocument();
-    expect(screen.getByText('ข้อความเข้า')).toBeInTheDocument();
-    expect(screen.getByText('คำถามยอดนิยม (Top FAQ)')).toBeInTheDocument();
+    expect(await screen.findByText('Reply Objects')).toBeInTheDocument();
+    expect(screen.getByText('Intent Categories')).toBeInTheDocument();
+    expect(screen.getByText('Active Responses')).toBeInTheDocument();
+    // 2 reply objects
+    expect(screen.getByText('2')).toBeInTheDocument();
+    // 3 intents (1 inactive) → hint 2 หมวดที่เปิดใช้
+    expect(screen.getByText('2 หมวดที่เปิดใช้')).toBeInTheDocument();
+    // active responses = 1 (เฉพาะ intent ที่เปิดใช้และมี response)
+    expect(screen.getByText('คำตอบในหมวดที่เปิดใช้')).toBeInTheDocument();
   });
 
-  it('หมวดไม่มี keyword แสดงเหตุผลไม่พร้อม', async () => {
-    mockIntentsOk([intent({ keywords: [] })]);
+  it('Recent Templates แสดงสูงสุด 5 รายการพร้อม objectId', async () => {
+    mockReplyObjects.mockResolvedValue({
+      ok: true,
+      data: {
+        items: Array.from({ length: 7 }, (_, i) =>
+          replyObject({ id: `o${i}`, objectId: `flex_${i}`, name: `Template ${i}` }),
+        ),
+      },
+    });
     render(<ChatbotDashboardClient />);
 
-    expect(await screen.findByText('ยังไม่มี keyword')).toBeInTheDocument();
+    expect(await screen.findByText('Template 0')).toBeInTheDocument();
+    expect(screen.getByText('Template 4')).toBeInTheDocument();
+    expect(screen.queryByText('Template 5')).not.toBeInTheDocument();
+    expect(screen.getByText('$flex_0')).toBeInTheDocument();
   });
 
-  it('ไม่มีหมวดแสดงลิงก์ไปสร้าง', async () => {
-    mockIntentsOk([]);
+  it('Active Intents แสดงจำนวน keyword/response และเหตุผลไม่พร้อม', async () => {
+    mockIntents.mockResolvedValue({
+      ok: true,
+      data: { items: [intent(), intent({ id: 'i2', name: 'ที่อยู่', keywords: [] })] },
+    });
     render(<ChatbotDashboardClient />);
 
-    expect(await screen.findByText('ไปสร้างหมวด')).toBeInTheDocument();
+    expect(await screen.findByText('1 keywords · 1 responses')).toBeInTheDocument();
+    expect(screen.getByLabelText('ยังไม่มี keyword')).toBeInTheDocument();
+  });
+
+  it('ไม่มีข้อมูลแสดงลิงก์สร้างทั้งสองฝั่ง', async () => {
+    mockReplyObjects.mockResolvedValue({ ok: true, data: { items: [] } });
+    mockIntents.mockResolvedValue({ ok: true, data: { items: [] } });
+    render(<ChatbotDashboardClient />);
+
+    expect(await screen.findByText('สร้างเทมเพลตแรก')).toBeInTheDocument();
+    expect(screen.getByText('ไปสร้างหมวด')).toBeInTheDocument();
   });
 });
 
 describe('ChatbotDashboardClient error', () => {
-  it('403 แสดง Forbidden ไม่ใช่ข้อความทั่วไปอย่างเดียว', async () => {
-    mockStats.mockResolvedValue({
-      ok: false,
-      error: 'Forbidden',
-      status: 403,
-    });
-    mockIntentsOk([]);
+  it('intents ล้มแสดง error ไม่ใช่ empty state', async () => {
+    mockIntents.mockResolvedValue({ ok: false, error: 'เซิร์ฟเวอร์ขัดข้อง กรุณาลองใหม่', status: 500 });
     render(<ChatbotDashboardClient />);
-    expect(await screen.findByText('Forbidden')).toBeInTheDocument();
-    expect(screen.queryByText('โหลดข้อมูลไม่สำเร็จ')).not.toBeInTheDocument();
-  });
 
-  // § intents ล้มต้องเห็น error ของ intents ไม่ใช่ empty state ชวนสร้างหมวดซ้ำ — stats ยังเขียวอยู่
-  it('intents 500 แสดง error ไม่ใช่ลิงก์ไปสร้างหมวด', async () => {
-    mockIntentsFail(500, 'เซิร์ฟเวอร์ขัดข้อง กรุณาลองใหม่');
-    render(<ChatbotDashboardClient />);
     expect(await screen.findByText('เซิร์ฟเวอร์ขัดข้อง กรุณาลองใหม่')).toBeInTheDocument();
     expect(screen.queryByText('ไปสร้างหมวด')).not.toBeInTheDocument();
-    // KPI stats ยังต้องอยู่ครบ — error นี้เป็นของ intents อย่างเดียว
-    expect(screen.getByText('ข้อความเข้า')).toBeInTheDocument();
+    // reply objects ยังแสดงปกติ
+    expect(screen.getByText('Welcome Message')).toBeInTheDocument();
   });
 
-  it('intents 403 แสดง error ไม่ใช่ empty state', async () => {
-    mockIntentsFail(403, 'สิทธิ์ไม่เพียงพอ');
+  it('reply objects 403 แสดง error แยกจาก intents', async () => {
+    mockReplyObjects.mockResolvedValue({ ok: false, error: 'สิทธิ์ไม่เพียงพอ', status: 403 });
     render(<ChatbotDashboardClient />);
+
     expect(await screen.findByText('สิทธิ์ไม่เพียงพอ')).toBeInTheDocument();
-    expect(screen.queryByText('ไปสร้างหมวด')).not.toBeInTheDocument();
-  });
-
-  // § stats เสร็จก่อนแต่ intents ยังค้าง — ต้องเห็น loading ไม่ใช่ flash false-empty
-  it('intents ค้างแต่ stats เสร็จยังแสดง loading', async () => {
-    mockIntents.mockImplementation(() => new Promise(() => {}));
-    render(<ChatbotDashboardClient />);
-    expect(await screen.findByText('กำลังโหลด...')).toBeInTheDocument();
-    expect(screen.queryByText('ไปสร้างหมวด')).not.toBeInTheDocument();
-    await act(async () => {});
+    expect(screen.queryByText('สร้างเทมเพลตแรก')).not.toBeInTheDocument();
+    expect(screen.getByText('เวลาทำการ')).toBeInTheDocument();
   });
 });

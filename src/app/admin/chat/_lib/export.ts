@@ -1,0 +1,76 @@
+import type { Message } from './types';
+
+// § export ฝั่ง client ล้วน — ไม่มี endpoint ใหม่ (jsk ใช้ backend /export/*)
+// ข้อความในห้องที่โหลดมาแล้วเท่านั้น (หน้าที่ยาวจะ export เฉพาะที่เห็น) ระบุใน UI
+
+const SENDER_LABEL: Record<string, string> = {
+  user: 'ผู้ใช้',
+  admin: 'เจ้าหน้าที่',
+  bot: 'บอท',
+  system: 'ระบบ',
+};
+
+function csvCell(value: string): string {
+  // § RFC 4180 — ครอบด้วย " และซ้ำ " ที่อยู่ข้างใน
+  if (/[",\n\r]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
+  return value;
+}
+
+export function messagesToCsv(messages: Message[]): string {
+  const header = ['เวลา', 'ผู้ส่ง', 'ประเภท', 'ข้อความ'];
+  const rows = messages.map((m) => [
+    m.createdAt,
+    SENDER_LABEL[m.sender] ?? m.sender,
+    m.messageType,
+    m.textContent ?? (m.messageType === 'text' ? '' : `[${m.messageType}]`),
+  ]);
+  // BOM ให้ Excel อ่านไทยถูก (เหมือน export ของ chat-histories)
+  return '﻿' + [header, ...rows].map((r) => r.map(csvCell).join(',')).join('\r\n');
+}
+
+export function downloadFile(content: string, filename: string, type: string): void {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/**
+ * § PDF = สั่งพิมพ์หน้าต่างใหม่แล้วให้ผู้ใช้ "Save as PDF" — ไม่เพิ่ม library PDF
+ * (Thai font embedding ใน pdf-lib ต้องแนบฟอนต์เพิ่มหลาย MB เพื่อหน้าเดียว)
+ */
+export function printConversation(
+  title: string,
+  messages: Message[],
+): boolean {
+  const win = window.open('', '_blank', 'width=800,height=900');
+  if (!win) return false;
+  const rows = messages
+    .map(
+      (m) =>
+        `<tr><td class="t">${escapeHtml(new Date(m.createdAt).toLocaleString('th-TH'))}</td>` +
+        `<td>${escapeHtml(SENDER_LABEL[m.sender] ?? m.sender)}</td>` +
+        `<td>${escapeHtml(m.textContent ?? `[${m.messageType}]`)}</td></tr>`,
+    )
+    .join('');
+  win.document.write(
+    `<!doctype html><html lang="th"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>` +
+      '<style>body{font-family:"Sarabun",sans-serif;padding:24px;color:#111}' +
+      'h1{font-size:18px}table{width:100%;border-collapse:collapse;font-size:12px}' +
+      'th,td{border:1px solid #ccc;padding:6px;text-align:left;vertical-align:top}' +
+      'td.t{white-space:nowrap;color:#555}</style></head><body>' +
+      `<h1>${escapeHtml(title)}</h1><table><thead><tr><th>เวลา</th><th>ผู้ส่ง</th><th>ข้อความ</th></tr></thead>` +
+      `<tbody>${rows}</tbody></table></body></html>`,
+  );
+  win.document.close();
+  win.focus();
+  win.print();
+  return true;
+}
