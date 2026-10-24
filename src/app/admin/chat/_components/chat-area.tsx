@@ -80,8 +80,7 @@ export function ChatArea({
               <PanelLeftOpen className="h-4 w-4" aria-hidden="true" />
             </button>
           )}
-          <span className="truncate text-sm font-bold text-ink">Live Chat</span>
-          <span className="hidden truncate text-xs text-muted sm:inline">Live Chat Console</span>
+          <span className="truncate text-sm font-bold text-ink">Live Chat Console</span>
         </div>
         <span
           className={cn(
