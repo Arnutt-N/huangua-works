@@ -23,7 +23,7 @@ function friend(over: Partial<FriendItem> = {}): FriendItem {
     followState: 'following',
     followCount: 1,
     refollowCount: 2,
-    since: '2026-04-05T00:00:00Z',
+    lastFollowAt: '2026-04-05T00:00:00Z',
     chatMode: 'bot_active',
     lastActiveAt: '2026-10-16T13:57:00Z',
     richMenuId: null,
@@ -42,9 +42,9 @@ beforeEach(() => {
     ok: true,
     data: {
       items: [
-        { id: 'e1', lineUserId: 'f1', event: 'follow', createdAt: '2026-04-05T00:00:00Z', displayName: 'Admin Somying', pictureUrl: null, maskedId: 'U*...001' },
-        { id: 'e2', lineUserId: 'f1', event: 'unfollow', createdAt: '2026-05-01T00:00:00Z', displayName: 'Admin Somying', pictureUrl: null, maskedId: 'U*...001' },
-        { id: 'e3', lineUserId: 'f1', event: 'follow', createdAt: '2026-05-02T00:00:00Z', displayName: 'Admin Somying', pictureUrl: null, maskedId: 'U*...001' },
+        { id: 'e1', friendId: 'f1', event: 'follow', createdAt: '2026-04-05T00:00:00Z', displayName: 'Admin Somying', pictureUrl: null, maskedId: 'U*...001' },
+        { id: 'e2', friendId: 'f1', event: 'unfollow', createdAt: '2026-05-01T00:00:00Z', displayName: 'Admin Somying', pictureUrl: null, maskedId: 'U*...001' },
+        { id: 'e3', friendId: 'f1', event: 'follow', createdAt: '2026-05-02T00:00:00Z', displayName: 'Admin Somying', pictureUrl: null, maskedId: 'U*...001' },
       ],
     },
   });

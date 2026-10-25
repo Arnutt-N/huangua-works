@@ -3,6 +3,12 @@ import { ALL_STATUSES } from './cases/state-machine';
 import { ALL_BUDGET_STATUSES } from './cases/budget';
 import { STAFF_ROLES } from './auth/roles';
 import { CONVERSATION_MODES } from './line/chat-modes';
+import {
+  CANNED_RESPONSE_CATEGORIES,
+  CANNED_SHORTCUT_MAX,
+  CANNED_TITLE_MAX,
+  TAG_COLORS,
+} from './contracts';
 
 /**
  * Validation schemas — source of truth สำหรับทุก input boundary
@@ -240,13 +246,18 @@ export const chatReplySchema = z.object({
  * POST/PATCH /api/line/admin/canned-responses — ข้อความสำเร็จรูป
  * shortcut เป็น natural key สำหรับพิมพ์ "/xxx" ใน composer
  */
-export const CANNED_RESPONSE_CATEGORIES = ['info', 'greeting', 'closing', 'escalation'] as const;
-
-const cannedTitle = z.string().trim().min(1, 'กรุณากรอกชื่อ').max(100, 'ชื่อยาวเกิน 100 ตัวอักษร');
+const cannedTitle = z
+  .string()
+  .trim()
+  .min(1, 'กรุณากรอกชื่อ')
+  .max(CANNED_TITLE_MAX, 'ชื่อยาวเกิน 100 ตัวอักษร');
 const cannedShortcut = z
   .string()
   .trim()
-  .regex(/^[a-z0-9-]{1,30}$/, 'shortcut ใช้ได้เฉพาะ a-z, 0-9 และ - (ยาวไม่เกิน 30)')
+  .regex(
+    new RegExp(`^[a-z0-9-]{1,${CANNED_SHORTCUT_MAX}}$`),
+    'shortcut ใช้ได้เฉพาะ a-z, 0-9 และ - (ยาวไม่เกิน 30)',
+  )
   .optional()
   .or(z.literal('').transform(() => undefined));
 const cannedContent = z
@@ -287,8 +298,6 @@ export const chatPrefsSchema = z
     message: 'ต้องระบุ pinned หรือ muted',
   });
 
-/** สีของ tag = design token variant เท่านั้น — ไม่รับ hex เพื่อคงพาเลตระบบ */
-export const TAG_COLORS = ['accent', 'gold', 'success', 'warning', 'danger', 'muted'] as const;
 
 /** POST /api/line/admin/tags */
 export const chatTagSchema = z.object({

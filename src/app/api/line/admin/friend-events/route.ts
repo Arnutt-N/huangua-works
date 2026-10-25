@@ -9,7 +9,7 @@ import { ADMIN_ROLES } from '@/lib/auth/roles';
 export const runtime = 'nodejs';
 
 const querySchema = z.object({
-  lineUserId: z.string().trim().max(50).optional(),
+  friendId: z.string().trim().max(50).optional(),
   limit: z.coerce.number().int().min(1).max(200).optional().default(100),
 });
 
@@ -23,7 +23,7 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const parsed = querySchema.safeParse({
-    lineUserId: url.searchParams.get('lineUserId') ?? undefined,
+    friendId: url.searchParams.get('friendId') ?? undefined,
     limit: url.searchParams.get('limit') ?? undefined,
   });
   if (!parsed.success) {
@@ -32,17 +32,17 @@ export async function GET(request: Request) {
       { status: 400 },
     );
   }
-  const { lineUserId, limit } = parsed.data;
+  const { friendId, limit } = parsed.data;
 
   const db = await getDb();
 
   const conditions = [];
-  if (lineUserId) conditions.push(eq(lineFriendEvents.lineUserId, lineUserId));
+  if (friendId) conditions.push(eq(lineFriendEvents.lineUserId, friendId));
 
   const rows = await db
     .select({
       id: lineFriendEvents.id,
-      lineUserId: lineFriendEvents.lineUserId,
+      friendId: lineFriendEvents.lineUserId,
       event: lineFriendEvents.event,
       createdAt: lineFriendEvents.createdAt,
       displayName: lineUsers.displayName,

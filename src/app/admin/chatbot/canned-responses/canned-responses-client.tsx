@@ -22,23 +22,21 @@ import {
   updateCannedResponse,
 } from '@/app/admin/chat/_lib/api';
 import type { CannedResponse } from '@/app/admin/chat/_lib/types';
+import {
+  CANNED_CATEGORY_LABELS,
+  CANNED_RESPONSE_CATEGORIES,
+  CANNED_SHORTCUT_MAX,
+  CANNED_TITLE_MAX,
+} from '@/lib/contracts';
 
-const CATEGORY_OPTIONS = [
-  { value: 'info', label: 'ข้อมูลทั่วไป' },
-  { value: 'greeting', label: 'ทักทาย' },
-  { value: 'closing', label: 'ปิดการสนทนา' },
-  { value: 'escalation', label: 'ส่งต่อ/ยกระดับ' },
-] as const;
-
-const CATEGORY_LABEL: Record<string, string> = Object.fromEntries(
-  CATEGORY_OPTIONS.map((c) => [c.value, c.label]),
-);
-
-const SHORTCUT_MAX = 30;
+const CATEGORY_OPTIONS = CANNED_RESPONSE_CATEGORIES.map((value) => ({
+  value,
+  label: CANNED_CATEGORY_LABELS[value],
+}));
 
 function categoryLabel(value: string | undefined): string {
   if (!value) return '—';
-  return CATEGORY_LABEL[value] ?? value;
+  return (CANNED_CATEGORY_LABELS as Record<string, string>)[value] ?? value;
 }
 
 export function CannedResponsesClient() {
@@ -282,7 +280,7 @@ export function CannedResponsesClient() {
                 value={shortcut}
                 onChange={(e) => setShortcut(e.target.value)}
                 placeholder="greeting"
-                maxLength={SHORTCUT_MAX}
+                maxLength={CANNED_SHORTCUT_MAX}
                 required
               />
             </div>
@@ -293,7 +291,7 @@ export function CannedResponsesClient() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="ข้อความทักทาย"
-                maxLength={100}
+                maxLength={CANNED_TITLE_MAX}
               />
             </div>
             <div>

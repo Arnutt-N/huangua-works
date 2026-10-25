@@ -12,7 +12,7 @@ function formatTime(seconds: number): string {
 }
 
 export function SessionTimeoutWarning() {
-  const { showWarning, remainingSeconds, extendSession } = useSessionTimeout(() => {
+  const { showWarning, remainingSeconds, restartIdleTimer } = useSessionTimeout(() => {
     void logout();
   });
 
@@ -42,7 +42,7 @@ export function SessionTimeoutWarning() {
         </p>
 
         <div className="flex gap-3">
-          <Button variant="primary" className="flex-1" onClick={extendSession}>
+          <Button variant="primary" className="flex-1" onClick={restartIdleTimer}>
             Stay Logged In
           </Button>
           <Button variant="outline" className="flex-1" onClick={() => void logout()}>

@@ -87,7 +87,7 @@ export async function GET(request: Request) {
   if (pageIds.length > 0) {
     const events = await db
       .select({
-        lineUserId: lineFriendEvents.lineUserId,
+        friendId: lineFriendEvents.lineUserId,
         event: lineFriendEvents.event,
         createdAt: lineFriendEvents.createdAt,
       })
@@ -95,9 +95,9 @@ export async function GET(request: Request) {
       .where(inArray(lineFriendEvents.lineUserId, pageIds))
       .orderBy(lineFriendEvents.createdAt);
     for (const e of events) {
-      const list = eventsByUser.get(e.lineUserId) ?? [];
+      const list = eventsByUser.get(e.friendId) ?? [];
       list.push({ event: e.event, createdAt: e.createdAt });
-      eventsByUser.set(e.lineUserId, list);
+      eventsByUser.set(e.friendId, list);
     }
   }
 
@@ -112,7 +112,7 @@ export async function GET(request: Request) {
       followState,
       followCount: stats.followCount,
       refollowCount: stats.refollowCount,
-      since: stats.lastFollowAt ? stats.lastFollowAt.toISOString() : null,
+      lastFollowAt: stats.lastFollowAt ? stats.lastFollowAt.toISOString() : null,
       chatMode: r.chatMode ?? null,
       lastActiveAt: r.lastMessageAt,
       richMenuId: getAssignedMenuId(r.metadata),

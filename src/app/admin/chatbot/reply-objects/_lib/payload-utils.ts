@@ -98,44 +98,6 @@ export function stripEditorKeys<T>(value: T): T {
   return value;
 }
 
-export const ALLOWED_ACTION_URI_SCHEMES = ['https:', 'http:', 'tel:', 'mailto:', 'line:'] as const;
-
-export const URI_SCHEME_ERROR_TH =
-  'ลิงก์ไม่ปลอดภัยหรือไม่รองรับ — ใช้ได้เฉพาะ https:, http:, tel:, mailto: หรือ line: เท่านั้น';
-
-export function isAllowedActionUri(uri: string): boolean {
-  try {
-    const protocol = new URL(uri).protocol;
-    return (ALLOWED_ACTION_URI_SCHEMES as readonly string[]).includes(protocol);
-  } catch {
-    return false;
-  }
-}
-
-export function findInvalidActionUri(value: unknown): string | null {
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const bad = findInvalidActionUri(item);
-      if (bad !== null) return bad;
-    }
-    return null;
-  }
-  if (isRecord(value)) {
-    if (
-      value.type === 'uri' &&
-      typeof value.uri === 'string' &&
-      value.uri.trim() !== '' &&
-      !isAllowedActionUri(value.uri)
-    ) {
-      return value.uri;
-    }
-    for (const nested of Object.values(value)) {
-      const bad = findInvalidActionUri(nested);
-      if (bad !== null) return bad;
-    }
-  }
-  return null;
-}
 
 /** skeleton payload ต่อชนิด — ชนิดอื่นเริ่ม {} แล้วแก้ด้วย JSON editor */
 export function defaultPayloadForType(objectType: string): Payload {

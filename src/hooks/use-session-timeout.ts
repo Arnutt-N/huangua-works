@@ -8,7 +8,8 @@ const WARNING_BEFORE = 5 * 60 * 1000;
 export interface SessionTimeoutState {
   showWarning: boolean;
   remainingSeconds: number;
-  extendSession: () => void;
+  /** § รีเซ็ตตัวเตือนฝั่ง client เท่านั้น — ไม่ต่ออายุ JWT (session จริงคุมด้วย token.expiresAt) */
+  restartIdleTimer: () => void;
 }
 
 export function useSessionTimeout(onLogout: () => void): SessionTimeoutState {
@@ -74,9 +75,9 @@ export function useSessionTimeout(onLogout: () => void): SessionTimeoutState {
     };
   }, [resetTimer, clearAllTimers]);
 
-  const extendSession = useCallback(() => {
+  const restartIdleTimer = useCallback(() => {
     resetTimer();
   }, [resetTimer]);
 
-  return { showWarning, remainingSeconds, extendSession };
+  return { showWarning, remainingSeconds, restartIdleTimer };
 }

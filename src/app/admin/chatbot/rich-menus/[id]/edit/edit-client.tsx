@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Label, Input } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import { areaStyle, toLineAction, validateArea, type RichMenuArea } from '../../rich-menu-templates';
-import { ensureRichMenuImage } from '../../rich-menu-image';
+import { fitRichMenuImage } from '../../rich-menu-image';
 import {
   DISPLAY_MODE_LABEL,
   canPublish,
@@ -143,7 +143,7 @@ export function RichMenuEditClient({ menuId }: { menuId: string }) {
   async function uploadImage() {
     if (!imageFile) return null;
     try {
-      const fitted = await ensureRichMenuImage(imageFile);
+      const fitted = await fitRichMenuImage(imageFile);
       const uploadFile =
         fitted.file instanceof File && !fitted.converted
           ? fitted.file

@@ -204,7 +204,7 @@ export interface FriendItem {
   followState: 'following' | 'unfollowed';
   followCount: number;
   refollowCount: number;
-  since: string | null;
+  lastFollowAt: string | null;
   chatMode: string | null;
   lastActiveAt: string | null;
   richMenuId: string | null;
@@ -219,7 +219,7 @@ export interface FriendsPage extends ListOf<FriendItem> {
 
 export interface FriendEventItem {
   id: string;
-  lineUserId: string;
+  friendId: string;
   event: 'follow' | 'unfollow';
   createdAt: string;
   displayName: string | null;
@@ -473,9 +473,9 @@ export const adminApi = {
     request<FriendsPage>(`/api/line/admin/friends?${query}`),
   getFriend: (id: string): Promise<ApiResult<FriendItem>> =>
     request<FriendItem>(`/api/line/admin/friends/${id}`),
-  listFriendEvents: (lineUserId?: string): Promise<ApiResult<ListOf<FriendEventItem>>> =>
+  listFriendEvents: (friendId?: string): Promise<ApiResult<ListOf<FriendEventItem>>> =>
     request<ListOf<FriendEventItem>>(
-      `/api/line/admin/friend-events${lineUserId ? `?lineUserId=${encodeURIComponent(lineUserId)}` : ''}`,
+      `/api/line/admin/friend-events${friendId ? `?friendId=${encodeURIComponent(friendId)}` : ''}`,
     ),
   assignUserRichMenu: (friendId: string, richMenuId: string): Promise<ApiResult<OkBody>> =>
     request<OkBody>(`/api/line/admin/friends/${friendId}/rich-menu`, withBody('POST', { richMenuId })),

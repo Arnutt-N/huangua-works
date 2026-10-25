@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  RICH_MENU_IMAGE_LIMIT_BYTES,
-  planRichMenuFit,
-  scaledToFit,
-} from './rich-menu-image';
+import { RICH_MENU_IMAGE_LIMIT_BYTES } from '@/lib/contracts';
+import { planRichMenuFit, scaledToFit } from './rich-menu-image';
 
 describe('planRichMenuFit', () => {
   it('รูปไม่เกิน 1 MB ผ่านไปเฉย ๆ', () => {

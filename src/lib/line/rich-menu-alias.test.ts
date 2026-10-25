@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { isValidAliasId } from './rich-menu-service';
+import { isValidAliasId } from '@/lib/contracts';
 
 describe('isValidAliasId', () => {
   test('ตัวอักษรอังกฤษ ตัวเลข _ - ผ่าน', () => {

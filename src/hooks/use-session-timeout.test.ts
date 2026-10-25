@@ -70,14 +70,14 @@ describe('useSessionTimeout', () => {
     expect(onLogout).not.toHaveBeenCalled();
   });
 
-  it('extendSession ปิด modal แล้วเริ่มนับใหม่ — ไม่เรียก onLogout ก่อนครบ 30 นาทีใหม่', () => {
+  it('restartIdleTimer ปิด modal แล้วเริ่มนับใหม่ — ไม่เรียก onLogout ก่อนครบ 30 นาทีใหม่', () => {
     const onLogout = vi.fn();
     const { result } = renderHook(() => useSessionTimeout(onLogout));
 
     act(() => void vi.advanceTimersByTime(INACTIVITY_MS - WARNING_MS + 1000));
     expect(result.current.showWarning).toBe(true);
 
-    act(() => result.current.extendSession());
+    act(() => result.current.restartIdleTimer());
     expect(result.current.showWarning).toBe(false);
 
     act(() => void vi.advanceTimersByTime(INACTIVITY_MS - 1000));

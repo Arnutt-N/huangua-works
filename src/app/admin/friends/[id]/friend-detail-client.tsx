@@ -48,7 +48,7 @@ export function FriendDetailClient({ friendId }: { friendId: string }) {
         <dl className="grid gap-2 text-sm sm:grid-cols-2">
           <div><dt className="text-muted">ID (ปกปิด)</dt><dd className="font-mono text-xs text-ink">{item.maskedId ?? '—'}</dd></div>
           <div><dt className="text-muted">สถานะ</dt><dd className="text-ink">{item.followState === 'following' ? 'ติดตามอยู่' : 'เลิกติดตาม'}</dd></div>
-          <div><dt className="text-muted">เริ่มติดตาม</dt><dd className="text-ink">{formatThaiDateTime(item.since)}</dd></div>
+          <div><dt className="text-muted">เริ่มติดตาม</dt><dd className="text-ink">{formatThaiDateTime(item.lastFollowAt)}</dd></div>
           <div><dt className="text-muted">ติดตาม / กลับมา</dt><dd className="text-ink">{item.followCount} / {item.refollowCount}{item.refollowCount > 0 ? ` (กลับมา ${item.refollowCount} ครั้ง)` : ''}</dd></div>
           <div><dt className="text-muted">เคลื่อนไหวล่าสุด</dt><dd className="text-ink">{formatThaiDateTime(item.lastActiveAt)}</dd></div>
           <div><dt className="text-muted">Rich Menu</dt><dd className="text-ink">{item.richMenuName ?? 'เมนูหลัก'}</dd></div>

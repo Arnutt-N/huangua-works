@@ -1,7 +1,8 @@
 // § LINE รับ content ของ rich menu ไม่เกิน 1 MB (413) — ย่อฝั่ง client ก่อนอัปโหลด
 // รูปที่พอดีอยู่แล้วผ่านไปเฉย ๆ (ไม่ re-encode เพื่อรักษา alpha ของ PNG)
 
-export const RICH_MENU_IMAGE_LIMIT_BYTES = 1024 * 1024;
+import { RICH_MENU_IMAGE_LIMIT_BYTES } from '@/lib/contracts';
+
 export const RICH_MENU_IMAGE_MAX_W = 2500;
 export const RICH_MENU_IMAGE_MAX_H = 1686;
 
@@ -40,11 +41,11 @@ export function scaledToFit(
   };
 }
 
-export interface EnsureRichMenuImageResult {
-  file: File | Blob;
-  filename: string;
-  converted: boolean;
-}
+/** § fits:false คือผลที่ถูกต้องได้ — ย่อจนสุดแล้วยังเกิน 1 MB ให้ server 413 เป็นผู้ตัดสิน */
+export type FitRichMenuImageResult =
+  | { fits: true; converted: false; file: File; filename: string }
+  | { fits: true; converted: true; file: Blob; filename: string }
+  | { fits: false; converted: true; file: Blob; filename: string };
 
 function canvasSupported(): boolean {
   try {
@@ -54,19 +55,26 @@ function canvasSupported(): boolean {
   }
 }
 
+async function tryDecodeBitmap(file: File): Promise<ImageBitmap | null> {
+  if (typeof createImageBitmap !== 'function') return null;
+  try {
+    return await createImageBitmap(file);
+  } catch {
+    return null;
+  }
+}
+
 async function decodeSource(
   file: File,
 ): Promise<{ source: CanvasImageSource; width: number; height: number; release: () => void }> {
-  if (typeof createImageBitmap === 'function') {
-    try {
-      const bitmap = await createImageBitmap(file);
-      return {
-        source: bitmap,
-        width: bitmap.width,
-        height: bitmap.height,
-        release: () => bitmap.close(),
-      };
-    } catch {}
+  const bitmap = await tryDecodeBitmap(file);
+  if (bitmap) {
+    return {
+      source: bitmap,
+      width: bitmap.width,
+      height: bitmap.height,
+      release: () => bitmap.close(),
+    };
   }
   const url = URL.createObjectURL(file);
   try {
@@ -113,9 +121,9 @@ function jpegFilename(name: string): string {
   return `${name.replace(/\.[^.]+$/, '') || 'image'}.jpg`;
 }
 
-export async function ensureRichMenuImage(file: File): Promise<EnsureRichMenuImageResult> {
+export async function fitRichMenuImage(file: File): Promise<FitRichMenuImageResult> {
   if (file.size <= RICH_MENU_IMAGE_LIMIT_BYTES) {
-    return { file, filename: file.name, converted: false };
+    return { fits: true, converted: false, file, filename: file.name };
   }
   if (typeof document === 'undefined' || !canvasSupported()) {
     throw new Error(RICH_MENU_FIT_GUIDANCE);
@@ -134,11 +142,11 @@ export async function ensureRichMenuImage(file: File): Promise<EnsureRichMenuIma
       );
       if (!best || blob.size < best.size) best = blob;
       if (blob.size <= RICH_MENU_IMAGE_LIMIT_BYTES) {
-        return { file: blob, filename: jpegFilename(file.name), converted: true };
+        return { fits: true, converted: true, file: blob, filename: jpegFilename(file.name) };
       }
     }
     if (!best) throw new Error(RICH_MENU_FIT_GUIDANCE);
-    return { file: best, filename: jpegFilename(file.name), converted: true };
+    return { fits: false, converted: true, file: best, filename: jpegFilename(file.name) };
   } finally {
     decoded.release();
   }

@@ -1084,7 +1084,7 @@ export const richMenuAliases = pgTable(
   {
     id: text('id').primaryKey(),
     // § alias_id เปลี่ยนเป้าได้อย่างเดียว (LINE PUT) ชื่อเอง immutable — validate
-    // pattern ที่ service (`isValidAliasId`) ไม่ใช่ที่ schema
+    // pattern ที่ `src/lib/contracts.ts` (`isValidAliasId`) ไม่ใช่ที่ schema
     aliasId: text('alias_id').notNull().unique(),
     // § RESTRICT: เมนูที่ alias ผูกอยู่ลบไม่ได้ก่อนลบ alias (กันเมนูลอย)
     richMenuId: text('rich_menu_id')

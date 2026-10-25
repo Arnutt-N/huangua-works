@@ -19,7 +19,7 @@ import {
   type RichMenuArea,
   type RichMenuAreaAction,
 } from '../rich-menu-templates';
-import { ensureRichMenuImage } from '../rich-menu-image';
+import { fitRichMenuImage } from '../rich-menu-image';
 import { DISPLAY_MODE_LABEL } from '../rich-menu-state';
 import { ThaiDateTimeField } from '../thai-datetime-field';
 
@@ -150,7 +150,7 @@ export function RichMenuBuilderClient() {
     }
 
     try {
-      const fitted = await ensureRichMenuImage(file!);
+      const fitted = await fitRichMenuImage(file!);
       const uploadFile =
         fitted.file instanceof File && !fitted.converted
           ? fitted.file

@@ -8,6 +8,7 @@ import { requireStaffApi } from '@/lib/auth/require-staff';
 import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit';
 import { broadcastTargetSchema } from '@/lib/line/broadcast-target';
+import { BROADCAST_TEXT_MAX, BROADCAST_TITLE_MAX } from '@/lib/contracts';
 import { z } from 'zod';
 
 export const runtime = 'nodejs';
@@ -17,13 +18,13 @@ const httpsUrl = z.string().url().refine((u) => u.startsWith('https://'), 'ต�
 // § content เป็น discriminated union เข้มเท่า LINE รับ — เดิมตรวจแค่ type string + passthrough
 // bypass wizard POST ตรงเก็บของผิดลง DB ไปแตกตอน send/cron (502 ทีหลัง) ต้อง fail ที่ boundary
 const contentSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('text'), text: z.string().min(1).max(5000) }).passthrough(),
+  z.object({ type: z.literal('text'), text: z.string().min(1).max(BROADCAST_TEXT_MAX) }).passthrough(),
   z.object({ type: z.literal('image'), originalContentUrl: httpsUrl, previewImageUrl: httpsUrl }).passthrough(),
   z.object({ type: z.literal('flex'), altText: z.string().min(1).max(400), contents: z.record(z.string(), z.unknown()) }).passthrough(),
 ]);
 
 const createSchema = z.object({
-  title: z.string().trim().max(100, 'ชื่อแคมเปญยาวเกินไป').optional(),
+  title: z.string().trim().max(BROADCAST_TITLE_MAX, 'ชื่อแคมเปญยาวเกินไป').optional(),
   content: z.array(contentSchema).min(1).max(5),
   target: broadcastTargetSchema.default({ kind: 'all' }),
   scheduledAt: z.string().datetime().nullable().optional(),

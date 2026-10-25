@@ -4,7 +4,8 @@ import { parseBody } from '@/lib/api-helpers';
 import { requireStaffApi } from '@/lib/auth/require-staff';
 import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit';
-import { deleteMenuAlias, isValidAliasId, repointMenuAlias } from '@/lib/line/rich-menu-service';
+import { deleteMenuAlias, repointMenuAlias } from '@/lib/line/rich-menu-service';
+import { isValidAliasId } from '@/lib/contracts';
 
 export const runtime = 'nodejs';
 

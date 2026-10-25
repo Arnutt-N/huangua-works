@@ -4,13 +4,12 @@ import { useCallback, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { FieldError, Label, Input } from '@/components/ui/field';
 import { REPLY_OBJECT_TYPES } from '@/lib/line/reply-object-validation';
+import { findActionUriViolation, URI_SCHEME_ERROR_TH } from '@/lib/contracts';
 import {
   defaultPayloadForType,
   ensureEditorKeys,
-  findInvalidActionUri,
   safeParsePayload,
   stripEditorKeys,
-  URI_SCHEME_ERROR_TH,
   type QuickReply,
 } from '../_lib/payload-utils';
 import { QuickReplyEditor } from './quick-reply-editor';
@@ -104,7 +103,7 @@ export function ReplyObjectForm({
       setError('Invalid JSON payload');
       return;
     }
-    const invalidUri = findInvalidActionUri(parsed);
+    const invalidUri = findActionUriViolation(parsed);
     if (invalidUri) {
       setError(`${URI_SCHEME_ERROR_TH} (${invalidUri})`);
       return;

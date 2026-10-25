@@ -2,7 +2,8 @@
 
 import { useId } from 'react';
 import { Trash2 } from 'lucide-react';
-import { FIELD_CLS, isAllowedActionUri, URI_SCHEME_ERROR_TH, type LineAction } from '../_lib/payload-utils';
+import { isAllowedActionUri, URI_SCHEME_ERROR_TH } from '@/lib/contracts';
+import { FIELD_CLS, type LineAction } from '../_lib/payload-utils';
 
 const ACTION_TYPES = ['message', 'uri', 'postback'] as const;
 

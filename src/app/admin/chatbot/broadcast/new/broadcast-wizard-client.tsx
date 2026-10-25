@@ -9,13 +9,13 @@ import { FieldHint, Label, Textarea } from '@/components/ui/field';
 import { ThaiDatePicker } from '@/components/ui/thai-date-picker';
 import { ArrowLeft, ArrowRight, Check, FileText, Image, Braces, Send } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { BROADCAST_TEXT_MAX, BROADCAST_TITLE_MAX } from '@/lib/contracts';
 
 // ponytail: ตัด type object ออกชั่วคราว — server ยังไม่มี resolver $objectId → LineOutgoingMessage
 // คืนได้เมื่อ broadcast-service แกะ ref ก่อนยิง LINE API
 type ContentType = 'text' | 'image' | 'flex';
 
-const TEXT_MAX = 5000;
-const TITLE_MAX = 100;
+
 
 const TYPE_CARDS: { key: ContentType; label: string; desc: string; icon: typeof FileText }[] = [
   { key: 'text', label: 'ข้อความ', desc: 'ส่งข้อความตัวอักษรธรรมดา', icon: FileText },
@@ -76,8 +76,8 @@ export function BroadcastWizardClient() {
   function buildContent(): { content: BroadcastContent[]; error: string | null } {
     if (contentType === 'text') {
       if (!message.trim()) return { content: [], error: 'กรุณากรอกข้อความ' };
-      if (message.length > TEXT_MAX) {
-        return { content: [], error: `ข้อความยาวเกิน ${TEXT_MAX.toLocaleString('th-TH')} ตัวอักษร` };
+      if (message.length > BROADCAST_TEXT_MAX) {
+        return { content: [], error: `ข้อความยาวเกิน ${BROADCAST_TEXT_MAX.toLocaleString('th-TH')} ตัวอักษร` };
       }
       return { content: [{ type: 'text', text: message.trim() }], error: null };
     }
@@ -213,7 +213,7 @@ export function BroadcastWizardClient() {
             <input
               id="bw-title"
               aria-label="ชื่อแคมเปญ"
-              maxLength={TITLE_MAX}
+              maxLength={BROADCAST_TITLE_MAX}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="เช่น ประกาศปิดทำการวันที่ 12 ส.ค."
@@ -227,14 +227,14 @@ export function BroadcastWizardClient() {
               <Textarea
                 id="bw-msg"
                 rows={4}
-                maxLength={TEXT_MAX}
+                maxLength={BROADCAST_TEXT_MAX}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="เช่น ประกาศ: อบต.หัวงัวปิดทำการวันที่ 12 ส.ค."
               />
               {/* § LINE จำกัดข้อความ broadcast ต่อครั้งที่ 5000 ตัวอักษร */}
               <p className="mt-1 text-right text-xs tabular-nums text-muted">
-                {message.length.toLocaleString('th-TH')} / {TEXT_MAX.toLocaleString('th-TH')}
+                {message.length.toLocaleString('th-TH')} / {BROADCAST_TEXT_MAX.toLocaleString('th-TH')}
               </p>
             </div>
           )}

@@ -3,12 +3,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Check, Plus, Settings2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { TAG_COLORS } from '@/lib/contracts';
 import { createTag, fetchTags, putConversationTags } from '../_lib/api';
 import { TAG_BADGE } from '../_lib/labels';
 import type { ChatTag } from '../_lib/types';
 
-/** สีที่เลือกได้ = token variant keys เท่านั้น (ตรงกับ TAG_COLORS ใน validation) */
-const TAG_COLOR_OPTIONS = ['accent', 'gold', 'success', 'warning', 'danger', 'muted'] as const;
+const TAG_COLOR_OPTIONS = TAG_COLORS;
 
 export function TagPicker({
   conversationId,

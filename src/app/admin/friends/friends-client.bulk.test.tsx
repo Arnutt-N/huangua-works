@@ -28,7 +28,7 @@ function friend(over: Partial<FriendItem> = {}): FriendItem {
     followState: 'following',
     followCount: 1,
     refollowCount: 2,
-    since: '2026-04-05T00:00:00Z',
+    lastFollowAt: '2026-04-05T00:00:00Z',
     chatMode: 'bot_active',
     lastActiveAt: '2026-10-16T13:57:00Z',
     richMenuId: null,

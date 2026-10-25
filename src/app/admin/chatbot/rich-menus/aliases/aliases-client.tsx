@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import { adminApi } from '@/app/admin/_lib/admin-api';
+import { ALIAS_ID_PATTERN } from '@/lib/contracts';
 import { isSyncedMenu } from '../menu-predicates';
 import { useResource } from '@/app/admin/_lib/use-resource';
 import { PageHeader } from '@/components/admin/page-header';
@@ -12,7 +13,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 
-const ALIAS_ID_PATTERN = /^[a-zA-Z0-9_-]{1,50}$/;
 
 export function RichMenuAliasesClient() {
   const [aliasId, setAliasId] = useState('');

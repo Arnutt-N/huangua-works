@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm';
+import { isValidAliasId } from '@/lib/contracts';
 import { getDb } from '@/lib/db';
 import { richMenuAliases, richMenus } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
@@ -298,10 +299,6 @@ export async function publishRichMenu(id: string): Promise<{ ok: boolean; error?
 
 // ─── alias (สลับ tab ด้วย richmenuswitch) ────────────────────────────────
 
-/** pattern เดียวกับ LINE console: a-z A-Z 0-9 _ - ยาวไม่เกิน 50 */
-export function isValidAliasId(aliasId: string): boolean {
-  return /^[a-zA-Z0-9_-]{1,50}$/.test(aliasId);
-}
 
 async function resolveAliasTarget(
   db: Awaited<ReturnType<typeof getDb>>,

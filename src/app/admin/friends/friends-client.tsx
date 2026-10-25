@@ -328,7 +328,7 @@ export function FriendsClient() {
                         {chatModeLabel(friend.chatMode)}
                       </td>
                       <td className="whitespace-nowrap px-3 py-2.5 text-muted">
-                        {formatThaiDate(friend.since)}
+                        {formatThaiDate(friend.lastFollowAt)}
                       </td>
                       <td className="whitespace-nowrap px-3 py-2.5 text-muted">
                         {friend.lastActiveAt
