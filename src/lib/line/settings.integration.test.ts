@@ -8,6 +8,9 @@ import { getChatSetting, setChatSettings } from './settings';
 import { configVersionKey, readConfigVersion } from './config-version';
 import { GET, PUT } from '@/app/api/line/admin/settings/route';
 
+// § Redis ร่วมกับ dev server ทำให้แอสเสิร์ตแบบ 5s ไม่พอ — ใช้ timeout แบบ intake pattern
+vi.setConfig({ testTimeout: 30_000 });
+
 vi.mock('@/lib/auth/require-staff', () => ({
   requireStaffApi: vi.fn(async () => ({
     ok: true,
@@ -77,7 +80,9 @@ describe('settings · process เดียวกัน', () => {
   });
 
   test('ทุกครั้งที่เขียน เลข version ใน Redis เพิ่มขึ้น 1', async () => {
-    const before = Number((await readConfigVersion('settings')) ?? '0');
+    // § อ่านค่าดิบจาก Redis ไม่ผ่าน readConfigVersion — ตัวนั้นมี cache 3s อาจคืนค่าเก่า
+    // แล้วเทียบกับ INCR จริงพลาด (คีย์นี้สะสมข้ามรอบ test ไม่ได้ reset)
+    const before = Number((await redis.get(configVersionKey('settings'))) ?? '0');
     await setChatSettings({ bot_enabled: true });
     expect(await readConfigVersion('settings')).toBe(String(before + 1));
   });
