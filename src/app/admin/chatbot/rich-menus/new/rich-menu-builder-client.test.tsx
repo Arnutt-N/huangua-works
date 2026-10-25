@@ -2,14 +2,19 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   RICH_MENU_TEMPLATES,
   areaStyle,
   templateByKey,
+  templatesByGroup,
   validateArea,
 } from '../rich-menu-templates';
 import { RichMenuBuilderClient } from './rich-menu-builder-client';
+
+const listReplyObjects = vi.fn();
+const listIntents = vi.fn();
+const listMenuAliases = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -17,7 +22,10 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/app/admin/_lib/admin-api', () => ({
   adminApi: {
-    createRichMenu: vi.fn().mockResolvedValue({ ok: true, data: {} }),
+    createRichMenu: vi.fn().mockResolvedValue({ ok: true, data: { id: 'm1' } }),
+    listReplyObjects: (...args: unknown[]) => listReplyObjects(...args),
+    listIntents: (...args: unknown[]) => listIntents(...args),
+    listMenuAliases: (...args: unknown[]) => listMenuAliases(...args),
   },
 }));
 
@@ -25,10 +33,18 @@ afterEach(() => {
   cleanup();
 });
 
+beforeEach(() => {
+  listReplyObjects.mockResolvedValue({ ok: true, data: { items: [] } });
+  listIntents.mockResolvedValue({ ok: true, data: { items: [] } });
+  listMenuAliases.mockResolvedValue({ ok: true, data: { items: [] } });
+});
+
 describe('rich-menu-templates', () => {
-  it('มี 3 เทมเพลต เริ่มด้วย 6 ปุ่ม 3x2', () => {
-    expect(RICH_MENU_TEMPLATES).toHaveLength(3);
-    expect(RICH_MENU_TEMPLATES[0]!.key).toBe('grid-3x2');
+  it('มี 11 เทมเพลต แยก Large 7 / Compact 4', () => {
+    expect(RICH_MENU_TEMPLATES).toHaveLength(11);
+    expect(templatesByGroup('Large')).toHaveLength(7);
+    expect(templatesByGroup('Compact')).toHaveLength(4);
+    expect(RICH_MENU_TEMPLATES[0]!.key).toBe('large-6');
     expect(RICH_MENU_TEMPLATES[0]!.areas).toHaveLength(6);
   });
 
@@ -48,47 +64,49 @@ describe('rich-menu-templates', () => {
     expect(validateArea({ type: 'message', text: 'สวัสดี' })).toBeNull();
   });
 
-  it('validateArea บล็อก placeholder LIFF_ID', () => {
+  it('validateArea บล็อก placeholder LIFF_ID + บังคับ alias ของ richmenuswitch', () => {
     expect(validateArea({ type: 'uri', uri: 'https://liff.line.me/<LIFF_ID>/intake' })).toBe(
       'กรุณาแทน <LIFF_ID> ด้วยค่า LINE_LIFF_ID จริงก่อนบันทึก',
     );
+    expect(validateArea({ type: 'richmenuswitch' })).toBe('ต้องเลือก alias ปลายทาง');
+    expect(validateArea({ type: 'richmenuswitch', richMenuAliasId: 'a' })).toBeNull();
   });
 
   it('areaStyle แปลง bounds เป็น percent', () => {
-    const s = areaStyle(
-      { x: 0, y: 0, width: 833, height: 843 },
-      { width: 2500, height: 1686 },
-    );
+    const s = areaStyle({ x: 0, y: 0, width: 833, height: 843 }, { width: 2500, height: 1686 });
     expect(s.left).toBe('0%');
     expect(s.width).toContain('%');
   });
 });
 
 describe('RichMenuBuilderClient', () => {
-  it('แสดงเทมเพลตและ 6 พื้นที่', () => {
+  it('แสดงเทมเพลตเริ่มต้นและครบ 6 พื้นที่', async () => {
     render(<RichMenuBuilderClient />);
-
-    expect(screen.getByText('6 ปุ่ม (3×2)')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'พื้นที่ 1' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'พื้นที่ 6' })).toBeInTheDocument();
+    expect(await screen.findByText('6 ปุ่ม (3×2)')).toBeInTheDocument();
+    expect(screen.getByLabelText('ประเภทการทำงานพื้นที่ 1')).toBeInTheDocument();
+    expect(screen.getByLabelText('ประเภทการทำงานพื้นที่ 6')).toBeInTheDocument();
   });
 
-  it('สลับเทมเพลตเปลี่ยนจำนวนพื้นที่', async () => {
+  it('เปิด modal เลือกเทมเพลตและเปลี่ยนจำนวนพื้นที่', async () => {
     const user = userEvent.setup();
     render(<RichMenuBuilderClient />);
+    await user.click(screen.getByRole('button', { name: /เปลี่ยนเทมเพลต/ }));
+    expect(await screen.findByText('เลือกเทมเพลต')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: '4 ปุ่ม (2×2)' }));
+    await user.click(screen.getByRole('button', { name: /4 ปุ่ม \(2×2\)/ }));
+    await user.click(screen.getByRole('button', { name: 'ใช้เทมเพลตนี้' }));
 
-    expect(screen.queryByRole('button', { name: 'พื้นที่ 6' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'พื้นที่ 4' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('ประเภทการทำงานพื้นที่ 6')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('ประเภทการทำงานพื้นที่ 4')).toBeInTheDocument();
   });
 
-  it('บล็อกเมื่อชื่อเมนูว่าง', async () => {
+  it('บล็อกเมื่อยังไม่กรอกชื่อเมนู', async () => {
     const user = userEvent.setup();
     render(<RichMenuBuilderClient />);
+    await screen.findByText('6 ปุ่ม (3×2)');
 
-    await user.click(screen.getByRole('button', { name: 'สร้างเมนู' }));
+    await user.click(screen.getByRole('button', { name: 'บันทึกฉบับร่าง' }));
 
-    expect(await screen.findByText('กรุณากรอกชื่อเมนู')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('กรุณากรอกชื่อเมนู');
   });
 });

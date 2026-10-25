@@ -8,6 +8,8 @@
  *   คืน object เปล่า และ error คืน `{ error }` + status จึงห้าม assume ว่าทุกจุดคืนรูปเดียว
  */
 
+import type { RichMenuDisplayMode } from '@/lib/contracts';
+
 export type ApiOk<T> = { ok: true; data: T };
 export type ApiFail = { ok: false; error: string; status: number };
 export type ApiResult<T> = ApiOk<T> | ApiFail;
@@ -86,6 +88,8 @@ export type IntentPatch = Partial<IntentPayload>;
 export interface ReplyObject {
   id: string;
   objectId: string;
+  name: string | null;
+  category: string | null;
   objectType: string;
   payload: Record<string, unknown>;
   altText: string | null;
@@ -95,6 +99,8 @@ export interface ReplyObject {
 
 export interface ReplyObjectInput {
   objectId: string;
+  name?: string;
+  category?: string;
   objectType: string;
   payload: Record<string, unknown>;
   altText?: string; // create schema รับ string optional เท่านั้น — ไม่รับ null (route.ts createSchema)
@@ -102,10 +108,19 @@ export interface ReplyObjectInput {
 }
 
 export interface ReplyObjectPatch {
+  name?: string | null;
+  category?: string | null;
   objectType: string;
   payload: Record<string, unknown>;
   altText?: string | null; // update schema รับ null ได้ (route.ts updateSchema)
   isActive: boolean;
+}
+
+
+
+export interface RichMenuAreaInput {
+  bounds: { x: number; y: number; width: number; height: number };
+  action: { type: string; uri?: string; text?: string; richMenuAliasId?: string };
 }
 
 export interface RichMenuItem {
@@ -114,19 +129,73 @@ export interface RichMenuItem {
   chatBarText: string;
   lineRichMenuId: string | null;
   status: string;
+  displayMode: string;
   syncStatus: string;
   lastSyncError: string | null;
+  imageUrl: string | null;
   displayStartAt: string | null;
   displayEndAt: string | null;
   createdAt: string;
+  userLinkCount?: number;
+}
+
+export interface RichMenuConfig {
+  size: { width: number; height: number };
+  selected?: boolean;
+  name?: string;
+  chatBarText?: string;
+  areas?: RichMenuAreaInput[];
+}
+
+export interface RichMenuItemDetail extends RichMenuItem {
+  config: RichMenuConfig;
 }
 
 export interface RichMenuInput {
   name: string;
   chatBarText: string;
   config: unknown;
+  displayMode?: RichMenuDisplayMode;
   displayStartAt?: string;
   displayEndAt?: string;
+}
+
+export interface RichMenuPatch {
+  name?: string;
+  chatBarText?: string;
+  areas?: RichMenuAreaInput[];
+  displayMode?: RichMenuDisplayMode;
+  displayStartAt?: string | null;
+  displayEndAt?: string | null;
+}
+
+export interface RichMenuInsightMetric {
+  count: number;
+  unique_users: number;
+}
+
+export interface RichMenuInsightSummary {
+  rich_menu_id: string;
+  metrics_from: string | null;
+  metrics_to: string | null;
+  impression: RichMenuInsightMetric | null;
+  clicks: { bound: string; count: number; unique_users: number }[] | null;
+  privacy_restricted: boolean;
+}
+
+export interface RichMenuInsightDailyPoint {
+  date: string;
+  count: number;
+  unique_users: number;
+}
+
+export interface RichMenuInsightDaily {
+  rich_menu_id: string;
+  metrics_from: string | null;
+  metrics_to: string | null;
+  impression: { metrics: RichMenuInsightDailyPoint[] } | null;
+  clicks: { bound: string; metrics: RichMenuInsightDailyPoint[] }[] | null;
+  privacy_restricted: boolean;
 }
 
 export interface FriendItem {
@@ -137,6 +206,8 @@ export interface FriendItem {
   followState: 'following' | 'unfollowed';
   followCount: number;
   refollowCount: number;
+  lastFollowAt: string | null;
+  chatMode: string | null;
   lastActiveAt: string | null;
   richMenuId: string | null;
   richMenuName: string | null;
@@ -148,10 +219,21 @@ export interface FriendsPage extends ListOf<FriendItem> {
   pageSize: number;
 }
 
+export interface FriendEventItem {
+  id: string;
+  friendId: string;
+  event: 'follow' | 'unfollow';
+  createdAt: string;
+  displayName: string | null;
+  pictureUrl: string | null;
+  maskedId: string | null;
+}
+
 export interface RichMenuAliasItem {
   aliasId: string;
   richMenuId: string;
   menuName: string | null;
+  syncStatus: string | null;
 }
 
 export type BroadcastTarget =
@@ -166,6 +248,7 @@ export interface BroadcastContent {
 
 export interface BroadcastItem {
   id: string;
+  title: string | null;
   content: BroadcastContent[];
   status: string;
   target: BroadcastTarget;
@@ -180,9 +263,16 @@ export interface BroadcastItem {
 }
 
 export interface BroadcastInput {
+  title?: string | null;
   content: BroadcastContent[];
   target: BroadcastTarget;
   scheduledAt: string | null;
+}
+
+export interface BroadcastPage extends ListOf<BroadcastItem> {
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 export interface BroadcastRecipientOption {
@@ -318,8 +408,8 @@ export const adminApi = {
     request<ListOf<IntentItem>>('/api/line/admin/intents'),
   getIntent: (id: string): Promise<ApiResult<IntentItem>> =>
     request<IntentItem>(`/api/line/admin/intents/${id}`),
-  createIntent: (payload: IntentPayload): Promise<ApiResult<OkBody>> =>
-    request<OkBody>('/api/line/admin/intents', withBody('POST', payload)),
+  createIntent: (payload: IntentPayload): Promise<ApiResult<OkBody & { id?: string }>> =>
+    request<OkBody & { id?: string }>('/api/line/admin/intents', withBody('POST', payload)),
   updateIntent: (id: string, payload: IntentPatch): Promise<ApiResult<OkBody>> =>
     request<OkBody>(`/api/line/admin/intents/${id}`, withBody('PATCH', payload)),
   deleteIntent: (id: string): Promise<ApiResult<OkBody>> =>
@@ -338,8 +428,30 @@ export const adminApi = {
   // ── Rich menus ──
   listRichMenus: (): Promise<ApiResult<ListOf<RichMenuItem>>> =>
     request<ListOf<RichMenuItem>>('/api/line/admin/rich-menus'),
-  createRichMenu: (payload: RichMenuInput): Promise<ApiResult<OkBody>> =>
-    request<OkBody>('/api/line/admin/rich-menus', withBody('POST', payload)),
+  getRichMenu: (id: string): Promise<ApiResult<RichMenuItemDetail>> =>
+    request<RichMenuItemDetail>(`/api/line/admin/rich-menus/${id}`),
+  createRichMenu: (payload: RichMenuInput): Promise<ApiResult<OkBody & { id?: string }>> =>
+    request<OkBody & { id?: string }>('/api/line/admin/rich-menus', withBody('POST', payload)),
+  updateRichMenu: (id: string, payload: RichMenuPatch): Promise<ApiResult<OkBody>> =>
+    request<OkBody>(`/api/line/admin/rich-menus/${id}`, withBody('PATCH', payload)),
+  deleteRichMenu: (id: string): Promise<ApiResult<OkBody>> =>
+    request<OkBody>(`/api/line/admin/rich-menus/${id}`, { method: 'DELETE' }),
+  getRichMenuInsightSummary: (
+    id: string,
+    from: string,
+    to: string,
+  ): Promise<ApiResult<RichMenuInsightSummary>> =>
+    request<RichMenuInsightSummary>(
+      `/api/line/admin/rich-menus/${id}/insights/summary?from=${from}&to=${to}`,
+    ),
+  getRichMenuInsightDaily: (
+    id: string,
+    from: string,
+    to: string,
+  ): Promise<ApiResult<RichMenuInsightDaily>> =>
+    request<RichMenuInsightDaily>(
+      `/api/line/admin/rich-menus/${id}/insights/daily?from=${from}&to=${to}`,
+    ),
   syncRichMenu: (id: string): Promise<ApiResult<OkBody>> =>
     request<OkBody>(`/api/line/admin/rich-menus/${id}/sync`, { method: 'POST' }),
   publishRichMenu: (id: string): Promise<ApiResult<OkBody>> =>
@@ -363,20 +475,27 @@ export const adminApi = {
     request<FriendsPage>(`/api/line/admin/friends?${query}`),
   getFriend: (id: string): Promise<ApiResult<FriendItem>> =>
     request<FriendItem>(`/api/line/admin/friends/${id}`),
+  listFriendEvents: (friendId?: string): Promise<ApiResult<ListOf<FriendEventItem>>> =>
+    request<ListOf<FriendEventItem>>(
+      `/api/line/admin/friend-events${friendId ? `?friendId=${encodeURIComponent(friendId)}` : ''}`,
+    ),
   assignUserRichMenu: (friendId: string, richMenuId: string): Promise<ApiResult<OkBody>> =>
     request<OkBody>(`/api/line/admin/friends/${friendId}/rich-menu`, withBody('POST', { richMenuId })),
   unassignUserRichMenu: (friendId: string): Promise<ApiResult<OkBody>> =>
     request<OkBody>(`/api/line/admin/friends/${friendId}/rich-menu`, { method: 'DELETE' }),
 
   // ── Broadcasts ──
-  listBroadcasts: (): Promise<ApiResult<ListOf<BroadcastItem>>> =>
-    request<ListOf<BroadcastItem>>('/api/line/admin/broadcasts'),
+  listBroadcasts: (query?: string): Promise<ApiResult<BroadcastPage>> =>
+    request<BroadcastPage>(`/api/line/admin/broadcasts${query ? `?${query}` : ''}`),
   getBroadcast: (id: string): Promise<ApiResult<BroadcastItem>> =>
     request<BroadcastItem>(`/api/line/admin/broadcasts/${id}`),
-  createBroadcast: (payload: BroadcastInput): Promise<ApiResult<OkBody>> =>
-    request<OkBody>('/api/line/admin/broadcasts', withBody('POST', payload)),
+  createBroadcast: (payload: BroadcastInput): Promise<ApiResult<OkBody & { id?: string }>> =>
+    request<OkBody & { id?: string }>('/api/line/admin/broadcasts', withBody('POST', payload)),
   sendBroadcast: (id: string): Promise<ApiResult<OkBody>> =>
     request<OkBody>(`/api/line/admin/broadcasts/${id}/send`, { method: 'POST' }),
+  /** ยกเลิกแบบ soft — API คืน 409 เมื่อสถานะส่งแล้ว/กำลังส่ง */
+  cancelBroadcast: (id: string): Promise<ApiResult<OkBody>> =>
+    request<OkBody>(`/api/line/admin/broadcasts/${id}`, { method: 'DELETE' }),
   listBroadcastRecipients: (): Promise<ApiResult<ListOf<BroadcastRecipientOption>>> =>
     request<ListOf<BroadcastRecipientOption>>('/api/line/admin/broadcasts/recipients'),
   dryRunBroadcast: (target: BroadcastTarget): Promise<ApiResult<{ estimatedRecipients: number }>> =>

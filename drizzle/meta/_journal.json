@@ -225,6 +225,27 @@
       "when": 1792412343512,
       "tag": "0031_drop_line_plaintext",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1792500000001,
+      "tag": "0032_line_menu_parity_tranche3",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1792500000002,
+      "tag": "0033_rich_menu_display_mode",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1792500000003,
+      "tag": "0034_broadcast_title_and_cancel_status",
+      "breakpoints": true
     }
   ]
 }

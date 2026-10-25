@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { getDb, type Tx } from '@/lib/db';
 import { chatIntentKeywords, chatIntentResponses, chatIntents } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
@@ -149,10 +149,10 @@ export async function updateIntent(id: string, patch: UpdateIntentInput): Promis
 
 export async function deleteIntent(id: string): Promise<IntentWriteResult> {
   const db = await getDb();
-  // keywords/responses หายตามด้วย onDelete: 'cascade'
   const deleted = await db
-    .delete(chatIntents)
-    .where(eq(chatIntents.id, id))
+    .update(chatIntents)
+    .set({ isActive: false, updatedAt: new Date() })
+    .where(and(eq(chatIntents.id, id), eq(chatIntents.isActive, true)))
     .returning({ id: chatIntents.id });
   if (deleted.length === 0) return { ok: false, reason: 'not_found' };
 

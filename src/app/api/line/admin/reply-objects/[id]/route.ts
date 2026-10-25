@@ -13,6 +13,8 @@ import { replyObjectTypeSchema, validateReplyPayload } from '@/lib/line/reply-ob
 export const runtime = 'nodejs';
 
 const updateSchema = z.object({
+  name: z.string().trim().min(1, 'กรุณากรอกชื่อ').max(120).nullable().optional(),
+  category: z.string().trim().max(60).nullable().optional(),
   objectType: replyObjectTypeSchema.optional(),
   payload: z.record(z.string(), z.unknown()).optional(),
   altText: z.string().max(200).nullable().optional(),
@@ -78,7 +80,11 @@ export async function DELETE(
   const { id } = await params;
   const db = await getDb();
 
-  const [existing] = await db.select({ objectId: chatReplyObjects.objectId }).from(chatReplyObjects).where(eq(chatReplyObjects.id, id)).limit(1);
+  const [existing] = await db
+    .select({ objectId: chatReplyObjects.objectId })
+    .from(chatReplyObjects)
+    .where(and(eq(chatReplyObjects.id, id), eq(chatReplyObjects.isActive, true)))
+    .limit(1);
   if (!existing) {
     return NextResponse.json({ error: 'ไม่พบ reply object' }, { status: 404 });
   }
@@ -101,7 +107,11 @@ export async function DELETE(
     );
   }
 
-  await db.update(chatReplyObjects).set({ isActive: false, updatedAt: new Date() }).where(eq(chatReplyObjects.id, id));
+  // § where isActive=true — ลบซ้ำต้อง 404; แถวที่ซ่อนแล้วห้าม audit ซ้ำ
+  await db
+    .update(chatReplyObjects)
+    .set({ isActive: false, updatedAt: new Date() })
+    .where(and(eq(chatReplyObjects.id, id), eq(chatReplyObjects.isActive, true)));
 
   await logAudit({
     userId: authz.ctx.user.id,

@@ -11,20 +11,27 @@ import { isUniqueViolation } from '@/lib/db/errors';
 
 export const runtime = 'nodejs';
 
-export async function GET() {
+export async function GET(request: Request) {
   const authz = await requireStaffApi(STAFF_ROLES);
   if (!authz.ok) return authz.response;
 
+  const includeInactive = new URL(request.url).searchParams.get('include_inactive') === 'true';
+
   const db = await getDb();
-  const rows = await db
+  const base = db
     .select({
       id: chatCannedResponses.id,
       title: chatCannedResponses.title,
       shortcut: chatCannedResponses.shortcut,
       content: chatCannedResponses.content,
+      category: chatCannedResponses.category,
+      usageCount: chatCannedResponses.usageCount,
+      isActive: chatCannedResponses.isActive,
+      updatedAt: chatCannedResponses.updatedAt,
     })
-    .from(chatCannedResponses)
-    .where(eq(chatCannedResponses.isActive, true))
+    .from(chatCannedResponses);
+
+  const rows = await (includeInactive ? base : base.where(eq(chatCannedResponses.isActive, true)))
     .orderBy(asc(chatCannedResponses.title));
 
   return NextResponse.json(rows);
@@ -46,6 +53,7 @@ export async function POST(request: Request) {
       title: result.data.title,
       shortcut: result.data.shortcut ?? null,
       content: result.data.content,
+      category: result.data.category,
       createdBy: authz.ctx.user.id,
     });
   } catch (error) {

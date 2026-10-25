@@ -5,9 +5,12 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiResult, IntentItem } from '@/app/admin/_lib/admin-api';
 import { IntentSection } from './intent-section';
-
-// § เทสนี้รัน userEvent หลายขั้นภายใต้โหลดทั้งชุด timeout 5s ไม่พอ — 30s ตาม intake pattern
+// § timeout 5s ไม่พอ — เทสต์นี้รอ state จริงตาม pattern ของชุด intake
 vi.setConfig({ testTimeout: 30_000 });
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
 
 const listIntents = vi.fn();
 const createIntent = vi.fn();
@@ -57,18 +60,20 @@ beforeEach(() => {
 });
 
 describe('IntentSection หมวดเจตนา JSK', () => {
-  it('ลิสต์แสดงชื่อ keyword และป้ายพร้อม + ลิงก์ดู + ปุ่มเปิดปิด', async () => {
+  it('ลิสต์แสดงชื่อ keyword + สวิตช์สถานะ + ลิงก์ดู', async () => {
     listIntents.mockResolvedValue({ ok: true, data: { items: [intent()] } });
     render(<IntentSection />);
 
     expect(await screen.findByText('เวลาทำการ')).toBeInTheDocument();
     expect(screen.getByText('กี่โมง')).toBeInTheDocument();
-    expect(screen.getAllByText('พร้อม').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole('switch', { name: 'ปิด เวลาทำการ' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
     expect(screen.getByRole('link', { name: 'ดู เวลาทำการ' })).toHaveAttribute(
       'href',
       '/admin/chatbot/auto-replies/i1',
     );
-    expect(screen.getByRole('button', { name: 'ปิด เวลาทำการ' })).toBeInTheDocument();
   });
 
   it('toggle ปิดยิง update isActive=false + reload', async () => {
@@ -79,7 +84,7 @@ describe('IntentSection หมวดเจตนา JSK', () => {
     render(<IntentSection />);
     await screen.findByText('เวลาทำการ');
 
-    await userEvent.setup().click(screen.getByRole('button', { name: 'ปิด เวลาทำการ' }));
+    await userEvent.setup().click(screen.getByRole('switch', { name: 'ปิด เวลาทำการ' }));
     await waitFor(() => expect(updateIntent).toHaveBeenCalled());
     const [id, payload] = updateIntent.mock.calls[0] as [string, Record<string, unknown>];
     expect(id).toBe('i1');
@@ -88,11 +93,12 @@ describe('IntentSection หมวดเจตนา JSK', () => {
     expect(payload).not.toHaveProperty('responses');
   });
 
-  it('หมวดไม่มี keyword แสดงไม่พร้อม', async () => {
+  it('หมวดไม่มี keyword — สวิตช์ยังโชว์สถานะพร้อมมี title เตือนเหตุผล', async () => {
     listIntents.mockResolvedValue({ ok: true, data: { items: [intent({ keywords: [] })] } });
     render(<IntentSection />);
 
-    expect(await screen.findByText('ไม่พร้อม')).toBeInTheDocument();
+    const sw = await screen.findByRole('switch');
+    expect(sw).toHaveAttribute('title', expect.stringContaining('ยังไม่มี keyword'));
   });
 
   it('ห้องว่างแสดง empty state ไทย', async () => {
@@ -111,11 +117,11 @@ describe('IntentSection หมวดเจตนา JSK', () => {
     render(<IntentSection />);
     await screen.findByText(/ยังไม่มีหมวดเจตนา/);
 
-    await user.click(screen.getByRole('button', { name: 'เพิ่มหมวด' }));
+    await user.click(screen.getByRole('button', { name: 'New Category' }));
     await user.type(screen.getByLabelText('ชื่อหมวด *'), 'เวลาทำการ');
     await user.type(screen.getByLabelText('keyword ที่ 1'), 'กี่โมง');
     await user.type(screen.getByLabelText('ข้อความคำตอบที่ 1'), 'เปิด 08:30-16:30');
-    await user.click(screen.getByRole('button', { name: 'บันทึก' }));
+    await user.click(screen.getByRole('button', { name: 'สร้างอย่างเดียว' }));
 
     await waitFor(() => expect(createIntent).toHaveBeenCalled());
     expect(await screen.findByText('เวลาทำการ')).toBeInTheDocument();
@@ -127,10 +133,10 @@ describe('IntentSection หมวดเจตนา JSK', () => {
     render(<IntentSection />);
     await screen.findByText(/ยังไม่มีหมวดเจตนา/);
 
-    await user.click(screen.getByRole('button', { name: 'เพิ่มหมวด' }));
+    await user.click(screen.getByRole('button', { name: 'New Category' }));
     await user.type(screen.getByLabelText('ชื่อหมวด *'), 'เวลาทำการ');
     await user.type(screen.getByLabelText('ข้อความคำตอบที่ 1'), 'เปิด 08:30-16:30');
-    await user.click(screen.getByRole('button', { name: 'บันทึก' }));
+    await user.click(screen.getByRole('button', { name: 'สร้างอย่างเดียว' }));
 
     await waitFor(() => expect(createIntent).not.toHaveBeenCalled());
   });

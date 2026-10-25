@@ -1,19 +1,23 @@
 import { NextResponse } from 'next/server';
-import { asc } from 'drizzle-orm';
+import { asc, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
-import { richMenus } from '@/lib/db/schema';
+import { lineUsers, richMenus } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import { parseBody } from '@/lib/api-helpers';
 import { requireStaffApi } from '@/lib/auth/require-staff';
 import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit';
+import { findInvalidRichMenuArea, RICH_MENU_DISPLAY_MODES } from '@/lib/contracts';
 import { z } from 'zod';
 
 export const runtime = 'nodejs';
 
+const displayModeSchema = z.enum(RICH_MENU_DISPLAY_MODES);
+
 const createSchema = z.object({
   name: z.string().min(1).max(100),
   chatBarText: z.string().min(1).max(20).default('เมนู'),
+  displayMode: displayModeSchema.optional(),
   displayStartAt: z.string().datetime({ offset: true }).optional(),
   displayEndAt: z.string().datetime({ offset: true }).optional(),
   config: z.object({
@@ -33,7 +37,27 @@ export async function GET() {
   if (!authz.ok) return authz.response;
 
   const db = await getDb();
-  const rows = await db.select().from(richMenus).orderBy(asc(richMenus.createdAt));
+  const rows = await db
+    .select({
+      id: richMenus.id,
+      name: richMenus.name,
+      chatBarText: richMenus.chatBarText,
+      lineRichMenuId: richMenus.lineRichMenuId,
+      status: richMenus.status,
+      displayMode: richMenus.displayMode,
+      syncStatus: richMenus.syncStatus,
+      lastSyncError: richMenus.lastSyncError,
+      imageUrl: richMenus.imageUrl,
+      displayStartAt: richMenus.displayStartAt,
+      displayEndAt: richMenus.displayEndAt,
+      createdAt: richMenus.createdAt,
+      userLinkCount: sql<number>`(
+        SELECT count(*)::int FROM ${lineUsers}
+        WHERE ${lineUsers.metadata}->>'richMenuId' = ${richMenus.id}
+      )`,
+    })
+    .from(richMenus)
+    .orderBy(asc(richMenus.createdAt));
   return NextResponse.json({ items: rows });
 }
 
@@ -47,16 +71,33 @@ export async function POST(request: Request) {
   const db = await getDb();
   const id = generateId();
 
+  // § client ตรวจ https แล้ว แต่ POST ตรงข้าม client ได้ — ต้องบังคับที่ boundary ด้วย
+  const badUri = findInvalidRichMenuArea(result.data.config.areas);
+  if (badUri) {
+    return NextResponse.json(
+      { error: `URL ของปุ่มเมนูต้องเป็น https เท่านั้น (พบ ${badUri})` },
+      { status: 400 },
+    );
+  }
+
   const { displayStartAt, displayEndAt } = result.data;
+  const displayMode = result.data.displayMode ?? 'ALWAYS';
   if (displayStartAt && displayEndAt && displayEndAt <= displayStartAt) {
     return NextResponse.json({ error: 'วันสิ้นสุดต้องหลังวันเริ่มแสดง' }, { status: 400 });
+  }
+  if (displayMode === 'SCHEDULED' && (!displayStartAt || !displayEndAt)) {
+    return NextResponse.json(
+      { error: 'โหมด "ตามช่วงเวลา" ต้องระบุวันเวลาเริ่มต้นและสิ้นสุด' },
+      { status: 400 },
+    );
   }
 
   await db.insert(richMenus).values({
     id,
     name: result.data.name,
     chatBarText: result.data.chatBarText,
-    config: result.data.config,
+    config: { ...result.data.config, selected: displayMode === 'ALWAYS' },
+    displayMode,
     displayStartAt: displayStartAt ? new Date(displayStartAt) : null,
     displayEndAt: displayEndAt ? new Date(displayEndAt) : null,
     createdBy: authz.ctx.user.id,

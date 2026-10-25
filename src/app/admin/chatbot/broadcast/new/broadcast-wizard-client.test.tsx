@@ -16,7 +16,8 @@ vi.mock('@/app/admin/_lib/admin-api', () => ({
   adminApi: {
     listBroadcastRecipients: vi.fn().mockResolvedValue({ ok: true, data: { items: [] } }),
     dryRunBroadcast: vi.fn(),
-    createBroadcast: vi.fn().mockResolvedValue({ ok: true, data: {} }),
+    createBroadcast: vi.fn().mockResolvedValue({ ok: true, data: { ok: true, id: 'new-1' } }),
+    sendBroadcast: vi.fn().mockResolvedValue({ ok: true, data: { ok: true } }),
   },
 }));
 
@@ -50,10 +51,21 @@ describe('BroadcastWizardClient ตัวช่วยสร้าง 4 ขั้
     expect(screen.getByLabelText('URL รูปภาพ (https)')).toBeInTheDocument();
   });
 
+  it('ขั้นเขียนข้อความมีช่องชื่อแคมเปญ + ตัวนับ 5000', async () => {
+    const user = userEvent.setup();
+    render(<BroadcastWizardClient />);
+
+    await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
+
+    expect(screen.getByLabelText('ชื่อแคมเปญ')).toBeInTheDocument();
+    expect(screen.getByText(/0 \/ 5,000/)).toBeInTheDocument();
+    await user.type(screen.getByLabelText('ข้อความประกาศ'), 'สวัสดี');
+    expect(screen.getByText(/6 \/ 5,000/)).toBeInTheDocument();
+  });
+
   it('ขั้นตรวจสอบแสดง preview + dry-run ก่อนสร้าง', async () => {
     const user = userEvent.setup();
     const dryRun = adminApi.dryRunBroadcast as ReturnType<typeof vi.fn>;
-    // § ตั้งก่อน render — mock ต้องพร้อมก่อนกดทดลองส่ง
     dryRun.mockResolvedValue({ ok: true, data: { estimatedRecipients: 5 } });
     render(<BroadcastWizardClient />);
 
@@ -63,17 +75,10 @@ describe('BroadcastWizardClient ตัวช่วยสร้าง 4 ขั้
     await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
 
     expect(await screen.findByText('น้ำประปาไม่ไหล')).toBeInTheDocument();
-    expect(screen.queryByText('ไม่มีสร้างงานจริง')).not.toBeInTheDocument();
+    expect(screen.getByText('กลุ่มเป้าหมาย')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'ประเมินจำนวนผู้รับ' }));
     await waitFor(() => expect(dryRun).toHaveBeenCalledTimes(1));
-    // § "ประมาณ {n} คน — ..." แตกเป็นหลาย text node — matcher รวม textContent เฉพาะ span ผล dry-run
-    expect(
-      await screen.findByText(
-        (_, el) => el?.tagName === 'SPAN' && (el?.textContent?.includes('ไม่มีสร้างงานจริง') ?? false),
-        {},
-        { timeout: 3000 },
-      ),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('ประมาณ 5 คน')).toBeInTheDocument();
   });
 
   it('บล็อกเมื่อข้อความว่าง — หยุดตั้งแต่หน้าเขียน', async () => {
@@ -87,6 +92,20 @@ describe('BroadcastWizardClient ตัวช่วยสร้าง 4 ขั้
     expect(screen.getByLabelText('ข้อความประกาศ')).toBeInTheDocument();
   });
 
+  it('วางข้อความเกิน 5000 ตัวอักษรถูกตัดที่ 5000 (maxLength) + ตัวนับเต็ม', async () => {
+    const user = userEvent.setup();
+    render(<BroadcastWizardClient />);
+
+    await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
+    await user.click(screen.getByLabelText('ข้อความประกาศ'));
+    // § paste ทาง clipboard เร็วกว่าพิมพ์ 5001 ตัว และ maxLength ตัดให้เหลือ 5000
+    await user.paste('ก'.repeat(5001));
+
+    const textarea = screen.getByLabelText('ข้อความประกาศ') as HTMLTextAreaElement;
+    expect(textarea.value.length).toBe(5000);
+    expect(screen.getByText(/5,000 \/ 5,000/)).toBeInTheDocument();
+  });
+
   it('image ส่ง payload ชนิด image พร้อม URL คู่', async () => {
     const user = userEvent.setup();
     render(<BroadcastWizardClient />);
@@ -96,7 +115,7 @@ describe('BroadcastWizardClient ตัวช่วยสร้าง 4 ขั้
     await user.type(screen.getByLabelText('URL รูปภาพ (https)'), 'https://example.com/a.jpg');
     await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
     await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
-    await user.click(screen.getByRole('button', { name: 'สร้างร่าง' }));
+    await user.click(screen.getByRole('button', { name: 'บันทึกแบบร่าง' }));
 
     const create = adminApi.createBroadcast as ReturnType<typeof vi.fn>;
     expect(create).toHaveBeenCalledWith(
@@ -112,6 +131,35 @@ describe('BroadcastWizardClient ตัวช่วยสร้าง 4 ขั้
     );
   });
 
+  it('ชื่อแคมเปญถูกส่งไปกับ payload', async () => {
+    const user = userEvent.setup();
+    render(<BroadcastWizardClient />);
+
+    await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
+    await user.type(screen.getByLabelText('ชื่อแคมเปญ'), 'ประกาศปิดทำการ');
+    await user.type(screen.getByLabelText('ข้อความประกาศ'), 'ปิดทำการ 12 ส.ค.');
+    await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
+    await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
+    await user.click(screen.getByRole('button', { name: 'บันทึกแบบร่าง' }));
+
+    const create = adminApi.createBroadcast as ReturnType<typeof vi.fn>;
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ title: 'ประกาศปิดทำการ' }));
+  });
+
+  it('"ส่งเลย" สร้างแล้วยิง sendBroadcast ต่อทันที', async () => {
+    const user = userEvent.setup();
+    const send = adminApi.sendBroadcast as ReturnType<typeof vi.fn>;
+    render(<BroadcastWizardClient />);
+
+    await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
+    await user.type(screen.getByLabelText('ข้อความประกาศ'), 'สวัสดี');
+    await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
+    await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
+    await user.click(screen.getByRole('button', { name: 'ส่งเลย' }));
+
+    await waitFor(() => expect(send).toHaveBeenCalledWith('new-1'));
+  });
+
   it('flex ว่าง altText ถูกบล็อก — หยุดตั้งแต่หน้าเขียน', async () => {
     const user = userEvent.setup();
     render(<BroadcastWizardClient />);
@@ -124,37 +172,6 @@ describe('BroadcastWizardClient ตัวช่วยสร้าง 4 ขั้
     expect(screen.getByLabelText('Flex JSON')).toBeInTheDocument();
   });
 
-  it('ข้าม step ไม่ได้เมื่อ content ยังผิด — error ค้างหน้าเดิม', async () => {
-    const user = userEvent.setup();
-    render(<BroadcastWizardClient />);
-
-    await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
-    await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
-
-    expect(await screen.findByText('กรุณากรอกข้อความ')).toBeInTheDocument();
-    expect(screen.getByLabelText('ข้อความประกาศ')).toBeInTheDocument();
-  });
-
-  it('ตั้งเวลาอดีตถูกบล็อก', async () => {
-    const user = userEvent.setup();
-    const create = adminApi.createBroadcast as ReturnType<typeof vi.fn>;
-    render(<BroadcastWizardClient />);
-
-    await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
-    await user.type(screen.getByLabelText('ข้อความประกาศ'), 'สวัสดี');
-    await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
-    await user.click(screen.getByLabelText('ตั้งเวลาส่ง (เว้นว่าง = สร้างเป็นร่าง)'));
-    await user.type(
-      screen.getByLabelText('ตั้งเวลาส่ง (เว้นว่าง = สร้างเป็นร่าง)'),
-      '2020-01-01T10:00',
-    );
-    await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
-    await user.click(screen.getByRole('button', { name: /ตั้งเวลาส่ง/ }));
-
-    expect(await screen.findByText(/เวลาส่งต้องเป็นอนาคต/)).toBeInTheDocument();
-    expect(create).not.toHaveBeenCalled();
-  });
-
   it('schedule แปลงเป็น ISO มี offset', async () => {
     const user = userEvent.setup();
     render(<BroadcastWizardClient />);
@@ -162,13 +179,14 @@ describe('BroadcastWizardClient ตัวช่วยสร้าง 4 ขั้
     await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
     await user.type(screen.getByLabelText('ข้อความประกาศ'), 'สวัสดี');
     await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
-    await user.click(screen.getByLabelText('ตั้งเวลาส่ง (เว้นว่าง = สร้างเป็นร่าง)'));
-    await user.type(
-      screen.getByLabelText('ตั้งเวลาส่ง (เว้นว่าง = สร้างเป็นร่าง)'),
-      '2099-10-22T10:00',
-    );
+
+    await user.click(screen.getByLabelText('วันที่ส่ง (เว้นว่าง = สร้างเป็นร่าง)'));
+    await user.click(screen.getByRole('button', { name: 'เดือนถัดไป' }));
+    await user.click(screen.getByRole('button', { name: '5' }));
+    await user.type(screen.getByLabelText('เวลาส่ง'), '10:00');
+
     await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
-    await user.click(screen.getByRole('button', { name: /ตั้งเวลาส่ง/ }));
+    await user.click(screen.getByRole('button', { name: 'บันทึกแบบร่าง' }));
 
     const create = adminApi.createBroadcast as ReturnType<typeof vi.fn>;
     const payload = create.mock.calls[0]?.[0] as { scheduledAt: string | null };

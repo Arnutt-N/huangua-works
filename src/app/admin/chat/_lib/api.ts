@@ -111,8 +111,10 @@ export async function putPrefs(
 
 // § คืน null เมื่อ response ไม่ ok — caller แยก "ว่าง" ([]) กับ "โหลดล้ม" (null) ได้
 // ห้าม `?? []` ตรงนี้ ไม่งั้น loadError ตาย โหลดล้มโชว์ empty state แทน error
-export async function fetchCannedResponses(): Promise<CannedResponse[] | null> {
-  const res = await fetch('/api/line/admin/canned-responses');
+export async function fetchCannedResponses(includeInactive = false): Promise<CannedResponse[] | null> {
+  const res = await fetch(
+    `/api/line/admin/canned-responses${includeInactive ? '?include_inactive=true' : ''}`,
+  );
   return jsonOrNull<CannedResponse[]>(res);
 }
 
@@ -120,6 +122,7 @@ export async function createCannedResponse(body: {
   title: string;
   shortcut?: string;
   content: string;
+  category?: string;
 }): Promise<{ ok: boolean; error?: string }> {
   const res = await fetch('/api/line/admin/canned-responses', {
     method: 'POST',
@@ -133,7 +136,7 @@ export async function createCannedResponse(body: {
 
 export async function updateCannedResponse(
   id: string,
-  body: { title?: string; shortcut?: string; content?: string },
+  body: { title?: string; shortcut?: string; content?: string; category?: string; isActive?: boolean },
 ): Promise<{ ok: boolean; error?: string }> {
   const res = await fetch(`/api/line/admin/canned-responses/${id}`, {
     method: 'PATCH',
@@ -148,6 +151,11 @@ export async function updateCannedResponse(
 export async function deleteCannedResponse(id: string): Promise<boolean> {
   const res = await fetch(`/api/line/admin/canned-responses/${id}`, { method: 'DELETE' });
   return res.ok;
+}
+
+/** § fire-and-forget — ตัวนับ "ใช้ไป" ต้องไม่ทำให้ช่องพิมพ์ค้าง ห้ามเปลี่ยนเป็น await */
+export function markCannedResponseUsed(id: string): void {
+  void fetch(`/api/line/admin/canned-responses/${id}/use`, { method: 'POST' }).catch(() => {});
 }
 
 // ── tags ──

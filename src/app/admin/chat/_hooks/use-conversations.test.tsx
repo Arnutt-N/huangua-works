@@ -17,6 +17,8 @@ function Probe() {
       {feedback?.type === 'error' && <p role="status">{feedback.msg}</p>}
       <button type="button" onClick={() => void loadConversations()}>reload</button>
       <ConversationList
+        collapsed={false}
+        onToggleCollapsed={() => {}}
         visible={visible}
         counts={counts}
         loading={loading}

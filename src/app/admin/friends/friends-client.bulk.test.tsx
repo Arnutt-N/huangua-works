@@ -28,6 +28,8 @@ function friend(over: Partial<FriendItem> = {}): FriendItem {
     followState: 'following',
     followCount: 1,
     refollowCount: 2,
+    lastFollowAt: '2026-04-05T00:00:00Z',
+    chatMode: 'bot_active',
     lastActiveAt: '2026-10-16T13:57:00Z',
     richMenuId: null,
     richMenuName: null,
@@ -53,11 +55,17 @@ beforeEach(() => {
 });
 
 describe('FriendsClient bulk JSK', () => {
-  it('ตารางมี checkbox + คอลัมน์ Rich Menu/Chat Mode/Since/Last Active + refollow badge', async () => {
+  it('ตารางมี checkbox + หัวคอลัมน์ User/Rich Menu/Status/Chat Mode/Since/Last Active + refollow badge', async () => {
     render(<FriendsClient />);
     const table = await screen.findByRole('table');
     expect(within(table).getAllByRole('checkbox').length).toBeGreaterThanOrEqual(2);
     expect(within(table).getAllByText('กลับมา 2 ครั้ง').length).toBe(2);
+    for (const head of ['User', 'Status', 'Chat Mode', 'Since', 'Last Active']) {
+      expect(within(table).getByText(head)).toBeInTheDocument();
+    }
+    expect(within(table).getAllByText('BOT').length).toBe(2);
+    expect(within(table).getAllByText('ACTIVE').length).toBe(2);
+    expect(within(table).getAllByText('5 เม.ย. 2569').length).toBe(2);
   });
 
   it('เลือก 2 คน + bulk assign ยิงครบทุกราย', async () => {

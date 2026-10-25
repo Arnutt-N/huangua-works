@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { LayoutGrid, Search, UsersRound } from 'lucide-react';
-import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
+import { History, LayoutGrid, Search, UsersRound } from 'lucide-react';
+import { AdminCard } from '@/components/admin/admin-card';
+import { PageHeader } from '@/components/admin/page-header';
 import {
   Dialog,
   DialogContent,
@@ -15,17 +16,23 @@ import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/field';
 import { useResource } from '@/app/admin/_lib/use-resource';
 import { adminApi, type FriendItem, type RichMenuItem } from '@/app/admin/_lib/admin-api';
-import { isUsableMenu } from '@/app/admin/chatbot/rich-menus/menu-predicates';
+import { isUsableMenu } from '@/app/admin/chatbot/rich-menus/rich-menu-state';
 
 type StatusFilter = 'all' | FriendItem['followState'];
 
 const PAGE_SIZE = 20;
 
-function formatThaiDateTime(iso: string | null): string {
-  if (!iso) return '—';
+function formatThaiDate(iso: string | null): string {
+  if (!iso) return '-';
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+  if (Number.isNaN(d.getTime())) return '-';
+  return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function chatModeLabel(mode: string | null): string {
+  if (mode === null) return '-';
+  if (mode === 'human_active' || mode === 'waiting_handoff') return 'HUMAN';
+  return 'BOT';
 }
 
 function initialOf(name: string | null): string {
@@ -179,11 +186,17 @@ export function FriendsClient() {
         </div>
       )}
 
-      <AdminCard>
-        <AdminCardTitle icon={<UsersRound className="h-4 w-4" />}>
-          เพื่อน LINE ({total} คน)
-        </AdminCardTitle>
+      <PageHeader title="ประวัติเพื่อน" subtitle="ประวัติการเพิ่มเพื่อนและการเปลี่ยนแปลง">
+        <Link
+          href="/admin/friends/history"
+          className="inline-flex min-h-touch items-center justify-center gap-1 rounded-md border border-border bg-surface px-3 text-sm font-semibold text-ink hover:bg-accent-sunken"
+        >
+          <History className="h-4 w-4" aria-hidden="true" />
+          ประวัติ
+        </Link>
+      </PageHeader>
 
+      <AdminCard>
         <div className="flex flex-col gap-2 sm:flex-row">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted" />
@@ -194,7 +207,7 @@ export function FriendsClient() {
                 setQ(e.target.value);
                 setPage(1);
               }}
-              placeholder="ค้นหาชื่อที่แสดง..."
+              placeholder="Search users..."
               className="pl-9"
             />
           </div>
@@ -207,7 +220,7 @@ export function FriendsClient() {
             }}
             className="min-h-touch rounded-lg border border-border/50 bg-surface px-3 text-sm"
           >
-            <option value="all">ทุกสถานะ</option>
+            <option value="all">All Status</option>
             <option value="following">ติดตามอยู่</option>
             <option value="unfollowed">เลิกติดตาม</option>
           </select>
@@ -245,11 +258,13 @@ export function FriendsClient() {
                         className="h-4 w-4"
                       />
                     </th>
-                    <th scope="col" className="px-3 py-2 font-medium">เพื่อน</th>
-                    <th scope="col" className="px-3 py-2 font-medium">สถานะ</th>
-                    <th scope="col" className="px-3 py-2 font-medium">ติดตาม / กลับมา</th>
-                    <th scope="col" className="px-3 py-2 font-medium">เคลื่อนไหวล่าสุด</th>
-                    <th scope="col" className="px-3 py-2 font-medium">ริชเมนู</th>
+                    <th scope="col" className="px-3 py-2 font-medium">User</th>
+                    <th scope="col" className="w-20 px-3 py-2 font-medium">Rich Menu</th>
+                    <th scope="col" className="px-3 py-2 font-medium">Status</th>
+                    {/* § w-16 ให้ "Chat Mode" ตัดสองบรรทัด — ห้ามใช้ <br> (getByText หาไม่เจอ) */}
+                    <th scope="col" className="w-16 px-3 py-2 font-medium">Chat Mode</th>
+                    <th scope="col" className="px-3 py-2 font-medium">Since</th>
+                    <th scope="col" className="px-3 py-2 font-medium">Last Active</th>
                     <th scope="col" className="px-3 py-2 font-medium">
                       <span className="sr-only">จัดการ</span>
                     </th>
@@ -302,19 +317,27 @@ export function FriendsClient() {
                           </div>
                         </div>
                       </td>
+                      <td className="px-3 py-2.5 text-muted">
+                        {friend.richMenuName ?? '—'}
+                      </td>
                       <td className="px-3 py-2.5">
                         <span
                           className={`rounded-full px-2 py-0.5 text-xs font-medium ${friend.followState === 'following' ? 'bg-success/10 text-success' : 'bg-muted/10 text-muted'}`}
                         >
-                          {friend.followState === 'following' ? 'ติดตามอยู่' : 'เลิกติดตาม'}
+                          {friend.followState === 'following' ? 'ACTIVE' : 'UNFOLLOWED'}
                         </span>
                       </td>
-                      <td className="px-3 py-2.5 text-muted">
-                        {friend.followCount} / {friend.refollowCount}
+                      <td className="px-3 py-2.5 text-xs font-medium tabular-nums text-muted">
+                        {chatModeLabel(friend.chatMode)}
                       </td>
-                      <td className="px-3 py-2.5 text-muted">{formatThaiDateTime(friend.lastActiveAt)}</td>
-                      <td className="px-3 py-2.5 text-muted">
-                        {friend.richMenuName ?? '—'}
+                      <td className="whitespace-nowrap px-3 py-2.5 text-muted">
+                        {formatThaiDate(friend.lastFollowAt)}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-muted">
+                        {friend.lastActiveAt
+                          ? formatThaiDate(friend.lastActiveAt) + ' ' +
+                            new Date(friend.lastActiveAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
+                          : '-'}
                       </td>
                       <td className="px-3 py-2.5 text-right">
                         <Button
@@ -322,7 +345,7 @@ export function FriendsClient() {
                           onClick={() => openAssign(friend)}
                           className="min-h-touch gap-1 text-xs"
                         >
-                          <LayoutGrid className="h-3.5 w-3.5" /> กำหนดริชเมนู
+                          <LayoutGrid className="h-3.5 w-3.5" /> Rich Menu
                         </Button>
                       </td>
                     </tr>

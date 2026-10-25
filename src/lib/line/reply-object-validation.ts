@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { findActionUriViolation, URI_SCHEME_ERROR_TH } from '@/lib/contracts';
 import type { LineQuickReply, LineQuickReplyItem } from './types';
 
 /**
@@ -100,5 +101,8 @@ export function validateReplyPayload(
   if (payload.quickReply !== undefined && parseQuickReply(payload.quickReply) === null) {
     return 'quickReply ไม่ถูกต้อง (ต้องมี 1-13 items ที่ action ถูกต้อง)';
   }
+  // § scheme ของ action uri ต้องบังคับที่ server — z.string().url() รับ javascript:/data: ผ่าน
+  const badUri = findActionUriViolation(payload);
+  if (badUri !== null) return `${URI_SCHEME_ERROR_TH} (${badUri})`;
   return null;
 }

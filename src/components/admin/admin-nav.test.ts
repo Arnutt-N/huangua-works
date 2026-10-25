@@ -12,14 +12,15 @@ describe('visibleNavGroups', () => {
   it('officer ไม่เห็นกลุ่ม "ระบบและเครื่องมือ" เลย เพราะทุกเมนูในกลุ่มเป็น supervisorOnly แล้ว', () => {
     const labels = visibleNavGroups('officer').map((g) => g.label);
     expect(labels).not.toContain('ระบบและเครื่องมือ');
-    expect(labels).toEqual(['งานหลัก', 'แชท LINE']);
+    expect(labels).toEqual(['งานหลัก', 'CHATBOT MANAGEMENT']);
   });
 
-  it('officer ไม่เห็นกลุ่ม "แชทบอท" (ทุกเมนูเป็น supervisorOnly)', () => {
-    expect(visibleNavGroups('officer').map((g) => g.label)).not.toContain('แชทบอท');
+  it('officer เห็นแค่ Live Chat ในกลุ่ม CHATBOT MANAGEMENT (เมนูอื่น supervisorOnly)', () => {
+    const bot = visibleNavGroups('officer').find((g) => g.label === 'CHATBOT MANAGEMENT');
+    expect(bot?.items.map((i) => i.key)).toEqual(['chat']);
   });
 
-  it('officer ไม่เห็นสามเมนูใหม่ แต่ยังเห็น "การสนทนา"', () => {
+  it('officer ไม่เห็นสามเมนูใหม่ แต่ยังเห็น Live Chat', () => {
     const keys = visibleNavGroups('officer').flatMap((g) => g.items).map((i) => i.key);
     expect(keys).toContain('chat');
     expect(keys).not.toContain('chat-histories');
@@ -27,8 +28,8 @@ describe('visibleNavGroups', () => {
     expect(keys).not.toContain('canned-responses');
   });
 
-  it('head เห็นสามเมนูใหม่ในกลุ่ม "แชทบอท"', () => {
-    const bot = visibleNavGroups('head').find((g) => g.label === 'แชทบอท');
+  it('head เห็นสามเมนูใหม่ในกลุ่ม CHATBOT MANAGEMENT', () => {
+    const bot = visibleNavGroups('head').find((g) => g.label === 'CHATBOT MANAGEMENT');
     expect(bot?.items.map((i) => i.key)).toEqual(
       expect.arrayContaining(['chat-histories', 'friends', 'canned-responses']),
     );

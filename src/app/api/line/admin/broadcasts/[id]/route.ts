@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { count, eq } from 'drizzle-orm';
+import { and, count, eq, inArray } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { chatBroadcastFailedRecipients, chatBroadcasts } from '@/lib/db/schema';
@@ -57,4 +57,49 @@ export async function GET(
   });
 
   return NextResponse.json({ ...row, failedRecipients: failed?.failedRecipients ?? 0 });
+}
+
+/**
+ * DELETE = ยกเลิกแบบ soft (เปลี่ยนสถานะเป็น cancelled ไม่ลบแถว) — แถวประวัติการส่ง
+ * ต้องอยู่ต่อเพื่อ audit; draft กับ scheduled ยกเลิกได้ ของส่งแล้ว/กำลังส่งให้ 409
+ */
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const authz = await requireStaffApi(ADMIN_ROLES);
+  if (!authz.ok) return authz.response;
+
+  const { id } = await params;
+  const db = await getDb();
+
+  // § UPDATE แบบมี status guard ในตัว — กัน cron claim scheduled→sending ระหว่างที่เรา
+  // อ่าน status แล้วยังไม่เขียน (เดิมอ่านก่อนแล้ว update ไม่มี guard = ยกเลิกทับของที่กำลังส่ง)
+  const cancelled = await db
+    .update(chatBroadcasts)
+    .set({ status: 'cancelled', updatedAt: new Date() })
+    .where(and(eq(chatBroadcasts.id, id), inArray(chatBroadcasts.status, ['draft', 'scheduled'])))
+    .returning({ id: chatBroadcasts.id });
+
+  if (cancelled.length === 0) {
+    const row = await firstOrUndefined(
+      db.select({ status: chatBroadcasts.status }).from(chatBroadcasts).where(eq(chatBroadcasts.id, id)).limit(1),
+    );
+    if (!row) return NextResponse.json({ error: 'ไม่พบ broadcast' }, { status: 404 });
+    return NextResponse.json(
+      { error: 'สถานะนี้ยกเลิกไม่ได้ — ส่งไปแล้วหรือกำลังส่ง' },
+      { status: 409 },
+    );
+  }
+
+  await logAudit({
+    userId: authz.ctx.user.id,
+    action: AUDIT_ACTIONS.BROADCAST_DELETE,
+    resource: 'chat_broadcasts',
+    resourceId: id,
+    ipAddress: authz.ctx.ipAddress,
+    userAgent: authz.ctx.userAgent,
+  });
+
+  return NextResponse.json({ ok: true });
 }

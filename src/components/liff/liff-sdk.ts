@@ -14,6 +14,7 @@ export interface LiffSdk {
   login(): void;
   getIDToken(): string | null;
   getProfile(): Promise<{ displayName?: string; pictureUrl?: string }>;
+  closeWindow?: () => void;
 }
 
 declare global {

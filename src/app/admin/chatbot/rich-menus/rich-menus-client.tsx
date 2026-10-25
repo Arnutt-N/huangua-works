@@ -2,271 +2,229 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { BarChart3, Eye, Link2, Plus, RefreshCw, SquarePen, Trash2, Users } from 'lucide-react';
 import type { RichMenuItem } from '@/app/admin/_lib/admin-api';
 import { adminApi } from '@/app/admin/_lib/admin-api';
-import { isSyncedMenu } from './menu-predicates';
-import { AliasList } from './alias-list';
 import { useResource } from '@/app/admin/_lib/use-resource';
-import { useRef } from 'react';
-import { Plus, RefreshCw, Globe, ImageUp, LayoutGrid, Eye, BarChart3 } from 'lucide-react';
-import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Label, Input, Textarea } from '@/components/ui/field';
-
-// § template เมนูบริการงานช่าง อบต.หัวงัว 6 ช่อง (2500×1686) — 5 ปุ่ม uri เปิด LIFF
-// + ปุ่มติดต่อเจ้าหน้าที่ (message → บอทตอบ Flex handoff)
-// แทน <LIFF_ID> ด้วยค่า LINE_LIFF_ID ก่อน Sync (ดู .env.example หัวข้อ LIFF)
-// ?category=<slug> จะ preselect หมวดใน /intake ให้อัตโนมัติ (slug ผิด → ฟอร์มว่าง)
-const DEFAULT_CONFIG = JSON.stringify({
-  size: { width: 2500, height: 1686 },
-  selected: true,
-  name: 'เมนูบริการงานช่าง อบต.หัวงัว',
-  chatBarText: 'เมนูหลัก',
-  areas: [
-    { bounds: { x: 0, y: 0, width: 833, height: 843 }, action: { type: 'uri', uri: 'https://liff.line.me/<LIFF_ID>/intake?category=roads-sidewalks' } },
-    { bounds: { x: 833, y: 0, width: 833, height: 843 }, action: { type: 'uri', uri: 'https://liff.line.me/<LIFF_ID>/intake?category=electricity-lighting' } },
-    { bounds: { x: 1666, y: 0, width: 834, height: 843 }, action: { type: 'uri', uri: 'https://liff.line.me/<LIFF_ID>/intake?category=water-supply' } },
-    { bounds: { x: 0, y: 843, width: 833, height: 843 }, action: { type: 'uri', uri: 'https://liff.line.me/<LIFF_ID>/intake' } },
-    { bounds: { x: 833, y: 843, width: 833, height: 843 }, action: { type: 'uri', uri: 'https://liff.line.me/<LIFF_ID>/track' } },
-    { bounds: { x: 1666, y: 843, width: 834, height: 843 }, action: { type: 'message', text: 'ติดต่อเจ้าหน้าที่' } },
-  ],
-}, null, 2);
+import { PageHeader } from '@/components/admin/page-header';
+import { DetailModal } from '@/components/admin/detail-modal';
+import { ConfirmDialog } from '@/components/admin/confirm-dialog';
+import { cn } from '@/lib/cn';
+import {
+  menuStatusPill,
+  needsResync,
+  pillTone,
+  primaryAction,
+  toLocalDatetimeInputValue,
+} from './rich-menu-state';
 
 export function RichMenusClient() {
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [name, setName] = useState('');
-  const [chatBarText, setChatBarText] = useState('เมนูหลัก');
-  const [displayStart, setDisplayStart] = useState('');
-  const [displayEnd, setDisplayEnd] = useState('');
-  const [configJson, setConfigJson] = useState(DEFAULT_CONFIG);
-  const [saving, setSaving] = useState(false);
-  const [uploadingId, setUploadingId] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const uploadTargetRef = useRef<RichMenuItem | null>(null);
-
-  const { data, loading, feedback, notify, mutate } = useResource({
-    load: adminApi.listRichMenus,
-  });
+  const router = useRouter();
+  const { data, loading, feedback, mutate } = useResource({ load: adminApi.listRichMenus });
   const items = data?.items ?? [];
-  const [aliasId, setAliasId] = useState('');
-  const [aliasTarget, setAliasTarget] = useState('');
-  const aliasesRes = useResource({ load: adminApi.listMenuAliases });
-  const aliases = aliasesRes.data?.items ?? [];
-  const reloadAliases = aliasesRes.reload;
-  const syncedMenus = items.filter(isSyncedMenu);
 
-  async function handleCreateAlias() {
-    if (!aliasId.trim() || !aliasTarget) {
-      notify('error', 'กรอกชื่อ alias และเลือกเมนูเป้าหมาย');
-      return;
-    }
-    const ok = await mutate(() => adminApi.createMenuAlias(aliasId.trim(), aliasTarget), 'สร้าง alias สำเร็จ');
-    if (ok) {
-      setAliasId('');
-      await reloadAliases();
-    }
-  }
-
-  async function handleRepoint(alias: string, menuId: string) {
-    if (!menuId) return;
-    if (await mutate(() => adminApi.repointMenuAlias(alias, menuId), `ย้าย alias ${alias} แล้ว`)) {
-      await reloadAliases();
-    }
-  }
-
-  async function handleDeleteAlias(alias: string) {
-    if (!confirm(`ลบ alias "${alias}" บน LINE ด้วย?`)) return;
-    if (await mutate(() => adminApi.deleteMenuAlias(alias), 'ลบ alias สำเร็จ')) {
-      await reloadAliases();
-    }
-  }
-
-  async function handleCreate() {
-    if (!name.trim()) {
-      notify('error', 'กรุณากรอกชื่อ');
-      return;
-    }
-    // § modal เก่าใช้ DEFAULT_CONFIG ที่มี <LIFF_ID> — กันตั้งแต่ client ไม่ให้ขึ้น LINE เป็นปุ่มพัง
-    if (/<\s*LIFF_ID\s*>/i.test(configJson) || (configJson.includes('<') && configJson.includes('LIFF'))) {
-      notify('error', 'กรุณาแทน <LIFF_ID> ด้วยค่า LINE_LIFF_ID จริงก่อนบันทึก');
-      return;
-    }
-    let config: unknown;
-    try {
-      config = JSON.parse(configJson);
-    } catch {
-      notify('error', 'Config JSON ไม่ถูกต้อง');
-      return;
-    }
-
-    setSaving(true);
-    const ok = await mutate(
-      () =>
-        adminApi.createRichMenu({
-          name: name.trim(),
-          chatBarText,
-          config,
-          ...(displayStart ? { displayStartAt: new Date(displayStart).toISOString() } : {}),
-          ...(displayEnd ? { displayEndAt: new Date(displayEnd).toISOString() } : {}),
-        }),
-      'สร้าง Rich Menu สำเร็จ',
-    );
-    setSaving(false);
-    if (ok) {
-      setDialogOpen(false);
-      setName('');
-      setDisplayStart('');
-      setDisplayEnd('');
-    }
-  }
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+  const [viewMenu, setViewMenu] = useState<RichMenuItem | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<RichMenuItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function handleSync(item: RichMenuItem) {
-    await mutate(() => adminApi.syncRichMenu(item.id), 'Sync สำเร็จ');
-  }
-
-  function pickImage(item: RichMenuItem) {
-    uploadTargetRef.current = item;
-    fileRef.current?.click();
-  }
-
-  async function handleImagePicked(e: React.ChangeEvent<HTMLInputElement>) {
-    const item = uploadTargetRef.current;
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!item || !file) return;
-    setUploadingId(item.id);
-    await mutate(() => adminApi.uploadRichMenuImage(item.id, file), 'อัปรูพสำเร็จ — รูปขึ้น LINE แล้ว');
-    setUploadingId(null);
+    setSyncingId(item.id);
+    await mutate(() => adminApi.syncRichMenu(item.id), 'ซิงค์ไป LINE สำเร็จ');
+    setSyncingId(null);
   }
 
   async function handlePublish(item: RichMenuItem) {
-    if (!confirm(`Publish "${item.name}" ให้ผู้ใช้ LINE ทุกคน?`)) return;
-    // server คืน 422 { error } เมื่อ LINE ปฏิเสธ — mutate เอาข้อความนั้นมาแจ้ง
-    await mutate(() => adminApi.publishRichMenu(item.id), 'Publish สำเร็จ — ผู้ใช้ทุกคนจะเห็นเมนูใหม่');
+    await mutate(() => adminApi.publishRichMenu(item.id), 'ตั้งเป็นเมนูหลักสำเร็จ');
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    const ok = await mutate(() => adminApi.deleteRichMenu(deleteTarget.id), 'ลบ Rich Menu แล้ว');
+    setDeleting(false);
+    if (ok) setDeleteTarget(null);
   }
 
   return (
-    <>
+    <div className="space-y-4">
+      <PageHeader title="Rich Menus" subtitle="จัดการเมนู LINE Official Account">
+        <Link href="/admin/chatbot/rich-menus/aliases">
+          <Button variant="ghost" size="sm" className="gap-1.5">
+            <Link2 className="h-4 w-4" /> Aliases
+          </Button>
+        </Link>
+        <Link href="/admin/chatbot/rich-menus/new">
+          <Button size="sm" className="gap-1.5">
+            <Plus className="h-4 w-4" /> New Menu
+          </Button>
+        </Link>
+      </PageHeader>
+
       {feedback && (
-        <div role="status" className={`rounded-lg px-4 py-3 text-sm font-medium ${feedback.type === 'success' ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}>
+        <div
+          role="status"
+          className={cn(
+            'rounded-lg px-4 py-3 text-sm font-medium',
+            feedback.type === 'success' ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger',
+          )}
+        >
           {feedback.msg}
         </div>
       )}
 
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/png,image/jpeg"
-        aria-label="เลือกไฟล์รูปเมนู"
-        className="hidden"
-        onChange={handleImagePicked}
-      />
-      <AdminCard>
-        <AdminCardTitle
-          icon={<LayoutGrid className="h-4 w-4" />}
-          action={
-            <span className="flex gap-2">
-              <Link
-                href="/admin/chatbot/rich-menus/aliases"
-                className="inline-flex min-h-touch items-center gap-1.5 rounded-md border border-border bg-transparent px-4 text-sm font-semibold text-ink"
-              >
-                Aliases
-              </Link>
-              <Link
-                href="/admin/chatbot/rich-menus/new"
-                className="inline-flex min-h-touch items-center gap-1.5 rounded-md bg-accent-strong px-4 text-sm font-semibold text-on-accent"
-              >
-                <Plus className="h-4 w-4" /> สร้าง
-              </Link>
-            </span>
-          }
-        >
-          Rich Menus ({items.length})
-        </AdminCardTitle>
-
-        {loading ? (
-          <div className="py-12 text-center text-muted">กำลังโหลด...</div>
-        ) : items.length === 0 ? (
-          <div className="py-12 text-center text-muted">ยังไม่มี Rich Menu — กด &quot;สร้าง&quot; เพื่อเริ่ม</div>
-        ) : (
+      {loading ? (
+        <div className="py-12 text-center text-muted">กำลังโหลดข้อมูล...</div>
+      ) : items.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border p-12 text-center">
+          <p className="text-sm text-muted">ไม่พบข้อมูลเมนูในระบบ</p>
+          <Link href="/admin/chatbot/rich-menus/new" className="mt-2 block text-sm text-accent-strong hover:underline">
+            สร้างเมนูแรกของคุณ →
+          </Link>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-left">
               <thead>
                 <tr className="border-b border-border/50 text-xs font-semibold uppercase tracking-wide text-muted">
-                  <th scope="col" className="px-4 py-3">Preview</th>
+                  <th scope="col" className="w-40 px-4 py-3 text-center">Preview</th>
                   <th scope="col" className="px-4 py-3">รายละเอียดเมนู</th>
                   <th scope="col" className="px-4 py-3 text-center">สถานะ</th>
-                  <th scope="col" className="px-4 py-3 text-right">จัดการ</th>
+                  <th scope="col" className="px-4 py-3 text-center">จัดการ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/30">
                 {items.map((item) => {
-                  const live = item.status === 'active' && isSyncedMenu(item);
+                  const pill = menuStatusPill(item);
+                  const action = primaryAction(item);
+                  const imageFailed = failedImages.has(item.id);
                   return (
-                    <tr key={item.id} className="hover:bg-accent/5">
-                      <td className="w-32 px-4 py-3">
-                        <div className="flex h-16 w-28 items-center justify-center rounded-lg border border-border/50 bg-surface-sunken text-xs text-muted">
-                          {item.name.slice(0, 12)}
+                    <tr key={item.id} className="transition-colors hover:bg-accent/5">
+                      <td className="px-4 py-4">
+                        <div className="aspect-[250/168.6] w-32 overflow-hidden rounded-lg border border-border bg-surface-sunken">
+                          {item.lineRichMenuId && !imageFailed ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={`/api/line/admin/rich-menus/${item.id}/image`}
+                              alt={item.name}
+                              className="h-full w-full object-cover"
+                              onError={() =>
+                                setFailedImages((prev) => new Set(prev).add(item.id))
+                              }
+                            />
+                          ) : (
+                            <div className="flex h-full items-center justify-center bg-surface-sunken px-2 text-center text-[10px] text-muted">
+                              No Image
+                            </div>
+                          )}
                         </div>
                       </td>
-                      <td className="max-w-60 px-4 py-3">
-                        <p className="truncate text-sm font-semibold text-ink">{item.name}</p>
-                        <p className="mt-0.5 text-xs text-muted">Bar Text: &quot;{item.chatBarText}&quot;</p>
-                        <p className="mt-0.5 truncate font-mono text-[10px] text-muted">
+                      <td className="px-4 py-4">
+                        <p className="font-semibold text-ink">{item.name}</p>
+                        <p className="mt-1 text-xs text-muted">
+                          <span className="font-medium">Bar Text:</span>{' '}
+                          <span className="italic">&quot;{item.chatBarText}&quot;</span>
+                        </p>
+                        <p className="mt-1 truncate font-mono text-[10px] text-muted">
                           {item.lineRichMenuId ?? 'LOCAL_ONLY'}
                         </p>
-                        {item.lastSyncError && <p className="mt-0.5 text-xs text-danger">{item.lastSyncError}</p>}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-center">
-                        {live ? (
-                          <span className="inline-block rounded-full bg-success/10 px-2.5 py-0.5 text-[10px] font-bold text-success">
-                            Live Now
-                          </span>
-                        ) : (
-                          <span className="inline-block rounded-full bg-muted/10 px-2.5 py-0.5 text-[10px] font-bold text-muted">
-                            {item.status === 'active' ? 'ใช้งาน' : item.status}
+                        {(item.userLinkCount ?? 0) > 0 && (
+                          <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-accent-sunken px-1.5 py-0.5 text-[10px] font-bold text-accent-strong">
+                            <Users className="h-3 w-3" /> {item.userLinkCount} ผู้ใช้
                           </span>
                         )}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right">
-                        {!item.lineRichMenuId ? (
-                          <Button variant="outline" onClick={() => handleSync(item)} className="min-h-touch gap-1 text-xs">
-                            <RefreshCw className="h-3.5 w-3.5" /> Sync
-                          </Button>
-                        ) : item.syncStatus !== 'synced' ? (
-                          <Button variant="outline" onClick={() => handleSync(item)} className="min-h-touch gap-1 text-xs">
-                            <RefreshCw className="h-3.5 w-3.5" /> ซิงค์การแก้ไข
-                          </Button>
-                        ) : item.status !== 'active' ? (
-                          <Button variant="outline" onClick={() => handlePublish(item)} className="min-h-touch gap-1 text-xs">
-                            <Globe className="h-3.5 w-3.5" /> Set Active
-                          </Button>
-                        ) : (
-                          <span className="text-[10px] font-bold text-success">Live Now</span>
-                        )}
-                        <span className="ml-2 inline-flex gap-1">
-                          <Link
-                            href={`/admin/chatbot/rich-menus/${item.id}/insights`}
-                            aria-label={`สถานะเมนู ${item.name}`}
-                            className="inline-flex min-h-touch min-w-touch items-center justify-center rounded-md hover:bg-accent/10"
-                          >
-                            <BarChart3 className="h-4 w-4 text-muted" />
-                          </Link>
-                          <Link
-                            href={`/admin/chatbot/rich-menus/${item.id}/edit`}
-                            aria-label={`ซิงก์/เผยแพร่ ${item.name}`}
-                            className="inline-flex min-h-touch min-w-touch items-center justify-center rounded-md hover:bg-accent/10"
-                          >
-                            <Eye className="h-4 w-4 text-muted" />
-                          </Link>
+                      <td className="px-4 py-4 text-center">
+                        <span
+                          title={pill.title}
+                          className={cn(
+                            'rounded-full border px-2.5 py-1 text-[10px] font-bold',
+                            pillTone[pill.tone],
+                          )}
+                        >
+                          {pill.label}
                         </span>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex items-center justify-center gap-2">
+                          {action === 'sync' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-1 text-xs"
+                              onClick={() => handleSync(item)}
+                              disabled={syncingId === item.id}
+                            >
+                              <RefreshCw className="h-3.5 w-3.5" />
+                              {syncingId === item.id ? 'กำลังซิงค์...' : 'Sync to LINE'}
+                            </Button>
+                          )}
+                          {action === 'resync' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-1 text-xs"
+                              onClick={() => handleSync(item)}
+                              disabled={syncingId === item.id}
+                            >
+                              <RefreshCw className="h-3.5 w-3.5" />
+                              {syncingId === item.id
+                                ? 'กำลังซิงค์...'
+                                : needsResync(item)
+                                  ? 'ซิงค์การแก้ไข'
+                                  : 'Re-sync'}
+                            </Button>
+                          )}
+                          {action === 'publish' && (
+                            <Button size="sm" className="text-xs" onClick={() => handlePublish(item)}>
+                              Set Active
+                            </Button>
+                          )}
+                          {action === null && (
+                            <span className="rounded-full border border-success/30 bg-success-soft px-3 py-1 text-[10px] font-black tracking-widest text-success-ink">
+                              Live Now
+                            </span>
+                          )}
+
+                          <div className="flex items-center gap-1 border-l border-border pl-3">
+                            {item.lineRichMenuId && (
+                              <Link
+                                href={`/admin/chatbot/rich-menus/${item.id}/insights`}
+                                aria-label={`สถิติ ${item.name}`}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted hover:bg-accent-sunken hover:text-accent-strong"
+                              >
+                                <BarChart3 className="h-4 w-4" />
+                              </Link>
+                            )}
+                            <button
+                              type="button"
+                              aria-label={`ดูรายละเอียด ${item.name}`}
+                              onClick={() => setViewMenu(item)}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted hover:bg-accent-sunken hover:text-accent-strong"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </button>
+                            <Link
+                              href={`/admin/chatbot/rich-menus/${item.id}/edit`}
+                              aria-label={`แก้ไข ${item.name}`}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted hover:bg-accent-sunken hover:text-accent-strong"
+                            >
+                              <SquarePen className="h-4 w-4" />
+                            </Link>
+                            <button
+                              type="button"
+                              aria-label={`ลบ ${item.name}`}
+                              onClick={() => setDeleteTarget(item)}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-danger hover:bg-danger/10"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -274,77 +232,70 @@ export function RichMenusClient() {
               </tbody>
             </table>
           </div>
-        )}
-      </AdminCard>
-
-      <AdminCard>
-        <AdminCardTitle icon={<LayoutGrid className="h-4 w-4" />}>
-          Aliases ({aliases.length}) — สลับ tab ด้วย richmenuswitch
-        </AdminCardTitle>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Input
-            aria-label="ชื่อ alias"
-            value={aliasId}
-            onChange={(e) => setAliasId(e.target.value)}
-            placeholder="เช่น main-menu (a-z 0-9 _ -)"
-            className="flex-1"
-          />
-          <select
-            aria-label="เมนูเป้าหมาย"
-            value={aliasTarget}
-            onChange={(e) => setAliasTarget(e.target.value)}
-            className="min-h-touch rounded-lg border border-border/50 bg-surface px-3 text-sm"
-          >
-            <option value="">เลือกเมนูที่ sync แล้ว</option>
-            {syncedMenus.map((m) => (
-              <option key={m.id} value={m.id}>{m.name}</option>
-            ))}
-          </select>
-          <Button onClick={handleCreateAlias} className="min-h-touch gap-1.5"><Plus className="h-4 w-4" /> สร้าง alias</Button>
         </div>
-        <AliasList
-          aliases={aliases}
-          syncedMenus={syncedMenus}
-          onRepoint={(alias, menuId) => void handleRepoint(alias, menuId)}
-          onDelete={(alias) => void handleDeleteAlias(alias)}
-        />
-      </AdminCard>
+      )}
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>สร้าง Rich Menu</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div>
-              <Label htmlFor="rm-name">ชื่อเมนู</Label>
-              <Input id="rm-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="เช่น Main Menu v2" />
-            </div>
-            <div>
-              <Label htmlFor="rm-bar">Chat Bar Text</Label>
-              <Input id="rm-bar" value={chatBarText} onChange={(e) => setChatBarText(e.target.value)} />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="rm-start">เริ่มแสดง (ไม่บังคับ)</Label>
-                <Input id="rm-start" type="datetime-local" value={displayStart} onChange={(e) => setDisplayStart(e.target.value)} />
-              </div>
-              <div>
-                <Label htmlFor="rm-end">สิ้นสุด (ไม่บังคับ)</Label>
-                <Input id="rm-end" type="datetime-local" value={displayEnd} onChange={(e) => setDisplayEnd(e.target.value)} />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="rm-config">Config (LINE Rich Menu JSON)</Label>
-              <Textarea id="rm-config" rows={10} value={configJson} onChange={(e) => setConfigJson(e.target.value)} className="font-mono text-xs" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setDialogOpen(false)}>ยกเลิก</Button>
-            <Button onClick={handleCreate} disabled={saving}>{saving ? 'กำลังสร้าง...' : 'สร้าง'}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+      <DetailModal
+        title="รายละเอียดริชเมนู"
+        open={viewMenu !== null}
+        onClose={() => setViewMenu(null)}
+        rows={
+          viewMenu
+            ? [
+                { label: 'ชื่อเมนู', value: viewMenu.name },
+                { label: 'ข้อความแถบแชท', value: <span className="italic">&quot;{viewMenu.chatBarText}&quot;</span> },
+                { label: 'LINE Rich Menu ID', value: <span className="font-mono text-xs">{viewMenu.lineRichMenuId ?? 'LOCAL_ONLY'}</span> },
+                {
+                  label: 'ช่วงเวลาแสดงผล',
+                  value:
+                    [viewMenu.displayStartAt, viewMenu.displayEndAt]
+                      .map((v) => (v ? toLocalDatetimeInputValue(v).replace('T', ' ') : null))
+                      .filter(Boolean)
+                      .join(' – ') || 'ตลอดเวลา',
+                },
+                { label: 'ผู้ใช้ที่ผูกเมนูนี้', value: `${viewMenu.userLinkCount ?? 0} คน` },
+              ]
+            : []
+        }
+        renderExtra={
+          viewMenu?.lineRichMenuId && !failedImages.has(viewMenu.id) ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={`/api/line/admin/rich-menus/${viewMenu.id}/image`}
+              alt={viewMenu.name}
+              className="w-full rounded-lg border border-border"
+              onError={() => setFailedImages((prev) => new Set(prev).add(viewMenu.id))}
+            />
+          ) : undefined
+        }
+        actions={
+          viewMenu
+            ? [
+                {
+                  label: 'แก้ไข',
+                  variant: 'outline',
+                  onClick: () => {
+                    const id = viewMenu.id;
+                    setViewMenu(null);
+                    router.push(`/admin/chatbot/rich-menus/${id}/edit`);
+                  },
+                },
+                { label: 'ปิด', onClick: () => setViewMenu(null) },
+              ]
+            : undefined
+        }
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title="ยืนยันการลบ"
+        description={`ต้องการลบ Rich Menu "${deleteTarget?.name ?? ''}" หรือไม่?`}
+        confirmText="ลบ"
+        danger
+        busy={deleting}
+      />
+    </div>
   );
 }

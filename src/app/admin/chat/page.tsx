@@ -3,7 +3,7 @@ import { requireStaff } from '@/lib/auth/require-staff';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { ChatClient } from './chat-client';
 
-export const metadata: Metadata = { title: 'แชท LINE' };
+export const metadata: Metadata = { title: 'Live Chat' };
 export const dynamic = 'force-dynamic';
 
 /**
@@ -16,7 +16,7 @@ export default async function AdminChatPage() {
   const { user: staffUser } = await requireStaff();
 
   return (
-    <AdminShell user={staffUser} active="chat" title="แชท LINE" bleed>
+    <AdminShell user={staffUser} active="chat" title="Live Chat" bleed>
       <ChatClient adminUserId={staffUser.id} />
     </AdminShell>
   );

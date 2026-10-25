@@ -64,6 +64,10 @@ export interface CannedResponse {
   title: string;
   shortcut: string | null;
   content: string;
+  category?: string;
+  usageCount?: number;
+  isActive?: boolean;
+  updatedAt?: string;
 }
 
 export interface StaffMember {

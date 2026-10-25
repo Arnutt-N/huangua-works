@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import type { IntentItem, IntentMatchType } from '@/app/admin/_lib/admin-api';
 import { adminApi } from '@/app/admin/_lib/admin-api';
 import { readinessOf } from './readiness';
@@ -57,10 +58,13 @@ function emptyForm(): IntentForm {
 }
 
 export function IntentSection() {
+  const router = useRouter();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<IntentForm>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<IntentItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const { data, loading, feedback, notify, mutate, reload } = useResource({
     load: adminApi.listIntents,
@@ -97,7 +101,7 @@ export function IntentSection() {
     setDialogOpen(true);
   }
 
-  async function handleSave() {
+  async function handleSave(mode: 'configure' | 'only' | 'save' = 'save') {
     if (!form.name.trim()) {
       notify('error', 'กรุณากรอกชื่อหมวด');
       return;
@@ -129,17 +133,29 @@ export function IntentSection() {
       responses,
     };
     setSaving(true);
-    const ok = await mutate(
-      () => (editingId ? adminApi.updateIntent(editingId, payload) : adminApi.createIntent(payload)),
-      editingId ? 'แก้ไขหมวดสำเร็จ' : 'เพิ่มหมวดสำเร็จ',
-    );
+    const res = editingId
+      ? await adminApi.updateIntent(editingId, payload)
+      : await adminApi.createIntent(payload);
+    if (res.ok) {
+      notify('success', editingId ? 'แก้ไขหมวดสำเร็จ' : 'เพิ่มหมวดสำเร็จ');
+      setDialogOpen(false);
+      if (!editingId && mode === 'configure' && 'id' in res.data && res.data.id) {
+        router.push(`/admin/chatbot/auto-replies/${res.data.id}`);
+        return;
+      }
+      await reload();
+    } else {
+      notify('error', res.error);
+    }
     setSaving(false);
-    if (ok) setDialogOpen(false);
   }
 
-  async function handleDelete(item: IntentItem) {
-    if (!confirm(`ลบหมวด "${item.name}" ?`)) return;
-    await mutate(() => adminApi.deleteIntent(item.id), 'ลบหมวดแล้ว');
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    await mutate(() => adminApi.deleteIntent(deleteTarget.id), 'ลบหมวดแล้ว');
+    setDeleting(false);
+    setDeleteTarget(null);
   }
 
   async function handleToggle(item: IntentItem) {
@@ -170,11 +186,11 @@ export function IntentSection() {
           action={
             <Button onClick={openCreate} className="min-h-touch gap-1.5">
               <Plus className="h-4 w-4" />
-              เพิ่มหมวด
+              New Category
             </Button>
           }
         >
-          หมวดเจตนา ({items.length})
+          Intent Categories
         </AdminCardTitle>
 
         <p className="mb-3 text-sm text-muted">
@@ -186,23 +202,22 @@ export function IntentSection() {
           <div className="py-12 text-center text-muted">กำลังโหลด...</div>
         ) : items.length === 0 ? (
           <div className="py-12 text-center text-muted">
-            ยังไม่มีหมวดเจตนา — กด &quot;เพิ่มหมวด&quot; เพื่อเริ่มสร้าง
+            ยังไม่มีหมวดเจตนา — กด &quot;New Category&quot; เพื่อเริ่มสร้าง
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-border text-xs uppercase text-muted">
-                  <th className="px-3 py-2 font-medium">หมวด</th>
+                  <th className="px-3 py-2 font-medium">Category</th>
                   <th className="px-3 py-2 font-medium">Keywords</th>
-                  <th className="px-3 py-2 text-center font-medium">ตอบ</th>
-                  <th className="px-3 py-2 text-center font-medium">พร้อม</th>
+                  <th className="px-3 py-2 text-center font-medium">สถานะ</th>
                   <th className="px-3 py-2 text-right font-medium">จัดการ</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((item) => {
-                  const { ready, reason } = readinessOf(item);
+                  const { reason } = readinessOf(item);
                   return (
                     <tr key={item.id} className="border-b border-border/50 hover:bg-accent/5">
                       <td className="max-w-xs px-3 py-3">
@@ -227,18 +242,25 @@ export function IntentSection() {
                           )}
                         </div>
                       </td>
-                      <td className="px-3 py-3 text-center tabular-nums">{item.responses.length}</td>
                       <td className="px-3 py-3 text-center">
-                        <span
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={item.isActive}
+                          aria-label={`${item.isActive ? 'ปิด' : 'เปิด'} ${item.name}`}
                           title={reason}
-                          className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-                            ready && item.isActive
-                              ? 'bg-success/10 text-success'
-                              : 'bg-danger/10 text-danger'
+                          onClick={() => handleToggle(item)}
+                          className={`relative inline-flex h-5 w-9 flex-none items-center rounded-pill transition-colors duration-normal ${
+                            item.isActive ? 'bg-accent-strong' : 'bg-surface-sunken'
                           }`}
                         >
-                          {ready && item.isActive ? 'พร้อม' : 'ไม่พร้อม'}
-                        </span>
+                          <span
+                            aria-hidden="true"
+                            className={`inline-block h-4 w-4 rounded-pill bg-white shadow transition-transform duration-normal ${
+                              item.isActive ? 'translate-x-4' : 'translate-x-0.5'
+                            }`}
+                          />
+                        </button>
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex justify-end gap-1">
@@ -250,20 +272,6 @@ export function IntentSection() {
                             <Eye className="h-4 w-4 text-muted" />
                           </Link>
                           <button
-                            onClick={() => handleToggle(item)}
-                            className="flex min-h-touch items-center justify-center rounded-full px-2 text-xs font-medium hover:bg-accent/10"
-                            aria-label={`${item.isActive ? 'ปิด' : 'เปิด'} ${item.name}`}
-                            aria-pressed={item.isActive}
-                          >
-                            <span
-                              className={`inline-block rounded-full px-2 py-0.5 ${
-                                item.isActive ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'
-                              }`}
-                            >
-                              {item.isActive ? 'เปิด' : 'ปิด'}
-                            </span>
-                          </button>
-                          <button
                             onClick={() => openEdit(item)}
                             className="min-h-touch min-w-touch flex items-center justify-center rounded-md hover:bg-accent/10"
                             aria-label={`แก้ไข ${item.name}`}
@@ -271,7 +279,7 @@ export function IntentSection() {
                             <Pencil className="h-4 w-4 text-muted" />
                           </button>
                           <button
-                            onClick={() => handleDelete(item)}
+                            onClick={() => setDeleteTarget(item)}
                             className="min-h-touch min-w-touch flex items-center justify-center rounded-md hover:bg-danger/10"
                             aria-label={`ลบ ${item.name}`}
                           >
@@ -288,10 +296,31 @@ export function IntentSection() {
         )}
       </AdminCard>
 
+      <Dialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>ลบหมวดเจตนา</DialogTitle>
+          </DialogHeader>
+          <p className="py-2 text-sm text-muted">
+            ลบ &quot;{deleteTarget?.name}&quot;? คำตอบของหมวดนี้จะหายไปด้วย
+          </p>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleteTarget(null)}>ยกเลิก</Button>
+            <Button
+              onClick={() => void handleDelete()}
+              disabled={deleting}
+              className="bg-danger text-on-accent hover:bg-danger/90"
+            >
+              {deleting ? 'กำลังลบ...' : 'ยืนยันลบ'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editingId ? 'แก้ไขหมวด' : 'เพิ่มหมวดใหม่'}</DialogTitle>
+            <DialogTitle>{editingId ? 'แก้ไขหมวด' : 'เพิ่ม Category ใหม่'}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
@@ -486,9 +515,20 @@ export function IntentSection() {
             <Button variant="ghost" onClick={() => setDialogOpen(false)}>
               ยกเลิก
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? 'กำลังบันทึก...' : 'บันทึก'}
-            </Button>
+            {editingId ? (
+              <Button onClick={() => void handleSave('save')} disabled={saving}>
+                {saving ? 'กำลังบันทึก...' : 'บันทึก'}
+              </Button>
+            ) : (
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button variant="outline" onClick={() => void handleSave('only')} disabled={saving}>
+                  สร้างอย่างเดียว
+                </Button>
+                <Button onClick={() => void handleSave('configure')} disabled={saving}>
+                  สร้างและตั้งค่าต่อ
+                </Button>
+              </div>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

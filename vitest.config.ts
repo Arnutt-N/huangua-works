@@ -4,7 +4,9 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    // § default exclude ของ vitest มี node_modules — ต้องรวมไว้ด้วยหรือมันจะกวาด node_modules
+    include: ['src/**/*.test.{ts,tsx}'],
+    exclude: ['**/node_modules/**', '**/*.integration.test.ts'],
     // integration test (*.integration.test.ts) ต้องมี local Postgres + Redis
     // รันอยู่จริง (`docker compose up -d postgres redis up-redis`) — โหลด
     // DATABASE_URL/Redis vars จาก .env.local ผ่านไฟล์นี้ ไม่กระทบ unit test ปกติ

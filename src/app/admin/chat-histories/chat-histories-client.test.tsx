@@ -134,7 +134,7 @@ describe('ChatHistoriesClient อ่านอย่างเดียว', () =>
     ]);
     render(<ChatHistoriesClient />);
     await screen.findByText('ผู้ใช้ LINE a1b2c3d4');
-    expect(screen.getByText('a1b2c3d4')).toBeInTheDocument();
+    expect(screen.getAllByText('a1b2c3d4').length).toBeGreaterThan(0);
     expect(bodyText()).not.toContain(RAW_LINE_ID);
   });
 
@@ -201,7 +201,7 @@ describe('ChatHistoryDetail อ่านอย่างเดียว', () => {
     await screen.findByText('รับเรื่องแล้วครับ');
     expect(screen.getAllByText('สมชาย').length).toBeGreaterThan(0);
     expect(screen.getByText('ปิดเรื่อง')).toBeInTheDocument();
-    expect(screen.getByText('a1b2c3d4')).toBeInTheDocument();
+    expect(screen.getAllByText('a1b2c3d4').length).toBeGreaterThan(0);
     expect(fetchConversations).not.toHaveBeenCalled();
     expect(bodyText()).not.toContain(RAW_LINE_ID);
     expect(bodyText()).not.toMatch(/\bresolved\b/);
@@ -217,7 +217,7 @@ describe('ChatHistoryDetail อ่านอย่างเดียว', () => {
 
     await screen.findByText('รับเรื่องแล้วครับ');
     expect(screen.getAllByText('สมหญิง').length).toBeGreaterThan(0);
-    expect(screen.getByText('z9y8x7w6')).toBeInTheDocument();
+    expect(screen.getAllByText('z9y8x7w6').length).toBeGreaterThan(0);
     const payload = await fetchConversationPage.mock.results[0]?.value;
     expect(payload.conversation.displayName).toBe('สมหญิง');
     expect(payload.conversation.pictureUrl).toBe('https://example.test/pic.jpg');

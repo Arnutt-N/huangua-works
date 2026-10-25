@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { count, desc, inArray, sql } from 'drizzle-orm';
+import { count, desc, eq, inArray, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { chatBroadcasts, chatBroadcastFailedRecipients } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
@@ -8,21 +8,14 @@ import { requireStaffApi } from '@/lib/auth/require-staff';
 import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit';
 import { broadcastTargetSchema } from '@/lib/line/broadcast-target';
+import { BROADCAST_TITLE_MAX } from '@/lib/contracts';
+import { broadcastContentSchema as contentSchema } from '@/lib/line/broadcast-content-schema';
 import { z } from 'zod';
 
 export const runtime = 'nodejs';
 
-const httpsUrl = z.string().url().refine((u) => u.startsWith('https://'), 'ต้องเป็น https URL');
-
-// § content เป็น discriminated union เข้มเท่า LINE รับ — เดิมตรวจแค่ type string + passthrough
-// bypass wizard POST ตรงเก็บของผิดลง DB ไปแตกตอน send/cron (502 ทีหลัง) ต้อง fail ที่ boundary
-const contentSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('text'), text: z.string().min(1).max(5000) }).passthrough(),
-  z.object({ type: z.literal('image'), originalContentUrl: httpsUrl, previewImageUrl: httpsUrl }).passthrough(),
-  z.object({ type: z.literal('flex'), altText: z.string().min(1).max(400), contents: z.record(z.string(), z.unknown()) }).passthrough(),
-]);
-
 const createSchema = z.object({
+  title: z.string().trim().max(BROADCAST_TITLE_MAX, 'ชื่อแคมเปญยาวเกินไป').nullable().optional(),
   content: z.array(contentSchema).min(1).max(5),
   target: broadcastTargetSchema.default({ kind: 'all' }),
   scheduledAt: z.string().datetime().nullable().optional(),
@@ -31,6 +24,9 @@ const createSchema = z.object({
 const querySchema = z.object({
   page: z.coerce.number().int().min(1).optional().default(1),
   pageSize: z.coerce.number().int().min(1).max(100).optional().default(50),
+  status: z
+    .enum(['draft', 'scheduled', 'sending', 'sent', 'failed', 'cancelled'])
+    .optional(),
 });
 
 export async function GET(request: Request) {
@@ -41,6 +37,7 @@ export async function GET(request: Request) {
   const parsed = querySchema.safeParse({
     page: url.searchParams.get('page') ?? undefined,
     pageSize: url.searchParams.get('pageSize') ?? undefined,
+    status: url.searchParams.get('status') ?? undefined,
   });
   if (!parsed.success) {
     return NextResponse.json(
@@ -48,16 +45,18 @@ export async function GET(request: Request) {
       { status: 400 },
     );
   }
-  const { page, pageSize } = parsed.data;
+  const { page, pageSize, status } = parsed.data;
 
   const db = await getDb();
 
-  const [countRow] = await db.select({ value: count() }).from(chatBroadcasts);
+  const where = status ? eq(chatBroadcasts.status, status) : undefined;
+  const [countRow] = await db.select({ value: count() }).from(chatBroadcasts).where(where);
   const total = countRow?.value ?? 0;
 
   const rows = await db
     .select()
     .from(chatBroadcasts)
+    .where(where)
     .orderBy(desc(chatBroadcasts.createdAt))
     .limit(pageSize)
     .offset((page - 1) * pageSize);
@@ -95,6 +94,7 @@ export async function POST(request: Request) {
 
   await db.insert(chatBroadcasts).values({
     id,
+    title: result.data.title ?? null,
     content: result.data.content,
     status,
     target: result.data.target,

@@ -1,3 +1,5 @@
+import type { TAG_COLORS } from '@/lib/contracts';
+
 export const MODE_LABELS: Record<string, string> = {
   bot_active: 'Bot ตอบอัตโนมัติ',
   waiting_handoff: 'รอเจ้าหน้าที่',
@@ -26,7 +28,7 @@ export const MODE_BADGE: Record<string, string> = {
 
 export const FALLBACK_BADGE = 'bg-surface-sunken text-muted ring-border-strong/30';
 
-/** สีป้าย tag — key ต้องตรงกับ TAG_COLORS ใน validation (token variants เท่านั้น) */
+/** สีป้าย tag — key ผูกกับ TAG_COLORS (token variants เท่านั้น) */
 export const TAG_BADGE: Record<string, string> = {
   accent: 'bg-accent-sunken text-accent-strong ring-accent-strong/20',
   gold: 'bg-accent-gold-soft text-warning-ink ring-warning-ink/20',
@@ -34,4 +36,4 @@ export const TAG_BADGE: Record<string, string> = {
   warning: 'bg-warning-soft text-warning-ink ring-warning-ink/20',
   danger: 'bg-danger-soft text-danger-ink ring-danger-ink/20',
   muted: 'bg-surface-sunken text-muted ring-border-strong/30',
-};
+} satisfies Record<(typeof TAG_COLORS)[number], string>;

@@ -6,17 +6,19 @@ import {
   MessageSquare,
   FolderCog,
   Bot,
-  Send,
+  Megaphone,
+  Reply,
   Image,
-  LayoutGrid,
   HeartPulse,
   History,
   UsersRound,
-  Zap,
   Settings,
   Palette,
   ListChecks,
   ContactRound,
+  PanelTop,
+  MessageSquareText,
+  MessageSquareReply,
   type LucideIcon,
 } from 'lucide-react';
 import { ADMIN_ROLES, type UserRole } from '@/lib/auth/roles';
@@ -76,12 +78,6 @@ export interface AdminNavGroup {
  *
  * (ปัจจุบันทุกเมนูในกลุ่มนี้เป็น supervisorOnly — /admin/audit ถูกจำกัดเพิ่มเพราะ
  * มี email/ชื่อเจ้าหน้าที่ IP address และเลขติดตามของประชาชนอยู่ในตาราง)
- *
- * § ทำไม ไฟล์สื่อ/ย่อรูป/สุขภาพระบบ/ตั้งค่า ไม่อยู่ในกลุ่ม "แชทบอท"
- * ทั้งสี่ตัวไม่ได้ผูกกับบอทโดยเฉพาะ — ไฟล์สื่อใช้กับ Rich Menu ก็จริงแต่ใช้กับ
- * งานอื่นได้ด้วย, ย่อรูปเป็นเครื่องมือทั่วไป, สุขภาพระบบตรวจ DB/Redis/LINE ทั้งระบบ
- * และ /admin/settings จะมีการตั้งค่าอื่นนอกจากบอทตามมา จึงเลี่ยงชื่อ "ตั้งค่าบอท"
- * ที่ผูกกับบอทเกินจริง
  */
 export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
   {
@@ -92,29 +88,17 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     ],
   },
   {
-    /**
-     * § กลุ่มนี้มีเมนูเดียวโดยตั้งใจ — อย่ายุบรวมเข้า "แชทบอท"
-     * การสนทนาคือเจ้าหน้าที่คุยกับประชาชนเอง (งานประจำวัน ทุก staff เข้าได้)
-     * ส่วนกลุ่มแชทบอทคืองานตั้งค่าให้บอทตอบแทน (supervisorOnly ทั้งกลุ่ม)
-     * ถ้ายุบรวมกัน เวลา officer ล็อกอิน visibleNavGroups() จะกรองจนเหลือหัวข้อ
-     * "แชทบอท" ที่มีลูกเดียวคือ "การสนทนา" — หัวข้อขัดกับเนื้อหาที่อยู่ข้างใน
-     */
-    label: 'แชท LINE',
+    label: 'CHATBOT MANAGEMENT',
     items: [
-      { key: 'chat', label: 'การสนทนา', href: '/admin/chat', icon: MessageSquare },
-    ],
-  },
-  {
-    label: 'แชทบอท',
-    items: [
-      { key: 'chatbot', label: 'ภาพรวมบอท', href: '/admin/chatbot', icon: Bot, supervisorOnly: true },
-      { key: 'chat-histories', label: 'ประวัติการสนทนา', href: '/admin/chat-histories', icon: History, supervisorOnly: true },
-      { key: 'friends', label: 'เพื่อน LINE', href: '/admin/friends', icon: UsersRound, supervisorOnly: true },
-      { key: 'auto-replies', label: 'ตอบอัตโนมัติ', href: '/admin/chatbot/auto-replies', icon: MessageSquare, supervisorOnly: true },
-      { key: 'canned-responses', label: 'ข้อความด่วน', href: '/admin/chatbot/canned-responses', icon: Zap, supervisorOnly: true },
-      { key: 'reply-objects', label: 'ข้อความสำเร็จรูป', href: '/admin/chatbot/reply-objects', icon: LayoutGrid, supervisorOnly: true },
-      { key: 'broadcast', label: 'ส่งประกาศ', href: '/admin/chatbot/broadcast', icon: Send, supervisorOnly: true },
-      { key: 'rich-menus', label: 'Rich Menu', href: '/admin/chatbot/rich-menus', icon: LayoutGrid, supervisorOnly: true },
+      { key: 'chatbot', label: 'Chatbot Overview', href: '/admin/chatbot', icon: Bot, supervisorOnly: true },
+      { key: 'chat', label: 'Live Chat', href: '/admin/chat', icon: MessageSquare },
+      { key: 'chat-histories', label: 'Chat Histories', href: '/admin/chat-histories', icon: History, supervisorOnly: true },
+      { key: 'broadcast', label: 'Broadcast', href: '/admin/chatbot/broadcast', icon: Megaphone, supervisorOnly: true },
+      { key: 'auto-replies', label: 'Auto-Replies', href: '/admin/chatbot/auto-replies', icon: Reply, supervisorOnly: true },
+      { key: 'reply-objects', label: 'Reply Objects', href: '/admin/chatbot/reply-objects', icon: MessageSquareReply, supervisorOnly: true },
+      { key: 'canned-responses', label: 'Canned Responses', href: '/admin/chatbot/canned-responses', icon: MessageSquareText, supervisorOnly: true },
+      { key: 'rich-menus', label: 'Rich Menus', href: '/admin/chatbot/rich-menus', icon: PanelTop, supervisorOnly: true },
+      { key: 'friends', label: 'Friend Histories', href: '/admin/friends', icon: UsersRound, supervisorOnly: true },
     ],
   },
   {

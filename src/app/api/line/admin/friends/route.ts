@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { and, count, ilike, inArray, sql, type SQL } from 'drizzle-orm';
+import { and, count, eq, ilike, inArray, sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '@/lib/db';
-import { lineFriendEvents, lineUsers, richMenus } from '@/lib/db/schema';
+import { lineFriendEvents, lineUsers, richMenus, chatConversations } from '@/lib/db/schema';
 import { escapeLike } from '@/lib/db/like';
 import { countFollowStats } from '@/lib/line/friend-events';
 import { requireStaffApi } from '@/lib/auth/require-staff';
@@ -71,8 +71,11 @@ export async function GET(request: Request) {
       metadata: lineUsers.metadata,
       maskedId: sql<string | null>`left(${lineUsers.lineUserIdEnc}, 8)`,
       latestEvent,
+      // § ห้องเดียวต่อคน (uniqueIndex chat_conversations_line_user_id_hash_idx) — leftJoin ตรงได้ไม่ทำแถวซ้ำ
+      chatMode: chatConversations.mode,
     })
     .from(lineUsers)
+    .leftJoin(chatConversations, eq(chatConversations.lineUserIdHash, lineUsers.lineUserIdHash))
     .where(where)
     .orderBy(sql`${lineUsers.lastMessageAt} DESC NULLS LAST`, lineUsers.id)
     .limit(pageSize)
@@ -84,7 +87,7 @@ export async function GET(request: Request) {
   if (pageIds.length > 0) {
     const events = await db
       .select({
-        lineUserId: lineFriendEvents.lineUserId,
+        friendId: lineFriendEvents.lineUserId,
         event: lineFriendEvents.event,
         createdAt: lineFriendEvents.createdAt,
       })
@@ -92,9 +95,9 @@ export async function GET(request: Request) {
       .where(inArray(lineFriendEvents.lineUserId, pageIds))
       .orderBy(lineFriendEvents.createdAt);
     for (const e of events) {
-      const list = eventsByUser.get(e.lineUserId) ?? [];
+      const list = eventsByUser.get(e.friendId) ?? [];
       list.push({ event: e.event, createdAt: e.createdAt });
-      eventsByUser.set(e.lineUserId, list);
+      eventsByUser.set(e.friendId, list);
     }
   }
 
@@ -109,6 +112,8 @@ export async function GET(request: Request) {
       followState,
       followCount: stats.followCount,
       refollowCount: stats.refollowCount,
+      lastFollowAt: stats.lastFollowAt ? stats.lastFollowAt.toISOString() : null,
+      chatMode: r.chatMode ?? null,
       lastActiveAt: r.lastMessageAt,
       richMenuId: getAssignedMenuId(r.metadata),
     };

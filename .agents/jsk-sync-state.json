@@ -1,9 +1,9 @@
 {
   "jskRepoPath": "D:\\genAI\\jsk-app",
   "jskSessionLogDir": "D:\\genAI\\jsk-app\\project-log-md\\pi",
-  "lastSyncedSessionFile": "session-summary-20261023-0209.md",
-  "lastSyncedJskHead": "333cfdc",
-  "lastSyncedAt": "2026-10-23T08:06:00+07:00",
+  "lastSyncedSessionFile": "session-summary-20261025-0102.md",
+  "lastSyncedJskHead": "2c56454",
+  "lastSyncedAt": "2026-10-25T01:13:15+07:00",
   "portedItems": [
     {
       "jskPr": "#280, #281",
@@ -19,6 +19,37 @@
       "jskPr": "#285, #286, #287",
       "summary": "Shared ThaiDatePicker (Portal + 32px touch clear button + responsive width) + /admin/reports and /admin/audit date range filters",
       "huanguaBranch": "feat/jsk-port-quota-datepicker"
+    },
+    {
+      "jskPr": "#289",
+      "summary": "ย้ายสวิตช์เปิด/ปิดจากคอลัมน์จัดการไปคอลัมน์สถานะ (Canned Responses)",
+      "huanguaBranch": "feat/jsk-line-menu-parity"
+    }
+  ],
+  "reviewedItems": [
+    {
+      "jskPr": "#288",
+      "summary": "LIFF SDK XSS 2.20.0–2.31.0 — huangua โหลด edge/2/sdk.js (latest) ไม่ pin เวอร์ชันมีช่องโหว่ จึงไม่มีอะไรต้องแก้"
+    },
+    {
+      "jskPr": "#290",
+      "summary": "ViewToggle + DetailModal — พอร์ตแล้วใน Tranche 0/4"
+    },
+    {
+      "jskPr": "#291–#295",
+      "summary": "soft-delete policy / partial unique index (ชื่อที่ซ่อนนำกลับมาใช้ได้) / show-hidden toggle — huangua ทำ soft-delete แล้ว แต่ unique ของ chat_intents.name และ chat_reply_objects.object_id ยังบล็อกการสร้างชื่อซ้ำหลังซ่อน; ยังไม่พอร์ต partial index (รอคำตัดสิน), taxonomy/booking/request-v2 ไม่มีในหัวงัว"
+    },
+    {
+      "jskPr": "—",
+      "summary": "แสดงสวิตช์ในคอลัมน์สถานะ: canned แก้แล้ว, auto-replies มีอยู่แล้ว, reply objects เป็นการ์ดจึงคงสวิตช์ในแถวปุ่ม"
+    },
+    {
+      "jskPr": "#296",
+      "summary": "Canned switch อยู่คอลัมน์สถานะ — พอร์ตแล้วใน 0583b02; Files preview ใช้ S3 public URL ของหัวงัว ไม่พบปัญหา broken image แบบ jsk; Users LINE short form N/A (users คือ staff); skn_menu→jsk_menu / StatsCard navy N/A"
+    },
+    {
+      "jskPr": "#296",
+      "summary": "ยังไม่พอร์ต (รอคำตัดสิน): Viewer read-only role (ALL_ROLES ของหัวงัวยังไม่มี viewer) และ reply-objects edit ย้ายจาก modal เป็น full page ตาม jsk"
     }
   ]
 }

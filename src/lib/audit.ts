@@ -74,6 +74,7 @@ export const AUDIT_ACTIONS = {
   BROADCAST_CREATE: 'broadcast_create',
   BROADCAST_VIEW: 'broadcast_view',
   BROADCAST_SEND: 'broadcast_send',
+  BROADCAST_DELETE: 'broadcast_delete',
   RICH_MENU_CREATE: 'rich_menu_create',
   RICH_MENU_SYNC: 'rich_menu_sync',
   RICH_MENU_PUBLISH: 'rich_menu_publish',

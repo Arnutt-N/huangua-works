@@ -23,6 +23,12 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
   });
 
   const [activeTab, setActiveTab] = useState<'keywords' | 'responses'>('keywords');
+  const [nameDraft, setNameDraft] = useState<string | null>(null);
+  const [descDraft, setDescDraft] = useState<string | null>(null);
+  const [newKeyword, setNewKeyword] = useState('');
+  const [newMatchType, setNewMatchType] = useState<IntentMatchType>('contains');
+  const [newReplyType, setNewReplyType] = useState<'text' | 'reply_object'>('text');
+  const [newResponseText, setNewResponseText] = useState('');
 
   async function handleToggle() {
     if (!item) return;
@@ -78,6 +84,79 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
     await reload();
   }
 
+  async function saveMeta() {
+    if (!item || nameDraft === null) return;
+    const trimmed = nameDraft.trim();
+    if (!trimmed) {
+      notify('error', 'ชื่อหมวดต้องไม่ว่าง');
+      return;
+    }
+    const res = await adminApi.updateIntent(item.id, {
+      name: trimmed,
+      description: (descDraft ?? '').trim() || null,
+    });
+    if (!res.ok) {
+      notify('error', res.error);
+      return;
+    }
+    notify('success', 'บันทึกชื่อ/คำอธิบายแล้ว');
+    setNameDraft(null);
+    setDescDraft(null);
+    await reload();
+  }
+
+  async function addKeyword() {
+    if (!item) return;
+    const kw = newKeyword.trim();
+    if (!kw) {
+      notify('error', 'กรุณากรอก keyword');
+      return;
+    }
+    const res = await adminApi.updateIntent(item.id, {
+      keywords: [
+        ...item.keywords.map((k) => ({ keyword: k.keyword, matchType: k.matchType })),
+        { keyword: kw, matchType: newMatchType },
+      ],
+    });
+    if (!res.ok) {
+      notify('error', res.error);
+      return;
+    }
+    setNewKeyword('');
+    await reload();
+  }
+
+  async function addResponse() {
+    if (!item) return;
+    const value = newResponseText.trim();
+    if (!value) {
+      notify('error', newReplyType === 'text' ? 'กรุณากรอกข้อความคำตอบ' : 'กรุณากรอก reply object id');
+      return;
+    }
+    const res = await adminApi.updateIntent(item.id, {
+      responses: [
+        ...item.responses.map((r) => ({
+          replyType: r.replyType,
+          textContent: r.textContent,
+          replyObjectId: r.replyObjectId,
+          displayOrder: r.displayOrder,
+        })),
+        {
+          replyType: newReplyType,
+          textContent: newReplyType === 'text' ? value : null,
+          replyObjectId: newReplyType === 'reply_object' ? value : null,
+          displayOrder: item.responses.length,
+        },
+      ],
+    });
+    if (!res.ok) {
+      notify('error', res.error);
+      return;
+    }
+    setNewResponseText('');
+    await reload();
+  }
+
   if (loading) return <div className="py-12 text-center text-muted">กำลังโหลด...</div>;
   if (!item) return <div className="py-12 text-center text-muted">ไม่พบหมวดนี้</div>;
 
@@ -113,7 +192,43 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
         >
           {item.name}
         </AdminCardTitle>
-        {item.description && <p className="text-sm text-muted">{item.description}</p>}
+        {nameDraft === null ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {item.description && <p className="text-sm text-muted">{item.description}</p>}
+            <Button
+              variant="outline"
+              onClick={() => {
+                setNameDraft(item.name);
+                setDescDraft(item.description ?? '');
+              }}
+              className="gap-1 text-xs"
+            >
+              <Pencil className="h-3.5 w-3.5" /> แก้ไข
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-2 rounded-lg border border-border p-3">
+            <input
+              aria-label="ชื่อหมวด"
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              className="min-h-touch w-full rounded-md border border-border bg-surface-raised px-3 text-sm text-ink"
+            />
+            <input
+              aria-label="คำอธิบาย"
+              value={descDraft ?? ''}
+              onChange={(e) => setDescDraft(e.target.value)}
+              placeholder="คำอธิบาย (เว้นว่างได้)"
+              className="min-h-touch w-full rounded-md border border-border bg-surface-raised px-3 text-sm text-ink"
+            />
+            <div className="flex gap-2">
+              <Button onClick={() => void saveMeta()} className="text-xs">บันทึก</Button>
+              <Button variant="ghost" onClick={() => { setNameDraft(null); setDescDraft(null); }}>
+                ยกเลิก
+              </Button>
+            </div>
+          </div>
+        )}
       </AdminCard>
 
       <div className="flex gap-2" role="tablist" aria-label="ส่วนของหมวด">
@@ -141,7 +256,7 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
         <AdminCard>
           <AdminCardTitle icon={<Key className="h-4 w-4" />}>Keywords</AdminCardTitle>
           {item.keywords.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted">ยังไม่มี keyword — เพิ่มจากปุ่มแก้ไขในหน้ารายการ</p>
+            <p className="py-6 text-center text-sm text-muted">ยังไม่มี keyword — เพิ่มด้านล่าง</p>
           ) : (
             <ul className="space-y-2">
               {item.keywords.map((kw) => (
@@ -162,12 +277,43 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
               ))}
             </ul>
           )}
+          <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-border/50 pt-3">
+            <div className="min-w-40 flex-1">
+              <label htmlFor="add-keyword" className="text-xs text-muted">keyword ใหม่</label>
+              <input
+                id="add-keyword"
+                aria-label="keyword ใหม่"
+                value={newKeyword}
+                onChange={(e) => setNewKeyword(e.target.value)}
+                placeholder="เช่น กี่โมง"
+                className="min-h-touch w-full rounded-md border border-border bg-surface-raised px-3 text-sm text-ink"
+              />
+            </div>
+            <div>
+              <label htmlFor="add-match" className="text-xs text-muted">วิธีจับคู่</label>
+              <select
+                id="add-match"
+                aria-label="วิธีจับคู่ keyword"
+                value={newMatchType}
+                onChange={(e) => setNewMatchType(e.target.value as IntentMatchType)}
+                className="min-h-touch rounded-md border border-border bg-surface-raised px-2 text-sm text-ink"
+              >
+                <option value="exact">ตรงทั้งหมด</option>
+                <option value="starts_with">ขึ้นต้น</option>
+                <option value="contains">มีคำนี้</option>
+                <option value="regex">regex</option>
+              </select>
+            </div>
+            <Button onClick={() => void addKeyword()} className="gap-1 text-xs">
+              <Plus className="h-3.5 w-3.5" /> เพิ่ม
+            </Button>
+          </div>
         </AdminCard>
       ) : (
         <AdminCard>
           <AdminCardTitle icon={<MessageSquare className="h-4 w-4" />}>คำตอบ</AdminCardTitle>
           {item.responses.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted">ยังไม่มีคำตอบ — เพิ่มจากปุ่มแก้ไขในหน้ารายการ</p>
+            <p className="py-6 text-center text-sm text-muted">ยังไม่มีคำตอบ — เพิ่มด้านล่าง</p>
           ) : (
             <ul className="space-y-2">
               {item.responses.map((r) => (
@@ -192,6 +338,35 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
               ))}
             </ul>
           )}
+          <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-border/50 pt-3">
+            <div className="min-w-40 flex-1">
+              <label htmlFor="add-response" className="text-xs text-muted">คำตอบใหม่</label>
+              <input
+                id="add-response"
+                aria-label="คำตอบใหม่"
+                value={newResponseText}
+                onChange={(e) => setNewResponseText(e.target.value)}
+                placeholder={newReplyType === 'text' ? 'ข้อความตอบกลับ' : 'reply object id เช่น rpl_xxx'}
+                className="min-h-touch w-full rounded-md border border-border bg-surface-raised px-3 text-sm text-ink"
+              />
+            </div>
+            <div>
+              <label htmlFor="add-reply-type" className="text-xs text-muted">ประเภท</label>
+              <select
+                id="add-reply-type"
+                aria-label="ประเภทคำตอบ"
+                value={newReplyType}
+                onChange={(e) => setNewReplyType(e.target.value as 'text' | 'reply_object')}
+                className="min-h-touch rounded-md border border-border bg-surface-raised px-2 text-sm text-ink"
+              >
+                <option value="text">ข้อความ</option>
+                <option value="reply_object">reply object</option>
+              </select>
+            </div>
+            <Button onClick={() => void addResponse()} className="gap-1 text-xs">
+              <Plus className="h-3.5 w-3.5" /> เพิ่ม
+            </Button>
+          </div>
         </AdminCard>
       )}
 

@@ -3,6 +3,12 @@ import { ALL_STATUSES } from './cases/state-machine';
 import { ALL_BUDGET_STATUSES } from './cases/budget';
 import { STAFF_ROLES } from './auth/roles';
 import { CONVERSATION_MODES } from './line/chat-modes';
+import {
+  CANNED_RESPONSE_CATEGORIES,
+  CANNED_SHORTCUT_MAX,
+  CANNED_TITLE_MAX,
+  TAG_COLORS,
+} from './contracts';
 
 /**
  * Validation schemas — source of truth สำหรับทุก input boundary
@@ -240,25 +246,47 @@ export const chatReplySchema = z.object({
  * POST/PATCH /api/line/admin/canned-responses — ข้อความสำเร็จรูป
  * shortcut เป็น natural key สำหรับพิมพ์ "/xxx" ใน composer
  */
+const cannedTitle = z
+  .string()
+  .trim()
+  .min(1, 'กรุณากรอกชื่อ')
+  .max(CANNED_TITLE_MAX, `ชื่อยาวเกิน ${CANNED_TITLE_MAX} ตัวอักษร`);
+const cannedShortcut = z
+  .string()
+  .trim()
+  .regex(
+    new RegExp(`^[a-z0-9-]{1,${CANNED_SHORTCUT_MAX}}$`),
+    `shortcut ใช้ได้เฉพาะ a-z, 0-9 และ - (ยาวไม่เกิน ${CANNED_SHORTCUT_MAX})`,
+  )
+  .optional()
+  .or(z.literal('').transform(() => undefined));
+const cannedContent = z
+  .string()
+  .trim()
+  .min(1, 'กรุณากรอกข้อความ')
+  .max(5000, 'ข้อความยาวเกิน 5,000 ตัวอักษร');
+const cannedCategory = z.enum(CANNED_RESPONSE_CATEGORIES);
+
 export const cannedResponseSchema = z.object({
-  title: z.string().trim().min(1, 'กรุณากรอกชื่อ').max(100, 'ชื่อยาวเกิน 100 ตัวอักษร'),
-  shortcut: z
-    .string()
-    .trim()
-    .regex(/^[a-z0-9-]{1,30}$/, 'shortcut ใช้ได้เฉพาะ a-z, 0-9 และ - (ยาวไม่เกิน 30)')
-    .optional()
-    .or(z.literal('').transform(() => undefined)),
-  content: z
-    .string()
-    .trim()
-    .min(1, 'กรุณากรอกข้อความ')
-    .max(5000, 'ข้อความยาวเกิน 5,000 ตัวอักษร'),
+  title: cannedTitle,
+  shortcut: cannedShortcut,
+  content: cannedContent,
+  category: cannedCategory.default('info'),
 });
 
-export const cannedResponseUpdateSchema = cannedResponseSchema.partial().refine(
-  (v) => Object.values(v).some((x) => x !== undefined),
-  { message: 'ต้องระบุอย่างน้อย 1 ฟิลด์' },
-);
+// § ห้ามใช้ cannedResponseSchema.partial() — Zod 4 ยังเติม .default() ของ category
+// แม้ฟิลด์ไม่อยู่ใน body ทำให้ PATCH isActive ไปรีเซ็ต category เป็น 'info' ทุกครั้ง
+export const cannedResponseUpdateSchema = z
+  .object({
+    title: cannedTitle.optional(),
+    shortcut: cannedShortcut.optional(),
+    content: cannedContent.optional(),
+    category: cannedCategory.optional(),
+    isActive: z.boolean().optional(),
+  })
+  .refine((v) => Object.values(v).some((x) => x !== undefined), {
+    message: 'ต้องระบุอย่างน้อย 1 ฟิลด์',
+  });
 
 /** PUT /api/line/admin/conversations/[id]/prefs — pin/mute ต่อแอดมิน */
 export const chatPrefsSchema = z
@@ -270,8 +298,6 @@ export const chatPrefsSchema = z
     message: 'ต้องระบุ pinned หรือ muted',
   });
 
-/** สีของ tag = design token variant เท่านั้น — ไม่รับ hex เพื่อคงพาเลตระบบ */
-export const TAG_COLORS = ['accent', 'gold', 'success', 'warning', 'danger', 'muted'] as const;
 
 /** POST /api/line/admin/tags */
 export const chatTagSchema = z.object({
