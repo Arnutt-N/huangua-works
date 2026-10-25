@@ -107,6 +107,7 @@ export async function DELETE(
     );
   }
 
+  // § where isActive=true — ลบซ้ำต้อง 404; แถวที่ซ่อนแล้วห้าม audit ซ้ำ
   await db
     .update(chatReplyObjects)
     .set({ isActive: false, updatedAt: new Date() })

@@ -22,6 +22,13 @@ export async function GET(request: Request) {
   if (!authz.ok) return authz.response;
 
   const url = new URL(request.url);
+  // § ชื่อเดิม lineUserId ถูก rename เป็น friendId — ถ้าเงียบ ๆ ปล่อยผ่านจะคืน event ของทุกคน
+  if (url.searchParams.has('lineUserId')) {
+    return NextResponse.json(
+      { error: 'พารามิเตอร์ lineUserId เลิกใช้แล้ว ใช้ friendId แทน' },
+      { status: 400 },
+    );
+  }
   const parsed = querySchema.safeParse({
     friendId: url.searchParams.get('friendId') ?? undefined,
     limit: url.searchParams.get('limit') ?? undefined,
@@ -36,9 +43,6 @@ export async function GET(request: Request) {
 
   const db = await getDb();
 
-  const conditions = [];
-  if (friendId) conditions.push(eq(lineFriendEvents.lineUserId, friendId));
-
   const rows = await db
     .select({
       id: lineFriendEvents.id,
@@ -51,7 +55,7 @@ export async function GET(request: Request) {
     })
     .from(lineFriendEvents)
     .leftJoin(lineUsers, eq(lineFriendEvents.lineUserId, lineUsers.id))
-    .where(conditions.length > 0 ? sql.join(conditions, sql` AND `) : undefined)
+    .where(friendId ? eq(lineFriendEvents.lineUserId, friendId) : undefined)
     .orderBy(desc(lineFriendEvents.createdAt))
     .limit(limit);
 

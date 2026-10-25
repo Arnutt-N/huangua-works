@@ -7,11 +7,12 @@ import { parseBody } from '@/lib/api-helpers';
 import { requireStaffApi } from '@/lib/auth/require-staff';
 import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit';
+import { findInvalidRichMenuArea, RICH_MENU_DISPLAY_MODES } from '@/lib/contracts';
 import { z } from 'zod';
 
 export const runtime = 'nodejs';
 
-const displayModeSchema = z.enum(['ALWAYS', 'SCHEDULED', 'MANUAL']);
+const displayModeSchema = z.enum(RICH_MENU_DISPLAY_MODES);
 
 const createSchema = z.object({
   name: z.string().min(1).max(100),
@@ -69,6 +70,15 @@ export async function POST(request: Request) {
 
   const db = await getDb();
   const id = generateId();
+
+  // § client ตรวจ https แล้ว แต่ POST ตรงข้าม client ได้ — ต้องบังคับที่ boundary ด้วย
+  const badUri = findInvalidRichMenuArea(result.data.config.areas);
+  if (badUri) {
+    return NextResponse.json(
+      { error: `URL ของปุ่มเมนูต้องเป็น https เท่านั้น (พบ ${badUri})` },
+      { status: 400 },
+    );
+  }
 
   const { displayStartAt, displayEndAt } = result.data;
   const displayMode = result.data.displayMode ?? 'ALWAYS';

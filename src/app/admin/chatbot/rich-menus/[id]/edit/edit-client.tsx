@@ -3,24 +3,25 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Loader2 } from 'lucide-react';
-import { adminApi, type RichMenuItemDetail, type RichMenuDisplayMode } from '@/app/admin/_lib/admin-api';
+import { adminApi, type RichMenuItemDetail } from '@/app/admin/_lib/admin-api';
 import { useResource } from '@/app/admin/_lib/use-resource';
 import { PageHeader } from '@/components/admin/page-header';
 import { Button } from '@/components/ui/button';
 import { Label, Input } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
+import { RICH_MENU_DISPLAY_MODES, toRichMenuDisplayMode, type RichMenuDisplayMode } from '@/lib/contracts';
 import { areaStyle, toLineAction, validateArea, type RichMenuArea } from '../../rich-menu-templates';
-import { fitRichMenuImage } from '../../rich-menu-image';
+import { fitRichMenuImage, RICH_MENU_FIT_GUIDANCE } from '../../rich-menu-image';
 import {
   DISPLAY_MODE_LABEL,
-  canPublish,
   menuStatusPill,
   needsResync,
+  primaryAction,
   pillTone,
 } from '../../rich-menu-state';
 import { ThaiDateTimeField } from '../../thai-datetime-field';
 
-const DISPLAY_MODES: RichMenuDisplayMode[] = ['ALWAYS', 'SCHEDULED', 'MANUAL'];
+const DISPLAY_MODES = RICH_MENU_DISPLAY_MODES;
 
 export function RichMenuEditClient({ menuId }: { menuId: string }) {
   const [menu, setMenu] = useState<RichMenuItemDetail | null>(null);
@@ -47,7 +48,7 @@ export function RichMenuEditClient({ menuId }: { menuId: string }) {
     setMenu(data);
     setName(data.name);
     setChatBarText(data.chatBarText);
-    setDisplayMode((data.displayMode as RichMenuDisplayMode) || 'ALWAYS');
+    setDisplayMode(toRichMenuDisplayMode(data.displayMode));
     setDisplayStartAt(data.displayStartAt);
     setDisplayEndAt(data.displayEndAt);
     setAreas(
@@ -144,6 +145,7 @@ export function RichMenuEditClient({ menuId }: { menuId: string }) {
     if (!imageFile) return null;
     try {
       const fitted = await fitRichMenuImage(imageFile);
+      if (!fitted.fits) return RICH_MENU_FIT_GUIDANCE;
       const uploadFile =
         fitted.file instanceof File && !fitted.converted
           ? fitted.file
@@ -250,19 +252,11 @@ export function RichMenuEditClient({ menuId }: { menuId: string }) {
   const size = menu.config?.size ?? { width: 2500, height: 1686 };
   const pill = menuStatusPill(menu);
   const pendingResync = needsResync(menu);
-  const action = !menu.lineRichMenuId
-    ? 'sync'
-    : pendingResync
-      ? 'resync'
-      : menu.syncStatus === 'error'
-        ? 'resync'
-        : canPublish(menu) && menu.status !== 'active'
-          ? 'publish'
-          : null;
+  const action = primaryAction(menu);
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Edit Rich Menu" subtitle={`แก้ไขเมนู: ${menu.name}`}>
+      <PageHeader title="แก้ไข Rich Menu" subtitle={`แก้ไขเมนู: ${menu.name}`}>
         <Link
           href="/admin/chatbot/rich-menus"
           aria-label="กลับ"
@@ -381,13 +375,16 @@ export function RichMenuEditClient({ menuId }: { menuId: string }) {
               onChange={handleImageChange}
             />
             <p className="mt-2 text-xs text-muted">รองรับ JPEG, PNG — สูงสุด 1 MB (ระบบย่อให้อัตโนมัติ)</p>
+            {imageFile && (
+              <p className="mt-1 text-xs font-medium text-warning-ink">รูปจะถูกอัปโหลดเมื่อกด &quot;บันทึกและซิงค์&quot; เท่านั้น</p>
+            )}
           </div>
         </div>
 
         {areas.length > 0 && (
           <div className="space-y-4 border-t border-border pt-4">
             <div>
-              <h3 className="text-sm font-bold text-ink">Area Actions</h3>
+              <h3 className="text-sm font-bold text-ink">การทำงานของพื้นที่</h3>
               <p className="text-xs text-muted">กำหนดปลายทางของแต่ละพื้นที่บนเมนู</p>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
@@ -409,7 +406,7 @@ export function RichMenuEditClient({ menuId }: { menuId: string }) {
 
                   {area.action.type === 'uri' && (
                     <div>
-                      <Label htmlFor={`rm-uri-${i}`}>WEBSITE URL</Label>
+                      <Label htmlFor={`rm-uri-${i}`}>URL เว็บไซต์</Label>
                       <Input
                         id={`rm-uri-${i}`}
                         value={area.action.uri ?? ''}
@@ -420,7 +417,7 @@ export function RichMenuEditClient({ menuId }: { menuId: string }) {
                   )}
                   {area.action.type === 'message' && (
                     <div>
-                      <Label htmlFor={`rm-text-${i}`}>TEXT / PAYLOAD</Label>
+                      <Label htmlFor={`rm-text-${i}`}>ข้อความ / เพย์โหลด</Label>
                       <Input
                         id={`rm-text-${i}`}
                         value={area.action.text ?? ''}

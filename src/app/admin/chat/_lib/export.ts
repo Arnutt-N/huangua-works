@@ -8,9 +8,11 @@ const SENDER_LABEL: Record<string, string> = {
 };
 
 function csvCell(value: string): string {
+  // § กัน CSV injection — ข้อความจากผู้ใช้ที่ขึ้นต้นด้วยสูตร Excel ต้องถูกทำให้เป็น text
+  const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
   // § RFC 4180 — ครอบด้วย " และซ้ำ " ที่อยู่ข้างใน
-  if (/[",\n\r]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
-  return value;
+  if (/[",\n\r]/.test(safe)) return `"${safe.replace(/"/g, '""')}"`;
+  return safe;
 }
 
 export function messagesToCsv(messages: Message[]): string {

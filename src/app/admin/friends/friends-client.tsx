@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/field';
 import { useResource } from '@/app/admin/_lib/use-resource';
 import { adminApi, type FriendItem, type RichMenuItem } from '@/app/admin/_lib/admin-api';
-import { isUsableMenu } from '@/app/admin/chatbot/rich-menus/menu-predicates';
+import { isUsableMenu } from '@/app/admin/chatbot/rich-menus/rich-menu-state';
 
 type StatusFilter = 'all' | FriendItem['followState'];
 
@@ -317,6 +317,9 @@ export function FriendsClient() {
                           </div>
                         </div>
                       </td>
+                      <td className="px-3 py-2.5 text-muted">
+                        {friend.richMenuName ?? '—'}
+                      </td>
                       <td className="px-3 py-2.5">
                         <span
                           className={`rounded-full px-2 py-0.5 text-xs font-medium ${friend.followState === 'following' ? 'bg-success/10 text-success' : 'bg-muted/10 text-muted'}`}
@@ -335,9 +338,6 @@ export function FriendsClient() {
                           ? formatThaiDate(friend.lastActiveAt) + ' ' +
                             new Date(friend.lastActiveAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
                           : '-'}
-                      </td>
-                      <td className="px-3 py-2.5 text-muted">
-                        {friend.richMenuName ?? '—'}
                       </td>
                       <td className="px-3 py-2.5 text-right">
                         <Button

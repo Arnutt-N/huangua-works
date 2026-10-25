@@ -1,16 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { z } from 'zod';
+import { broadcastContentSchema as contentSchema } from '@/lib/line/broadcast-content-schema';
 
-const httpsUrl = z.string().url().refine((u) => u.startsWith('https://'), 'ต้องเป็น https URL');
-const contentSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('text'), text: z.string().min(1).max(5000) }).passthrough(),
-  z.object({ type: z.literal('image'), originalContentUrl: httpsUrl, previewImageUrl: httpsUrl }).passthrough(),
-  z.object({ type: z.literal('flex'), altText: z.string().min(1).max(400), contents: z.record(z.string(), z.unknown()) }).passthrough(),
-]);
-
-// § schema นี้ mirror createSchema ใน route.ts — bypass wizard POST ตรงต้อง fail ที่ boundary
-// ไม่ไปแตกตอน send/cron
-describe('broadcast contentSchema (mirror route createSchema)', () => {
+describe('broadcast contentSchema (schema จริงจาก route)', () => {
   it('text ว่างไม่ผ่าน', () => {
     expect(contentSchema.safeParse({ type: 'text', text: '' }).success).toBe(false);
   });
@@ -23,6 +14,16 @@ describe('broadcast contentSchema (mirror route createSchema)', () => {
 
   it('flex ขาด altText ไม่ผ่าน', () => {
     expect(contentSchema.safeParse({ type: 'flex', contents: {} }).success).toBe(false);
+  });
+
+  it('flex ที่มี javascript: uri ไม่ผ่าน', () => {
+    expect(
+      contentSchema.safeParse({
+        type: 'flex',
+        altText: 'alt',
+        contents: { body: { contents: [{ action: { type: 'uri', uri: 'javascript:alert(1)' } }] } },
+      }).success,
+    ).toBe(false);
   });
 
   it('type นอก union ไม่ผ่าน', () => {

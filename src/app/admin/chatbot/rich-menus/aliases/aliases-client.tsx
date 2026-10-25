@@ -4,8 +4,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import { adminApi } from '@/app/admin/_lib/admin-api';
-import { ALIAS_ID_PATTERN } from '@/lib/contracts';
-import { isSyncedMenu } from '../menu-predicates';
+import { isValidAliasId } from '@/lib/contracts';
+import { isSyncedMenu } from '../rich-menu-state';
 import { useResource } from '@/app/admin/_lib/use-resource';
 import { PageHeader } from '@/components/admin/page-header';
 import { ConfirmDialog } from '@/components/admin/confirm-dialog';
@@ -30,7 +30,7 @@ export function RichMenuAliasesClient() {
   const syncedMenus = items.filter(isSyncedMenu);
 
   async function handleCreate() {
-    if (!ALIAS_ID_PATTERN.test(aliasId.trim())) {
+    if (!isValidAliasId(aliasId.trim())) {
       setFormError('alias id ใช้ได้เฉพาะ a-z A-Z 0-9 _ - ความยาว 1-50 ตัว');
       return;
     }

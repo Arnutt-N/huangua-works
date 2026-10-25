@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  canPublish,
+  isSyncedMenu,
+  isUsableMenu,
   menuStatusPill,
   needsResync,
   primaryAction,
@@ -21,11 +22,11 @@ function fields(over: Partial<RichMenuPillFields> = {}): RichMenuPillFields {
   };
 }
 
-describe('canPublish / needsResync', () => {
+describe('isSyncedMenu / needsResync', () => {
   it('publish ได้เฉพาะเมนูที่ sync สำเร็จ', () => {
-    expect(canPublish(fields())).toBe(true);
-    expect(canPublish(fields({ syncStatus: 'error' }))).toBe(false);
-    expect(canPublish(fields({ lineRichMenuId: null }))).toBe(false);
+    expect(isSyncedMenu(fields())).toBe(true);
+    expect(isSyncedMenu(fields({ syncStatus: 'error' }))).toBe(false);
+    expect(isSyncedMenu(fields({ lineRichMenuId: null }))).toBe(false);
   });
 
   it('needsResync เฉพาะเมื่อมี line id และ pending', () => {

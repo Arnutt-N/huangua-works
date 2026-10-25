@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiResult, IntentItem } from '@/app/admin/_lib/admin-api';
 import { IntentSection } from './intent-section';
+// § timeout 5s ไม่พอ — เทสต์นี้รอ state จริงตาม pattern ของชุด intake
 vi.setConfig({ testTimeout: 30_000 });
 
 vi.mock('next/navigation', () => ({

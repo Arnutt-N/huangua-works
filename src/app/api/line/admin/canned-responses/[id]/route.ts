@@ -53,6 +53,7 @@ export async function DELETE(
 
   // soft delete — เก็บไว้เผื่อข้อความเก่าอ้างถึง + กัน id ถูก reuse
   // ปล่อย shortcut คืน (partial unique index ครอบทุกแถวที่ shortcut ไม่ null)
+  // § where isActive=true — ลบซ้ำต้อง 404 (idempotent repeat-DELETE)
   const [deleted] = await db
     .update(chatCannedResponses)
     .set({ isActive: false, shortcut: null, updatedAt: new Date() })

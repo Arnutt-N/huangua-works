@@ -9,25 +9,6 @@ export const RICH_MENU_IMAGE_MAX_H = 1686;
 export const RICH_MENU_FIT_GUIDANCE =
   'ย่อรูปอัตโนมัติไม่ได้ — โปรดใช้รูปไม่เกิน 1 MB หรือย่อที่หน้า /admin/image-resize ก่อนอัปโหลด';
 
-export interface RichMenuFitAttempt {
-  scale: number;
-  quality: number;
-}
-
-export function planRichMenuFit(fileSize: number): {
-  fits: boolean;
-  attempts: RichMenuFitAttempt[];
-} {
-  if (fileSize <= RICH_MENU_IMAGE_LIMIT_BYTES) return { fits: true, attempts: [] };
-  const attempts: RichMenuFitAttempt[] = [];
-  for (const scale of [1, 0.75, 0.5, 0.35]) {
-    for (const quality of [0.9, 0.8, 0.7, 0.6]) {
-      attempts.push({ scale, quality });
-    }
-  }
-  return { fits: false, attempts };
-}
-
 export function scaledToFit(
   width: number,
   height: number,
@@ -133,7 +114,11 @@ export async function fitRichMenuImage(file: File): Promise<FitRichMenuImageResu
   try {
     const target = scaledToFit(decoded.width, decoded.height, RICH_MENU_IMAGE_MAX_W, RICH_MENU_IMAGE_MAX_H);
     let best: Blob | null = null;
-    for (const { scale, quality } of planRichMenuFit(file.size).attempts) {
+    // § ลำดับย่อ: ลด quality ก่อน แล้วค่อยลดขนาด (attempts ใช้เฉพาะในฟังก์ชันนี้)
+    const attempts = [1, 0.75, 0.5, 0.35].flatMap((scale) =>
+      [0.9, 0.8, 0.7, 0.6].map((quality) => ({ scale, quality })),
+    );
+    for (const { scale, quality } of attempts) {
       const blob = await encodeJpeg(
         decoded.source,
         Math.max(1, Math.round(target.width * scale)),

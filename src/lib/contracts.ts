@@ -19,8 +19,18 @@ export const CANNED_CATEGORY_LABELS: Record<(typeof CANNED_RESPONSE_CATEGORIES)[
   escalation: 'ส่งต่อ/ยกระดับ',
 };
 
+// ── rich menu display mode ──────────────────────────────────────────────────
+export const RICH_MENU_DISPLAY_MODES = ['ALWAYS', 'SCHEDULED', 'MANUAL'] as const;
+export type RichMenuDisplayMode = (typeof RICH_MENU_DISPLAY_MODES)[number];
+
+export function toRichMenuDisplayMode(value: unknown): RichMenuDisplayMode {
+  return (RICH_MENU_DISPLAY_MODES as readonly string[]).includes(value as string)
+    ? (value as RichMenuDisplayMode)
+    : 'ALWAYS';
+}
+
 // ── rich menu alias ─────────────────────────────────────────────────────────
-export const ALIAS_ID_PATTERN = /^[a-zA-Z0-9_-]{1,50}$/;
+const ALIAS_ID_PATTERN = /^[a-zA-Z0-9_-]{1,50}$/;
 
 export function isValidAliasId(aliasId: string): boolean {
   return ALIAS_ID_PATTERN.test(aliasId);
@@ -40,11 +50,30 @@ export const URI_SCHEME_ERROR_TH =
 
 export function isAllowedActionUri(uri: string): boolean {
   try {
-    const protocol = new URL(uri).protocol;
+    const protocol = new URL(uri.trim()).protocol;
     return (ALLOWED_ACTION_URI_SCHEMES as readonly string[]).includes(protocol);
   } catch {
     return false;
   }
+}
+
+/** § LINE imagemap ใช้ `linkUri` ไม่ใช่ `uri` — ต้องตรวจทั้งสองชื่อ */
+const ACTION_URI_FIELDS = ['uri', 'linkUri'] as const;
+
+/** rich menu action ต้องเป็น https เท่านั้น (ตรงกับ validateArea ฝั่ง client) */
+export function findInvalidRichMenuArea(areas: unknown): string | null {
+  if (!Array.isArray(areas)) return null;
+  for (const area of areas) {
+    const action = (area as { action?: unknown } | null)?.action as
+      | { type?: unknown; uri?: unknown }
+      | undefined;
+    if (!action) continue;
+    if (action.type !== 'uri') continue;
+    if (typeof action.uri !== 'string' || action.uri.trim() === '') continue;
+    const uri = action.uri.trim();
+    if (!uri.startsWith('https://')) return uri;
+  }
+  return null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -60,13 +89,13 @@ export function findActionUriViolation(value: unknown): string | null {
     return null;
   }
   if (isRecord(value)) {
-    if (
-      value.type === 'uri' &&
-      typeof value.uri === 'string' &&
-      value.uri.trim() !== '' &&
-      !isAllowedActionUri(value.uri)
-    ) {
-      return value.uri;
+    if (value.type === 'uri') {
+      for (const field of ACTION_URI_FIELDS) {
+        const candidate = value[field];
+        if (typeof candidate === 'string' && candidate.trim() !== '' && !isAllowedActionUri(candidate)) {
+          return candidate;
+        }
+      }
     }
     for (const nested of Object.values(value)) {
       const bad = findActionUriViolation(nested);

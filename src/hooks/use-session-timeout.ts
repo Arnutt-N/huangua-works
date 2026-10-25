@@ -19,6 +19,13 @@ export function useSessionTimeout(onLogout: () => void): SessionTimeoutState {
   const warningRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const showWarningRef = useRef(false);
+  // § onLogout มาจากผู้เรียกแบบ inline ได้ทุก render — เก็บใน ref เพื่อไม่ให้
+  // identity ใหม่ไป re-arm resetTimer จน modal ปิดเองแล้ว logout ไม่เคยยิง
+  const onLogoutRef = useRef(onLogout);
+
+  useEffect(() => {
+    onLogoutRef.current = onLogout;
+  }, [onLogout]);
 
   useEffect(() => {
     showWarningRef.current = showWarning;
@@ -53,9 +60,9 @@ export function useSessionTimeout(onLogout: () => void): SessionTimeoutState {
     }, INACTIVITY_TIMEOUT - WARNING_BEFORE);
 
     timeoutRef.current = setTimeout(() => {
-      onLogout();
+      onLogoutRef.current();
     }, INACTIVITY_TIMEOUT);
-  }, [clearAllTimers, onLogout]);
+  }, [clearAllTimers]);
 
   useEffect(() => {
     const events = ['mousemove', 'keypress', 'click', 'scroll', 'touchstart'] as const;
@@ -75,9 +82,5 @@ export function useSessionTimeout(onLogout: () => void): SessionTimeoutState {
     };
   }, [resetTimer, clearAllTimers]);
 
-  const restartIdleTimer = useCallback(() => {
-    resetTimer();
-  }, [resetTimer]);
-
-  return { showWarning, remainingSeconds, restartIdleTimer };
+  return { showWarning, remainingSeconds, restartIdleTimer: resetTimer };
 }

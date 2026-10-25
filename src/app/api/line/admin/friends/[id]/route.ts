@@ -70,6 +70,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     followState,
     followCount: stats.followCount,
     refollowCount: stats.refollowCount,
+    lastFollowAt: stats.lastFollowAt ? stats.lastFollowAt.toISOString() : null,
     lastActiveAt: row.lastMessageAt,
     richMenuId,
     richMenuName,

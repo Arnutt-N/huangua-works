@@ -250,13 +250,13 @@ const cannedTitle = z
   .string()
   .trim()
   .min(1, 'กรุณากรอกชื่อ')
-  .max(CANNED_TITLE_MAX, 'ชื่อยาวเกิน 100 ตัวอักษร');
+  .max(CANNED_TITLE_MAX, `ชื่อยาวเกิน ${CANNED_TITLE_MAX} ตัวอักษร`);
 const cannedShortcut = z
   .string()
   .trim()
   .regex(
     new RegExp(`^[a-z0-9-]{1,${CANNED_SHORTCUT_MAX}}$`),
-    'shortcut ใช้ได้เฉพาะ a-z, 0-9 และ - (ยาวไม่เกิน 30)',
+    `shortcut ใช้ได้เฉพาะ a-z, 0-9 และ - (ยาวไม่เกิน ${CANNED_SHORTCUT_MAX})`,
   )
   .optional()
   .or(z.literal('').transform(() => undefined));

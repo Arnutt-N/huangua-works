@@ -8,6 +8,8 @@
  *   คืน object เปล่า และ error คืน `{ error }` + status จึงห้าม assume ว่าทุกจุดคืนรูปเดียว
  */
 
+import type { RichMenuDisplayMode } from '@/lib/contracts';
+
 export type ApiOk<T> = { ok: true; data: T };
 export type ApiFail = { ok: false; error: string; status: number };
 export type ApiResult<T> = ApiOk<T> | ApiFail;
@@ -114,7 +116,7 @@ export interface ReplyObjectPatch {
   isActive: boolean;
 }
 
-export type RichMenuDisplayMode = 'ALWAYS' | 'SCHEDULED' | 'MANUAL';
+
 
 export interface RichMenuAreaInput {
   bounds: { x: number; y: number; width: number; height: number };

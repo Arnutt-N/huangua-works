@@ -9,10 +9,11 @@ import { parseBody } from '@/lib/api-helpers';
 import { requireStaffApi } from '@/lib/auth/require-staff';
 import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit';
+import { findInvalidRichMenuArea, RICH_MENU_DISPLAY_MODES } from '@/lib/contracts';
 
 export const runtime = 'nodejs';
 
-const displayModeSchema = z.enum(['ALWAYS', 'SCHEDULED', 'MANUAL']);
+const displayModeSchema = z.enum(RICH_MENU_DISPLAY_MODES);
 
 const areaSchema = z.object({
   bounds: z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }),
@@ -75,6 +76,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   const { name, chatBarText, areas, displayMode } = result.data;
+  const badUri = findInvalidRichMenuArea(areas);
+  if (badUri) {
+    return NextResponse.json(
+      { error: `URL ของปุ่มเมนูต้องเป็น https เท่านั้น (พบ ${badUri})` },
+      { status: 400 },
+    );
+  }
   const start = toDate(result.data.displayStartAt);
   const end = toDate(result.data.displayEndAt);
 

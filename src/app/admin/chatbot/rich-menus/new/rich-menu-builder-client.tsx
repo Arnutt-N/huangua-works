@@ -4,12 +4,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Loader2, RefreshCw, Upload } from 'lucide-react';
-import { adminApi, type RichMenuDisplayMode } from '@/app/admin/_lib/admin-api';
+import { adminApi } from '@/app/admin/_lib/admin-api';
 import { useResource } from '@/app/admin/_lib/use-resource';
 import { PageHeader } from '@/components/admin/page-header';
 import { Button } from '@/components/ui/button';
 import { Label, Input } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
+import { RICH_MENU_DISPLAY_MODES, type RichMenuDisplayMode } from '@/lib/contracts';
 import {
   RICH_MENU_TEMPLATES,
   areaStyle,
@@ -19,11 +20,11 @@ import {
   type RichMenuArea,
   type RichMenuAreaAction,
 } from '../rich-menu-templates';
-import { fitRichMenuImage } from '../rich-menu-image';
+import { fitRichMenuImage, RICH_MENU_FIT_GUIDANCE } from '../rich-menu-image';
 import { DISPLAY_MODE_LABEL } from '../rich-menu-state';
 import { ThaiDateTimeField } from '../thai-datetime-field';
 
-const DISPLAY_MODES: RichMenuDisplayMode[] = ['ALWAYS', 'SCHEDULED', 'MANUAL'];
+const DISPLAY_MODES = RICH_MENU_DISPLAY_MODES;
 
 export function RichMenuBuilderClient() {
   const router = useRouter();
@@ -151,6 +152,11 @@ export function RichMenuBuilderClient() {
 
     try {
       const fitted = await fitRichMenuImage(file!);
+      if (!fitted.fits) {
+        setBusy(null);
+        setError(`สร้างและซิงค์เมนูแล้ว แต่${RICH_MENU_FIT_GUIDANCE}`);
+        return;
+      }
       const uploadFile =
         fitted.file instanceof File && !fitted.converted
           ? fitted.file
@@ -182,7 +188,7 @@ export function RichMenuBuilderClient() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <PageHeader title="New Rich Menu">
+      <PageHeader title="สร้าง Rich Menu">
         <Link
           href="/admin/chatbot/rich-menus"
           aria-label="กลับ"
@@ -203,7 +209,7 @@ export function RichMenuBuilderClient() {
           <section className="rounded-2xl border border-border bg-surface p-5 shadow-sm">
             <h2 className="flex items-center gap-2 text-lg font-bold text-ink">
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent-sunken text-xs font-bold text-accent-strong">1</span>
-              Basic Information
+              ข้อมูลพื้นฐาน
             </h2>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div>
@@ -212,7 +218,7 @@ export function RichMenuBuilderClient() {
                   id="rb-name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Summer Campaign 2024"
+                  placeholder="เช่น เมนูหลัก 2569"
                 />
               </div>
               <div>
@@ -231,14 +237,14 @@ export function RichMenuBuilderClient() {
             <div className="flex items-center justify-between">
               <h2 className="flex items-center gap-2 text-lg font-bold text-ink">
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent-sunken text-xs font-bold text-accent-strong">2</span>
-                Template &amp; Actions
+                เทมเพลตและการทำงาน
               </h2>
               <button
                 type="button"
                 onClick={() => setTemplateModalOpen(true)}
                 className="inline-flex items-center gap-1 text-sm font-bold text-accent-strong hover:underline"
               >
-                <RefreshCw className="h-4 w-4" /> Change Template
+                <RefreshCw className="h-4 w-4" /> เปลี่ยนเทมเพลต
               </button>
             </div>
 
@@ -289,7 +295,7 @@ export function RichMenuBuilderClient() {
 
                     {action.type === 'uri' && (
                       <div>
-                        <Label htmlFor={`rb-uri-${i}`}>WEBSITE URL</Label>
+                        <Label htmlFor={`rb-uri-${i}`}>URL เว็บไซต์</Label>
                         <Input
                           id={`rb-uri-${i}`}
                           value={action.uri ?? ''}
@@ -302,7 +308,7 @@ export function RichMenuBuilderClient() {
                     {action.type === 'message' && (
                       <div className="space-y-2">
                         <div>
-                          <Label htmlFor={`rb-text-${i}`}>TEXT / PAYLOAD</Label>
+                          <Label htmlFor={`rb-text-${i}`}>ข้อความ / เพย์โหลด</Label>
                           <Input
                             id={`rb-text-${i}`}
                             value={action.text ?? ''}
@@ -310,7 +316,7 @@ export function RichMenuBuilderClient() {
                           />
                         </div>
                         <div>
-                          <Label htmlFor={`rb-obj-${i}`}>SYSTEM OBJECTS</Label>
+                          <Label htmlFor={`rb-obj-${i}`}>ออบเจ็กต์สำเร็จรูป</Label>
                           <select
                             id={`rb-obj-${i}`}
                             aria-label={`เลือก reply object หรือ intent พื้นที่ ${i + 1}`}
@@ -318,8 +324,8 @@ export function RichMenuBuilderClient() {
                             onChange={(e) => quickSelectSystemObject(i, e.target.value)}
                             className="min-h-touch w-full rounded-lg border border-border bg-surface px-2 text-sm"
                           >
-                            <option value="">-- Quick Select --</option>
-                            <optgroup label="Auto Replies">
+                            <option value="">-- เลือกด่วน --</option>
+                            <optgroup label="คำตอบอัตโนมัติ">
                               {intents.map((intent) => (
                                 <option key={intent.id} value={`intent:${intent.name}`}>
                                   {intent.name}
@@ -377,7 +383,7 @@ export function RichMenuBuilderClient() {
           <section className="sticky top-6 space-y-5 rounded-2xl border border-border bg-surface p-5 shadow-sm">
             <h2 className="flex items-center gap-2 text-lg font-bold text-ink">
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent-sunken text-xs font-bold text-accent-strong">3</span>
-              Design &amp; Sync
+              รูปและการซิงค์
             </h2>
 
             <label
@@ -403,7 +409,7 @@ export function RichMenuBuilderClient() {
               ) : (
                 <span className="flex h-full flex-col items-center justify-center gap-2 py-10 text-muted">
                   <Upload className="h-8 w-8 text-accent-strong" />
-                  <span className="text-sm font-bold">Upload Rich Menu Image</span>
+                  <span className="text-sm font-bold">อัปโหลดรูปเมนู</span>
                   <span className="text-[10px]">
                     {template.size.width}x{template.size.height} pixels
                   </span>
@@ -502,8 +508,8 @@ export function RichMenuBuilderClient() {
           <div className="relative z-10 flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-border bg-surface shadow-overlay">
             <div className="flex items-center justify-between border-b border-border px-6 py-4">
               <div>
-                <h2 className="text-2xl font-black tracking-tight text-ink">Select a template</h2>
-                <p className="text-sm text-muted">Choose a layout that fits your content strategy</p>
+                <h2 className="text-2xl font-black tracking-tight text-ink">เลือกเทมเพลต</h2>
+                <p className="text-sm text-muted">เลือกเลย์เอาต์ที่เหมาะกับเนื้อหา</p>
               </div>
               <Button variant="ghost" size="sm" onClick={() => setTemplateModalOpen(false)}>
                 ปิด
@@ -571,7 +577,7 @@ export function RichMenuBuilderClient() {
                   setTemplateModalOpen(false);
                 }}
               >
-                Apply Design
+                ใช้เทมเพลตนี้
               </Button>
             </div>
           </div>

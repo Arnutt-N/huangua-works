@@ -82,7 +82,7 @@ describe('rich-menu-templates', () => {
 describe('RichMenuBuilderClient', () => {
   it('แสดงเทมเพลตเริ่มต้นและครบ 6 พื้นที่', async () => {
     render(<RichMenuBuilderClient />);
-    expect(await screen.findByText('6 Buttons (3x2)')).toBeInTheDocument();
+    expect(await screen.findByText('6 ปุ่ม (3×2)')).toBeInTheDocument();
     expect(screen.getByLabelText('ประเภทการทำงานพื้นที่ 1')).toBeInTheDocument();
     expect(screen.getByLabelText('ประเภทการทำงานพื้นที่ 6')).toBeInTheDocument();
   });
@@ -90,11 +90,11 @@ describe('RichMenuBuilderClient', () => {
   it('เปิด modal เลือกเทมเพลตและเปลี่ยนจำนวนพื้นที่', async () => {
     const user = userEvent.setup();
     render(<RichMenuBuilderClient />);
-    await user.click(screen.getByRole('button', { name: /Change Template/ }));
-    expect(await screen.findByText('Select a template')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /เปลี่ยนเทมเพลต/ }));
+    expect(await screen.findByText('เลือกเทมเพลต')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /4 Buttons \(2x2\)/ }));
-    await user.click(screen.getByRole('button', { name: 'Apply Design' }));
+    await user.click(screen.getByRole('button', { name: /4 ปุ่ม \(2×2\)/ }));
+    await user.click(screen.getByRole('button', { name: 'ใช้เทมเพลตนี้' }));
 
     expect(screen.queryByLabelText('ประเภทการทำงานพื้นที่ 6')).not.toBeInTheDocument();
     expect(screen.getByLabelText('ประเภทการทำงานพื้นที่ 4')).toBeInTheDocument();
@@ -103,7 +103,7 @@ describe('RichMenuBuilderClient', () => {
   it('บล็อกเมื่อยังไม่กรอกชื่อเมนู', async () => {
     const user = userEvent.setup();
     render(<RichMenuBuilderClient />);
-    await screen.findByText('6 Buttons (3x2)');
+    await screen.findByText('6 ปุ่ม (3×2)');
 
     await user.click(screen.getByRole('button', { name: 'บันทึกฉบับร่าง' }));
 

@@ -35,7 +35,7 @@ function area(
 export const RICH_MENU_TEMPLATES: RichMenuTemplate[] = [
   {
     key: 'large-6',
-    label: '6 Buttons (3x2)',
+    label: '6 ปุ่ม (3×2)',
     group: 'Large',
     size: LARGE,
     areas: [
@@ -49,7 +49,7 @@ export const RICH_MENU_TEMPLATES: RichMenuTemplate[] = [
   },
   {
     key: 'large-4',
-    label: '4 Buttons (2x2)',
+    label: '4 ปุ่ม (2×2)',
     group: 'Large',
     size: LARGE,
     areas: [
@@ -61,7 +61,7 @@ export const RICH_MENU_TEMPLATES: RichMenuTemplate[] = [
   },
   {
     key: 'large-3-top',
-    label: '3 Buttons (1 Top, 2 Bottom)',
+    label: '3 ปุ่ม (บน 1 ล่าง 2)',
     group: 'Large',
     size: LARGE,
     areas: [
@@ -72,7 +72,7 @@ export const RICH_MENU_TEMPLATES: RichMenuTemplate[] = [
   },
   {
     key: 'large-3-left',
-    label: '3 Buttons (1 Left, 2 Right)',
+    label: '3 ปุ่ม (ซ้าย 1 ขวา 2)',
     group: 'Large',
     size: LARGE,
     areas: [
@@ -83,7 +83,7 @@ export const RICH_MENU_TEMPLATES: RichMenuTemplate[] = [
   },
   {
     key: 'large-2-rows',
-    label: '2 Buttons (Rows)',
+    label: '2 ปุ่ม (แถว)',
     group: 'Large',
     size: LARGE,
     areas: [
@@ -93,7 +93,7 @@ export const RICH_MENU_TEMPLATES: RichMenuTemplate[] = [
   },
   {
     key: 'large-2-cols',
-    label: '2 Buttons (Columns)',
+    label: '2 ปุ่ม (คอลัมน์)',
     group: 'Large',
     size: LARGE,
     areas: [
@@ -103,14 +103,14 @@ export const RICH_MENU_TEMPLATES: RichMenuTemplate[] = [
   },
   {
     key: 'large-1',
-    label: '1 Button (Full)',
+    label: '1 ปุ่ม (เต็ม)',
     group: 'Large',
     size: LARGE,
     areas: [area('Full Area', { x: 0, y: 0, width: 2500, height: 1686 })],
   },
   {
     key: 'compact-3',
-    label: '3 Buttons (Columns)',
+    label: '3 ปุ่ม (คอลัมน์)',
     group: 'Compact',
     size: COMPACT,
     areas: [
@@ -121,7 +121,7 @@ export const RICH_MENU_TEMPLATES: RichMenuTemplate[] = [
   },
   {
     key: 'compact-2-cols',
-    label: '2 Buttons (Columns)',
+    label: '2 ปุ่ม (คอลัมน์)',
     group: 'Compact',
     size: COMPACT,
     areas: [
@@ -131,7 +131,7 @@ export const RICH_MENU_TEMPLATES: RichMenuTemplate[] = [
   },
   {
     key: 'compact-2-asym',
-    label: '2 Buttons (Small Left)',
+    label: '2 ปุ่ม (ซ้ายเล็ก)',
     group: 'Compact',
     size: COMPACT,
     areas: [
@@ -141,7 +141,7 @@ export const RICH_MENU_TEMPLATES: RichMenuTemplate[] = [
   },
   {
     key: 'compact-1',
-    label: '1 Button (Full)',
+    label: '1 ปุ่ม (เต็ม)',
     group: 'Compact',
     size: COMPACT,
     areas: [area('Full Area', { x: 0, y: 0, width: 2500, height: 843 })],

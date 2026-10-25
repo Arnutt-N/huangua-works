@@ -98,6 +98,7 @@ describe('BroadcastWizardClient ตัวช่วยสร้าง 4 ขั้
 
     await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
     await user.click(screen.getByLabelText('ข้อความประกาศ'));
+    // § paste ทาง clipboard เร็วกว่าพิมพ์ 5001 ตัว และ maxLength ตัดให้เหลือ 5000
     await user.paste('ก'.repeat(5001));
 
     const textarea = screen.getByLabelText('ข้อความประกาศ') as HTMLTextAreaElement;

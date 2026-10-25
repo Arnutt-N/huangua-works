@@ -38,12 +38,12 @@ export function SessionTimeoutWarning() {
         <p className="mb-4 text-muted">
           Your session will expire in{' '}
           <span className="font-semibold tabular-nums text-danger">{formatTime(remainingSeconds)}</span> due to
-          inactivity. Click below to stay logged in.
+          inactivity. Continuing only restarts this warning; the session itself still expires at its own limit.
         </p>
 
         <div className="flex gap-3">
           <Button variant="primary" className="flex-1" onClick={restartIdleTimer}>
-            Stay Logged In
+            Continue
           </Button>
           <Button variant="outline" className="flex-1" onClick={() => void logout()}>
             Logout

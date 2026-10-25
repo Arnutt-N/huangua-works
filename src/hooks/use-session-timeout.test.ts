@@ -86,4 +86,20 @@ describe('useSessionTimeout', () => {
     act(() => void vi.advanceTimersByTime(2000));
     expect(onLogout).toHaveBeenCalledTimes(1);
   });
+
+  // § callback แบบ inline เหมือน component จริง (identity ใหม่ทุก render) —
+  // เคยทำให้ modal ดับเองและ logout ไม่เคยยิง
+  it('callback ที่ถูกสร้างใหม่ทุก render ไม่รีเซ็ต timer และ logout ยังทำงาน', () => {
+    const onLogout = vi.fn();
+    const { result } = renderHook(() => useSessionTimeout(() => onLogout()));
+
+    act(() => void vi.advanceTimersByTime(INACTIVITY_MS - WARNING_MS + 1000));
+    expect(result.current.showWarning).toBe(true);
+
+    act(() => void vi.advanceTimersByTime(5000));
+    expect(result.current.showWarning).toBe(true);
+
+    act(() => void vi.advanceTimersByTime(WARNING_MS));
+    expect(onLogout).toHaveBeenCalledTimes(1);
+  });
 });
