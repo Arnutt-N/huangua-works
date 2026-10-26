@@ -111,9 +111,10 @@ export async function putPrefs(
 
 // § คืน null เมื่อ response ไม่ ok — caller แยก "ว่าง" ([]) กับ "โหลดล้ม" (null) ได้
 // ห้าม `?? []` ตรงนี้ ไม่งั้น loadError ตาย โหลดล้มโชว์ empty state แทน error
-export async function fetchCannedResponses(includeInactive = false): Promise<CannedResponse[] | null> {
+export async function fetchCannedResponses(includeInactive = false, signal?: AbortSignal): Promise<CannedResponse[] | null> {
   const res = await fetch(
     `/api/line/admin/canned-responses${includeInactive ? '?include_inactive=true' : ''}`,
+    { signal },
   );
   return jsonOrNull<CannedResponse[]>(res);
 }

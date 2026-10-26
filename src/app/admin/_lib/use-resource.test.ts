@@ -72,7 +72,7 @@ describe('useResource', () => {
     );
     await flush(0);
     expect(adapter.load).toHaveBeenCalledTimes(1);
-    expect(adapter.load).toHaveBeenLastCalledWith('');
+    expect(adapter.load).toHaveBeenLastCalledWith('', expect.objectContaining({ signal: expect.any(AbortSignal) }));
 
     rerender({ q: 'ว' });
     await flush(299);
@@ -80,7 +80,7 @@ describe('useResource', () => {
 
     await flush(1);
     expect(adapter.load).toHaveBeenCalledTimes(2);
-    expect(adapter.load).toHaveBeenLastCalledWith('ว');
+    expect(adapter.load).toHaveBeenLastCalledWith('ว', expect.objectContaining({ signal: expect.any(AbortSignal) }));
   });
 
   it('ทิ้ง response ของ request เก่าที่มาช้ากว่า', async () => {
@@ -167,8 +167,9 @@ describe('useResource', () => {
     await flush(2000); // เกิน 4000ms ของ "แรก" แล้ว
     expect(result.current.feedback).toEqual({ type: 'error', msg: 'สอง' });
 
-    await flush(2001); // ครบ 4000ms ของ "สอง"
-    expect(result.current.feedback).toBeNull();
+    await flush(2001); // ครบ 4000ms ของ "สอง" — § NET-02: error ต้องไม่หายเอง
+    expect(result.current.feedback).toEqual({ type: 'error', msg: 'สอง' });
+    expect(result.current.error).toBe('สอง');
   });
 
   it('intervalMs: โหลดซ้ำทุก 30s โดย loadingOnReload:false ไม่ปิดข้อมูลเดิม', async () => {
@@ -210,7 +211,7 @@ describe('useResource', () => {
     });
     rerender({ q: 'B' });
     await flush(100); // ก่อน debounce 300ms ของ B
-    expect(adapter.load).toHaveBeenLastCalledWith('A');
+    expect(adapter.load).toHaveBeenLastCalledWith('A', expect.objectContaining({ signal: expect.any(AbortSignal) }));
 
     await flush(200); // ครบ debounce → request B
     await act(async () => {
@@ -283,6 +284,58 @@ describe('useResource', () => {
     });
     expect(captured.current?.loading).toBe(false);
     expect(captured.current?.data?.items[0]?.id).toBe('2');
+  });
+
+  it('error คงค้างจนกว่า request ถัดไปสำเร็จ (NET-02)', async () => {
+    const load = vi.fn(
+      async (_q: string, _opts?: { signal?: AbortSignal }): Promise<ApiResult<Page>> => ({ ok: false, error: 'เซสชันหมดอายุ', status: 401, code: 'SESSION_EXPIRED' }),
+    );
+    const { result } = renderHook(() => useResource({ load }));
+    await flush(0);
+
+    expect(result.current.error).toBe('เซสชันหมดอายุ');
+    expect(result.current.errorCode).toBe('SESSION_EXPIRED');
+  });
+
+  it('401 แล้วกด retry สำเร็จ → error ถูกเคลียร์', async () => {
+    const load = vi
+      .fn<() => Promise<ApiResult<Page>>>()
+      .mockResolvedValueOnce({ ok: false, error: 'เซสชันหมดอายุ', status: 401, code: 'SESSION_EXPIRED' })
+      .mockResolvedValueOnce({ ok: true, data: { items: [{ id: '1', name: 'a' }], total: 1 } });
+    const { result } = renderHook(() => useResource({ load }));
+    await flush(0);
+    expect(result.current.error).toBe('เซสชันหมดอายุ');
+
+    await act(async () => {
+      await result.current.reload();
+    });
+    expect(result.current.error).toBeNull();
+    expect(result.current.errorCode).toBeUndefined();
+    expect(result.current.data?.total).toBe(1);
+  });
+
+  it('unmount ระหว่าง request ค้าง → abort ถูกเรียก, ไม่มี state update', async () => {
+    const onAbort = vi.fn();
+    const load = vi.fn(async (_q: string, opts?: { signal?: AbortSignal }): Promise<ApiResult<Page>> => {
+      opts?.signal?.addEventListener('abort', onAbort);
+      return new Promise(() => {}); // ค้างตลอด
+    });
+    const { unmount } = renderHook(() => useResource({ load, debounceMs: 0 }));
+    await flush(0);
+    unmount();
+    expect(onAbort).toHaveBeenCalled();
+  });
+
+  it('signal ถูกส่งถึง fetch จริง (ไม่ใช่แค่ abort controller)', async () => {
+    let seenSignal: AbortSignal | undefined;
+    const load = vi.fn(async (_q: string, opts?: { signal?: AbortSignal }): Promise<ApiResult<Page>> => {
+      seenSignal = opts?.signal;
+      return { ok: true, data: { items: [], total: 0 } };
+    });
+    const { result } = renderHook(() => useResource({ load }));
+    await flush(0);
+    expect(seenSignal).toBeInstanceOf(AbortSignal);
+    expect(result.current.error).toBeNull();
   });
 
   it('setData แก้ค่าฝั่ง client ได้ (optimistic) และ reload ดันค่าจริงกลับมา', async () => {

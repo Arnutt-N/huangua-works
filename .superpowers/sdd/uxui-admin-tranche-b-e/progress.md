@@ -21,3 +21,12 @@
 - A11Y-03: dialog base max-h + ลบ override 3 จุด
 - A11Y-04: session-timeout ไทย + aria-describedby + focus trap/return — test 2/2
 - tsc + eslint ผ่าน
+
+## T4 — NET-02/03/04: complete (pending commit)
+- Layer: ApiFail.code, request 401/403 mapping + 15s timeout + NETWORK/TIMEOUT, 17 methods opts, 6 wrappers
+- use-resource: load(query, opts), error/errorCode persistent, notify แยก success/error, mutate in-flight guard, abort cleanup
+- AdminErrorState (card/inline) + error.tsx ('use client')
+- UI 19 ไฟล์: 7 หนัก + details (error≠notFound) + composite + health/settings/conversations
+- NET-04: rich-menus publish guard, intent-detail mutating guard; try/catch มีอยู่แล้ว (verify)
+- tests: use-resource 17→21 (error persistence, retry clear, abort, signal-through), admin-api, error.tsx 1/1
+- Ruling: notify('error') ตั้ง error แต่ไม่แตะ errorCode (applyLoadResult ตั้งก่อนเรียก notify) — cost ถ้าผิด: code หาย

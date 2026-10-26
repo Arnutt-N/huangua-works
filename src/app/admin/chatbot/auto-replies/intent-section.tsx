@@ -7,6 +7,7 @@ import type { IntentItem, IntentMatchType } from '@/app/admin/_lib/admin-api';
 import { adminApi } from '@/app/admin/_lib/admin-api';
 import { readinessOf } from './readiness';
 import { useResource } from '@/app/admin/_lib/use-resource';
+import { AdminErrorState } from '@/components/admin/admin-error-state';
 import { Plus, Pencil, Trash2, Bot, Eye } from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import {
@@ -66,7 +67,7 @@ export function IntentSection() {
   const [deleteTarget, setDeleteTarget] = useState<IntentItem | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const { data, loading, feedback, notify, mutate, reload } = useResource({
+  const { data, loading, feedback, error, errorCode, notify, mutate, reload } = useResource({
     load: adminApi.listIntents,
   });
   const items = data?.items ?? [];

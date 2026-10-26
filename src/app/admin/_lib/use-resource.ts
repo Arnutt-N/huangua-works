@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ApiResult } from './admin-api';
+import type { ApiFail, ApiResult } from './admin-api';
 
 /**
  * hook เดียวของหน้า admin: โหลดตอนเปิด/ค้นหา, mutate แล้วโหลดใหม่,
@@ -23,7 +23,7 @@ const FEEDBACK_MS = 4000;
 
 export interface UseResourceOptions<TData> {
   /** ส่งฟังก์ชันคงที่จาก module (adminApi.xxx) — ห้ามสร้าง arrow inline ถ้าอยากให้ reload ตาม query ใหม่ */
-  load: (query: string) => Promise<ApiResult<TData>>;
+  load: (query: string, opts?: { signal?: AbortSignal }) => Promise<ApiResult<TData>>;
   query?: string;
   debounceMs?: number;
   intervalMs?: number;
@@ -34,6 +34,10 @@ export interface UseResourceResult<TData> {
   data: TData | null;
   loading: boolean;
   feedback: Feedback;
+  /** persistent error จาก load — คงค้างจนกว่า request ถัดไปสำเร็จ (แยกจาก feedback ที่ auto-clear) */
+  error: string | null;
+  /** code คู่กับ error — AdminErrorState ใช้ branch SESSION_EXPIRED → ลิงก์ login */
+  errorCode?: ApiFail['code'];
   notify: (type: 'success' | 'error', msg: string) => void;
   clearFeedback: () => void;
   reload: () => Promise<void>;
@@ -57,6 +61,8 @@ export function useResource<TData>(options: UseResourceOptions<TData>): UseResou
   const [data, setDataState] = useState<TData | null>(null);
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState<Feedback>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<ApiFail['code']>(undefined);
 
   const seqRef = useRef(0); // เก็บลำดับ request ล่าสุด — response เก่าที่มาช้าคนละ seq จะถูกทิ้ง
   const mountedRef = useRef(true); // false หลัง unmount — กัน notify/setState จาก reload ที่ค้าง
@@ -81,10 +87,19 @@ export function useResource<TData>(options: UseResourceOptions<TData>): UseResou
     // เคลียร์ timer เก่าก่อนเสมอ — ไม่งั้นข้อความใหม่จะโดน timer ของข้อความเก่าลบ
     if (notifyTimerRef.current !== null) clearTimeout(notifyTimerRef.current);
     setFeedback({ type, msg });
-    notifyTimerRef.current = setTimeout(() => {
-      notifyTimerRef.current = null;
-      setFeedback(null);
-    }, FEEDBACK_MS);
+    if (type === 'success') {
+      // § success auto-clear ตามเดิม — แต่ error ต้องคงค้าง (NET-02: ไม่หายเองก่อนผู้ใช้แก้)
+      notifyTimerRef.current = setTimeout(() => {
+        notifyTimerRef.current = null;
+        setFeedback(null);
+      }, FEEDBACK_MS);
+    } else {
+      // § error ผ่าน notify ตรง ๆ (เช่น mutation error จาก mutate()) → ตั้ง persistent error ด้วย code undefined
+      // (mutation error ไม่มี code จาก server) — แต่ถ้า applyLoadResult ตั้งไว้แล้ว ห้ามเขียนทับ
+      // (applyLoadResult set errorCode ก่อนเรียก notify เสมอ — ดูบรรทัดล่าง)
+      // หมายเหตุ: notify ไม่รู้ code → ใช้ setError อย่างเดียว, ไม่แตะ errorCode
+      setError(msg);
+    }
   }, []);
 
   // ปลด timer แจ้งผลตอน unmount + ยกเลิก seq ของ reload ที่ค้าง (manual reload ไม่ได้อยู่ใน effect)
@@ -100,32 +115,63 @@ export function useResource<TData>(options: UseResourceOptions<TData>): UseResou
     };
   }, []);
 
+  const applyLoadResult = useCallback(
+    (res: ApiResult<TData>) => {
+      if (res.ok) {
+        setDataState(res.data);
+        setError(null);
+        setErrorCode(undefined);
+      } else {
+        // § persistent error — คงค้างจนกว่า request ถัดไปสำเร็จ (feedback ยัง auto-clear ตามเดิมสำหรับ success)
+        setError(res.error);
+        setErrorCode(res.code);
+        notify('error', res.error);
+      }
+    },
+    [notify],
+  );
+
   const reload = useCallback(async () => {
     const seq = ++seqRef.current;
     if (loadingOnReload) setLoading(true);
-    const res = await loadRef.current(query);
+    const ctrl = new AbortController();
+    let res: ApiResult<TData>;
+    try {
+      res = await loadRef.current(query, { signal: ctrl.signal });
+    } catch (err) {
+      // § caller abort (unmount/query เปลี่ยน) → ทิ้งเงียบ ไม่ตั้ง error
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      throw err;
+    }
     // § generation + mounted: effect cleanup ตั้ง cancelled เฉพาะ run ของ effect
     // manual reload ที่ค้างต้องถูกทิ้งด้วย seq เดียวกัน และห้าม notify/ตั้ง timer หลัง unmount
     if (!mountedRef.current || seq !== seqRef.current) return;
-    if (res.ok) setDataState(res.data);
-    else notify('error', res.error);
+    applyLoadResult(res);
     setLoading(false);
-  }, [query, loadingOnReload, notify]);
+  }, [query, loadingOnReload, notify, applyLoadResult]);
 
+  // § in-flight guard: กันเรียก mutate() ซ้อนกันในตัว hook เอง (ถ้า in-flight อยู่ return false ทันที)
+  const mutateInFlightRef = useRef(false);
   const mutate = useCallback(
     async <TResult,>(
       fn: () => Promise<ApiResult<TResult>>,
       successMsg: string,
       mutateOpts?: { reload?: boolean },
     ): Promise<boolean> => {
-      const res = await fn();
-      if (!res.ok) {
-        notify('error', res.error);
-        return false;
+      if (mutateInFlightRef.current) return false;
+      mutateInFlightRef.current = true;
+      try {
+        const res = await fn();
+        if (!res.ok) {
+          notify('error', res.error);
+          return false;
+        }
+        notify('success', successMsg);
+        if (mutateOpts?.reload !== false) await reload();
+        return true;
+      } finally {
+        mutateInFlightRef.current = false;
       }
-      notify('success', successMsg);
-      if (mutateOpts?.reload !== false) await reload();
-      return true;
     },
     [notify, reload],
   );
@@ -136,14 +182,21 @@ export function useResource<TData>(options: UseResourceOptions<TData>): UseResou
 
   useEffect(() => {
     let cancelled = false;
+    const ctrl = new AbortController();
     const run = () => {
       if (loadingOnReload) setLoading(true);
       const seq = ++seqRef.current;
       void (async () => {
-        const res = await loadRef.current(query);
+        let res: ApiResult<TData>;
+        try {
+          res = await loadRef.current(query, { signal: ctrl.signal });
+        } catch (err) {
+          // § abort จาก cleanup (unmount/query เปลี่ยน) → ทิ้งเงียบ ไม่ตั้ง error
+          if (err instanceof DOMException && err.name === 'AbortError') return;
+          throw err;
+        }
         if (!mountedRef.current || cancelled || seq !== seqRef.current) return;
-        if (res.ok) setDataState(res.data);
-        else notify('error', res.error);
+        applyLoadResult(res);
         setLoading(false);
       })();
     };
@@ -154,10 +207,11 @@ export function useResource<TData>(options: UseResourceOptions<TData>): UseResou
     const poll = intervalMs ? setInterval(run, intervalMs) : null;
     return () => {
       cancelled = true;
+      ctrl.abort();
       clearTimeout(timer);
       if (poll !== null) clearInterval(poll);
     };
-  }, [query, debounceMs, intervalMs, loadingOnReload, notify]);
+  }, [query, debounceMs, intervalMs, loadingOnReload, notify, applyLoadResult]);
 
-  return { data, loading, feedback, notify, clearFeedback, reload, mutate, setData };
+  return { data, loading, feedback, error, errorCode, notify, clearFeedback, reload, mutate, setData };
 }

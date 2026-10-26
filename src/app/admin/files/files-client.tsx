@@ -6,6 +6,7 @@ import { adminApi } from '@/app/admin/_lib/admin-api';
 import { useResource } from '@/app/admin/_lib/use-resource';
 import { Upload, Trash2, Copy, Image as ImageIcon, FileIcon } from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
+import { AdminErrorState } from '@/components/admin/admin-error-state';
 import { Button } from '@/components/ui/button';
 
 function formatSize(bytes: number): string {
@@ -18,7 +19,7 @@ export function FilesClient() {
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const { data, loading, feedback, notify, mutate } = useResource({
+  const { data, loading, feedback, error, errorCode, notify, mutate, reload } = useResource({
     load: adminApi.listMedia,
   });
   const items = data?.items ?? [];
@@ -75,6 +76,8 @@ export function FilesClient() {
 
         {loading ? (
           <div className="py-12 text-center text-muted">กำลังโหลด...</div>
+        ) : data === null && error ? (
+          <AdminErrorState error={error} errorCode={errorCode} onRetry={() => void reload()} />
         ) : items.length === 0 ? (
           <div className="py-12 text-center text-muted">ยังไม่มีไฟล์ — อัปโหลดไฟล์แรก</div>
         ) : (

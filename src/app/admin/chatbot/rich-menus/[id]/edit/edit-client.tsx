@@ -20,6 +20,8 @@ import {
   pillTone,
 } from '../../rich-menu-state';
 import { ThaiDateTimeField } from '../../thai-datetime-field';
+import { AdminErrorState } from '@/components/admin/admin-error-state';
+import type { ApiFail } from '@/app/admin/_lib/admin-api';
 
 const DISPLAY_MODES = RICH_MENU_DISPLAY_MODES;
 
@@ -37,6 +39,7 @@ export function RichMenuEditClient({ menuId }: { menuId: string }) {
   const [displayStartAt, setDisplayStartAt] = useState<string | null>(null);
   const [displayEndAt, setDisplayEndAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<ApiFail['code']>(undefined);
   const [busy, setBusy] = useState<'draft' | 'sync' | 'action' | null>(null);
 
   const aliasesRes = useResource({ load: adminApi.listMenuAliases });
@@ -69,7 +72,11 @@ export function RichMenuEditClient({ menuId }: { menuId: string }) {
   async function loadMenu() {
     const res = await adminApi.getRichMenu(menuId);
     if (!res.ok) {
-      setNotFound(true);
+      if (res.status === 404) setNotFound(true);
+      else {
+        setError(res.error);
+        setErrorCode(res.code);
+      }
       setLoading(false);
       return;
     }
@@ -84,7 +91,11 @@ export function RichMenuEditClient({ menuId }: { menuId: string }) {
       void adminApi.getRichMenu(menuId).then((res) => {
         if (cancelled) return;
         if (!res.ok) {
-          setNotFound(true);
+          if (res.status === 404) setNotFound(true);
+          else {
+            setError(res.error);
+            setErrorCode(res.code);
+          }
           setLoading(false);
           return;
         }
@@ -247,7 +258,11 @@ export function RichMenuEditClient({ menuId }: { menuId: string }) {
   }
 
   if (loading) return <div className="py-12 text-center text-muted">กำลังโหลด...</div>;
-  if (notFound || !menu) return <div className="py-12 text-center text-muted">ไม่พบเมนูนี้</div>;
+  if (notFound || !menu) {
+    if (error)
+      return <AdminErrorState error={error} errorCode={errorCode} onRetry={() => void loadMenu()} />;
+    return <div className="py-12 text-center text-muted">ไม่พบเมนูนี้</div>;
+  }
 
   const size = menu.config?.size ?? { width: 2500, height: 1686 };
   const pill = menuStatusPill(menu);

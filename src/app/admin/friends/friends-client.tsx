@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { History, LayoutGrid, Search, UsersRound } from 'lucide-react';
 import { AdminCard } from '@/components/admin/admin-card';
 import { PageHeader } from '@/components/admin/page-header';
+import { AdminErrorState } from '@/components/admin/admin-error-state';
 import {
   Dialog,
   DialogContent,
@@ -55,7 +56,7 @@ export function FriendsClient() {
     return params.toString();
   }, [q, status, page]);
 
-  const { data, loading, feedback, notify, reload } = useResource({
+  const { data, loading, feedback, error, errorCode, notify, reload } = useResource({
     load: adminApi.listFriends,
     query,
     debounceMs: 300,
@@ -228,6 +229,8 @@ export function FriendsClient() {
 
         {loading ? (
           <div className="py-12 text-center text-muted">กำลังโหลด...</div>
+        ) : data === null && error ? (
+          <AdminErrorState error={error} errorCode={errorCode} onRetry={() => void reload()} />
         ) : items.length === 0 ? (
           <div className="py-12 text-center text-muted">
             {isFiltered ? 'ไม่พบเพื่อนที่ตรงกับเงื่อนไข' : 'ยังไม่มีรายชื่อเพื่อน'}

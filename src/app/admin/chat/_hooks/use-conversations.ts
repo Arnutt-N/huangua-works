@@ -17,8 +17,8 @@ const EMPTY_CONVERSATIONS: Conversation[] = [];
  * § fetchConversations คืน null ทั้ง network fail และ !res.ok — อ่าน body เองเมื่อ !ok
  * เพื่อไม่ให้ข้อความ server (401 Unauthorized / 403 Forbidden) หายเป็นข้อความทั่วไป
  */
-const loadConversationsAdapter = async (): Promise<ApiResult<Conversation[]>> => {
-  const res = await fetch('/api/line/admin/conversations');
+const loadConversationsAdapter = async (_query: string, opts?: { signal?: AbortSignal }): Promise<ApiResult<Conversation[]>> => {
+  const res = await fetch('/api/line/admin/conversations', { signal: opts?.signal });
   if (res.ok) {
     const rows = (await res.json().catch(() => null)) as Conversation[] | null;
     return rows
@@ -37,7 +37,7 @@ export function useConversations() {
 
   // § loadingOnReload:false — ของเดิม loadConversations ไม่ยก loading ในการโหลดครั้งถัดไป
   // SSE เรียก reload บ่อย ถ้า loading=true list จะถูกแทนด้วย SkeletonRows (conversation-list.tsx)
-  const { data, loading, feedback, setData, reload } = useResource({
+  const { data, loading, feedback, error, errorCode, setData, reload } = useResource({
     load: loadConversationsAdapter,
     loadingOnReload: false,
   });

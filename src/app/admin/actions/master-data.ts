@@ -205,7 +205,13 @@ export async function toggleActive(formData: FormData): Promise<void> {
   if (!row) return;
 
   const next = !row.isActive;
-  await db.update(table).set({ isActive: next }).where(eq(table.id, id));
+  try {
+    await db.update(table).set({ isActive: next }).where(eq(table.id, id));
+  } catch (err) {
+    // § toggle ผ่าน form action (ไม่มี return) — error ไปทาง log + ไม่ throw ให้ Next แสดงหน้า error ดิบ
+    console.error('[master-data] toggle failed', err);
+    return;
+  }
 
   await logAudit({
     userId: actor.id,
@@ -249,16 +255,20 @@ export async function deleteDepartment(
   ]);
   if (refs.some(Boolean)) return { error: 'ลบหน่วยงานนี้ไม่ได้ — มีเรื่อง ผู้ใช้ หมวดหมู่ หรือแผนที่อ้างถึงอยู่ ให้ปิดใช้งานแทน' };
 
-  await db.delete(departments).where(eq(departments.id, id));
-  await logAudit({
-    userId: actor.id,
-    action: AUDIT_ACTIONS.DEPARTMENT_DELETE,
-    resource: 'departments',
-    resourceId: id,
-    ipAddress,
-    userAgent,
-    metadata: { name: target.name },
-  });
+  try {
+    await db.delete(departments).where(eq(departments.id, id));
+    await logAudit({
+      userId: actor.id,
+      action: AUDIT_ACTIONS.DEPARTMENT_DELETE,
+      resource: 'departments',
+      resourceId: id,
+      ipAddress,
+      userAgent,
+      metadata: { name: target.name },
+    });
+  } catch {
+    return { error: 'ลบข้อมูลไม่สำเร็จ กรุณาลองใหม่' };
+  }
   revalidatePath('/admin/master-data');
   return { error: null, success: 'ลบหน่วยงานแล้ว' };
 }

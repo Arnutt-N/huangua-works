@@ -7,7 +7,7 @@ import { adminApi } from '@/app/admin/_lib/admin-api';
 import { useResource } from '@/app/admin/_lib/use-resource';
 
 export function HealthClient() {
-  const { data, loading, feedback, reload } = useResource({
+  const { data, loading, error, errorCode, feedback, reload } = useResource({
     load: adminApi.getHealth,
     intervalMs: 30_000,
     loadingOnReload: false, // คงพฤติกรรมเดิม: refresh ไม่ปิดข้อมูลระหว่างโหลด
@@ -16,7 +16,7 @@ export function HealthClient() {
   if (loading) return <div className="py-12 text-center text-muted">กำลังตรวจสอบ...</div>;
   // § ห้าม return ก่อน banner — reload ล้มขณะมี data เดิมต้องเห็นข้อความจาก server ด้วย
   // health route คืน 401/403 `{ error: 'Unauthorized'|'Forbidden' }` เท่านั้น ไม่มี envelope อื่น
-  const errorMsg = feedback?.type === 'error' ? feedback.msg : null;
+  const errorMsg = error ?? (feedback?.type === 'error' ? feedback.msg : null);
 
   return (
     <AdminCard>

@@ -29,7 +29,7 @@ describe('adminApi — error envelope ถูก parse ที่เดียว',
   it('ดึงข้อความไทยจาก { error } ของ server พร้อม status', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'ไม่พบ FAQ' }, 404)));
     const res = await adminApi.deleteFaq('f1');
-    expect(res).toEqual({ ok: false, error: 'ไม่พบ FAQ', status: 404 });
+    expect(res).toEqual({ ok: false, error: 'ไม่พบ FAQ', status: 404, code: 'HTTP' });
   });
 
   it('ใช้ข้อความ fallback ภาษาไทยเมื่อ response ไม่มี { error }', async () => {
@@ -42,7 +42,7 @@ describe('adminApi — error envelope ถูก parse ที่เดียว',
   it('fetch reject → คืน error สายเชื่อมต่อ ไม่ throw ออกจาก adapter', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('network down')));
     const res = await adminApi.getSettings();
-    expect(res).toEqual({ ok: false, error: 'เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ', status: 0 });
+    expect(res).toEqual({ ok: false, error: 'เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ', status: 0, code: 'NETWORK' });
   });
 
   it('DELETE ไม่แนบ body และไม่ตั้ง Content-Type', async () => {

@@ -6,6 +6,7 @@ import { adminApi, type FriendItem } from '@/app/admin/_lib/admin-api';
 import { useResource } from '@/app/admin/_lib/use-resource';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import { Button } from '@/components/ui/button';
+import { AdminErrorState } from '@/components/admin/admin-error-state';
 
 function formatThaiDateTime(iso: string | null): string {
   if (!iso) return '—';
@@ -18,15 +19,17 @@ export function FriendDetailClient({ friendId }: { friendId: string }) {
   // § hook เดียวก้อน 100 — เคยมี 2 hooks (page 20 + 100) loading ดูก้อนแรกแต่แสดงก้อนสอง
   // เพื่อนนอก 20 แรกแวบ "ไม่พบ" เท็จ ปุ่มรีเฟรช reload ก้อนที่ไม่ได้แสดง
   const friend = useResource({
-    load: () => adminApi.getFriend(friendId),
+    load: (_q, opts) => adminApi.getFriend(friendId, opts),
   });
+  const { error: friendError, errorCode: friendErrorCode, reload: friendReload } = friend;
   const item: FriendItem | null = friend.data ?? null;
-  const events = useResource({ load: () => adminApi.listFriendEvents(friendId) });
+  const events = useResource({ load: (_q, opts) => adminApi.listFriendEvents(friendId, opts) });
   const timeline = [...(events.data?.items ?? [])].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
 
   if (friend.loading && !item) return <div className="py-12 text-center text-muted">กำลังโหลด...</div>;
+  if (!item && friendError) return <AdminErrorState error={friendError} errorCode={friendErrorCode} onRetry={() => void friendReload()} />;
   if (!item) return <div className="py-12 text-center text-muted">ไม่พบเพื่อนคนนี้</div>;
 
   return (

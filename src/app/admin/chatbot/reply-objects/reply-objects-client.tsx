@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/admin/empty-state';
 import { PageHeader } from '@/components/admin/page-header';
 import { DetailModal } from '@/components/admin/detail-modal';
+import { AdminErrorState } from '@/components/admin/admin-error-state';
 import { ConfirmDialog } from '@/components/admin/confirm-dialog';
 import {
   Dialog,
@@ -24,7 +25,7 @@ import {
 } from './_components/reply-object-form';
 
 export function ReplyObjectsClient() {
-  const { data, loading, feedback, notify, reload } = useResource({ load: adminApi.listReplyObjects });
+  const { data, loading, feedback, error, errorCode, notify, reload } = useResource({ load: adminApi.listReplyObjects });
   const items = data?.items ?? null;
 
   const [editing, setEditing] = useState<ReplyObject | null>(null);
@@ -134,6 +135,8 @@ export function ReplyObjectsClient() {
             </div>
           ))}
         </div>
+      ) : data === null && error ? (
+        <AdminErrorState error={error} errorCode={errorCode} onRetry={() => void reload()} />
       ) : data === null ? (
         <p role="status" className="py-10 text-center text-sm text-danger">โหลดข้อมูลไม่สำเร็จ</p>
       ) : data.items.length === 0 ? (

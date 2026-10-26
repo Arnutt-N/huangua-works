@@ -21,7 +21,7 @@ function formatQuotaLabel(
 }
 
 export function SettingsClient() {
-  const { data, loading, feedback, clearFeedback, mutate, setData } = useResource({
+  const { data, loading, feedback, error, errorCode, clearFeedback, mutate, setData, reload } = useResource({
     load: adminApi.getSettings,
   });
   // § ตั้งค่ากลางโหลดแยกอีกก้อน รูปเดียวกับบอท: derive ค่าจาก server แทน useEffect setState
