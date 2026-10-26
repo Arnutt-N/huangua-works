@@ -7,6 +7,7 @@
 - Ruling: dark `admin_reports-1440-dark.png` ต่าง 1 ไฟล์ในรอบทดสอบ (formatAge ข้ามชั่วโมงระหว่างรัน) — ยืนยันว่าต้องยกเว้น reports; ไม่งั้น gate flake
 - capture 2 รอบ: t0-r1 (36 PNG), t0-r2 (36 PNG) → diff OK (exit 0)
 - gate ล้มได้จริง: fixture แก้ 1 ไบต์ → `different: admin-1440-dark.png`, exit 1
+<<<<<<< HEAD
 
 ## T2 — FLOW-01/03/04 (branch feat/uxui-case-flow)
 
@@ -37,3 +38,5 @@
 - NET-04: try/catch queue/master-data/responsible, error.tsx test
 - tests: use-resource 17/17, admin-api, error.tsx; tsc ผ่าน; eslint 1 warning (exhaustive-deps notify — dep จริง)
 - Ruling: builder read-only ไม่ render AdminErrorState (ไม่มี empty state); cost ถ้าผิด: dropdown ว่างเงียบเมื่อ load ล้ม — ยอมรับได้เพราะ builder เป็นหน้า create ไม่ใช่ list
+=======
+>>>>>>> 21630bb (@)
