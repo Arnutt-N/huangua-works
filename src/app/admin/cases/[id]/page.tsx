@@ -17,14 +17,15 @@ import {
   villages,
 } from '@/lib/db/schema';
 import { requireStaff } from '@/lib/auth/require-staff';
-import { CASE_SUPERVISOR_ROLES } from '@/lib/auth/roles';
+import { canUseSupervisorAction } from '@/lib/auth/require-staff';
 import { BUDGET_LABELS_TH } from '@/lib/cases/budget';
 import { getActiveDepartments, getActiveOfficers } from '@/lib/queries/lookups';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { STATUS_LABELS_TH } from '@/lib/cases/state-machine';
 import { formatThaiDateTime } from '@/lib/thai-date';
 import { CaseStatusBadge } from '@/components/ui/case-status-badge';
-import { CaseDetailClient, SuccessToast } from './case-detail-client';
+import { CaseDetailClient } from './case-detail-client';
+import { safeInternalPath } from '@/lib/navigation';
 
 export const metadata: Metadata = { title: 'รายละเอียดเรื่อง' };
 
@@ -33,7 +34,8 @@ export const dynamic = 'force-dynamic';
 
 interface PageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ ok?: string }>;
+  searchParams: Promise<{ return?: string | string[] }>;
+  // § FLOW-03: รับ return path ผ่าน safeInternalPath — ไม่ผ่าน redirect ของ server action (FLOW-04 ลบ redirect แล้ว)
 }
 
 function formatAge(date: Date, now: number): string {
@@ -46,7 +48,8 @@ function formatAge(date: Date, now: number): string {
 export default async function CaseDetailPage({ params, searchParams }: PageProps) {
   const { user: staffUser } = await requireStaff();
   const { id: caseId } = await params;
-  const { ok } = await searchParams;
+  const { return: returnParam } = await searchParams;
+  const backHref = safeInternalPath(Array.isArray(returnParam) ? returnParam[0] : returnParam, '/admin/reports');
 
   const db = await getDb();
 
@@ -173,20 +176,23 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
 
-  const canChangeDepartment = CASE_SUPERVISOR_ROLES.includes(staffUser.role);
+  // § compute ครั้งเดียวแล้ว reuse — helper อ่าน DB ห้าม await ซ้ำ 4 ครั้งต่อ render
+  const canSupervise = await canUseSupervisorAction(staffUser.role);
+  const canChangeDepartment = canSupervise;
+  const canChangeBudget = canSupervise;
+  const canChangeBudgetAmount = canSupervise;
+  const canChangeActionDetails = canSupervise;
 
   return (
     <AdminShell user={staffUser} active="reports" title="รายละเอียดเรื่อง">
       {/* breadcrumb */}
       <Link
-        href="/admin/reports"
+        href={backHref}
         className="inline-flex min-h-touch items-center gap-2 text-sm font-medium text-muted transition-colors hover:text-accent-strong"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
         กลับไปหน้าจัดการเรื่อง
       </Link>
-
-      <SuccessToast ok={ok ?? null} />
 
       {/* หัวเรื่อง + meta — การ์ด glass ใบเดียวแทนข้อความลอยบนพื้นเปล่า */}
       <header className="glass-panel mt-2 rounded-xl p-5 shadow-sm sm:p-6">
@@ -296,6 +302,9 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
             officers={officerOptions}
             departments={deptRows}
             canChangeDepartment={canChangeDepartment}
+            canChangeBudget={canChangeBudget}
+            canChangeBudgetAmount={canChangeBudgetAmount}
+            canChangeActionDetails={canChangeActionDetails}
           />
         </section>
 

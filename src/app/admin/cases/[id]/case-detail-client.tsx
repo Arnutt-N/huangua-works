@@ -1,6 +1,7 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input, Label, Textarea } from '@/components/ui/field';
@@ -58,6 +59,9 @@ interface CaseDetailClientProps {
   officers: OfficerOption[];
   departments: DepartmentOption[];
   canChangeDepartment: boolean; // chief/head/superadmin เท่านั้น
+  canChangeBudget: boolean;
+  canChangeBudgetAmount: boolean;
+  canChangeActionDetails: boolean;
 }
 
 const initialActionState: CaseActionState = { error: null };
@@ -74,6 +78,9 @@ export function CaseDetailClient({
   officers,
   departments,
   canChangeDepartment,
+  canChangeBudget,
+  canChangeBudgetAmount,
+  canChangeActionDetails,
 }: CaseDetailClientProps) {
   // แยก useActionState ตาม action — แต่ละ form มี state อิสระ
   const [statusState, statusAction, statusPending] = useActionState(
@@ -108,6 +115,13 @@ export function CaseDetailClient({
     addUpdate,
     initialActionState
   );
+
+  // § หลัง success เรียก router.refresh() เพื่อดึงข้อมูลใหม่โดยไม่ remount — ฟอร์มอื่นคงค่าที่พิมพ์
+  const router = useRouter();
+  const anySuccess = statusState.success ?? assignState.success ?? deptState.success ?? priorityState.success ?? budgetState.success ?? budgetAmountState.success ?? actionDetailsState.success ?? commentState.success ?? null;
+  useEffect(() => {
+    if (anySuccess) router.refresh();
+  }, [anySuccess, router]);
 
   // local state สำหรับ status dropdown (เพื่อเช็ค transition ฝั่ง client ก่อน submit)
   const [selectedStatus, setSelectedStatus] = useState<CaseStatus>(currentStatus);
@@ -182,6 +196,7 @@ export function CaseDetailClient({
             หมายเหตุจะแสดงบนหน้าติดตามเรื่อง — ห้ามระบุชื่อ เบอร์โทร หรือที่อยู่ของบุคคลอื่น
           </p>
           {statusState.error && <ErrorText>{statusState.error}</ErrorText>}
+          {statusState.success && <SuccessText>{statusState.success}</SuccessText>}
           <Button type="submit" size="sm" disabled={statusPending || !transitionCheck.ok}>
             {statusPending ? 'กำลังบันทึก...' : 'บันทึกสถานะ'}
           </Button>
@@ -209,6 +224,7 @@ export function CaseDetailClient({
             </Select>
           </div>
           {assignState.error && <ErrorText>{assignState.error}</ErrorText>}
+          {assignState.success && <SuccessText>{assignState.success}</SuccessText>}
           <Button type="submit" size="sm" variant="secondary" disabled={assignPending}>
             {assignPending ? 'กำลังบันทึก...' : 'บันทึกการมอบหมาย'}
           </Button>
@@ -240,6 +256,7 @@ export function CaseDetailClient({
               </Select>
             </div>
             {deptState.error && <ErrorText>{deptState.error}</ErrorText>}
+          {deptState.success && <SuccessText>{deptState.success}</SuccessText>}
             <Button type="submit" size="sm" variant="secondary" disabled={deptPending}>
               {deptPending ? 'กำลังบันทึก...' : 'บันทึกหน่วยงาน'}
             </Button>
@@ -264,6 +281,7 @@ export function CaseDetailClient({
             </Select>
           </div>
           {priorityState.error && <ErrorText>{priorityState.error}</ErrorText>}
+          {priorityState.success && <SuccessText>{priorityState.success}</SuccessText>}
           <Button type="submit" size="sm" variant="secondary" disabled={priorityPending}>
             {priorityPending ? 'กำลังบันทึก...' : 'บันทึก'}
           </Button>
@@ -271,6 +289,7 @@ export function CaseDetailClient({
       </ActionCard>
 
       {/* ── สถานะงบประมาณ ── */}
+      {canChangeBudget ? (
       <ActionCard title="สถานะงบประมาณ">
         <form action={budgetAction} className="space-y-3">
           <input type="hidden" name="caseId" value={caseId} />
@@ -290,13 +309,20 @@ export function CaseDetailClient({
             </Select>
           </div>
           {budgetState.error && <ErrorText>{budgetState.error}</ErrorText>}
+          {budgetState.success && <SuccessText>{budgetState.success}</SuccessText>}
           <Button type="submit" size="sm" variant="secondary" disabled={budgetPending}>
             {budgetPending ? 'กำลังบันทึก...' : 'บันทึก'}
           </Button>
         </form>
       </ActionCard>
+      ) : (
+        <ActionCard title="สถานะงบประมาณ">
+          <p className="text-sm text-muted">สถานะงบประมาณ: <span className="font-semibold text-ink">{BUDGET_LABELS_TH[currentBudgetStatus]}</span></p>
+        </ActionCard>
+      )}
 
       {/* ── ยอดงบประมาณที่ใช้ ── */}
+      {canChangeBudgetAmount ? (
       <ActionCard title="งบประมาณที่ใช้">
         <form action={budgetAmountAction} className="space-y-3">
           <input type="hidden" name="caseId" value={caseId} />
@@ -312,13 +338,20 @@ export function CaseDetailClient({
             />
           </div>
           {budgetAmountState.error && <ErrorText>{budgetAmountState.error}</ErrorText>}
+          {budgetAmountState.success && <SuccessText>{budgetAmountState.success}</SuccessText>}
           <Button type="submit" size="sm" variant="secondary" disabled={budgetAmountPending}>
             {budgetAmountPending ? 'กำลังบันทึก...' : 'บันทึก'}
           </Button>
         </form>
       </ActionCard>
+      ) : (
+        <ActionCard title="งบประมาณที่ใช้">
+          <p className="text-sm text-muted">ยอดงบประมาณ: <span className="font-semibold text-ink">{currentBudgetAmount === null ? '—' : `${currentBudgetAmount.toLocaleString('th-TH')} บาท`}</span></p>
+        </ActionCard>
+      )}
 
       {/* ── รายละเอียดการดำเนินการ ── */}
+      {canChangeActionDetails ? (
       <ActionCard title="รายละเอียดการดำเนินการ">
         <form action={actionDetailsAction} className="space-y-3">
           <input type="hidden" name="caseId" value={caseId} />
@@ -334,11 +367,17 @@ export function CaseDetailClient({
             />
           </div>
           {actionDetailsState.error && <ErrorText>{actionDetailsState.error}</ErrorText>}
+          {actionDetailsState.success && <SuccessText>{actionDetailsState.success}</SuccessText>}
           <Button type="submit" size="sm" variant="secondary" disabled={actionDetailsPending}>
             {actionDetailsPending ? 'กำลังบันทึก...' : 'บันทึก'}
           </Button>
         </form>
       </ActionCard>
+      ) : (
+        <ActionCard title="รายละเอียดการดำเนินการ">
+          <p className="whitespace-pre-wrap text-sm text-ink">{currentActionDetails ?? '—'}</p>
+        </ActionCard>
+      )}
 
       {/* ── เพิ่มความคืบหน้า ── */}
       <ActionCard title="เพิ่มความคืบหน้า">
@@ -375,6 +414,7 @@ export function CaseDetailClient({
             ใครมีเลขติดตามก็เรียกดูได้ ห้ามระบุชื่อ เบอร์โทร หรือที่อยู่ของบุคคลอื่น
           </p>
           {commentState.error && <ErrorText>{commentState.error}</ErrorText>}
+          {commentState.success && <SuccessText>{commentState.success}</SuccessText>}
           <Button type="submit" size="sm" disabled={commentPending}>
             {commentPending ? 'กำลังบันทึก...' : 'เพิ่มความคืบหน้า'}
           </Button>
@@ -420,27 +460,15 @@ function ErrorText({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** success toast แสดงจาก query param ?ok=... */
-export function SuccessToast({ ok }: { ok: string | null }) {
-  if (!ok) return null;
-  const messages: Record<string, string> = {
-    status: 'อัปเดตสถานะเรียบร้อย',
-    assign: 'อัปเดตการมอบหมายเรียบร้อย',
-    department: 'อัปเดตหน่วยงานเรียบร้อย',
-    priority: 'อัปเดตความเร่งด่วนเรียบร้อย',
-    budget: 'อัปเดตสถานะงบประมาณเรียบร้อย',
-    budget_amount: 'บันทึกยอดงบประมาณเรียบร้อย',
-    action_details: 'บันทึกรายละเอียดการดำเนินการเรียบร้อย',
-    comment: 'เพิ่มความคืบหน้าเรียบร้อย',
-  };
-  const msg = messages[ok] ?? 'บันทึกเรียบร้อย';
+/** success banner รายฟอร์ม — แสดงจาก state.success หลัง action สำเร็จ (in-place, ไม่ remount) */
+export function SuccessText({ children }: { children: React.ReactNode }) {
   return (
     <div
       role="status"
-      className="mb-4 flex items-center gap-2 rounded-xl border border-success-ink/30 bg-success-soft px-4 py-3 text-sm font-semibold text-success-ink shadow-sm"
+      className="flex items-center gap-2 rounded-md border border-success-ink/30 bg-success-soft px-3 py-2 text-sm font-semibold text-success-ink"
     >
       <CheckCircle2 className="h-4 w-4 flex-none" aria-hidden="true" />
-      {msg}
+      {children}
     </div>
   );
 }

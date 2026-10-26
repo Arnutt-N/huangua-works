@@ -1,7 +1,6 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
 import { requireStaff } from '@/lib/auth/require-staff';
 import { CASE_SUPERVISOR_ROLES } from '@/lib/auth/roles';
 import { notifyCitizenStatusChange } from '@/lib/cases/line-notify';
@@ -57,7 +56,7 @@ export async function changeStatus(
 
   revalidatePath(`/admin/cases/${caseId}`);
   revalidatePath('/admin');
-  redirect(`/admin/cases/${caseId}?ok=status`);
+  return { error: null, success: 'บันทึกข้อมูลเรียบร้อย' };
 }
 
 export async function assignOfficer(
@@ -78,7 +77,7 @@ export async function assignOfficer(
 
   revalidatePath(`/admin/cases/${caseId}`);
   revalidatePath('/admin');
-  redirect(`/admin/cases/${caseId}?ok=assign`);
+  return { error: null, success: 'บันทึกข้อมูลเรียบร้อย' };
 }
 
 export async function changeDepartment(
@@ -98,7 +97,7 @@ export async function changeDepartment(
   if (!result.ok) return { error: result.error };
 
   revalidatePath(`/admin/cases/${caseId}`);
-  redirect(`/admin/cases/${caseId}?ok=department`);
+  return { error: null, success: 'บันทึกข้อมูลเรียบร้อย' };
 }
 
 export async function setPriority(
@@ -119,7 +118,7 @@ export async function setPriority(
 
   revalidatePath(`/admin/cases/${caseId}`);
   revalidatePath('/admin');
-  redirect(`/admin/cases/${caseId}?ok=priority`);
+  return { error: null, success: 'บันทึกข้อมูลเรียบร้อย' };
 }
 
 /**
@@ -144,7 +143,7 @@ export async function changeBudget(
 
   revalidatePath(`/admin/cases/${caseId}`);
   revalidatePath('/admin');
-  redirect(`/admin/cases/${caseId}?ok=budget`);
+  return { error: null, success: 'บันทึกข้อมูลเรียบร้อย' };
 }
 
 /**
@@ -174,7 +173,7 @@ export async function changeBudgetAmount(
 
   revalidatePath(`/admin/cases/${caseId}`);
   revalidatePath('/admin');
-  redirect(`/admin/cases/${caseId}?ok=budget_amount`);
+  return { error: null, success: 'บันทึกข้อมูลเรียบร้อย' };
 }
 
 /**
@@ -198,7 +197,7 @@ export async function changeActionDetails(
 
   revalidatePath(`/admin/cases/${caseId}`);
   revalidatePath('/admin');
-  redirect(`/admin/cases/${caseId}?ok=action_details`);
+  return { error: null, success: 'บันทึกข้อมูลเรียบร้อย' };
 }
 
 export async function addUpdate(
@@ -230,5 +229,5 @@ export async function addUpdate(
   if (!result.ok) return { error: result.error };
 
   revalidatePath(`/admin/cases/${caseId}`);
-  redirect(`/admin/cases/${caseId}?ok=comment`);
+  return { error: null, success: 'บันทึกข้อมูลเรียบร้อย' };
 }
