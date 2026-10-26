@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { adminApi } from '@/app/admin/_lib/admin-api';
@@ -14,12 +15,14 @@ import {
 export function NewReplyObjectClient() {
   const router = useRouter();
   const back = () => router.push('/admin/chatbot/reply-objects');
+  const [serverError, setServerError] = useState<string | null>(null);
 
   async function handleSave(form: ReplyObjectFormData): Promise<boolean> {
     let payload: Record<string, unknown>;
     try {
       payload = JSON.parse(form.payload);
     } catch {
+      setServerError('Invalid JSON payload');
       return false;
     }
     const res = await adminApi.createReplyObject({
@@ -31,7 +34,10 @@ export function NewReplyObjectClient() {
       ...(form.altText ? { altText: form.altText } : {}),
       isActive: true,
     });
-    if (!res.ok) return false;
+    if (!res.ok) {
+      setServerError(res.error);
+      return false;
+    }
     back();
     return true;
   }
@@ -44,6 +50,11 @@ export function NewReplyObjectClient() {
           กลับรายการ
         </Button>
       </PageHeader>
+      {serverError && (
+        <div role="alert" className="rounded-lg px-4 py-3 text-sm font-medium bg-danger/10 text-danger">
+          {serverError}
+        </div>
+      )}
       <div className="rounded-2xl border border-border/50 bg-surface p-6">
         <ReplyObjectForm
           initial={EMPTY_REPLY_OBJECT_FORM}

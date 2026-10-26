@@ -29,6 +29,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { RoleBadge, ROLE_LABELS_TH } from '@/components/admin/role-badge';
+import { ConfirmDialog } from '@/components/admin/confirm-dialog';
 import {
   createUser,
   toggleUserActive,
@@ -82,6 +83,27 @@ export function UsersClient({
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState<string | null>(null);
   const [resetOpen, setResetOpen] = useState<string | null>(null);
+  const [confirmUserId, setConfirmUserId] = useState<string | null>(null);
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<{ userId: string; message: string } | null>(null);
+
+  const confirmUser = users.find((u) => u.id === confirmUserId) ?? null;
+
+  async function handleConfirmToggle(): Promise<void> {
+    if (!confirmUser) return;
+    setPendingId(confirmUser.id);
+    const formData = new FormData();
+    formData.set('userId', confirmUser.id);
+    try {
+      const res = await toggleUserActive({ error: null }, formData);
+      if (res.error) {
+        setActionError({ userId: confirmUser.id, message: res.error });
+      }
+    } finally {
+      setPendingId(null);
+      setConfirmUserId(null);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -168,22 +190,23 @@ export function UsersClient({
               {/* Actions */}
               <div className="mt-3 flex flex-wrap items-center gap-2 sm:mt-0 sm:justify-end">
                 {/* Toggle active */}
-                <form action={toggleUserAction}>
-                  <input type="hidden" name="userId" value={u.id} />
-                  <input type="hidden" name="isSelf" value={String(u.id === currentUserId)} />
-                  <Button
-                    type="submit"
-                    variant="ghost"
-                    size="sm"
-                    disabled={u.id === currentUserId}
-                    aria-label={u.isActive ? 'ระงับบัญชี' : 'เปิดใช้งานบัญชี'}
-                  >
-                    <Power className="h-4 w-4" aria-hidden="true" />
-                    <span className="hidden sm:inline">
-                      {u.isActive ? 'ระงับ' : 'เปิดใช้'}
-                    </span>
-                  </Button>
-                </form>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={u.id === currentUserId}
+                  aria-label={u.isActive ? 'ระงับบัญชี' : 'เปิดใช้งานบัญชี'}
+                  onClick={() => {
+                    setActionError(null);
+                    setConfirmUserId(u.id);
+                  }}
+                >
+                  <Power className="h-4 w-4" aria-hidden="true" />
+                  <span className="hidden sm:inline">
+                    {u.isActive ? 'ระงับ' : 'เปิดใช้'}
+                  </span>
+                </Button>
+                {actionError?.userId === u.id && <FormError>{actionError.message}</FormError>}
 
                 {/* Edit role/dept */}
                 <Dialog
@@ -255,6 +278,22 @@ export function UsersClient({
       </div>
       {/* § key ตามข้อมูลใหม่ — save แล้วฟอร์มรีเซ็ต ไม่ทับของใหม่เงียบ (round-2 verdict) */}
       <TierMatrixCard key={JSON.stringify(tierMatrix)} tierMatrix={tierMatrix} />
+      <ConfirmDialog
+        open={confirmUser !== null}
+        onClose={() => {
+          if (pendingId === null) setConfirmUserId(null);
+        }}
+        onConfirm={() => void handleConfirmToggle()}
+        title={confirmUser?.isActive ? 'ระงับบัญชี' : 'เปิดใช้งานบัญชี'}
+        description={
+          confirmUser?.isActive
+            ? `ผู้ใช้ ${confirmUser.fullName} จะเข้าสู่ระบบไม่ได้จนกว่าจะเปิดใช้งานใหม่`
+            : `เปิดใช้งานบัญชีของ ${confirmUser?.fullName ?? ''} อีกครั้ง`
+        }
+        confirmText="ยืนยัน"
+        danger={confirmUser?.isActive ?? false}
+        busy={pendingId !== null}
+      />
     </div>
   );
 }
@@ -460,14 +499,6 @@ function ResetPasswordForm({
 // ────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ────────────────────────────────────────────────────────────────────────────
-
-/**
- * toggleUserActive ถูกเรียกแบบ inline (ไม่ใช่ dialog) — ใช้ wrapper เพื่อให้ signature
- * ตรงกับ form action expectation (void return) — redirect ใน action จะ trigger อัตโนมัติ
- */
-async function toggleUserAction(formData: FormData): Promise<void> {
-  await toggleUserActive({ error: null }, formData);
-}
 
 function FormError({ children }: { children: React.ReactNode }) {
   return (

@@ -14,12 +14,24 @@ import { z } from 'zod';
 
 export const runtime = 'nodejs';
 
-const createSchema = z.object({
-  title: z.string().trim().max(BROADCAST_TITLE_MAX, 'ชื่อแคมเปญยาวเกินไป').nullable().optional(),
-  content: z.array(contentSchema).min(1).max(5),
-  target: broadcastTargetSchema.default({ kind: 'all' }),
-  scheduledAt: z.string().datetime().nullable().optional(),
-});
+const createSchema = z
+  .object({
+    title: z.string().trim().max(BROADCAST_TITLE_MAX, 'ชื่อแคมเปญยาวเกินไป').nullable().optional(),
+    content: z.array(contentSchema).min(1).max(5),
+    target: broadcastTargetSchema.default({ kind: 'all' }),
+    scheduledAt: z.string().datetime().nullable().optional(),
+  })
+  .superRefine((data, ctx) => {
+    // § field เป็น nullable.optional → .refine บน field ตรง ๆ จะโดน null/undefined ด้วย
+    // ใช้ superRefine ระดับ object แล้วเช็คเฉพาะค่าที่มีจริง
+    if (data.scheduledAt && new Date(data.scheduledAt).getTime() <= Date.now()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['scheduledAt'],
+        message: 'เวลาส่งต้องเป็นอนาคต — เลือกเวลาใหม่หรือเว้นว่างเพื่อสร้างเป็นร่าง',
+      });
+    }
+  });
 
 const querySchema = z.object({
   page: z.coerce.number().int().min(1).optional().default(1),
