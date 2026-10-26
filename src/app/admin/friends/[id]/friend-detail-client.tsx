@@ -21,7 +21,7 @@ export function FriendDetailClient({ friendId }: { friendId: string }) {
   const friend = useResource({
     load: (_q, opts) => adminApi.getFriend(friendId, opts),
   });
-  const { error: friendError, errorCode: friendErrorCode, reload: friendReload } = friend;
+  const { error: friendError, errorCode: friendErrorCode, errorStatus: friendStatus, reload: friendReload } = friend;
   const item: FriendItem | null = friend.data ?? null;
   const events = useResource({ load: (_q, opts) => adminApi.listFriendEvents(friendId, opts) });
   const timeline = [...(events.data?.items ?? [])].sort(
@@ -29,7 +29,7 @@ export function FriendDetailClient({ friendId }: { friendId: string }) {
   );
 
   if (friend.loading && !item) return <div className="py-12 text-center text-muted">กำลังโหลด...</div>;
-  if (!item && friendError) return <AdminErrorState error={friendError} errorCode={friendErrorCode} onRetry={() => void friendReload()} />;
+  if (!item && friendError && friendStatus !== 404) return <AdminErrorState error={friendError} errorCode={friendErrorCode} onRetry={() => void friendReload()} />;
   if (!item) return <div className="py-12 text-center text-muted">ไม่พบเพื่อนคนนี้</div>;
 
   return (

@@ -61,7 +61,7 @@ describe('FriendDetailClient', () => {
   });
 
   it('ไม่มีเพื่อนแสดงข้อความไทย', async () => {
-    getFriend.mockResolvedValue({ ok: false, error: 'ไม่พบเพื่อนคนนี้', status: 404 });
+    getFriend.mockResolvedValue({ ok: false, error: 'ไม่พบเพื่อนคนนี้', status: 404, code: 'HTTP' });
     render(<FriendDetailClient friendId="nope" />);
     expect(await screen.findByText('ไม่พบเพื่อนคนนี้')).toBeInTheDocument();
   });

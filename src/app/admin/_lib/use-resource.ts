@@ -38,6 +38,8 @@ export interface UseResourceResult<TData> {
   error: string | null;
   /** code คู่กับ error — AdminErrorState ใช้ branch SESSION_EXPIRED → ลิงก์ login */
   errorCode?: ApiFail['code'];
+  /** HTTP status ของ load fail — detail pages ใช้แยก 404 (notFound) ออกจาก error อื่น */
+  errorStatus?: number;
   notify: (type: 'success' | 'error', msg: string) => void;
   clearFeedback: () => void;
   reload: () => Promise<void>;
@@ -63,6 +65,7 @@ export function useResource<TData>(options: UseResourceOptions<TData>): UseResou
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<ApiFail['code']>(undefined);
+  const [errorStatus, setErrorStatus] = useState<number | undefined>(undefined);
 
   const seqRef = useRef(0); // เก็บลำดับ request ล่าสุด — response เก่าที่มาช้าคนละ seq จะถูกทิ้ง
   const mountedRef = useRef(true); // false หลัง unmount — กัน notify/setState จาก reload ที่ค้าง
@@ -121,10 +124,12 @@ export function useResource<TData>(options: UseResourceOptions<TData>): UseResou
         setDataState(res.data);
         setError(null);
         setErrorCode(undefined);
+        setErrorStatus(undefined);
       } else {
         // § persistent error — คงค้างจนกว่า request ถัดไปสำเร็จ (feedback ยัง auto-clear ตามเดิมสำหรับ success)
         setError(res.error);
         setErrorCode(res.code);
+        setErrorStatus(res.status);
         notify('error', res.error);
       }
     },
@@ -213,5 +218,5 @@ export function useResource<TData>(options: UseResourceOptions<TData>): UseResou
     };
   }, [query, debounceMs, intervalMs, loadingOnReload, notify, applyLoadResult]);
 
-  return { data, loading, feedback, error, errorCode, notify, clearFeedback, reload, mutate, setData };
+  return { data, loading, feedback, error, errorCode, errorStatus, notify, clearFeedback, reload, mutate, setData };
 }

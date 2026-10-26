@@ -19,7 +19,7 @@ const MATCH_LABELS: Record<IntentMatchType, string> = {
 };
 
 export function IntentDetailClient({ intentId }: { intentId: string }) {
-  const { data: item, loading, feedback, error, errorCode, notify, reload } = useResource({
+  const { data: item, loading, feedback, error, errorCode, errorStatus, notify, reload } = useResource({
     load: (_q, opts) => adminApi.getIntent(intentId, opts),
   });
 
@@ -165,7 +165,7 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
   }
 
   if (loading) return <div className="py-12 text-center text-muted">กำลังโหลด...</div>;
-  if (!item && error) return <AdminErrorState error={error} errorCode={errorCode} onRetry={() => void reload()} />;
+  if (!item && error && errorStatus !== 404) return <AdminErrorState error={error} errorCode={errorCode} onRetry={() => void reload()} />;
   if (!item) return <div className="py-12 text-center text-muted">ไม่พบหมวดนี้</div>;
 
   const { ready, reason } = readinessOf(item);

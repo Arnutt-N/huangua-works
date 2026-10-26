@@ -70,7 +70,7 @@ describe('CannedResponsesClient ตาราง JSK', () => {
     fetchCannedResponses.mockResolvedValue([item({ isActive: false })]);
     render(<CannedResponsesClient />);
     expect(await screen.findByText('ปิดใช้งาน')).toBeInTheDocument();
-    expect(fetchCannedResponses).toHaveBeenCalledWith(true);
+    expect(fetchCannedResponses).toHaveBeenCalledWith(true, expect.any(AbortSignal));
   });
 
   it('ไม่มี shortcut แสดงชื่ออย่างเดียว', async () => {
