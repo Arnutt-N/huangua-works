@@ -90,7 +90,7 @@ export function FilesClient() {
                 </div>
                 <p className="truncate text-xs font-medium text-ink">{item.filename}</p>
                 <p className="text-xs text-muted">{formatSize(item.sizeBytes)} · {item.category}</p>
-                <div className="mt-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                <div className="mt-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
                   <button onClick={() => copyUrl(item.url)} className="min-h-touch min-w-touch flex items-center justify-center rounded hover:bg-accent/10" aria-label="คัดลอก URL">
                     <Copy className="h-3.5 w-3.5 text-muted" />
                   </button>

@@ -7,3 +7,17 @@
 - Ruling: dark `admin_reports-1440-dark.png` ต่าง 1 ไฟล์ในรอบทดสอบ (formatAge ข้ามชั่วโมงระหว่างรัน) — ยืนยันว่าต้องยกเว้น reports; ไม่งั้น gate flake
 - capture 2 รอบ: t0-r1 (36 PNG), t0-r2 (36 PNG) → diff OK (exit 0)
 - gate ล้มได้จริง: fixture แก้ 1 ไบต์ → `different: admin-1440-dark.png`, exit 1
+
+## T2 — FLOW-01/03/04 (branch feat/uxui-case-flow)
+
+## T2 — FLOW-01/03/04: complete
+- commit 1 (ca7e6bc): FLOW-04 — ลบ redirect 8 จุด, success banner รายฟอร์ม, router.refresh
+- commit 2 (c16ea54): FLOW-01 UI gate (canUseSupervisorAction + 3 flags + read-only), FLOW-03 (safeInternalPath + ?return=)
+- tests: navigation 6/6, require-staff 4/4; tsc ผ่าน
+
+## T3 — A11Y-01..04: complete
+- A11Y-01: use-media-query.ts (ใหม่), admin-layout inert/focus/focus-trap/aria-controls — test 1/1
+- A11Y-02: files-client focus-within + pointer-coarse — test 1/1
+- A11Y-03: dialog base max-h + ลบ override 3 จุด
+- A11Y-04: session-timeout ไทย + aria-describedby + focus trap/return — test 2/2
+- tsc + eslint ผ่าน

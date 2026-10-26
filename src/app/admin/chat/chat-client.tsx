@@ -224,7 +224,7 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
 
       {/* mobile: ข้อมูลลูกค้าเป็น dialog */}
       <Dialog open={mobilePanelOpen} onOpenChange={setMobilePanelOpen}>
-        <DialogContent className="max-h-[85dvh] overflow-y-auto p-0">
+        <DialogContent className="p-0">
           <DialogTitle className="sr-only">ข้อมูลลูกค้า</DialogTitle>
           <CustomerPanel
             conversation={selectedConv}

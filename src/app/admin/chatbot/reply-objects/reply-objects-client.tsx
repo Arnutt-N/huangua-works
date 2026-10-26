@@ -220,7 +220,7 @@ export function ReplyObjectsClient() {
       )}
 
       <Dialog open={editing !== null} onOpenChange={(o) => (!o ? setEditing(null) : undefined)}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
+        <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Edit Object</DialogTitle>
           </DialogHeader>
