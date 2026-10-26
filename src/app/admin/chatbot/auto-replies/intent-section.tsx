@@ -201,6 +201,8 @@ export function IntentSection() {
 
         {loading ? (
           <div className="py-12 text-center text-muted">กำลังโหลด...</div>
+        ) : data === null && error ? (
+          <AdminErrorState error={error} errorCode={errorCode} onRetry={() => void reload()} />
         ) : items.length === 0 ? (
           <div className="py-12 text-center text-muted">
             ยังไม่มีหมวดเจตนา — กด &quot;New Category&quot; เพื่อเริ่มสร้าง

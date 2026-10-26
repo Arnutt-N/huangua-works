@@ -101,6 +101,8 @@ export function useConversations() {
     counts,
     loading,
     feedback,
+    error,
+    errorCode,
     filter,
     setFilter,
     sort,

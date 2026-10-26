@@ -11,6 +11,7 @@ import { useMessageSearch } from './_hooks/use-message-search';
 import { CannedManageDialog } from './_components/canned-manage-dialog';
 import { ChatArea } from './_components/chat-area';
 import { ConversationList } from './_components/conversation-list';
+import { AdminErrorState } from '@/components/admin/admin-error-state';
 import { CustomerPanel } from './_components/customer-panel';
 import { TransferDialog } from './_components/transfer-dialog';
 
@@ -31,6 +32,8 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
     counts,
     loading,
     feedback,
+    error,
+    errorCode,
     filter,
     setFilter,
     sort,
@@ -153,8 +156,12 @@ export function ChatClient({ adminUserId }: { adminUserId: string }) {
     <>
       <div className="flex h-[calc(100dvh-4rem)] w-full overflow-hidden bg-surface font-sans">
         {/* มือถือ: แสดงรายการเต็มจอ แล้วสลับไปหน้าต่างแชทเมื่อเลือกห้อง */}
-        {feedback?.type === 'error' && (
-          <p role="status" className="px-3 py-2 text-sm text-danger">{feedback.msg}</p>
+        {error && !conversations.length ? (
+          <AdminErrorState error={error} errorCode={errorCode} onRetry={() => void loadConversations()} variant="inline" />
+        ) : (
+          feedback?.type === 'error' && (
+            <p role="status" className="px-3 py-2 text-sm text-danger">{feedback.msg}</p>
+          )
         )}
         <ConversationList
           collapsed={!listOpen}

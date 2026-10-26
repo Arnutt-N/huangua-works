@@ -2,6 +2,7 @@
 
 import { HeartPulse, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
+import { AdminErrorState } from '@/components/admin/admin-error-state';
 import { Button } from '@/components/ui/button';
 import { adminApi } from '@/app/admin/_lib/admin-api';
 import { useResource } from '@/app/admin/_lib/use-resource';
@@ -37,7 +38,9 @@ export function HealthClient() {
 
       {errorMsg && <p className="text-sm text-danger">{errorMsg}</p>}
 
-      {!data ? (
+      {!data && error ? (
+        <AdminErrorState error={error} errorCode={errorCode} onRetry={() => void reload()} />
+      ) : !data ? (
         <p className="text-sm text-danger">โหลดสถานะไม่สำเร็จ</p>
       ) : (
         <div className="space-y-3">

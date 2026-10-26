@@ -6,6 +6,7 @@ import { useResource } from '@/app/admin/_lib/use-resource';
 import { describeLineQuota } from '@/lib/line/quota';
 import { Settings, Save, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
+import { AdminErrorState } from '@/components/admin/admin-error-state';
 import { Button } from '@/components/ui/button';
 import { Label, Input, Textarea } from '@/components/ui/field';
 import { BUSINESS_DAY_LABELS as DAY_LABELS } from '@/lib/line/business-hours';
@@ -106,6 +107,7 @@ export function SettingsClient() {
   if (loading) return <div className="py-12 text-center text-muted">กำลังโหลด...</div>;
   // § ห้าม `if (!data) return null` ก่อน banner — โหลดครั้งแรกล้มต้องเห็น error ไม่ใช่หน้าว่าง
   if (!data) {
+    if (error) return <AdminErrorState error={error} errorCode={errorCode} onRetry={() => void reload()} />;
     return feedback?.type === 'error' ? (
       <div role="status" className="rounded-lg bg-danger/10 px-4 py-3 text-sm font-medium text-danger">
         {feedback.msg}

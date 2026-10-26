@@ -30,3 +30,10 @@
 - NET-04: rich-menus publish guard, intent-detail mutating guard; try/catch มีอยู่แล้ว (verify)
 - tests: use-resource 17→21 (error persistence, retry clear, abort, signal-through), admin-api, error.tsx 1/1
 - Ruling: notify('error') ตั้ง error แต่ไม่แตะ errorCode (applyLoadResult ตั้งก่อนเรียก notify) — cost ถ้าผิด: code หาย
+
+## T4 — NET-02/03/04: complete
+- Layer: ApiFail.code, 17 methods opts, request timeout 15s + Safari fallback, caller-abort ไม่ตั้ง error, use-resource error/errorCode persistent + notify แยก success/error, mutate in-flight guard, AbortController cleanup, wrappers 6 จุด
+- UI: AdminErrorState (card/inline) 19 ไฟล์ + edit/broadcast-detail แยก 404, error.tsx boundary
+- NET-04: try/catch queue/master-data/responsible, error.tsx test
+- tests: use-resource 17/17, admin-api, error.tsx; tsc ผ่าน; eslint 1 warning (exhaustive-deps notify — dep จริง)
+- Ruling: builder read-only ไม่ render AdminErrorState (ไม่มี empty state); cost ถ้าผิด: dropdown ว่างเงียบเมื่อ load ล้ม — ยอมรับได้เพราะ builder เป็นหน้า create ไม่ใช่ list
