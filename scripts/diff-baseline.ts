@@ -17,6 +17,39 @@ import { join, basename } from 'node:path';
 // prefix ของ slug ที่ยกเว้นจาก byte-compare (ตรวจแค่มีไฟล์ครบ)
 const EXCLUDED_PREFIXES = ['home-', 'admin_reports-', 'admin_cases_'];
 
+/**
+ * § รายชื่อ route ที่ capture script ต้องเก็บครบเสมอ (slug = path ที่แทน / ด้วย _)
+ * gate ต้อง fail เมื่อ "ไม่มีอะไรให้เทียบ" ไม่ใช่ผ่านเงียบ — ทั้งสอง dir ว่าง หรือ
+ * มีแต่ไฟล์ยกเว้น = ยังไม่ได้ capture จริง ไม่ใช่ "ภาพนิ่ง"
+ */
+const REQUIRED_SLUGS = [
+  'home',
+  'admin',
+  'admin_reports',
+  'admin_cases',
+  'admin_users',
+  'admin_chatbot_broadcast_new',
+  'admin_chatbot_reply-objects',
+  'admin_files',
+  'admin_settings',
+] as const;
+
+const VIEWPORTS = ['375', '1440'] as const;
+const THEMES = ['light', 'dark'] as const;
+
+function expectedFileCount(): number {
+  return REQUIRED_SLUGS.length * VIEWPORTS.length * THEMES.length;
+}
+
+/** slug ของชื่อไฟล์ เช่น admin_cases_xxx-375-dark.png → admin_cases (ตัด id ต่อท้ายออก) */
+function slugOf(file: string): string {
+  const m = /^(.*?)-\d+-(?:light|dark)\.png$/.exec(file);
+  const raw = m?.[1] ?? file;
+  // § /admin/cases/<id> → filename มี uuid ต่อท้าย slug; normalize กลับเป็น admin_cases
+  if (raw.startsWith('admin_cases_')) return 'admin_cases';
+  return raw;
+}
+
 function isExcluded(file: string): boolean {
   return EXCLUDED_PREFIXES.some((p) => file.startsWith(p));
 }
@@ -25,10 +58,28 @@ function isLightTheme(file: string): boolean {
   return file.endsWith('-light.png');
 }
 
+/** § ตรวจว่า dir มีไฟล์ครบตาม route ที่ต้อง capture — คืนข้อความ error ถ้าไม่ครบ */
+export function checkCoverage(dir: string): string[] {
+  const problems: string[] = [];
+  if (!existsSync(dir)) return [`missing dir: ${dir}`];
+  const files = readdirSync(dir).filter((f) => f.endsWith('.png'));
+  const expected = expectedFileCount();
+  if (files.length !== expected) {
+    problems.push(`${dir}: พบ ${files.length} ไฟล์ แต่ต้องมี ${expected} (${REQUIRED_SLUGS.length} routes × 2 viewports × 2 themes)`);
+  }
+  const presentSlugs = new Set(files.map(slugOf));
+  for (const slug of REQUIRED_SLUGS) {
+    if (!presentSlugs.has(slug)) problems.push(`${dir}: ไม่มี route "${slug}"`);
+  }
+  return problems;
+}
+
 export function diffDirs(beforeDir: string, afterDir: string): string[] {
   const diffs: string[] = [];
-  if (!existsSync(beforeDir)) return [`missing before dir: ${beforeDir}`];
-  if (!existsSync(afterDir)) return [`missing after dir: ${afterDir}`];
+  // § gate ต้อง fail เมื่อ capture ไม่ครบ — ไม่ปล่อยให้ dir ว่าง/มีแต่ไฟล์ยกเว้นผ่านเงียบ
+  diffs.push(...checkCoverage(beforeDir));
+  diffs.push(...checkCoverage(afterDir));
+  if (!existsSync(beforeDir) || !existsSync(afterDir)) return diffs;
 
   const before = new Set(readdirSync(beforeDir));
   const after = new Set(readdirSync(afterDir));

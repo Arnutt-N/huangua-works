@@ -95,8 +95,11 @@ export function UsersClient({
     const formData = new FormData();
     formData.set('userId', confirmUser.id);
     try {
+      // § toggleUserActive redirect('/admin/users?ok=toggled') เมื่อสำเร็จ — redirect() โยน
+      // NEXT_REDIRECT จึงไม่มีค่าคืนในเส้นทางนั้น (res เป็น undefined ได้) ต้องอ่านแบบ optional
+      // ไม่งั้น TypeError ใน console ทั้งที่ผู้ใช้เห็นการ navigate ปกติ
       const res = await toggleUserActive({ error: null }, formData);
-      if (res.error) {
+      if (res?.error) {
         setActionError({ userId: confirmUser.id, message: res.error });
       }
     } finally {

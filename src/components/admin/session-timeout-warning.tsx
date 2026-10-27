@@ -68,7 +68,7 @@ export function SessionTimeoutWarning() {
         <p id="session-timeout-desc" className="mb-4 text-muted">
           เซสชันของคุณจะหมดอายุในอีก{' '}
           <span className="font-semibold tabular-nums text-danger">{formatTime(remainingSeconds)}</span> เนื่องจาก
-          ไม่มีการใช้งาน การดำเนินการต่อจะรีสตาร์ทแค่คำเตือนนี้ เซสชันยังคงหมดอายุตามเวลาของมันเอง
+          ไม่มีการใช้งาน — กด &quot;ใช้งานต่อ&quot; เพื่อเริ่มนับเวลาการไม่ใช้งานใหม่
         </p>
 
         <div className="flex gap-3">

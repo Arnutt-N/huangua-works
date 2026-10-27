@@ -36,7 +36,8 @@ export function HealthClient() {
         )}
       </AdminCardTitle>
 
-      {errorMsg && <p className="text-sm text-danger">{errorMsg}</p>}
+      {/* § แสดง error ครั้งเดียว — มี card เมื่อไม่มี data, มี p เมื่อยังมี data เดิมอยู่ (reload ล้ม) */}
+      {data && errorMsg && <p className="text-sm text-danger">{errorMsg}</p>}
 
       {!data && error ? (
         <AdminErrorState error={error} errorCode={errorCode} onRetry={() => void reload()} />

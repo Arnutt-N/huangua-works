@@ -68,6 +68,7 @@ export function useResource<TData>(options: UseResourceOptions<TData>): UseResou
   const [errorStatus, setErrorStatus] = useState<number | undefined>(undefined);
 
   const seqRef = useRef(0); // เก็บลำดับ request ล่าสุด — response เก่าที่มาช้าคนละ seq จะถูกทิ้ง
+  const reloadCtrlRef = useRef<AbortController | null>(null); // controller ของ manual reload ล่าสุด — abort ตอน unmount
   const mountedRef = useRef(true); // false หลัง unmount — กัน notify/setState จาก reload ที่ค้าง
   const firstRef = useRef(true); // mount ต้องโหลดทันที ไม่รอ debounce
   const notifyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -118,6 +119,9 @@ export function useResource<TData>(options: UseResourceOptions<TData>): UseResou
     return () => {
       mountedRef.current = false;
       seqRef.current += 1;
+      // § abort manual reload ที่ค้าง — seq guard กัน state update แต่ request ยังวิ่งต่อ
+      reloadCtrlRef.current?.abort();
+      reloadCtrlRef.current = null;
       if (notifyTimerRef.current !== null) clearTimeout(notifyTimerRef.current);
     };
   }, []);
@@ -145,6 +149,9 @@ export function useResource<TData>(options: UseResourceOptions<TData>): UseResou
     const seq = ++seqRef.current;
     if (loadingOnReload) setLoading(true);
     const ctrl = new AbortController();
+    // § เก็บ controller ของ manual reload ไว้ abort ตอน unmount — seq guard กัน state update
+    // แต่ไม่ได้หยุด request ที่ค้างอยู่ (ยังวิ่งจนจบหลังผู้ใช้ออกจากหน้า)
+    reloadCtrlRef.current = ctrl;
     let res: ApiResult<TData>;
     try {
       res = await loadRef.current(query, { signal: ctrl.signal });
@@ -152,6 +159,8 @@ export function useResource<TData>(options: UseResourceOptions<TData>): UseResou
       // § caller abort (unmount/query เปลี่ยน) → ทิ้งเงียบ ไม่ตั้ง error
       if (err instanceof DOMException && err.name === 'AbortError') return;
       throw err;
+    } finally {
+      if (reloadCtrlRef.current === ctrl) reloadCtrlRef.current = null;
     }
     // § generation + mounted: effect cleanup ตั้ง cancelled เฉพาะ run ของ effect
     // manual reload ที่ค้างต้องถูกทิ้งด้วย seq เดียวกัน และห้าม notify/ตั้ง timer หลัง unmount
