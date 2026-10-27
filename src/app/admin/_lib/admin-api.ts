@@ -386,17 +386,19 @@ function timeoutSignal(external?: AbortSignal): { signal: AbortSignal; cleanup: 
   external?.addEventListener('abort', onExternalAbort, { once: true });
   const timeoutSig =
     typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(REQUEST_TIMEOUT_MS) : null;
-  if (timeoutSig) {
-    timeoutSig.addEventListener('abort', () => {
-      timedOut = true;
-      ctrl.abort(timeoutSig.reason);
-    });
-  }
+  // § เก็บ listener ไว้ remove ใน cleanup — AbortSignal.timeout() ถูก GC เองได้ก็ต่อเมื่อ
+  // ไม่มี listener ค้างอยู่ ถ้าไม่ remove จะถือ signal มีชีวิตจนครบ 15s ทุก request
+  const onTimeoutAbort = () => {
+    timedOut = true;
+    ctrl.abort(timeoutSig?.reason);
+  };
+  timeoutSig?.addEventListener('abort', onTimeoutAbort);
   return {
     signal: ctrl.signal,
     cleanup: () => {
       if (timer !== null) clearTimeout(timer);
       external?.removeEventListener('abort', onExternalAbort);
+      timeoutSig?.removeEventListener('abort', onTimeoutAbort);
     },
     timedOut: () => timedOut,
   };

@@ -86,24 +86,28 @@ export function useResource<TData>(options: UseResourceOptions<TData>): UseResou
     setFeedback(null);
   }, []);
 
-  const notify = useCallback((type: 'success' | 'error', msg: string) => {
-    // เคลียร์ timer เก่าก่อนเสมอ — ไม่งั้นข้อความใหม่จะโดน timer ของข้อความเก่าลบ
-    if (notifyTimerRef.current !== null) clearTimeout(notifyTimerRef.current);
-    setFeedback({ type, msg });
-    if (type === 'success') {
-      // § success auto-clear ตามเดิม — แต่ error ต้องคงค้าง (NET-02: ไม่หายเองก่อนผู้ใช้แก้)
-      notifyTimerRef.current = setTimeout(() => {
-        notifyTimerRef.current = null;
-        setFeedback(null);
-      }, FEEDBACK_MS);
-    } else {
-      // § error ผ่าน notify ตรง ๆ (เช่น mutation error จาก mutate()) → ตั้ง persistent error ด้วย code undefined
-      // (mutation error ไม่มี code จาก server) — แต่ถ้า applyLoadResult ตั้งไว้แล้ว ห้ามเขียนทับ
-      // (applyLoadResult set errorCode ก่อนเรียก notify เสมอ — ดูบรรทัดล่าง)
-      // หมายเหตุ: notify ไม่รู้ code → ใช้ setError อย่างเดียว, ไม่แตะ errorCode
-      setError(msg);
-    }
-  }, []);
+  const notify = useCallback(
+    (type: 'success' | 'error', msg: string, meta?: { code?: ApiFail['code']; status?: number }) => {
+      // เคลียร์ timer เก่าก่อนเสมอ — ไม่งั้นข้อความใหม่จะโดน timer ของข้อความเก่าลบ
+      if (notifyTimerRef.current !== null) clearTimeout(notifyTimerRef.current);
+      setFeedback({ type, msg });
+      if (type === 'success') {
+        // § success auto-clear ตามเดิม — แต่ error ต้องคงค้าง (NET-02: ไม่หายเองก่อนผู้ใช้แก้)
+        notifyTimerRef.current = setTimeout(() => {
+          notifyTimerRef.current = null;
+          setFeedback(null);
+        }, FEEDBACK_MS);
+      } else {
+        // § error ต้องแสดงคู่กับ code/status ของ "ครั้งที่ error เกิด" เสมอ — ถ้าไม่ส่ง meta มา
+        // (mutation error ที่ server ไม่ให้ code) ต้องเคลียร์ของเก่า ไม่งั้น SESSION_EXPIRED
+        // จาก load ก่อนหน้าจะค้างและ AdminErrorState โชว์ "เข้าสู่ระบบใหม่" ผิดสาเหตุ
+        setError(msg);
+        setErrorCode(meta?.code);
+        setErrorStatus(meta?.status);
+      }
+    },
+    [],
+  );
 
   // ปลด timer แจ้งผลตอน unmount + ยกเลิก seq ของ reload ที่ค้าง (manual reload ไม่ได้อยู่ใน effect)
   // § setup ต้องชุบ mounted กลับเป็น true เสมอ — StrictMode จำลอง unmount→remount ตอน mount
@@ -127,10 +131,8 @@ export function useResource<TData>(options: UseResourceOptions<TData>): UseResou
         setErrorStatus(undefined);
       } else {
         // § persistent error — คงค้างจนกว่า request ถัดไปสำเร็จ (feedback ยัง auto-clear ตามเดิมสำหรับ success)
-        setError(res.error);
-        setErrorCode(res.code);
-        setErrorStatus(res.status);
-        notify('error', res.error);
+        // ส่ง code/status ผ่าน notify เพื่อให้ error กับ code มาจากครั้งเดียวกันเสมอ
+        notify('error', res.error, { code: res.code, status: res.status });
       }
     },
     [notify],
@@ -172,6 +174,11 @@ export function useResource<TData>(options: UseResourceOptions<TData>): UseResou
           return false;
         }
         notify('success', successMsg);
+        // § mutation สำเร็จ = ผู้ใช้แก้ปัญหาที่ทำให้ error ค้างแล้ว → เคลียร์ persistent error
+        // (กรณี reload:false จะไม่มี load มาล้างให้ ไม่งั้น error เก่าค้างตลอดไป)
+        setError(null);
+        setErrorCode(undefined);
+        setErrorStatus(undefined);
         if (mutateOpts?.reload !== false) await reload();
         return true;
       } finally {

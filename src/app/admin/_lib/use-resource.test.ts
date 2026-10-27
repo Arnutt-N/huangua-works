@@ -356,4 +356,41 @@ describe('useResource', () => {
     });
     expect(result.current.data?.items[0]?.name).toBe('จากเซิร์ฟเวอร์');
   });
+
+  it('notify(error) จาก mutation ต้องไม่คู่กับ code เก่า (SESSION_EXPIRED ต้องไม่ค้าง)', async () => {
+    const load = vi.fn(
+      async (): Promise<ApiResult<Page>> => ({ ok: false, error: 'เซสชันหมดอายุ', status: 401, code: 'SESSION_EXPIRED' }),
+    );
+    const { result } = renderHook(() => useResource({ load }));
+    await flush(0);
+    expect(result.current.errorCode).toBe('SESSION_EXPIRED');
+
+    act(() => result.current.notify('error', 'บันทึกไม่สำเร็จ'));
+
+    expect(result.current.error).toBe('บันทึกไม่สำเร็จ');
+    // § error ใหม่ไม่มี code → ต้องไม่ค้าง code ของ load ก่อนหน้า ไม่งั้น AdminErrorState โชว์ "เข้าสู่ระบบใหม่" ผิดสาเหตุ
+    expect(result.current.errorCode).toBeUndefined();
+    expect(result.current.errorStatus).toBeUndefined();
+  });
+
+  it('mutate สำเร็จ (reload:false) เคลียร์ error ที่ค้างจาก load', async () => {
+    const load = vi.fn(
+      async (): Promise<ApiResult<Page>> => ({ ok: false, error: 'โหลดไม่สำเร็จ', status: 500, code: 'HTTP' }),
+    );
+    const { result } = renderHook(() => useResource({ load }));
+    await flush(0);
+    expect(result.current.error).toBe('โหลดไม่สำเร็จ');
+
+    await act(async () => {
+      await result.current.mutate(
+        async () => ({ ok: true as const, data: { ok: true } }),
+        'บันทึกแล้ว',
+        { reload: false },
+      );
+    });
+
+    // § ไม่มี load ตามมาล้างให้ → mutate ต้องเคลียร์เอง ไม่งั้น error เก่าค้างตลอดไป
+    expect(result.current.error).toBeNull();
+    expect(result.current.errorCode).toBeUndefined();
+  });
 });
