@@ -185,7 +185,7 @@ export function BroadcastClient() {
     notify('success', 'ยกเลิกประกาศแล้ว');
     setCancelTarget(null);
     setPage(0);
-    await mutate(() => adminApi.listBroadcasts(query), '');
+    await reload();
   }
 
   return (

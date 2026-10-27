@@ -8,7 +8,7 @@ vi.setConfig({ testTimeout: 30_000 });
 
 // A11Y-01: ทดสอบ drawer ผ่าน AdminLayout (mobileOpen=false + viewport มือถือ → aside มี inert)
 vi.mock('@/hooks/use-media-query', () => ({
-  useMediaQuery: vi.fn().mockReturnValue(false),
+  useMediaQuery: vi.fn().mockReturnValue({ isDesktop: false, hydrated: true }),
 }));
 
 vi.mock('@/components/site/brand-mark', () => ({

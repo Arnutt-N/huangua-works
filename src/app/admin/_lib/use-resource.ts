@@ -129,6 +129,9 @@ export function useResource<TData>(options: UseResourceOptions<TData>): UseResou
         setError(null);
         setErrorCode(undefined);
         setErrorStatus(undefined);
+        // § load สำเร็จ = error ที่ค้างอยู่หมดเหตุแล้ว — ล้างเฉพาะแบนเนอร์ "error"
+        // (ไม่มี timer ล้างให้ตาม NET-02) ห้ามแตะ success/timer ของ success ที่ mutate เพิ่งตั้ง
+        setFeedback((prev) => (prev?.type === 'error' ? null : prev));
       } else {
         // § persistent error — คงค้างจนกว่า request ถัดไปสำเร็จ (feedback ยัง auto-clear ตามเดิมสำหรับ success)
         // ส่ง code/status ผ่าน notify เพื่อให้ error กับ code มาจากครั้งเดียวกันเสมอ

@@ -393,4 +393,21 @@ describe('useResource', () => {
     expect(result.current.error).toBeNull();
     expect(result.current.errorCode).toBeUndefined();
   });
+
+  it('load สำเร็จล้างแบนเนอร์ error ที่ค้าง แต่ไม่แตะ success ที่เพิ่งแสดง', async () => {
+    const load = vi
+      .fn<() => Promise<ApiResult<Page>>>()
+      .mockResolvedValueOnce({ ok: false, error: 'เซิร์ฟเวอร์ขัดข้อง', status: 500, code: 'HTTP' })
+      .mockResolvedValueOnce({ ok: true, data: { items: [{ id: '1', name: 'a' }], total: 1 } });
+    const { result } = renderHook(() => useResource({ load }));
+    await flush(0);
+    expect(result.current.feedback?.type).toBe('error');
+
+    // retry สำเร็จ → error banner ต้องหาย ไม่ใช่ค้างตลอดไป
+    await act(async () => {
+      await result.current.reload();
+    });
+    expect(result.current.error).toBeNull();
+    expect(result.current.feedback).toBeNull();
+  });
 });

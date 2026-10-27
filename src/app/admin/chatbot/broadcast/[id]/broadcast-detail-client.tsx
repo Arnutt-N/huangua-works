@@ -143,7 +143,7 @@ export function BroadcastDetailClient({ broadcastId }: { broadcastId: string }) 
       return;
     }
     notify('success', 'ยกเลิกประกาศแล้ว');
-    await mutate(() => adminApi.getBroadcast(broadcastId), '');
+    await reload();
   }
 
   if (loading) return <div className="py-12 text-center text-muted">กำลังโหลด...</div>;

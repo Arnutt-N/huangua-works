@@ -118,13 +118,28 @@ export function CaseDetailClient({
 
   // § หลัง success เรียก router.refresh() เพื่อดึงข้อมูลใหม่โดยไม่ remount — ฟอร์มอื่นคงค่าที่พิมพ์
   const router = useRouter();
-  const anySuccess = statusState.success ?? assignState.success ?? deptState.success ?? priorityState.success ?? budgetState.success ?? budgetAmountState.success ?? actionDetailsState.success ?? commentState.success ?? null;
+  // § ใช้ "จำนวนครั้งที่สำเร็จ" แทน string — action ทุกตัวคืน success ข้อความเดียวกัน
+  // ถ้าเอา string มาเป็น dep ของ effect, action ที่ 2/3 ไม่เปลี่ยนค่า → refresh ไม่ยิง
+  const successCount =
+    Number(Boolean(statusState.success)) +
+    Number(Boolean(assignState.success)) +
+    Number(Boolean(deptState.success)) +
+    Number(Boolean(priorityState.success)) +
+    Number(Boolean(budgetState.success)) +
+    Number(Boolean(budgetAmountState.success)) +
+    Number(Boolean(actionDetailsState.success)) +
+    Number(Boolean(commentState.success));
   useEffect(() => {
-    if (anySuccess) router.refresh();
-  }, [anySuccess, router]);
+    if (successCount > 0) router.refresh();
+  }, [successCount, router]);
 
   // local state สำหรับ status dropdown (เพื่อเช็ค transition ฝั่ง client ก่อน submit)
   const [selectedStatus, setSelectedStatus] = useState<CaseStatus>(currentStatus);
+  // § หลัง router.refresh() ได้ currentStatus ใหม่ ต้องเลื่อน dropdown ตาม ไม่งั้นผู้ใช้เห็น
+  // สถานะเก่า + ข้อความแดง "อยู่ในสถานะปิดแล้ว" ทันทีหลังบันทึกสำเร็จ
+  useEffect(() => {
+    setSelectedStatus(currentStatus);
+  }, [currentStatus]);
   const transitionCheck = assertTransition(currentStatus, selectedStatus);
 
   return (

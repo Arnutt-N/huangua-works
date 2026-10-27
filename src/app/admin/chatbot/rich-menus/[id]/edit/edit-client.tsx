@@ -81,6 +81,9 @@ export function RichMenuEditClient({ menuId }: { menuId: string }) {
       return;
     }
     applyMenu(res.data);
+    // § load สำเร็จ = error เก่าหมดเหตุ → ต้องล้าง ไม่งั้นแบนเนอร์แดงค้างถาวรหลัง retry สำเร็จ
+    setError(null);
+    setErrorCode(undefined);
     setLoading(false);
   }
 
@@ -100,6 +103,8 @@ export function RichMenuEditClient({ menuId }: { menuId: string }) {
           return;
         }
         applyMenu(res.data);
+        setError(null);
+        setErrorCode(undefined);
         setLoading(false);
       });
     }, 0);

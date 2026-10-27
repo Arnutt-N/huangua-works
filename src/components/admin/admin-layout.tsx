@@ -54,7 +54,7 @@ export function AdminLayout({
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const isDesktop = useMediaQuery();
+  const { isDesktop, hydrated } = useMediaQuery();
   const hamburgerRef = useRef<HTMLButtonElement>(null);
   const asideRef = useRef<HTMLElement>(null);
 
@@ -103,8 +103,18 @@ export function AdminLayout({
     return () => window.removeEventListener('keydown', onKey);
   }, [mobileOpen]);
 
+  // § คืนโฟกัสให้ hamburger เฉพาะตอนที่ drawer "ปิดหลังเคยเปิด" — ห้ามยิงตอน mount
+  // ไม่งั้นทุกครั้งที่เข้า/เปลี่ยนหน้า admin บนมือถือ โฟกัสจะถูกกระชากจากตำแหน่งเริ่มต้น
+  const wasOpenRef = useRef(false);
   useEffect(() => {
-    if (!mobileOpen) hamburgerRef.current?.focus();
+    if (mobileOpen) {
+      wasOpenRef.current = true;
+      return;
+    }
+    if (wasOpenRef.current) {
+      wasOpenRef.current = false;
+      hamburgerRef.current?.focus();
+    }
   }, [mobileOpen]);
 
   const groups = visibleNavGroups(user.role);
@@ -126,7 +136,9 @@ export function AdminLayout({
       {/* ── Sidebar ── */}
       <aside
         ref={asideRef}
-        inert={!isDesktop && !mobileOpen}
+        // § ใส่ inert เฉพาะหลัง hydrate แล้วเท่านั้น — ระหว่าง SSR ยังไม่รู้ว่าเป็น desktop
+        // หรือ mobile ถ้าใส่ไปเลยผู้ใช้ desktop จะกดเมนูไม่ได้จนกว่า JS จะทำงาน
+        inert={hydrated && !isDesktop && !mobileOpen}
         className={cn(
           'glass-panel fixed inset-y-0 left-0 z-50 flex flex-col border-r shadow-lg',
           'transition-[width,transform] duration-normal ease-out-expo',
