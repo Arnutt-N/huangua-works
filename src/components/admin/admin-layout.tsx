@@ -57,12 +57,33 @@ export function AdminLayout({
   const { isDesktop, hydrated } = useMediaQuery();
   const hamburgerRef = useRef<HTMLButtonElement>(null);
   const asideRef = useRef<HTMLElement>(null);
+  const navRef = useRef<HTMLElement>(null);
 
   // อ่านค่าที่ผู้ใช้เลือกไว้ครั้งก่อน — อ่านหลัง mount เพื่อเลี่ยง hydration mismatch
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage อ่านได้เฉพาะฝั่ง client หลัง mount เท่านั้น
     setCollapsed(window.localStorage.getItem(COLLAPSE_KEY) === '1');
   }, []);
+
+  // § repo นี้ไม่มี admin/layout.tsx — ทุกหน้า render <AdminShell> เองใน page
+  // sidebar จึง remount ทุกครั้งที่เปลี่ยนหน้า และ nav เริ่ม scrollTop = 0 เสมอ
+  // คลิกเมนูล่างๆ แล้วแถบเมนูเด้งกลับขึ้นบน มองไม่เห็นว่าอยู่ที่เมนูไหน
+  // → เลื่อนเฉพาะ nav ให้ active item โผล่ (ไม่ใช้ scrollIntoView เพราะมันลาก
+  //   window/page scroll ตามไปด้วย ทำให้เนื้อหาหน้ากระตุก)
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    const activeEl = nav.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!activeEl) return;
+    // § เทียบ rect แทน offsetTop — offsetParent ของ item คือ <aside> (fixed) ไม่ใช่ nav
+    const navRect = nav.getBoundingClientRect();
+    const elRect = activeEl.getBoundingClientRect();
+    if (elRect.top < navRect.top) {
+      nav.scrollTop -= navRect.top - elRect.top;
+    } else if (elRect.bottom > navRect.bottom) {
+      nav.scrollTop += elRect.bottom - navRect.bottom;
+    }
+  }, [active]);
 
   function toggleCollapsed() {
     setCollapsed((prev) => {
@@ -204,7 +225,7 @@ export function AdminLayout({
         </div>
 
         {/* เมนูงาน — แบ่งกลุ่มตามหน้าที่ */}
-        <nav className="flex-1 overflow-y-auto p-3">
+        <nav ref={navRef} className="flex-1 overflow-y-auto p-3">
           {groups.map((group, i) => (
             <div key={group.label} className={cn(i > 0 && 'mt-5')}>
               {/* หัวข้อกลุ่ม: ตอนย่อเปลี่ยนเป็นเส้นคั่นแทน — ถ้าซ่อนเฉย ๆ
