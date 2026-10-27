@@ -27,7 +27,9 @@ Never work directly on `main`. Every task/phase gets its own branch.
 
 ### 1. Skill Selection
 
-Reference `.claude/skill-collections-20260712.md` and select the appropriate skill set for the task:
+Select the appropriate skill set for the task. The bullets below are the canonical
+list — the per-machine catalog under `.claude/skill-collections/` is gitignored and
+is absent in a fresh clone, so never block on it:
 
 - **Baseline (always):** karpathy-guidelines
 - **Process discipline:** superpowers (for serious eng work)
@@ -96,7 +98,7 @@ gh pr merge --squash
 
 ```
 [ ] New branch created
-[ ] Skills identified (ref: .claude/skill-collections-20260712.md)
+[ ] Skills identified (from the § 1 list)
 [ ] PRD written & reviewed
 [ ] PRP-Plan written & reviewed
 [ ] Review gate passed (user confirmed if needed)
@@ -316,8 +318,8 @@ Canonical vocabulary, unchanged — `needs-triage`, `needs-info`, `ready-for-age
 
 ### Domain docs
 
-Single-context — `CONTEXT.md` + `docs/adr/` at the repo root (neither exists yet;
-that's expected). See `docs/agents/domain.md`.
+Single-context — `CONTEXT.md` at the repo root plus `docs/adr/` (`docs/adr/` does not
+exist yet; that's expected, it gets created lazily). See `docs/agents/domain.md`.
 
 <!-- graft:start -->
 ## Graft — repo context graph
