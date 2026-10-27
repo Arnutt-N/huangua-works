@@ -5,6 +5,7 @@ import { MessageSquare, Package, Tags } from 'lucide-react';
 import { adminApi } from '@/app/admin/_lib/admin-api';
 import { useResource } from '@/app/admin/_lib/use-resource';
 import { PageHeader } from '@/components/admin/page-header';
+import { AdminErrorState } from '@/components/admin/admin-error-state';
 import { KpiCard } from '@/components/admin/kpi-card';
 import { readinessOf } from './auto-replies/readiness';
 
@@ -15,9 +16,8 @@ export function ChatbotDashboardClient() {
   const replyObjects = replyObjectsRes.data?.items ?? [];
   const intents = intentsRes.data?.items ?? [];
   const loading = replyObjectsRes.loading || intentsRes.loading;
-  const replyObjectsError =
-    replyObjectsRes.feedback?.type === 'error' ? replyObjectsRes.feedback.msg : null;
-  const intentsError = intentsRes.feedback?.type === 'error' ? intentsRes.feedback.msg : null;
+  const replyObjectsError = replyObjectsRes.error;
+  const intentsError = intentsRes.error;
 
   const activeIntents = intents.filter((i) => i.isActive);
   const activeResponses = activeIntents.reduce((sum, i) => sum + i.responses.length, 0);
@@ -28,15 +28,8 @@ export function ChatbotDashboardClient() {
     <div className="space-y-6">
       <PageHeader title="Chatbot Overview" subtitle="จัดการคำตอบอัตโนมัติและข้อความ Flex ของ LINE OA" />
 
-      {replyObjectsError && (
-        <p role="status" className="rounded-lg bg-danger/10 px-4 py-3 text-sm font-medium text-danger">
-          {replyObjectsError}
-        </p>
-      )}
-      {intentsError && (
-        <p role="status" className="rounded-lg bg-danger/10 px-4 py-3 text-sm font-medium text-danger">
-          {intentsError}
-        </p>
+      {(replyObjectsError ?? intentsError) && (
+        <AdminErrorState error={(replyObjectsError ?? intentsError)!} errorCode={replyObjectsRes.errorCode ?? intentsRes.errorCode} onRetry={() => { void replyObjectsRes.reload(); void intentsRes.reload(); }} variant="inline" />
       )}
 
       <div className="grid gap-4 md:grid-cols-3">

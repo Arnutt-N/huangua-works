@@ -18,6 +18,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import { AdminCard } from '@/components/admin/admin-card';
+import { AdminErrorState } from '@/components/admin/admin-error-state';
 import { PageHeader } from '@/components/admin/page-header';
 import {
   Dialog,
@@ -107,7 +108,7 @@ export function BroadcastClient() {
     return params.toString();
   }, [statusFilter, page]);
 
-  const { data, loading, feedback, notify, mutate } = useResource({
+  const { data, loading, feedback, error, errorCode, notify, mutate, reload } = useResource({
     load: adminApi.listBroadcasts,
     query,
   });
@@ -184,7 +185,7 @@ export function BroadcastClient() {
     notify('success', 'ยกเลิกประกาศแล้ว');
     setCancelTarget(null);
     setPage(0);
-    await mutate(() => adminApi.listBroadcasts(query), '');
+    await reload();
   }
 
   return (
@@ -240,6 +241,8 @@ export function BroadcastClient() {
               </div>
             ))}
           </div>
+        ) : data === null && error ? (
+          <AdminErrorState error={error} errorCode={errorCode} onRetry={() => void reload()} />
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center gap-3 px-4 py-12 text-center text-muted">
             <Radio className="h-10 w-10 opacity-30" aria-hidden="true" />

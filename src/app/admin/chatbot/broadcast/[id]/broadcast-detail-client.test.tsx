@@ -95,7 +95,7 @@ describe('BroadcastDetailClient', () => {
   });
 
   it('ไม่มีข้อมูลแสดงข้อความไทย', async () => {
-    getBroadcast.mockResolvedValue({ ok: false, error: 'ไม่พบ broadcast', status: 404 });
+    getBroadcast.mockResolvedValue({ ok: false, error: 'ไม่พบ broadcast', status: 404, code: 'HTTP' });
     render(<BroadcastDetailClient broadcastId="nope" />);
     expect(await screen.findByText('ไม่พบข้อมูล broadcast')).toBeInTheDocument();
   });

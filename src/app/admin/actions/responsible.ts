@@ -116,17 +116,21 @@ export async function updateResponsible(
   if (assigneeError) return { error: assigneeError };
 
   const db = await getDb();
-  await db
-    .update(legacyResponsibleMap)
-    .set({ departmentId: v.data.departmentId, assignedTo, decidedBy: actor.id, decidedAt: new Date() })
-    .where(eq(legacyResponsibleMap.raw, raw));
-  await logAudit({
-    userId: actor.id,
-    action: AUDIT_ACTIONS.RESPONSIBLE_UPDATE,
-    resource: 'legacy_responsible_map',
-    resourceId: raw,
-    metadata: { departmentId: v.data.departmentId, assignedTo },
-  });
+  try {
+    await db
+      .update(legacyResponsibleMap)
+      .set({ departmentId: v.data.departmentId, assignedTo, decidedBy: actor.id, decidedAt: new Date() })
+      .where(eq(legacyResponsibleMap.raw, raw));
+    await logAudit({
+      userId: actor.id,
+      action: AUDIT_ACTIONS.RESPONSIBLE_UPDATE,
+      resource: 'legacy_responsible_map',
+      resourceId: raw,
+      metadata: { departmentId: v.data.departmentId, assignedTo },
+    });
+  } catch {
+    return { error: 'บันทึกข้อมูลไม่สำเร็จ กรุณาลองใหม่' };
+  }
   revalidatePath(PATH);
   return { error: null, success: 'บันทึก mapping แล้ว' };
 }
@@ -144,16 +148,20 @@ export async function toggleResponsibleActive(
 
   const next = !current.isActive;
   const db = await getDb();
-  await db
-    .update(legacyResponsibleMap)
-    .set({ isActive: next, decidedBy: actor.id, decidedAt: new Date() })
-    .where(eq(legacyResponsibleMap.raw, raw));
-  await logAudit({
-    userId: actor.id,
-    action: next ? AUDIT_ACTIONS.RESPONSIBLE_ACTIVATE : AUDIT_ACTIONS.RESPONSIBLE_DEACTIVATE,
-    resource: 'legacy_responsible_map',
-    resourceId: raw,
-  });
+  try {
+    await db
+      .update(legacyResponsibleMap)
+      .set({ isActive: next, decidedBy: actor.id, decidedAt: new Date() })
+      .where(eq(legacyResponsibleMap.raw, raw));
+    await logAudit({
+      userId: actor.id,
+      action: next ? AUDIT_ACTIONS.RESPONSIBLE_ACTIVATE : AUDIT_ACTIONS.RESPONSIBLE_DEACTIVATE,
+      resource: 'legacy_responsible_map',
+      resourceId: raw,
+    });
+  } catch {
+    return { error: 'บันทึกข้อมูลไม่สำเร็จ กรุณาลองใหม่' };
+  }
   revalidatePath(PATH);
   return { error: null, success: next ? 'เปิดใช้งานแล้ว' : 'ปิดใช้งานแล้ว (แถวที่อ้างถึงค้าง blocked)' };
 }

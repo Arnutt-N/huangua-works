@@ -9,6 +9,7 @@ import { adminApi } from '@/app/admin/_lib/admin-api';
 import { useResource } from '@/app/admin/_lib/use-resource';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/admin/page-header';
+import { AdminErrorState } from '@/components/admin/admin-error-state';
 import { DetailModal } from '@/components/admin/detail-modal';
 import { ConfirmDialog } from '@/components/admin/confirm-dialog';
 import { cn } from '@/lib/cn';
@@ -22,10 +23,11 @@ import {
 
 export function RichMenusClient() {
   const router = useRouter();
-  const { data, loading, feedback, mutate } = useResource({ load: adminApi.listRichMenus });
+  const { data, loading, feedback, error, errorCode, mutate, reload } = useResource({ load: adminApi.listRichMenus });
   const items = data?.items ?? [];
 
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [publishingId, setPublishingId] = useState<string | null>(null);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const [viewMenu, setViewMenu] = useState<RichMenuItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<RichMenuItem | null>(null);
@@ -38,7 +40,13 @@ export function RichMenusClient() {
   }
 
   async function handlePublish(item: RichMenuItem) {
-    await mutate(() => adminApi.publishRichMenu(item.id), 'ตั้งเป็นเมนูหลักสำเร็จ');
+    if (publishingId !== null) return;
+    setPublishingId(item.id);
+    try {
+      await mutate(() => adminApi.publishRichMenu(item.id), 'ตั้งเป็นเมนูหลักสำเร็จ');
+    } finally {
+      setPublishingId(null);
+    }
   }
 
   async function handleDelete() {
@@ -78,6 +86,8 @@ export function RichMenusClient() {
 
       {loading ? (
         <div className="py-12 text-center text-muted">กำลังโหลดข้อมูล...</div>
+      ) : data === null && error ? (
+        <AdminErrorState error={error} errorCode={errorCode} onRetry={() => void reload()} />
       ) : items.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-12 text-center">
           <p className="text-sm text-muted">ไม่พบข้อมูลเมนูในระบบ</p>
@@ -180,8 +190,8 @@ export function RichMenusClient() {
                             </Button>
                           )}
                           {action === 'publish' && (
-                            <Button size="sm" className="text-xs" onClick={() => handlePublish(item)}>
-                              Set Active
+                            <Button size="sm" className="text-xs" onClick={() => handlePublish(item)} disabled={publishingId !== null}>
+                              {publishingId === item.id ? 'กำลังตั้งค่า...' : 'Set Active'}
                             </Button>
                           )}
                           {action === null && (

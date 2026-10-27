@@ -45,7 +45,7 @@ export function RichMenuBuilderClient() {
 
   const template = templateByKey(templateKey);
 
-  const replyObjectsRes = useResource({ load: adminApi.listReplyObjects });
+  const replyObjectsRes = useResource({ load: adminApi.listReplyObjects }); // read-only: ใช้แค่ dropdown options, ไม่ render AdminErrorState (ไม่มี empty state ของตัวเอง)
   const intentsRes = useResource({ load: adminApi.listIntents });
   const aliasesRes = useResource({ load: adminApi.listMenuAliases });
   const replyObjects = replyObjectsRes.data?.items ?? [];

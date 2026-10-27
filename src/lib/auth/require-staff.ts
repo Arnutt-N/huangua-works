@@ -7,7 +7,16 @@ import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { users } from '@/lib/db/schema';
 import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
-import { loginDenialReason, SUPERADMIN_ONLY, type UserRole } from '@/lib/auth/roles';
+import { CASE_SUPERVISOR_ROLES, loginDenialReason, SUPERADMIN_ONLY, type UserRole } from '@/lib/auth/roles';
+
+/**
+ * UI gate ฝั่ง supervisor action — ใช้ tier matrix เดียวกับ server (`resolveAllowedRoles`)
+ * async เสมอ (อ่าน DB) และ fail-closed ตามเดิม (อ่านไม่ได้ → superadmin เท่านั้น)
+ */
+export async function canUseSupervisorAction(role: UserRole): Promise<boolean> {
+  const allowed = await resolveAllowedRoles(CASE_SUPERVISOR_ROLES);
+  return allowed?.includes(role) ?? false;
+}
 import { getTierRoles, tierKeyForRoles } from '@/lib/auth/tiers';
 
 /**
@@ -16,7 +25,7 @@ import { getTierRoles, tierKeyForRoles } from '@/lib/auth/tiers';
  * call site ไม่ต้องเปลี่ยน — DB มี override ใช้ของ DB ไม่มีใช้ค่าคงที่เดิม
  * array แปลกหน้า (ไม่ใช่ 4 tier มาตรฐาน) ผ่านตรงเหมือนเดิม
  */
-async function resolveAllowedRoles(
+export async function resolveAllowedRoles(
   allowedRoles?: readonly UserRole[],
 ): Promise<readonly UserRole[] | undefined> {
   if (!allowedRoles) return undefined;

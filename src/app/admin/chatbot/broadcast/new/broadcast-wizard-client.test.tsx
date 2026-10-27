@@ -147,6 +147,7 @@ describe('BroadcastWizardClient ตัวช่วยสร้าง 4 ขั้
   });
 
   it('"ส่งเลย" สร้างแล้วยิง sendBroadcast ต่อทันที', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
     const user = userEvent.setup();
     const send = adminApi.sendBroadcast as ReturnType<typeof vi.fn>;
     render(<BroadcastWizardClient />);
@@ -186,10 +187,53 @@ describe('BroadcastWizardClient ตัวช่วยสร้าง 4 ขั้
     await user.type(screen.getByLabelText('เวลาส่ง'), '10:00');
 
     await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
-    await user.click(screen.getByRole('button', { name: 'บันทึกแบบร่าง' }));
+    await user.click(screen.getByRole('button', { name: 'ตั้งเวลาและบันทึก' }));
 
     const create = adminApi.createBroadcast as ReturnType<typeof vi.fn>;
     const payload = create.mock.calls[0]?.[0] as { scheduledAt: string | null };
     expect(payload.scheduledAt).toMatch(/Z|[+-]\d{2}:\d{2}$/);
+  });
+
+  it('draft ส่ง scheduledAt=null แม้ตั้งเวลาไว้', async () => {
+    const user = userEvent.setup();
+    render(<BroadcastWizardClient />);
+
+    await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
+    await user.type(screen.getByLabelText('ข้อความประกาศ'), 'ร่าง');
+    await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
+
+    await user.click(screen.getByLabelText('วันที่ส่ง (เว้นว่าง = สร้างเป็นร่าง)'));
+    await user.click(screen.getByRole('button', { name: 'เดือนถัดไป' }));
+    await user.click(screen.getByRole('button', { name: '5' }));
+    await user.type(screen.getByLabelText('เวลาส่ง'), '10:00');
+
+    await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
+    // confirm ส่งเลยจะยกเลิกเวลาที่ตั้งไว้ — draft ต้องทิ้งเวลาเช่นกัน
+    await user.click(screen.getByRole('button', { name: 'บันทึกแบบร่าง' }));
+
+    const create = adminApi.createBroadcast as ReturnType<typeof vi.fn>;
+    const payload = create.mock.calls[0]?.[0] as { scheduledAt: string | null };
+    expect(payload.scheduledAt).toBeNull();
+    const send = adminApi.sendBroadcast as ReturnType<typeof vi.fn>;
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('send-now ส่ง scheduledAt=null แล้วเรียก /send', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const user = userEvent.setup();
+    render(<BroadcastWizardClient />);
+
+    await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
+    await user.type(screen.getByLabelText('ข้อความประกาศ'), 'ด่วน');
+    await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
+    await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
+
+    await user.click(screen.getByRole('button', { name: 'ส่งเลย' }));
+
+    const create = adminApi.createBroadcast as ReturnType<typeof vi.fn>;
+    const payload = create.mock.calls[0]?.[0] as { scheduledAt: string | null };
+    expect(payload.scheduledAt).toBeNull();
+    const send = adminApi.sendBroadcast as ReturnType<typeof vi.fn>;
+    await waitFor(() => expect(send).toHaveBeenCalledWith('new-1'));
   });
 });

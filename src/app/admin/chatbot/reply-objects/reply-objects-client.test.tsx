@@ -130,7 +130,53 @@ describe('ReplyObjectsClient กริด JSK', () => {
 
   it('ลบแล้ว reload ลิสต์', async () => {
     const user = userEvent.setup();
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    listReplyObjects
+      .mockResolvedValueOnce({ ok: true, data: { items: [item()] } })
+      .mockResolvedValueOnce({ ok: true, data: { items: [] } });
+    deleteReplyObject.mockResolvedValue({ ok: true, data: { ok: true } });
+    render(<ReplyObjectsClient />);
+    await screen.findByText('$$welcome_flex');
+
+    await user.click(screen.getByRole('button', { name: 'ลบ welcome_flex' }));
+    await screen.findByRole('button', { name: 'ลบ' });
+    await user.click(screen.getByRole('button', { name: 'ลบ' }));
+
+    await waitFor(() => expect(deleteReplyObject).toHaveBeenCalledWith('r1'));
+    expect(await screen.findByText('ยังไม่มี reply object')).toBeInTheDocument();
+  });
+
+  it('handleToggleActive คืน error → banner แสดงข้อความเดิม', async () => {
+    const user = userEvent.setup();
+    updateReplyObject.mockResolvedValue({ ok: false, error: 'เซิร์ฟเวอร์ขัดข้อง', status: 500 });
+    render(<ReplyObjectsClient />);
+    await screen.findByText('$$welcome_flex');
+
+    await user.click(screen.getByRole('switch', { name: 'ปิดใช้งาน welcome_flex' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent('เซิร์ฟเวอร์ขัดข้อง');
+    });
+  });
+
+  it('กำลัง load mutation → ปุ่ม toggle/delete disabled', async () => {
+    const user = userEvent.setup();
+    let resolveUpdate!: (v: unknown) => void;
+    updateReplyObject.mockReturnValue(new Promise((res) => { resolveUpdate = res as never; }));
+    render(<ReplyObjectsClient />);
+    await screen.findByText('$$welcome_flex');
+
+    await user.click(screen.getByRole('switch', { name: 'ปิดใช้งาน welcome_flex' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('switch', { name: 'ปิดใช้งาน welcome_flex' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'ลบ welcome_flex' })).toBeDisabled();
+    });
+    resolveUpdate({ ok: true, data: { ok: true } });
+  });
+
+  it('handleDelete → เปิด ConfirmDialog ก่อนเรียกจริง (ไม่ใช้ window.confirm)', async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, 'confirm');
     listReplyObjects
       .mockResolvedValueOnce({ ok: true, data: { items: [item()] } })
       .mockResolvedValueOnce({ ok: true, data: { items: [] } });
@@ -140,8 +186,28 @@ describe('ReplyObjectsClient กริด JSK', () => {
 
     await user.click(screen.getByRole('button', { name: 'ลบ welcome_flex' }));
 
+    expect(await screen.findByText('เทมเพลตนี้จะถูกลบถาวรและเรียกคืนไม่ได้')).toBeInTheDocument();
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(deleteReplyObject).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'ลบ' }));
     await waitFor(() => expect(deleteReplyObject).toHaveBeenCalledWith('r1'));
-    expect(await screen.findByText('ยังไม่มี reply object')).toBeInTheDocument();
     confirmSpy.mockRestore();
+  });
+
+  it('toggle สำเร็จ → มี success banner ไม่ใช่แค่ reload เงียบ', async () => {
+    const user = userEvent.setup();
+    updateReplyObject.mockResolvedValue({ ok: true, data: { ok: true } });
+    listReplyObjects
+      .mockResolvedValueOnce({ ok: true, data: { items: [item()] } })
+      .mockResolvedValueOnce({ ok: true, data: { items: [item({ isActive: false })] } });
+    render(<ReplyObjectsClient />);
+    await screen.findByText('$$welcome_flex');
+
+    await user.click(screen.getByRole('switch', { name: 'ปิดใช้งาน welcome_flex' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent(/เรียบร้อย/);
+    });
   });
 });

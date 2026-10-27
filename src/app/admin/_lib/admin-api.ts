@@ -11,7 +11,7 @@
 import type { RichMenuDisplayMode } from '@/lib/contracts';
 
 export type ApiOk<T> = { ok: true; data: T };
-export type ApiFail = { ok: false; error: string; status: number };
+export type ApiFail = { ok: false; error: string; status: number; code?: 'SESSION_EXPIRED' | 'FORBIDDEN' | 'NETWORK' | 'TIMEOUT' | 'HTTP' };
 export type ApiResult<T> = ApiOk<T> | ApiFail;
 
 export interface OkBody {
@@ -369,32 +369,77 @@ function fallbackError(status: number): string {
   return 'ทำรายการไม่สำเร็จ';
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<ApiResult<T>> {
+// § timeout 15s ทุก request — Safari < 17.4 ไม่มี AbortSignal.timeout (โยน TypeError) → fallback เอง
+const REQUEST_TIMEOUT_MS = 15_000;
+
+function timeoutSignal(external?: AbortSignal): { signal: AbortSignal; cleanup: () => void; timedOut: () => boolean } {
+  const ctrl = new AbortController();
+  let timedOut = false;
+  const timer =
+    typeof AbortSignal.timeout === 'function'
+      ? null
+      : setTimeout(() => {
+          timedOut = true;
+          ctrl.abort(new Error('timeout'));
+        }, REQUEST_TIMEOUT_MS);
+  const onExternalAbort = () => ctrl.abort(external?.reason);
+  external?.addEventListener('abort', onExternalAbort, { once: true });
+  const timeoutSig =
+    typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(REQUEST_TIMEOUT_MS) : null;
+  // § เก็บ listener ไว้ remove ใน cleanup — AbortSignal.timeout() ถูก GC เองได้ก็ต่อเมื่อ
+  // ไม่มี listener ค้างอยู่ ถ้าไม่ remove จะถือ signal มีชีวิตจนครบ 15s ทุก request
+  const onTimeoutAbort = () => {
+    timedOut = true;
+    ctrl.abort(timeoutSig?.reason);
+  };
+  timeoutSig?.addEventListener('abort', onTimeoutAbort);
+  return {
+    signal: ctrl.signal,
+    cleanup: () => {
+      if (timer !== null) clearTimeout(timer);
+      external?.removeEventListener('abort', onExternalAbort);
+      timeoutSig?.removeEventListener('abort', onTimeoutAbort);
+    },
+    timedOut: () => timedOut,
+  };
+}
+
+// § caller abort (unmount/query เปลี่ยน) ต้องไม่ตั้ง error — แยกจาก timeout ด้วย timedOut()
+function isCallerAbort(err: unknown, timedOut: boolean): boolean {
+  return !timedOut && err instanceof DOMException && err.name === 'AbortError';
+}
+
+async function request<T>(path: string, init?: RequestInit & { timeoutMs?: number }): Promise<ApiResult<T>> {
+  const external = init?.signal ?? null;
+  const { signal, cleanup, timedOut } = timeoutSignal(external ?? undefined);
   let res: Response;
   try {
-    res = await fetch(path, init);
-  } catch {
-    return { ok: false, error: 'เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ', status: 0 };
+    res = await fetch(path, { ...init, signal });
+  } catch (err) {
+    cleanup();
+    if (isCallerAbort(err, timedOut())) throw err;
+    if (timedOut()) return { ok: false, error: 'หมดเวลาเชื่อมต่อ กรุณาลองใหม่', status: 0, code: 'TIMEOUT' };
+    return { ok: false, error: 'เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ', status: 0, code: 'NETWORK' };
   }
+  cleanup();
   const body: unknown = await res.json().catch(() => null);
   if (!res.ok) {
     const envelope = (body as { error?: unknown } | null)?.error;
-    return {
-      ok: false,
-      error:
-        typeof envelope === 'string' && envelope.length > 0 ? envelope : fallbackError(res.status),
-      status: res.status,
-    };
+    const msg =
+      typeof envelope === 'string' && envelope.length > 0 ? envelope : fallbackError(res.status);
+    if (res.status === 401) return { ok: false, error: 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่', status: 401, code: 'SESSION_EXPIRED' };
+    if (res.status === 403) return { ok: false, error: 'ไม่มีสิทธิ์ทำรายการนี้', status: 403, code: 'FORBIDDEN' };
+    return { ok: false, error: msg, status: res.status, code: 'HTTP' };
   }
   return { ok: true, data: body as T };
 }
 
 export const adminApi = {
   // ── FAQ / ตอบอัตโนมัติ ──
-  listFaq: (query = ''): Promise<ApiResult<FaqPage>> => {
+  listFaq: (query = '', opts?: { signal?: AbortSignal }): Promise<ApiResult<FaqPage>> => {
     const params = new URLSearchParams({ limit: '50' });
     if (query) params.set('q', query);
-    return request<FaqPage>(`/api/line/admin/faq?${params}`);
+    return request<FaqPage>(`/api/line/admin/faq?${params}`, opts);
   },
   createFaq: (payload: FaqPayload): Promise<ApiResult<OkBody>> =>
     request<OkBody>('/api/line/admin/faq', withBody('POST', payload)),
@@ -404,10 +449,10 @@ export const adminApi = {
     request<OkBody>(`/api/line/admin/faq/${id}`, { method: 'DELETE' }),
 
   // ── Intents / หมวดหมู่เจตนา ──
-  listIntents: (): Promise<ApiResult<ListOf<IntentItem>>> =>
-    request<ListOf<IntentItem>>('/api/line/admin/intents'),
-  getIntent: (id: string): Promise<ApiResult<IntentItem>> =>
-    request<IntentItem>(`/api/line/admin/intents/${id}`),
+  listIntents: (query = '', opts?: { signal?: AbortSignal }): Promise<ApiResult<ListOf<IntentItem>>> =>
+    request<ListOf<IntentItem>>('/api/line/admin/intents', opts),
+  getIntent: (id: string, opts?: { signal?: AbortSignal }): Promise<ApiResult<IntentItem>> =>
+    request<IntentItem>(`/api/line/admin/intents/${id}`, opts),
   createIntent: (payload: IntentPayload): Promise<ApiResult<OkBody & { id?: string }>> =>
     request<OkBody & { id?: string }>('/api/line/admin/intents', withBody('POST', payload)),
   updateIntent: (id: string, payload: IntentPatch): Promise<ApiResult<OkBody>> =>
@@ -416,8 +461,8 @@ export const adminApi = {
     request<OkBody>(`/api/line/admin/intents/${id}`, { method: 'DELETE' }),
 
   // ── Reply objects ──
-  listReplyObjects: (): Promise<ApiResult<ListOf<ReplyObject>>> =>
-    request<ListOf<ReplyObject>>('/api/line/admin/reply-objects'),
+  listReplyObjects: (query = '', opts?: { signal?: AbortSignal }): Promise<ApiResult<ListOf<ReplyObject>>> =>
+    request<ListOf<ReplyObject>>('/api/line/admin/reply-objects', opts),
   createReplyObject: (payload: ReplyObjectInput): Promise<ApiResult<OkBody>> =>
     request<OkBody>('/api/line/admin/reply-objects', withBody('POST', payload)),
   updateReplyObject: (id: string, payload: ReplyObjectPatch): Promise<ApiResult<OkBody>> =>
@@ -426,8 +471,8 @@ export const adminApi = {
     request<OkBody>(`/api/line/admin/reply-objects/${id}`, { method: 'DELETE' }),
 
   // ── Rich menus ──
-  listRichMenus: (): Promise<ApiResult<ListOf<RichMenuItem>>> =>
-    request<ListOf<RichMenuItem>>('/api/line/admin/rich-menus'),
+  listRichMenus: (query = '', opts?: { signal?: AbortSignal }): Promise<ApiResult<ListOf<RichMenuItem>>> =>
+    request<ListOf<RichMenuItem>>('/api/line/admin/rich-menus', opts),
   getRichMenu: (id: string): Promise<ApiResult<RichMenuItemDetail>> =>
     request<RichMenuItemDetail>(`/api/line/admin/rich-menus/${id}`),
   createRichMenu: (payload: RichMenuInput): Promise<ApiResult<OkBody & { id?: string }>> =>
@@ -456,8 +501,8 @@ export const adminApi = {
     request<OkBody>(`/api/line/admin/rich-menus/${id}/sync`, { method: 'POST' }),
   publishRichMenu: (id: string): Promise<ApiResult<OkBody>> =>
     request<OkBody>(`/api/line/admin/rich-menus/${id}/publish`, { method: 'POST' }),
-  listMenuAliases: (): Promise<ApiResult<ListOf<RichMenuAliasItem>>> =>
-    request<ListOf<RichMenuAliasItem>>('/api/line/admin/rich-menus/aliases'),
+  listMenuAliases: (query = '', opts?: { signal?: AbortSignal }): Promise<ApiResult<ListOf<RichMenuAliasItem>>> =>
+    request<ListOf<RichMenuAliasItem>>('/api/line/admin/rich-menus/aliases', opts),
   createMenuAlias: (aliasId: string, menuId: string): Promise<ApiResult<OkBody>> =>
     request<OkBody>('/api/line/admin/rich-menus/aliases', withBody('POST', { aliasId, menuId })),
   repointMenuAlias: (aliasId: string, menuId: string): Promise<ApiResult<OkBody>> =>
@@ -471,13 +516,14 @@ export const adminApi = {
   },
 
   // ── Friends ──
-  listFriends: (query: string): Promise<ApiResult<FriendsPage>> =>
-    request<FriendsPage>(`/api/line/admin/friends?${query}`),
-  getFriend: (id: string): Promise<ApiResult<FriendItem>> =>
-    request<FriendItem>(`/api/line/admin/friends/${id}`),
-  listFriendEvents: (friendId?: string): Promise<ApiResult<ListOf<FriendEventItem>>> =>
+  listFriends: (query: string, opts?: { signal?: AbortSignal }): Promise<ApiResult<FriendsPage>> =>
+    request<FriendsPage>(`/api/line/admin/friends?${query}`, opts),
+  getFriend: (id: string, opts?: { signal?: AbortSignal }): Promise<ApiResult<FriendItem>> =>
+    request<FriendItem>(`/api/line/admin/friends/${id}`, opts),
+  listFriendEvents: (friendId?: string, opts?: { signal?: AbortSignal }): Promise<ApiResult<ListOf<FriendEventItem>>> =>
     request<ListOf<FriendEventItem>>(
       `/api/line/admin/friend-events${friendId ? `?friendId=${encodeURIComponent(friendId)}` : ''}`,
+      opts,
     ),
   assignUserRichMenu: (friendId: string, richMenuId: string): Promise<ApiResult<OkBody>> =>
     request<OkBody>(`/api/line/admin/friends/${friendId}/rich-menu`, withBody('POST', { richMenuId })),
@@ -485,10 +531,10 @@ export const adminApi = {
     request<OkBody>(`/api/line/admin/friends/${friendId}/rich-menu`, { method: 'DELETE' }),
 
   // ── Broadcasts ──
-  listBroadcasts: (query?: string): Promise<ApiResult<BroadcastPage>> =>
-    request<BroadcastPage>(`/api/line/admin/broadcasts${query ? `?${query}` : ''}`),
-  getBroadcast: (id: string): Promise<ApiResult<BroadcastItem>> =>
-    request<BroadcastItem>(`/api/line/admin/broadcasts/${id}`),
+  listBroadcasts: (query = '', opts?: { signal?: AbortSignal }): Promise<ApiResult<BroadcastPage>> =>
+    request<BroadcastPage>(`/api/line/admin/broadcasts${query ? `?${query}` : ''}`, opts),
+  getBroadcast: (id: string, opts?: { signal?: AbortSignal }): Promise<ApiResult<BroadcastItem>> =>
+    request<BroadcastItem>(`/api/line/admin/broadcasts/${id}`, opts),
   createBroadcast: (payload: BroadcastInput): Promise<ApiResult<OkBody & { id?: string }>> =>
     request<OkBody & { id?: string }>('/api/line/admin/broadcasts', withBody('POST', payload)),
   sendBroadcast: (id: string): Promise<ApiResult<OkBody>> =>
@@ -502,7 +548,7 @@ export const adminApi = {
     request<{ estimatedRecipients: number }>('/api/line/admin/broadcasts/dry-run', withBody('POST', { target })),
 
   // ── Media ──
-  listMedia: (): Promise<ApiResult<MediaPage>> => request<MediaPage>('/api/line/admin/media'),
+  listMedia: (query = '', opts?: { signal?: AbortSignal }): Promise<ApiResult<MediaPage>> => request<MediaPage>('/api/line/admin/media', opts),
   uploadMedia: (file: File, category = 'general'): Promise<ApiResult<UploadResult>> => {
     const form = new FormData();
     form.append('file', file);
@@ -513,21 +559,21 @@ export const adminApi = {
     request<OkBody>(`/api/line/admin/media/${id}`, { method: 'DELETE' }),
 
   // ── health / settings / stats ──
-  getHealth: (): Promise<ApiResult<HealthData>> => request<HealthData>('/api/line/admin/health'),
-  getSettings: (): Promise<ApiResult<SettingsData>> =>
-    request<SettingsData>('/api/line/admin/settings'),
+  getHealth: (query = '', opts?: { signal?: AbortSignal }): Promise<ApiResult<HealthData>> => request<HealthData>('/api/line/admin/health', opts),
+  getSettings: (query = '', opts?: { signal?: AbortSignal }): Promise<ApiResult<SettingsData>> =>
+    request<SettingsData>('/api/line/admin/settings', opts),
   saveSettings: (payload: SettingsInput): Promise<ApiResult<OkBody>> =>
     request<OkBody>('/api/line/admin/settings', withBody('PUT', payload)),
-  getLineQuota: (): Promise<ApiResult<LineQuotaData>> =>
-    request<LineQuotaData>('/api/line/admin/quota'),
+  getLineQuota: (query = '', opts?: { signal?: AbortSignal }): Promise<ApiResult<LineQuotaData>> =>
+    request<LineQuotaData>('/api/line/admin/quota', opts),
   refreshLineQuota: (): Promise<ApiResult<LineQuotaData>> =>
     request<LineQuotaData>('/api/line/admin/quota?refresh=1'),
-  getSystemSettings: (): Promise<ApiResult<SystemSettingsData>> =>
-    request<SystemSettingsData>('/api/admin/system-settings'),
+  getSystemSettings: (query = '', opts?: { signal?: AbortSignal }): Promise<ApiResult<SystemSettingsData>> =>
+    request<SystemSettingsData>('/api/admin/system-settings', opts),
   saveSystemSettings: (payload: SystemSettingsInput): Promise<ApiResult<OkBody>> =>
     request<OkBody>('/api/admin/system-settings', withBody('PUT', payload)),
-  listApiConnections: (): Promise<ApiResult<ListOf<ApiConnectionItem>>> =>
-    request<ListOf<ApiConnectionItem>>('/api/admin/api-connections'),
+  listApiConnections: (query = '', opts?: { signal?: AbortSignal }): Promise<ApiResult<ListOf<ApiConnectionItem>>> =>
+    request<ListOf<ApiConnectionItem>>('/api/admin/api-connections', opts),
   refreshApiConnection: (provider: string): Promise<ApiResult<OkBody>> =>
     request<OkBody>('/api/admin/api-connections', withBody('POST', { provider })),
   getChatbotStats: (): Promise<ApiResult<ChatbotStats>> =>

@@ -116,7 +116,10 @@ export function ReplyObjectForm({
         payload: JSON.stringify(stripEditorKeys(parsed)),
       });
       if (!ok) setSaving(false);
-    } catch {
+    } catch (err) {
+      // § ห้ามกลืน exception — แสดงให้ผู้ใช้เห็นแทน return เงียบ
+      console.error('[reply-object-form] onSave threw', err);
+      setError(err instanceof Error ? err.message : 'บันทึกไม่สำเร็จ กรุณาลองใหม่');
       setSaving(false);
     }
   };
@@ -243,7 +246,7 @@ export function ReplyObjectForm({
 
       <div className="flex gap-3 pt-2">
         <Button type="submit" size="sm" disabled={saving}>
-          {submitLabel}
+          {saving ? 'กำลังบันทึก…' : submitLabel}
         </Button>
         <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
           ยกเลิก

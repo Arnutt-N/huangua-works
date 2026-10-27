@@ -108,7 +108,7 @@ export function BroadcastWizardClient() {
     return { content: [{ type: 'flex', altText, contents }], error: null };
   }
 
-  async function handleCreate(opts?: { sendNow?: boolean }) {
+  async function handleCreate(mode: 'draft' | 'schedule' | 'send-now') {
     if (targetKind === 'specific' && selectedIds.length === 0) {
       setError('กรุณาเลือกผู้รับอย่างน้อย 1 คน');
       return;
@@ -118,10 +118,21 @@ export function BroadcastWizardClient() {
       setError(contentError);
       return;
     }
+    if (mode === 'send-now') {
+      const ok = window.confirm('ส่งทันที — จะยกเลิกเวลาที่ตั้งไว้ (ถ้ามี) แล้วส่งเลย ต้องการดำเนินการต่อหรือไม่?');
+      if (!ok) return;
+    }
     // § datetime-local เป็นเวลาท้องถิ่น — ตั้งอดีตผ่านจะค้าง scheduled ไม่ส่ง (cron ยิง <= NOW)
-    if (scheduleAt && new Date(scheduleAt).getTime() <= Date.now()) {
-      setError('เวลาส่งต้องเป็นอนาคต — เลือกเวลาใหม่หรือเว้นว่างเพื่อสร้างเป็นร่าง');
-      return;
+    // past-time guard ใช้เฉพาะ mode 'schedule' — draft/send-now ส่ง scheduledAt: null อยู่แล้ว
+    if (mode === 'schedule') {
+      if (!scheduleAt) {
+        setError('กรุณาเลือกวันเวลา — หรือกด "บันทึกแบบร่าง" ถ้ายังไม่ต้องการตั้งเวลา');
+        return;
+      }
+      if (new Date(scheduleAt).getTime() <= Date.now()) {
+        setError('เวลาส่งต้องเป็นอนาคต — เลือกเวลาใหม่หรือเว้นว่างเพื่อสร้างเป็นร่าง');
+        return;
+      }
     }
     setSaving(true);
     setError(null);
@@ -129,9 +140,9 @@ export function BroadcastWizardClient() {
       title: title.trim() || null,
       content,
       target: currentTarget(),
-      scheduledAt: scheduleAt ? new Date(scheduleAt).toISOString() : null,
+      scheduledAt: mode === 'schedule' ? new Date(scheduleAt).toISOString() : null,
     });
-    if (res.ok && opts?.sendNow && res.data.id) {
+    if (res.ok && mode === 'send-now' && res.data.id) {
       const sent = await adminApi.sendBroadcast(res.data.id);
       if (!sent.ok) {
         setSaving(false);
@@ -445,10 +456,13 @@ export function BroadcastWizardClient() {
           </Button>
         ) : (
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" onClick={() => void handleCreate()} disabled={saving}>
+            <Button type="button" variant="outline" onClick={() => void handleCreate('draft')} disabled={saving}>
               {saving ? 'กำลังบันทึก...' : 'บันทึกแบบร่าง'}
             </Button>
-            <Button type="button" onClick={() => void handleCreate({ sendNow: true })} disabled={saving} className="gap-1.5">
+            <Button type="button" variant="outline" onClick={() => void handleCreate('schedule')} disabled={saving}>
+              {saving ? 'กำลังบันทึก...' : 'ตั้งเวลาและบันทึก'}
+            </Button>
+            <Button type="button" onClick={() => void handleCreate('send-now')} disabled={saving} className="gap-1.5">
               <Send className="h-4 w-4" />
               {saving ? 'กำลังส่ง...' : 'ส่งเลย'}
             </Button>

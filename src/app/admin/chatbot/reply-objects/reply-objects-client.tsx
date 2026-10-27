@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/admin/empty-state';
 import { PageHeader } from '@/components/admin/page-header';
 import { DetailModal } from '@/components/admin/detail-modal';
+import { AdminErrorState } from '@/components/admin/admin-error-state';
+import { ConfirmDialog } from '@/components/admin/confirm-dialog';
 import {
   Dialog,
   DialogContent,
@@ -23,11 +25,13 @@ import {
 } from './_components/reply-object-form';
 
 export function ReplyObjectsClient() {
-  const { data, loading, notify, reload } = useResource({ load: adminApi.listReplyObjects });
+  const { data, loading, feedback, error, errorCode, notify, reload } = useResource({ load: adminApi.listReplyObjects });
   const items = data?.items ?? null;
 
   const [editing, setEditing] = useState<ReplyObject | null>(null);
   const [viewObj, setViewObj] = useState<ReplyObject | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ReplyObject | null>(null);
+  const [pendingId, setPendingId] = useState<string | null>(null);
 
   async function handleEditSave(form: ReplyObjectFormData): Promise<boolean> {
     if (!editing) return false;
@@ -56,27 +60,41 @@ export function ReplyObjectsClient() {
   }
 
   async function handleToggleActive(item: ReplyObject) {
-    const res = await adminApi.updateReplyObject(item.id, {
-      objectType: item.objectType,
-      payload: item.payload,
-      altText: item.altText,
-      isActive: !item.isActive,
-    });
-    if (!res.ok) {
-      notify('error', res.error);
-      return;
+    if (pendingId !== null) return;
+    setPendingId(item.id);
+    try {
+      const res = await adminApi.updateReplyObject(item.id, {
+        objectType: item.objectType,
+        payload: item.payload,
+        altText: item.altText,
+        isActive: !item.isActive,
+      });
+      if (!res.ok) {
+        notify('error', res.error);
+        return;
+      }
+      notify('success', `อัปเดต ${item.objectId} เรียบร้อย`);
+      await reload();
+    } finally {
+      setPendingId(null);
     }
-    await reload();
   }
 
   async function handleDelete(item: ReplyObject) {
-    if (!confirm(`ลบ "$${item.objectId}" ?`)) return;
-    const res = await adminApi.deleteReplyObject(item.id);
-    if (!res.ok) {
-      notify('error', res.error);
-      return;
+    if (pendingId !== null) return;
+    setPendingId(item.id);
+    try {
+      const res = await adminApi.deleteReplyObject(item.id);
+      if (!res.ok) {
+        notify('error', res.error);
+        return;
+      }
+      notify('success', `ลบ ${item.objectId} เรียบร้อย`);
+      setDeleteTarget(null);
+      await reload();
+    } finally {
+      setPendingId(null);
     }
-    await reload();
   }
 
   const editInitial: ReplyObjectFormData | null = editing
@@ -92,6 +110,12 @@ export function ReplyObjectsClient() {
 
   return (
     <div className="space-y-6">
+      {feedback && (
+        <div role="status" className={`rounded-lg px-4 py-3 text-sm font-medium ${feedback.type === 'success' ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}>
+          {feedback.msg}
+        </div>
+      )}
+
       <PageHeader title="Reply Objects" subtitle="Manage reusable message templates">
         <Link href="/admin/chatbot/reply-objects/new">
           <Button size="sm" className="gap-1.5">
@@ -111,6 +135,8 @@ export function ReplyObjectsClient() {
             </div>
           ))}
         </div>
+      ) : data === null && error ? (
+        <AdminErrorState error={error} errorCode={errorCode} onRetry={() => void reload()} />
       ) : data === null ? (
         <p role="status" className="py-10 text-center text-sm text-danger">โหลดข้อมูลไม่สำเร็จ</p>
       ) : data.items.length === 0 ? (
@@ -169,6 +195,7 @@ export function ReplyObjectsClient() {
                   aria-checked={item.isActive}
                   aria-label={`${item.isActive ? 'ปิด' : 'เปิด'}ใช้งาน ${item.objectId}`}
                   onClick={() => void handleToggleActive(item)}
+                  disabled={pendingId !== null}
                   className={`relative inline-flex h-5 w-9 flex-none items-center rounded-pill transition-colors duration-normal ${
                     item.isActive ? 'bg-accent-strong' : 'bg-surface-sunken'
                   }`}
@@ -182,7 +209,8 @@ export function ReplyObjectsClient() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => void handleDelete(item)}
+                  onClick={() => setDeleteTarget(item)}
+                  disabled={pendingId !== null}
                   aria-label={`ลบ ${item.objectId}`}
                   className="inline-flex min-h-touch min-w-touch items-center justify-center rounded-md text-danger hover:bg-danger-soft"
                 >
@@ -195,7 +223,7 @@ export function ReplyObjectsClient() {
       )}
 
       <Dialog open={editing !== null} onOpenChange={(o) => (!o ? setEditing(null) : undefined)}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
+        <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Edit Object</DialogTitle>
           </DialogHeader>
@@ -259,6 +287,21 @@ export function ReplyObjectsClient() {
               ]
             : undefined
         }
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onClose={() => {
+          if (pendingId === null) setDeleteTarget(null);
+        }}
+        onConfirm={() => {
+          if (deleteTarget) void handleDelete(deleteTarget);
+        }}
+        title={`ลบ $${deleteTarget?.objectId ?? ''}`}
+        description={`เทมเพลตนี้จะถูกลบถาวรและเรียกคืนไม่ได้`}
+        confirmText="ลบ"
+        danger
+        busy={pendingId !== null}
       />
     </div>
   );

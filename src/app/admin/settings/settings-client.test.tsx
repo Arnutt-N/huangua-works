@@ -34,26 +34,26 @@ describe('SettingsClient initial error', () => {
     vi.mocked(adminApi.getSettings).mockResolvedValue({
       ok: false,
       error: 'Unauthorized',
-      status: 401,
+      status: 401, code: 'SESSION_EXPIRED',
     });
     // § ส่วนกลางกับ connections ล้มด้วย หน้าแรกต้องยังไม่มี input ใดโผล่มา
     vi.mocked(adminApi.getSystemSettings).mockResolvedValue({
       ok: false,
       error: 'Unauthorized',
-      status: 401,
+      status: 401, code: 'SESSION_EXPIRED',
     });
     vi.mocked(adminApi.listApiConnections).mockResolvedValue({
       ok: false,
       error: 'Unauthorized',
-      status: 401,
+      status: 401, code: 'SESSION_EXPIRED',
     });
     vi.mocked(adminApi.getLineQuota).mockResolvedValue({
       ok: false,
       error: 'Unauthorized',
-      status: 401,
+      status: 401, code: 'SESSION_EXPIRED',
     });
     const { container } = render(<SettingsClient />);
-    expect(await screen.findByRole('status')).toHaveTextContent('Unauthorized');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Unauthorized');
     expect(container.querySelector('form, input, textarea')).toBeNull();
   });
 

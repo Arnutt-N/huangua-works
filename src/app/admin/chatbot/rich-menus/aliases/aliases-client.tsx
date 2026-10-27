@@ -7,6 +7,7 @@ import { adminApi } from '@/app/admin/_lib/admin-api';
 import { isValidAliasId } from '@/lib/contracts';
 import { isSyncedMenu } from '../rich-menu-state';
 import { useResource } from '@/app/admin/_lib/use-resource';
+import { AdminErrorState } from '@/components/admin/admin-error-state';
 import { PageHeader } from '@/components/admin/page-header';
 import { ConfirmDialog } from '@/components/admin/confirm-dialog';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,8 @@ export function RichMenuAliasesClient() {
 
   const menusRes = useResource({ load: adminApi.listRichMenus });
   const aliasesRes = useResource({ load: adminApi.listMenuAliases });
+  const aliasesError = aliasesRes.error ?? menusRes.error;
+  const aliasesErrorCode = aliasesRes.errorCode ?? menusRes.errorCode;
   const items = menusRes.data?.items ?? [];
   const aliases = aliasesRes.data?.items ?? [];
   const loading = menusRes.loading || aliasesRes.loading;
@@ -143,6 +146,8 @@ export function RichMenuAliasesClient() {
 
       {loading ? (
         <p className="py-6 text-center text-sm text-muted">กำลังโหลดข้อมูล...</p>
+      ) : aliasesError && (aliasesRes.data === null || menusRes.data === null) ? (
+        <AdminErrorState error={aliasesError} errorCode={aliasesErrorCode} onRetry={() => { void aliasesRes.reload(); void menusRes.reload(); }} />
       ) : aliases.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-12 text-center">
           <p className="text-sm text-muted">ยังไม่มี alias ในระบบ</p>

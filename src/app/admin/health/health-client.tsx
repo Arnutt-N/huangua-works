@@ -2,12 +2,13 @@
 
 import { HeartPulse, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
+import { AdminErrorState } from '@/components/admin/admin-error-state';
 import { Button } from '@/components/ui/button';
 import { adminApi } from '@/app/admin/_lib/admin-api';
 import { useResource } from '@/app/admin/_lib/use-resource';
 
 export function HealthClient() {
-  const { data, loading, feedback, reload } = useResource({
+  const { data, loading, error, errorCode, feedback, reload } = useResource({
     load: adminApi.getHealth,
     intervalMs: 30_000,
     loadingOnReload: false, // คงพฤติกรรมเดิม: refresh ไม่ปิดข้อมูลระหว่างโหลด
@@ -16,7 +17,7 @@ export function HealthClient() {
   if (loading) return <div className="py-12 text-center text-muted">กำลังตรวจสอบ...</div>;
   // § ห้าม return ก่อน banner — reload ล้มขณะมี data เดิมต้องเห็นข้อความจาก server ด้วย
   // health route คืน 401/403 `{ error: 'Unauthorized'|'Forbidden' }` เท่านั้น ไม่มี envelope อื่น
-  const errorMsg = feedback?.type === 'error' ? feedback.msg : null;
+  const errorMsg = error ?? (feedback?.type === 'error' ? feedback.msg : null);
 
   return (
     <AdminCard>
@@ -35,9 +36,12 @@ export function HealthClient() {
         )}
       </AdminCardTitle>
 
-      {errorMsg && <p className="text-sm text-danger">{errorMsg}</p>}
+      {/* § แสดง error ครั้งเดียว — มี card เมื่อไม่มี data, มี p เมื่อยังมี data เดิมอยู่ (reload ล้ม) */}
+      {data && errorMsg && <p className="text-sm text-danger">{errorMsg}</p>}
 
-      {!data ? (
+      {!data && error ? (
+        <AdminErrorState error={error} errorCode={errorCode} onRetry={() => void reload()} />
+      ) : !data ? (
         <p className="text-sm text-danger">โหลดสถานะไม่สำเร็จ</p>
       ) : (
         <div className="space-y-3">

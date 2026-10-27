@@ -41,9 +41,15 @@ export async function updateQueueBooking(
   const { id, status, adminNote } = v.data;
 
   const db = await getDb();
-  const booking = await firstOrUndefined(
-    db.select().from(queueBookings).where(eq(queueBookings.id, id)).limit(1),
-  );
+  let booking;
+  try {
+    booking = await firstOrUndefined(
+      db.select().from(queueBookings).where(eq(queueBookings.id, id)).limit(1),
+    );
+  } catch (err) {
+    console.error('[queue] read failed', err);
+    return { error: 'โหลดข้อมูลไม่สำเร็จ กรุณาลองใหม่' };
+  }
   if (!booking) return { error: 'ไม่พบคิวที่ระบุ' };
 
   const from = booking.status as QueueBookingStatus;
@@ -53,23 +59,27 @@ export async function updateQueueBooking(
     };
   }
 
-  await db
-    .update(queueBookings)
-    .set({ status, adminNote: adminNote || null, updatedAt: new Date() })
-    .where(eq(queueBookings.id, id));
+  try {
+    await db
+      .update(queueBookings)
+      .set({ status, adminNote: adminNote || null, updatedAt: new Date() })
+      .where(eq(queueBookings.id, id));
 
-  await logAudit(
-    {
-      userId: auth.user.id,
-      action: AUDIT_ACTIONS.QUEUE_BOOKING_UPDATE,
-      resource: 'queue_bookings',
-      resourceId: id,
-      ipAddress: auth.ipAddress,
-      userAgent: auth.userAgent,
-      metadata: { from, to: status },
-    },
-    db,
-  );
+    await logAudit(
+      {
+        userId: auth.user.id,
+        action: AUDIT_ACTIONS.QUEUE_BOOKING_UPDATE,
+        resource: 'queue_bookings',
+        resourceId: id,
+        ipAddress: auth.ipAddress,
+        userAgent: auth.userAgent,
+        metadata: { from, to: status },
+      },
+      db,
+    );
+  } catch {
+    return { error: 'บันทึกข้อมูลไม่สำเร็จ กรุณาลองใหม่', success: undefined };
+  }
 
   revalidatePath('/admin/queue');
   return { error: null, success: `อัปเดตคิวเป็น “${QUEUE_BOOKING_STATUS_LABELS[status]}” แล้ว` };

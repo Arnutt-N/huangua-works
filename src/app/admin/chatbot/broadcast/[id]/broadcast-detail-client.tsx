@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import { Button } from '@/components/ui/button';
+import { AdminErrorState } from '@/components/admin/admin-error-state';
 import {
   Dialog,
   DialogContent,
@@ -118,8 +119,8 @@ export function BroadcastDetailClient({ broadcastId }: { broadcastId: string }) 
   const [sending, setSending] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
-  const { data, loading, feedback, mutate, notify } = useResource({
-    load: () => adminApi.getBroadcast(broadcastId),
+  const { data, loading, feedback, error, errorCode, errorStatus, mutate, notify, reload } = useResource({
+    load: (_q, opts) => adminApi.getBroadcast(broadcastId, opts),
   });
   const item = data ?? null;
 
@@ -142,10 +143,11 @@ export function BroadcastDetailClient({ broadcastId }: { broadcastId: string }) 
       return;
     }
     notify('success', 'ยกเลิกประกาศแล้ว');
-    await mutate(() => adminApi.getBroadcast(broadcastId), '');
+    await reload();
   }
 
   if (loading) return <div className="py-12 text-center text-muted">กำลังโหลด...</div>;
+  if (!item && error && errorStatus !== 404) return <AdminErrorState error={error} errorCode={errorCode} onRetry={() => void reload()} />;
   if (!item) return <div className="py-12 text-center text-muted">ไม่พบข้อมูล broadcast</div>;
 
   const st = STATUS[item.status] ?? STATUS.draft!;

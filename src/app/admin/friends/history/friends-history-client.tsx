@@ -2,6 +2,7 @@
 
 import { UserPlus, UserMinus } from 'lucide-react';
 import { AdminCard } from '@/components/admin/admin-card';
+import { AdminErrorState } from '@/components/admin/admin-error-state';
 import { PageHeader } from '@/components/admin/page-header';
 import { EmptyState } from '@/components/admin/empty-state';
 import { useResource } from '@/app/admin/_lib/use-resource';
@@ -19,7 +20,7 @@ function nameOf(e: FriendEventItem): string {
 
 /** § lineFriendEvents มีแค่ follow/unfollow — LINE ไม่ส่ง block event เข้า webhook ของเรา */
 export function FriendsHistoryClient() {
-  const { data, loading } = useResource({ load: adminApi.listFriendEvents });
+  const { data, loading, error, errorCode, reload } = useResource({ load: adminApi.listFriendEvents });
   const items = data?.items ?? [];
 
   return (
@@ -30,6 +31,8 @@ export function FriendsHistoryClient() {
         <h2 className="mb-4 text-base font-bold text-ink">เหตุการณ์ล่าสุด</h2>
         {loading ? (
           <p className="py-12 text-center text-sm text-muted">กำลังโหลด...</p>
+        ) : data === null && error ? (
+          <AdminErrorState error={error} errorCode={errorCode} onRetry={() => void reload()} />
         ) : items.length === 0 ? (
           <EmptyState
             icon={UserPlus}

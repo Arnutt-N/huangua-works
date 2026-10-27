@@ -9,6 +9,7 @@ import { readinessOf } from '../readiness';
 import { useResource } from '@/app/admin/_lib/use-resource';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import { Button } from '@/components/ui/button';
+import { AdminErrorState } from '@/components/admin/admin-error-state';
 
 const MATCH_LABELS: Record<IntentMatchType, string> = {
   exact: 'ตรงทั้งหมด',
@@ -18,8 +19,8 @@ const MATCH_LABELS: Record<IntentMatchType, string> = {
 };
 
 export function IntentDetailClient({ intentId }: { intentId: string }) {
-  const { data: item, loading, feedback, notify, reload } = useResource({
-    load: () => adminApi.getIntent(intentId),
+  const { data: item, loading, feedback, error, errorCode, errorStatus, notify, reload } = useResource({
+    load: (_q, opts) => adminApi.getIntent(intentId, opts),
   });
 
   const [activeTab, setActiveTab] = useState<'keywords' | 'responses'>('keywords');
@@ -29,16 +30,22 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
   const [newMatchType, setNewMatchType] = useState<IntentMatchType>('contains');
   const [newReplyType, setNewReplyType] = useState<'text' | 'reply_object'>('text');
   const [newResponseText, setNewResponseText] = useState('');
+  const [mutating, setMutating] = useState(false);
 
   async function handleToggle() {
-    if (!item) return;
-    const res = await adminApi.updateIntent(item.id, { isActive: !item.isActive });
-    if (!res.ok) {
-      notify('error', res.error);
-      return;
+    if (!item || mutating) return;
+    setMutating(true);
+    try {
+      const res = await adminApi.updateIntent(item.id, { isActive: !item.isActive });
+      if (!res.ok) {
+        notify('error', res.error);
+        return;
+      }
+      notify('success', item.isActive ? 'ปิดหมวดแล้ว' : 'เปิดหมวดแล้ว');
+      await reload();
+    } finally {
+      setMutating(false);
     }
-    notify('success', item.isActive ? 'ปิดหมวดแล้ว' : 'เปิดหมวดแล้ว');
-    await reload();
   }
 
   async function handleDeleteKeyword(keywordId: string) {
@@ -158,6 +165,7 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
   }
 
   if (loading) return <div className="py-12 text-center text-muted">กำลังโหลด...</div>;
+  if (!item && error && errorStatus !== 404) return <AdminErrorState error={error} errorCode={errorCode} onRetry={() => void reload()} />;
   if (!item) return <div className="py-12 text-center text-muted">ไม่พบหมวดนี้</div>;
 
   const { ready, reason } = readinessOf(item);
@@ -180,6 +188,7 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
             <button
               type="button"
               onClick={handleToggle}
+              disabled={mutating}
               aria-label={`${item.isActive ? 'ปิด' : 'เปิด'} ${item.name}`}
               aria-pressed={item.isActive}
               className="min-h-touch rounded-full px-3 text-xs font-semibold hover:bg-accent/10"

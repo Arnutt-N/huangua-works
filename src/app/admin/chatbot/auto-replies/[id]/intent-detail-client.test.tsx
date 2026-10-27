@@ -75,7 +75,7 @@ describe('IntentDetailClient', () => {
   });
 
   it('ไม่มีหมวดแสดงข้อความไทย', async () => {
-    getIntent.mockResolvedValue({ ok: false, error: 'ไม่พบหมวดนี้', status: 404 });
+    getIntent.mockResolvedValue({ ok: false, error: 'ไม่พบหมวดนี้', status: 404, code: 'HTTP' });
     render(<IntentDetailClient intentId="nope" />);
     expect(await screen.findByText('ไม่พบหมวดนี้')).toBeInTheDocument();
   });

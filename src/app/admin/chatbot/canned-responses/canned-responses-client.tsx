@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { DetailModal } from '@/components/admin/detail-modal';
+import { AdminErrorState } from '@/components/admin/admin-error-state';
 import { PageHeader } from '@/components/admin/page-header';
 import { FieldError, Input, Label, Textarea } from '@/components/ui/field';
 import { useResource } from '@/app/admin/_lib/use-resource';
@@ -40,9 +41,9 @@ function categoryLabel(value: string | undefined): string {
 }
 
 export function CannedResponsesClient() {
-  const { data, loading, notify, reload } = useResource({
-    load: async () => {
-      const rows = await fetchCannedResponses(true);
+  const { data, loading, error, errorCode, notify, reload } = useResource({
+    load: async (_q, opts) => {
+      const rows = await fetchCannedResponses(true, opts?.signal);
       return rows
         ? { ok: true as const, data: { items: rows } }
         : { ok: false as const, error: 'โหลดข้อมูลไม่สำเร็จ', status: 0 };
@@ -55,7 +56,7 @@ export function CannedResponsesClient() {
   const [shortcut, setShortcut] = useState('');
   const [content, setContent] = useState('');
   const [category, setCategory] = useState<string>('info');
-  const [error, setError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [viewRow, setViewRow] = useState<CannedResponse | null>(null);
 
@@ -65,7 +66,7 @@ export function CannedResponsesClient() {
     setShortcut('');
     setContent('');
     setCategory('info');
-    setError(null);
+    setFormError(null);
     setFormOpen(true);
   };
 
@@ -75,14 +76,14 @@ export function CannedResponsesClient() {
     setShortcut(item.shortcut ?? '');
     setContent(item.content);
     setCategory(item.category ?? 'info');
-    setError(null);
+    setFormError(null);
     setFormOpen(true);
   };
 
   const handleSave = async () => {
     if (!title.trim() || !shortcut.trim() || !content.trim() || busy) return;
     setBusy(true);
-    setError(null);
+    setFormError(null);
     const body = {
       title: title.trim(),
       shortcut: shortcut.trim(),
@@ -94,7 +95,7 @@ export function CannedResponsesClient() {
       : await createCannedResponse(body);
     setBusy(false);
     if (!result.ok) {
-      setError(result.error ?? 'บันทึกไม่สำเร็จ');
+      setFormError(result.error ?? 'บันทึกไม่สำเร็จ');
       return;
     }
     setFormOpen(false);
@@ -150,6 +151,8 @@ export function CannedResponsesClient() {
             </div>
           ))}
         </div>
+      ) : data === null && error ? (
+        <AdminErrorState error={error} errorCode={errorCode} onRetry={() => void reload()} />
       ) : data === null ? (
         <p role="status" className="py-10 text-center text-sm text-danger">โหลดข้อมูลไม่สำเร็จ</p>
       ) : data.items.length === 0 ? (
@@ -319,7 +322,7 @@ export function CannedResponsesClient() {
                 ))}
               </select>
             </div>
-            <FieldError>{error}</FieldError>
+            <FieldError>{formError}</FieldError>
             <div className="flex gap-3 pt-2">
               <Button
                 type="button"

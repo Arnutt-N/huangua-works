@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useMediaQuery } from '@/hooks/use-media-query';
 import Link from 'next/link';
 import { Menu, X, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { BrandMark } from '@/components/site/brand-mark';
@@ -53,6 +54,9 @@ export function AdminLayout({
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const { isDesktop, hydrated } = useMediaQuery();
+  const hamburgerRef = useRef<HTMLButtonElement>(null);
+  const asideRef = useRef<HTMLElement>(null);
 
   // อ่านค่าที่ผู้ใช้เลือกไว้ครั้งก่อน — อ่านหลัง mount เพื่อเลี่ยง hydration mismatch
   useEffect(() => {
@@ -69,13 +73,48 @@ export function AdminLayout({
   }
 
   // ปิด drawer เมื่อกด Escape (คู่กับการปิดตอนคลิกลิงก์และคลิกฉากหลัง)
+  // + โฟกัสเข้า drawer เมื่อเปิด, คืนให้ hamburger เมื่อปิด, กัก Tab ใน drawer
   useEffect(() => {
     if (!mobileOpen) return;
+    asideRef.current?.querySelector<HTMLElement>('a, button')?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMobileOpen(false);
+      if (e.key === 'Escape') {
+        setMobileOpen(false);
+        return;
+      }
+      // กัก Tab ใน drawer
+      if (e.key === 'Tab' && asideRef.current) {
+        const items = [...asideRef.current.querySelectorAll<HTMLElement>('a[href], button:not([disabled])')].filter(
+          (el) => el.offsetParent !== null,
+        );
+        if (items.length === 0) return;
+        const first = items[0]!;
+        const last = items[items.length - 1]!;
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+  }, [mobileOpen]);
+
+  // § คืนโฟกัสให้ hamburger เฉพาะตอนที่ drawer "ปิดหลังเคยเปิด" — ห้ามยิงตอน mount
+  // ไม่งั้นทุกครั้งที่เข้า/เปลี่ยนหน้า admin บนมือถือ โฟกัสจะถูกกระชากจากตำแหน่งเริ่มต้น
+  const wasOpenRef = useRef(false);
+  useEffect(() => {
+    if (mobileOpen) {
+      wasOpenRef.current = true;
+      return;
+    }
+    if (wasOpenRef.current) {
+      wasOpenRef.current = false;
+      hamburgerRef.current?.focus();
+    }
   }, [mobileOpen]);
 
   const groups = visibleNavGroups(user.role);
@@ -96,6 +135,10 @@ export function AdminLayout({
 
       {/* ── Sidebar ── */}
       <aside
+        ref={asideRef}
+        // § ใส่ inert เฉพาะหลัง hydrate แล้วเท่านั้น — ระหว่าง SSR ยังไม่รู้ว่าเป็น desktop
+        // หรือ mobile ถ้าใส่ไปเลยผู้ใช้ desktop จะกดเมนูไม่ได้จนกว่า JS จะทำงาน
+        inert={hydrated && !isDesktop && !mobileOpen}
         className={cn(
           'glass-panel fixed inset-y-0 left-0 z-50 flex flex-col border-r shadow-lg',
           'transition-[width,transform] duration-normal ease-out-expo',
@@ -103,6 +146,7 @@ export function AdminLayout({
           'w-72 lg:translate-x-0',
           mobileOpen ? 'translate-x-0' : '-translate-x-full',
         )}
+        id="admin-sidebar"
         aria-label="นำทางหลัก"
       >
         {/* แบรนด์ */}
@@ -206,8 +250,10 @@ export function AdminLayout({
             type="button"
             onClick={() => setMobileOpen(true)}
             className="flex h-11 w-11 flex-none items-center justify-center rounded-md text-ink hover:bg-accent-sunken focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong lg:hidden"
+            ref={hamburgerRef}
             aria-label="เปิดเมนู"
             aria-expanded={mobileOpen}
+            aria-controls="admin-sidebar"
           >
             <Menu className="h-5 w-5" aria-hidden="true" />
           </button>

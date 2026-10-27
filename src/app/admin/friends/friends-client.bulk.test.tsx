@@ -6,6 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FriendItem } from '@/app/admin/_lib/admin-api';
 import { FriendsClient } from './friends-client';
 
+// § test นี้รัน userEvent หลายขั้น (checkbox × 2 + select + confirm) — 5s default ไม่พอ
+// ตาม AGENTS.md: timing-sensitive tests ต้องตั้ง timeout ชัดเจน ไม่พึ่ง default
+vi.setConfig({ testTimeout: 30_000 });
+
 const listFriends = vi.fn();
 const listRichMenus = vi.fn();
 const assignUserRichMenu = vi.fn();

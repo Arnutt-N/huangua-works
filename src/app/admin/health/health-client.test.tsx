@@ -20,10 +20,13 @@ describe('HealthClient error', () => {
     vi.mocked(adminApi.getHealth).mockResolvedValue({
       ok: false,
       error: 'Unauthorized',
-      status: 401,
+      status: 401, code: 'SESSION_EXPIRED',
     });
     render(<HealthClient />);
-    expect(await screen.findByText('Unauthorized')).toBeInTheDocument();
+    // error แสดงทั้ง inline banner และ AdminErrorState card — assert ว่าเห็นอย่างน้อย 1 และไม่ใช่หน้าว่าง
+    const matches = await screen.findAllByText('Unauthorized');
+    expect(matches.length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText('โหลดสถานะไม่สำเร็จ')).not.toBeInTheDocument();
   });
 
   it('reload ล้ม 403 แสดง Forbidden ขณะการ์ดเดิมยังอยู่', async () => {
@@ -32,7 +35,7 @@ describe('HealthClient error', () => {
         ok: true,
         data: { status: 'healthy', probes: [], timestamp: '2026-10-03T00:00:00.000Z' },
       })
-      .mockResolvedValueOnce({ ok: false, error: 'Forbidden', status: 403 });
+      .mockResolvedValueOnce({ ok: false, error: 'Forbidden', status: 403, code: 'FORBIDDEN' });
     render(<HealthClient />);
     expect(await screen.findByText('ปกติ')).toBeInTheDocument();
     screen.getByRole('button', { name: /refresh/i }).click();

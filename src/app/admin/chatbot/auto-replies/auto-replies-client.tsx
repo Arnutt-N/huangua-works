@@ -6,6 +6,7 @@ import { adminApi } from '@/app/admin/_lib/admin-api';
 import { useResource } from '@/app/admin/_lib/use-resource';
 import { Plus, Search, Pencil, Trash2, MessageCircleQuestion } from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
+import { AdminErrorState } from '@/components/admin/admin-error-state';
 import {
   Dialog,
   DialogContent,
@@ -33,7 +34,7 @@ export function AutoRepliesClient() {
   const [form, setForm] = useState<FaqForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
 
-  const { data, loading, feedback, notify, mutate } = useResource({
+  const { data, loading, feedback, error, errorCode, notify, mutate, reload } = useResource({
     load: adminApi.listFaq,
     query: search,
     debounceMs: 300,
@@ -127,6 +128,8 @@ export function AutoRepliesClient() {
 
         {loading ? (
           <div className="py-12 text-center text-muted">กำลังโหลด...</div>
+        ) : data === null && error ? (
+          <AdminErrorState error={error} errorCode={errorCode} onRetry={() => void reload()} />
         ) : items.length === 0 ? (
           <div className="py-12 text-center text-muted">
             ยังไม่มี FAQ — กด &quot;เพิ่ม FAQ&quot; เพื่อเริ่มสร้าง
