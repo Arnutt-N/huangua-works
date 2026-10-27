@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/field';
 import { useResource } from '@/app/admin/_lib/use-resource';
 import { adminApi, type FriendItem, type RichMenuItem } from '@/app/admin/_lib/admin-api';
+import { LineAvatar } from '@/app/admin/chat/_components/line-avatar';
 import { isUsableMenu } from '@/app/admin/chatbot/rich-menus/rich-menu-state';
 
 type StatusFilter = 'all' | FriendItem['followState'];
@@ -287,21 +288,22 @@ export function FriendsClient() {
                       </td>
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-2.5">
-                          {friend.pictureUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={friend.pictureUrl}
-                              alt=""
-                              className="h-9 w-9 shrink-0 rounded-full object-cover"
-                            />
-                          ) : (
-                            <span
-                              aria-hidden
-                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/15 font-medium text-muted"
-                            >
-                              {initialOf(friend.displayName)}
-                            </span>
-                          )}
+                          {/* § ต้องผ่าน LineAvatar ไม่ใช่ <img> เปลือย — LINE CDN
+                              (sprofile.line-scdn.net) ปฏิเสธเมื่อ browser ส่ง Referer
+                              และ URL หมดอายุหลังผู้ใช้เปลี่ยนรูป <img> ตรงๆ จะโชว์
+                              ไอคอนรูปแตก/กรอบว่าง ไม่มี fallback */}
+                          <LineAvatar
+                            src={friend.pictureUrl}
+                            className="h-9 w-9 shrink-0 rounded-full object-cover"
+                            fallback={
+                              <span
+                                aria-hidden
+                                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/15 font-medium text-muted"
+                              >
+                                {initialOf(friend.displayName)}
+                              </span>
+                            }
+                          />
                           <div className="min-w-0">
                             <Link
                               href={`/admin/friends/${friend.id}`}

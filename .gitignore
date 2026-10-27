@@ -82,6 +82,8 @@ project-log-md/
 .kilo/
 .claude/skill-collections-comparison.md
 .claude/skill-collections-20260712.md
+.claude/skill-collections/
+.perch/
 research/
 scripts/tmp-shots/
 graphify-out/
