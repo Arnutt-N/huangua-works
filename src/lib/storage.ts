@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 let client: S3Client | null = null;
@@ -53,9 +53,48 @@ export async function deleteFile(key: string): Promise<void> {
   await s3.send(new DeleteObjectCommand({ Bucket: getBucket(), Key: key }));
 }
 
-export async function getPresignedUrl(key: string, expiresIn = 3600): Promise<string> {
+export interface ReadUrlOptions {
+  contentType?: string;
+  /** inline สำหรับรูป, attachment สำหรับที่เหลือ — กัน stored-XSS */
+  disposition?: 'inline' | 'attachment';
+  filename?: string;
+  /** default 300 วินาที — SigV4 เพดาน 900 */
+  expiresIn?: number;
+}
+
+const READ_URL_DEFAULT_TTL = 300;
+const READ_URL_MAX_TTL = 900;
+
+/**
+ * § presigned GET สำหรับอ่านไฟล์ — ต้องเซ็น GetObject ไม่ใช่ PutObject
+ * (ของเดิม `getPresignedUrl` เซ็น PutObject และไม่มี caller = dead export ที่ใช้ดาวน์โหลดไม่ได้)
+ *
+ * § reject key ที่มี `..` หรือขึ้นต้นด้วย `/` — caller ต้อง derive key จาก DB เอง
+ * ไม่ใช่รับจาก client แต่กันไว้อีกชั้นเผื่อมีคนส่งค่าผ่านมา
+ */
+export async function readUrlForKey(key: string, opts: ReadUrlOptions = {}): Promise<string> {
+  if (!key || key.startsWith('/') || key.split('/').includes('..')) {
+    throw new Error('storage key ไม่ถูกต้อง');
+  }
+  const expiresIn = Math.min(Math.max(opts.expiresIn ?? READ_URL_DEFAULT_TTL, 1), READ_URL_MAX_TTL);
+
+  const disposition = opts.disposition
+    ? opts.disposition === 'inline' && opts.filename
+      ? `inline; filename="${encodeURIComponent(opts.filename)}"`
+      : opts.disposition
+    : undefined;
+
   const s3 = getS3();
-  return getSignedUrl(s3, new PutObjectCommand({ Bucket: getBucket(), Key: key }), { expiresIn });
+  return getSignedUrl(
+    s3,
+    new GetObjectCommand({
+      Bucket: getBucket(),
+      Key: key,
+      ...(opts.contentType ? { ResponseContentType: opts.contentType } : {}),
+      ...(disposition ? { ResponseContentDisposition: disposition } : {}),
+    }),
+    { expiresIn },
+  );
 }
 
 export function isStorageConfigured(): boolean {
