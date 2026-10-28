@@ -673,6 +673,9 @@ export const chatMessages = pgTable(
 
     textContent: text('text_content'),
     mediaUrl: text('media_url'),
+    // § แหล่งความจริงของที่อยู่ไฟล์ (null = แถวก่อน migration หรือข้อความล้วน)
+    // mediaUrl เก็บไว้เพื่อ fallback ของแถวเก่า — โค้ดใหม่เขียนแค่ storageKey
+    storageKey: text('storage_key'),
     flexPayload: jsonb('flex_payload'),
     locationData: jsonb('location_data'),
 
@@ -1105,6 +1108,9 @@ export const mediaFiles = pgTable(
     createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
 
     url: text('url').notNull(),
+    // § แหล่งความจริงของที่อยู่ไฟล์ — url เก็บไว้เป็น fallback ของแถวก่อน backfill
+    // (แถวใหม่ตั้ง url เป็น NULL ได้หลัง cutover เต็มรูปแบบ)
+    storageKey: text('storage_key'),
     filename: text('filename').notNull(),
     mimeType: text('mime_type').notNull(),
     sizeBytes: integer('size_bytes').notNull(),
