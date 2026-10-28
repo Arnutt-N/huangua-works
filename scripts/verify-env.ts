@@ -54,19 +54,25 @@ for (const spec of required) {
   }
 }
 
-// § LIFF (optional group) — เปิดใช้เมื่อมีค่าจริงอย่างน้อยหนึ่งตัวในชุด แล้วบังคับให้ครบทั้งชุด
-// กัน deploy ที่ config ครึ่งเดียว (เช่น มี LIFF ID แต่ไม่มี channel id → session route
-// verify ไม่ได้) — ไม่ตั้งค่าเลยทั้งชุด = ข้ามอย่างเงียบ (ระบบเดิมทำงานได้ปกติ)
-const liffVars = ['NEXT_PUBLIC_LIFF_ID', 'LINE_LOGIN_CHANNEL_ID'] as const;
-const liffSet = liffVars.filter((k) => {
-  const v = process.env[k];
-  return !!v && !v.startsWith('YOUR_') && !v.startsWith('CHANGE_ME');
-});
-if (liffSet.length > 0 && liffSet.length < liffVars.length) {
-  const missing = liffVars.filter((k) => !liffSet.includes(k));
-  for (const key of missing) {
+// § optional group — เปิดใช้เมื่อมีค่าจริงอย่างน้อยหนึ่งตัวในชุด แล้วบังคับให้ครบทั้งชุด
+// กัน deploy ที่ config ครึ่งเดียว — ไม่ตั้งค่าเลยทั้งชุด = ข้ามอย่างเงียบ (ระบบเดิมทำงานได้ปกติ)
+// LIFF: มี LIFF ID แต่ไม่มี channel id → session route verify ไม่ได้
+// S3: ตรงกับสามตัวที่ isStorageConfigured() เช็ค — S3_REGION/S3_BUCKET มี default
+// และตรวจ static ไม่ได้ จึงไม่รวมในกลุ่ม
+const optionalGroups: { name: string; keys: readonly string[] }[] = [
+  { name: 'LIFF', keys: ['NEXT_PUBLIC_LIFF_ID', 'LINE_LOGIN_CHANNEL_ID'] },
+  { name: 'S3', keys: ['S3_ACCESS_KEY_ID', 'S3_ENDPOINT', 'S3_SECRET_ACCESS_KEY'] },
+];
+
+for (const group of optionalGroups) {
+  const set = group.keys.filter((k) => {
+    const v = process.env[k];
+    return !!v && !v.startsWith('YOUR_') && !v.startsWith('CHANGE_ME');
+  });
+  if (set.length === 0 || set.length === group.keys.length) continue;
+  for (const key of group.keys.filter((k) => !set.includes(k))) {
     errors.push(
-      `✗ ${key} — config LIFF ครึ่งเดียว (มี ${liffSet.join(', ')}) — ต้องครบทั้ง ${liffVars.join(' + ')} หรือไม่ตั้งค่าเลย`,
+      `✗ ${key} — config ${group.name} ครึ่งเดียว (มี ${set.join(', ')}) — ต้องครบทั้ง ${group.keys.join(' + ')} หรือไม่ตั้งค่าเลย`,
     );
   }
 }
