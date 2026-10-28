@@ -38,6 +38,16 @@ export async function uploadFile(
   return `${process.env.S3_ENDPOINT}/${getBucket()}/${key}`;
 }
 
+/** § inverse ของ uploadFile — URL ใน DB ถูกเก็บเป็น endpoint เติม bucket นำหน้า key
+ *  ห้ามใช้ slice(N) เพราะ endpoint ของ Supabase มี path prefix (`/storage/v1/s3`) */
+export function keyFromUrl(url: string): string | null {
+  const endpoint = process.env.S3_ENDPOINT;
+  if (!endpoint) return null;
+  const prefix = `${endpoint}/${getBucket()}/`;
+  if (!url.startsWith(prefix)) return null;
+  return url.slice(prefix.length) || null;
+}
+
 export async function deleteFile(key: string): Promise<void> {
   const s3 = getS3();
   await s3.send(new DeleteObjectCommand({ Bucket: getBucket(), Key: key }));
