@@ -134,12 +134,15 @@ export function CaseDetailClient({
   }, [successCount, router]);
 
   // local state สำหรับ status dropdown (เพื่อเช็ค transition ฝั่ง client ก่อน submit)
-  const [selectedStatus, setSelectedStatus] = useState<CaseStatus>(currentStatus);
-  // § หลัง router.refresh() ได้ currentStatus ใหม่ ต้องเลื่อน dropdown ตาม ไม่งั้นผู้ใช้เห็น
-  // สถานะเก่า + ข้อความแดง "อยู่ในสถานะปิดแล้ว" ทันทีหลังบันทึกสำเร็จ
-  useEffect(() => {
-    setSelectedStatus(currentStatus);
-  }, [currentStatus]);
+  // § ผูก draft กับ currentStatus แทนการเรียก setState ใน useEffect (ผิดกฎ react-hooks/set-state-in-effect)
+  // หลัง router.refresh() ได้ currentStatus ใหม่ selectedStatus จะเลื่อนตามทันทีตั้งแต่ render แรก
+  // ไม่เกิด cascading render และผู้ใช้ไม่เห็นสถานะเก่า + ข้อความแดง "อยู่ในสถานะปิดแล้ว"
+  const [draftStatus, setDraftStatus] = useState<{ base: CaseStatus; value: CaseStatus }>({
+    base: currentStatus,
+    value: currentStatus,
+  });
+  const selectedStatus = draftStatus.base === currentStatus ? draftStatus.value : currentStatus;
+  const setSelectedStatus = (value: CaseStatus) => setDraftStatus({ base: currentStatus, value });
   const transitionCheck = assertTransition(currentStatus, selectedStatus);
 
   return (
