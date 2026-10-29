@@ -4313,7 +4313,7 @@
     },
     "public.chat_csat_responses": {
       "name": "chat_csat_responses",
-      "schema": "public",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
@@ -4385,7 +4385,7 @@
     },
     "public.line_friend_events": {
       "name": "line_friend_events",
-      "schema": "public",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
@@ -4479,7 +4479,7 @@
     },
     "public.chat_broadcast_failed_recipients": {
       "name": "chat_broadcast_failed_recipients",
-      "schema": "public",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
