@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.setConfig({ testTimeout: 30_000 });
@@ -26,7 +26,10 @@ vi.mock('@/app/admin/_lib/admin-api', () => ({
 
 import { FilesClient } from './files-client';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 beforeEach(() => {
   mocks.fetchCalls.length = 0;
@@ -63,5 +66,42 @@ describe('หน้าไฟล์สื่อ — อ่านผ่าน read
 
     expect(screen.queryByLabelText('คัดลอก URL')).not.toBeInTheDocument();
     expect(screen.getByLabelText('เปิด a.png')).toBeInTheDocument();
+  });
+
+  it('กดเปิดไฟล์แล้วเปิดแท็บเปล่าก่อน fetch โดยไม่ส่ง noreferrer (ซึ่งจะคืน null) แล้วค่อยเซ็ต location.href', async () => {
+    const fakeTab = { opener: window as unknown, location: { href: '' }, close: vi.fn() };
+    const openSpy = vi.spyOn(window, 'open').mockImplementation((_url, _target, features) => {
+      // § จำลอง HTML spec จริง: ถ้าส่ง noreferrer/noopener ใน features จะคืน null เสมอ
+      if (features?.includes('noreferrer') || features?.includes('noopener')) return null;
+      return fakeTab as unknown as Window;
+    });
+
+    render(<FilesClient />);
+    await screen.findByText('b.pdf');
+    fireEvent.click(screen.getByLabelText('เปิด b.pdf'));
+
+    await waitFor(() => {
+      expect(fakeTab.location.href).toBe('https://signed.example//api/line/admin/media/f2/read-url');
+    });
+    expect(openSpy).toHaveBeenCalledTimes(1);
+    expect(fakeTab.opener).toBeNull();
+    openSpy.mockRestore();
+  });
+
+  it('ปิดแท็บเปล่าและแจ้งเตือนเมื่อขอ read-url ล้มเหลว', async () => {
+    const fakeTab = { opener: window as unknown, location: { href: '' }, close: vi.fn() };
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(fakeTab as unknown as Window);
+
+    render(<FilesClient />);
+    await screen.findByText('b.pdf');
+
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 500, json: async () => ({}) })));
+    fireEvent.click(screen.getByLabelText('เปิด b.pdf'));
+
+    await waitFor(() => {
+      expect(fakeTab.close).toHaveBeenCalledTimes(1);
+    });
+    expect(await screen.findByRole('status')).toHaveTextContent('เปิดไฟล์ไม่ได้');
+    openSpy.mockRestore();
   });
 });

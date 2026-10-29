@@ -61,8 +61,11 @@ export function FilesClient() {
   // ลิงก์ที่คัดลอกไปจะตายก่อนถึงมือผู้รับ จึงเหลือแค่ "เปิด" ที่ขอ URL ใหม่ทุกครั้ง
   // § เปิดหน้าต่างเปล่าก่อน await — window.open หลัง await ถือว่าไม่มี user gesture
   // และถูก popup blocker ตัดทิ้ง (Safari บล็อกแน่นอน, Chrome บ่อย)
+  // § ห้ามส่ง 'noreferrer'/'noopener' ใน windowFeatures ตอนเปิดแท็บเปล่า เพราะ HTML spec
+  // บังคับให้ window.open คืน null เสมอ — ตั้ง tab.opener = null แทนเพื่อให้ยังถือ ref ไว้เปลี่ยน location/close ได้
   async function openFile(item: MediaItem) {
-    const tab = window.open('', '_blank', 'noreferrer');
+    const tab = window.open('', '_blank');
+    if (tab) tab.opener = null;
     try {
       const res = await fetch(`/api/line/admin/media/${item.id}/read-url`, { cache: 'no-store' });
       if (!res.ok) throw new Error(String(res.status));

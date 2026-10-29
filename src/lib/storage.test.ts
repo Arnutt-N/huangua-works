@@ -136,6 +136,7 @@ describe('dispositionFor', () => {
   it('รูป inline, อย่างอื่น attachment', () => {
     expect(dispositionFor('image/jpeg')).toBe('inline');
     expect(dispositionFor('image/png')).toBe('inline');
+    expect(dispositionFor('image/gif')).toBe('inline');
     expect(dispositionFor('image/webp')).toBe('inline');
     expect(dispositionFor('application/pdf')).toBe('attachment');
     expect(dispositionFor('text/html')).toBe('attachment');
