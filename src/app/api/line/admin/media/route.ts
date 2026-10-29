@@ -43,7 +43,20 @@ export async function GET() {
   if (!authz.ok) return authz.response;
 
   const db = await getDb();
-  const rows = await db.select().from(mediaFiles).orderBy(desc(mediaFiles.createdAt)).limit(100);
+  // § select เฉพาะคอลัมน์ที่ client ต้องใช้ — ห้ามส่ง storage_key/url ออกไป
+  // client ขอ URL ที่เซ็นแล้วผ่าน /media/[id]/read-url เมื่อจะแสดงผลเท่านั้น
+  const rows = await db
+    .select({
+      id: mediaFiles.id,
+      filename: mediaFiles.filename,
+      mimeType: mediaFiles.mimeType,
+      sizeBytes: mediaFiles.sizeBytes,
+      category: mediaFiles.category,
+      createdAt: mediaFiles.createdAt,
+    })
+    .from(mediaFiles)
+    .orderBy(desc(mediaFiles.createdAt))
+    .limit(100);
   return NextResponse.json({ items: rows, storageConfigured: isStorageConfigured() });
 }
 
