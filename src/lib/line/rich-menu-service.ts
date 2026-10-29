@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { isValidAliasId } from '@/lib/contracts';
+import { findInvalidRichMenuArea, isValidAliasId } from '@/lib/contracts';
 import { getDb } from '@/lib/db';
 import { richMenuAliases, richMenus } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
@@ -207,6 +207,117 @@ export async function runDisplayTick(now = new Date()): Promise<DisplayTickResul
   }
 }
 
+function resolveConfiguredLiffId(explicit?: string | null): string | null {
+  const raw =
+    explicit !== undefined
+      ? explicit
+      : process.env.NEXT_PUBLIC_LIFF_ID || process.env.LINE_LIFF_ID || null;
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed.startsWith('YOUR_') || trimmed.startsWith('CHANGE_ME')) return null;
+  return trimmed;
+}
+
+function resolveHttpsOrigin(explicit?: string | null): string | null {
+  const raw = explicit !== undefined ? explicit : process.env.AUTH_URL || null;
+  if (!raw) return null;
+  try {
+    const parsed = new URL(raw.trim());
+    if (parsed.protocol !== 'https:') return null;
+    if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') return null;
+    return parsed.origin;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * § เมนูที่สร้างจาก DEFAULT_CONFIG เดิมมี `https://liff.line.me/<LIFF_ID>/...` ฝังอยู่ใน DB
+ * เมื่อส่งขึ้น LINE API ตรง ๆ จะโดน 400 (`invalid uri` + `invalid uri scheme` คูณจำนวนปุ่ม)
+ * จึง normalize ก่อนทั้งตอนอ่านและตอน sync:
+ * 1. ถ้ามี `NEXT_PUBLIC_LIFF_ID` หรือ `LINE_LIFF_ID` → แทน `<LIFF_ID>` ด้วยค่าจริง
+ * 2. ถ้าไม่มี LIFF ID แต่ `AUTH_URL` เป็น `https://` จริง → แปลงเป็นลิงก์เว็บ `${origin}/...`
+ * 3. ถ้าเป็น `richmenuswitch` ที่ขาด `data` → เติม `richmenuswitch:<aliasId>` ให้ผ่านสเปก LINE
+ */
+export function normalizeRichMenuConfig(
+  rawConfig: unknown,
+  env?: { liffId?: string | null; authUrl?: string | null },
+): { config: Record<string, unknown>; changed: boolean } {
+  if (!rawConfig || typeof rawConfig !== 'object') {
+    return { config: {}, changed: false };
+  }
+  const config = rawConfig as Record<string, unknown>;
+  if (!Array.isArray(config.areas)) {
+    return { config, changed: false };
+  }
+
+  const liffId = resolveConfiguredLiffId(env?.liffId);
+  const httpsOrigin = resolveHttpsOrigin(env?.authUrl);
+  let changed = false;
+
+  const areas = config.areas.map((area) => {
+    if (!area || typeof area !== 'object') return area;
+    const areaRecord = area as Record<string, unknown>;
+    const action = areaRecord.action;
+    if (!action || typeof action !== 'object') return area;
+    const actionRecord = action as Record<string, unknown>;
+
+    if (actionRecord.type === 'uri' && typeof actionRecord.uri === 'string') {
+      let nextUri = actionRecord.uri.trim();
+      if (/<\s*LIFF_ID\s*>/i.test(nextUri)) {
+        if (liffId) {
+          nextUri = nextUri.replace(/<\s*LIFF_ID\s*>/gi, liffId);
+        } else if (httpsOrigin) {
+          nextUri = nextUri.replace(
+            /^https?:\/\/liff\.line\.me\/<\s*LIFF_ID\s*>(\/.*)?$/i,
+            (_, path: string | undefined) => `${httpsOrigin}${path || '/'}`,
+          );
+        }
+      } else if (nextUri.startsWith('/')) {
+        if (liffId) {
+          nextUri = `https://liff.line.me/${liffId}${nextUri}`;
+        } else if (httpsOrigin) {
+          nextUri = `${httpsOrigin}${nextUri}`;
+        }
+      }
+      if (nextUri !== actionRecord.uri) {
+        changed = true;
+        return { ...areaRecord, action: { ...actionRecord, uri: nextUri } };
+      }
+    }
+
+    if (
+      actionRecord.type === 'richmenuswitch' &&
+      (typeof actionRecord.data !== 'string' || actionRecord.data.trim() === '')
+    ) {
+      const aliasId =
+        typeof actionRecord.richMenuAliasId === 'string' && actionRecord.richMenuAliasId.trim()
+          ? actionRecord.richMenuAliasId.trim()
+          : 'switch';
+      changed = true;
+      return {
+        ...areaRecord,
+        action: { ...actionRecord, data: `richmenuswitch:${aliasId}` },
+      };
+    }
+
+    return area;
+  });
+
+  if (!changed) return { config, changed: false };
+  return { config: { ...config, areas }, changed: true };
+}
+
+function formatInvalidUriSyncError(badUri: string): string {
+  if (/<\s*LIFF_ID\s*>/i.test(badUri)) {
+    return 'พบลิงก์ <LIFF_ID> ที่ยังไม่ได้แทนค่า — กรุณาตั้งค่า NEXT_PUBLIC_LIFF_ID หรือกดแก้ไขเมนูเพื่อใส่ URL จริงก่อนซิงค์';
+  }
+  if (badUri === '(ค่าว่าง)') {
+    return 'พบปุ่มเมนูแบบเปิดลิงก์ (URL) ที่ยังไม่ได้กรอก URL — กรุณากดแก้ไขเมนูเพื่อกรอกลิงก์ https:// ให้ครบทุกปุ่มก่อนซิงค์';
+  }
+  return `URL ของปุ่มเมนูไม่ถูกต้อง (${badUri}) — ต้องเป็นลิงก์ https:// ที่สมบูรณ์ กรุณากดแก้ไขเมนูก่อนซิงค์`;
+}
+
 export async function syncRichMenu(
   id: string,
 ): Promise<{ ok: boolean; error?: string; recreated?: boolean }> {
@@ -215,12 +326,30 @@ export async function syncRichMenu(
   if (!menu) return { ok: false, error: 'ไม่พบ rich menu' };
 
   try {
+    const { config: normalizedConfig, changed: configNormalized } = normalizeRichMenuConfig(menu.config);
+    if (configNormalized) {
+      await db
+        .update(richMenus)
+        .set({ config: normalizedConfig as typeof menu.config, updatedAt: new Date() })
+        .where(eq(richMenus.id, id));
+    }
+
+    const badUri = findInvalidRichMenuArea(normalizedConfig.areas);
+    if (badUri !== null) {
+      const msg = formatInvalidUriSyncError(badUri);
+      await db
+        .update(richMenus)
+        .set({ syncStatus: 'error', lastSyncError: msg.slice(0, 500), updatedAt: new Date() })
+        .where(eq(richMenus.id, id));
+      return { ok: false, error: msg };
+    }
+
     let lineId = menu.lineRichMenuId;
     let recreated = false;
 
     if (lineId) {
       const lineMenu = await getLineRichMenu(lineId);
-      if (lineMenu && !isRichMenuDrift(menu.config, lineMenu)) {
+      if (lineMenu && !isRichMenuDrift(normalizedConfig, lineMenu)) {
         // ตรงกัน = no-op ห้ามสร้างซ้ำ
         await db
           .update(richMenus)
@@ -230,7 +359,7 @@ export async function syncRichMenu(
       }
       // เพี้ยนหรือ stale → สร้างใหม่แล้วย้ายทุกอย่าง (recreate แบบ jsk-app)
       const oldLineId = lineMenu ? lineId : null;
-      lineId = await createLineRichMenu(menu.config);
+      lineId = await createLineRichMenu(normalizedConfig);
       recreated = true;
       await db
         .update(richMenus)
@@ -245,7 +374,7 @@ export async function syncRichMenu(
         await deleteLineRichMenu(oldLineId).catch(() => {});
       }
     } else {
-      lineId = await createLineRichMenu(menu.config);
+      lineId = await createLineRichMenu(normalizedConfig);
       await db.update(richMenus).set({ lineRichMenuId: lineId, updatedAt: new Date() }).where(eq(richMenus.id, id));
     }
 

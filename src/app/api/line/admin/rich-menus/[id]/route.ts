@@ -5,6 +5,7 @@ import { getDb } from '@/lib/db';
 import { pgCode } from '@/lib/db/errors';
 import { richMenuAliases, richMenus } from '@/lib/db/schema';
 import { deleteLineRichMenu, getDefaultLineRichMenu } from '@/lib/line/client';
+import { normalizeRichMenuConfig } from '@/lib/line/rich-menu-service';
 import { parseBody } from '@/lib/api-helpers';
 import { requireStaffApi } from '@/lib/auth/require-staff';
 import { ADMIN_ROLES } from '@/lib/auth/roles';
@@ -45,7 +46,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const db = await getDb();
   const [row] = await db.select().from(richMenus).where(eq(richMenus.id, id)).limit(1);
   if (!row) return NextResponse.json({ error: 'ไม่พบ rich menu' }, { status: 404 });
-  return NextResponse.json(row);
+  const { config: normalizedConfig, changed } = normalizeRichMenuConfig(row.config);
+  return NextResponse.json(changed ? { ...row, config: normalizedConfig } : row);
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -76,10 +78,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   const { name, chatBarText, areas, displayMode } = result.data;
-  const badUri = findInvalidRichMenuArea(areas);
+  const normalizedAreas = areas
+    ? (normalizeRichMenuConfig({ areas }).config.areas as typeof areas)
+    : undefined;
+  const badUri = findInvalidRichMenuArea(normalizedAreas);
   if (badUri) {
     return NextResponse.json(
-      { error: `URL ของปุ่มเมนูต้องเป็น https เท่านั้น (พบ ${badUri})` },
+      { error: `URL ของปุ่มเมนูต้องเป็น https ที่ถูกต้องและไม่ว่างเปล่า (พบ ${badUri})` },
       { status: 400 },
     );
   }
@@ -127,7 +132,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         ...prevConfig,
         name: nextName,
         chatBarText: nextBar,
-        areas: areas ?? prevConfig.areas,
+        areas: normalizedAreas ?? prevConfig.areas,
         selected: nextMode === 'ALWAYS',
       }
     : prevConfig;

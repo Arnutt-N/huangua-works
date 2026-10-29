@@ -8,6 +8,7 @@ import { requireStaffApi } from '@/lib/auth/require-staff';
 import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit';
 import { findInvalidRichMenuArea, RICH_MENU_DISPLAY_MODES } from '@/lib/contracts';
+import { normalizeRichMenuConfig } from '@/lib/line/rich-menu-service';
 import { z } from 'zod';
 
 export const runtime = 'nodejs';
@@ -72,10 +73,11 @@ export async function POST(request: Request) {
   const id = generateId();
 
   // § client ตรวจ https แล้ว แต่ POST ตรงข้าม client ได้ — ต้องบังคับที่ boundary ด้วย
-  const badUri = findInvalidRichMenuArea(result.data.config.areas);
+  const { config: normalizedConfig } = normalizeRichMenuConfig(result.data.config);
+  const badUri = findInvalidRichMenuArea(normalizedConfig.areas);
   if (badUri) {
     return NextResponse.json(
-      { error: `URL ของปุ่มเมนูต้องเป็น https เท่านั้น (พบ ${badUri})` },
+      { error: `URL ของปุ่มเมนูต้องเป็น https ที่ถูกต้องและไม่ว่างเปล่า (พบ ${badUri})` },
       { status: 400 },
     );
   }
@@ -96,7 +98,7 @@ export async function POST(request: Request) {
     id,
     name: result.data.name,
     chatBarText: result.data.chatBarText,
-    config: { ...result.data.config, selected: displayMode === 'ALWAYS' },
+    config: { ...normalizedConfig, selected: displayMode === 'ALWAYS' },
     displayMode,
     displayStartAt: displayStartAt ? new Date(displayStartAt) : null,
     displayEndAt: displayEndAt ? new Date(displayEndAt) : null,
