@@ -7,6 +7,7 @@ import { generateTrackingCode } from '../case-tracking';
 import { checkDuplicate, recordDedupHash } from '../dedup';
 import { AUDIT_ACTIONS, logAudit } from '../audit';
 import { getFiscalYear } from '../thai-date';
+import { keyFromUrl } from '../storage';
 import {
   recordIntakeConsent,
   resolveCitizen,
@@ -40,7 +41,7 @@ export interface CaseIntakeInput {
 
 export type CaseIntakeResult =
   | { ok: true; caseId: string; trackingCode: string; estimatedDays: number }
-  | { ok: false; error: string; errorCode: 'duplicate' | 'invalid_category' | 'internal'; existingTrackingCode?: string };
+  | { ok: false; error: string; errorCode: 'duplicate' | 'invalid_category' | 'invalid_attachment' | 'internal'; existingTrackingCode?: string };
 
 export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResult> {
   // § ด่าน input ก่อนแตะ DB — ไม่มีตัวตน (เว็บไม่มี cid / line ไม่มี lineUserId) = caller ส่ง input ผิด
@@ -52,6 +53,25 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
   }
 
   const db = await getDb();
+
+  // § attachments[].url มาจาก /api/cases/submit ซึ่งไม่ต้อง login — เดิมรับ URL ภายนอก
+  // อะไรก็ได้ (บังคับแค่ http/https) = ฝัง URL ของคนอื่นลง DB รอวันมีหน้าเอาไป render
+  // ตอนนี้รับเฉพาะ URL ที่ชี้ storage ของเรา แล้วแปลงเป็น key ก่อนเก็บ
+  let storageKeys: { key: string; type: string; size: number }[] | null = null;
+  if (input.attachments?.length) {
+    storageKeys = [];
+    for (const att of input.attachments) {
+      const key = keyFromUrl(att.url);
+      if (!key) {
+        return {
+          ok: false,
+          error: 'ไฟล์แนบต้องเป็นไฟล์ที่อัปโหลดผ่านระบบนี้เท่านั้น',
+          errorCode: 'invalid_attachment',
+        };
+      }
+      storageKeys.push({ key, type: att.type, size: att.size });
+    }
+  }
 
   const category = await firstOrUndefined(
     db.select().from(categories).where(eq(categories.id, input.categoryId)).limit(1)
@@ -150,7 +170,7 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
       submittedBy: submitterId,
       departmentId: category.defaultDepartmentId || null,
       dueDate,
-      attachments: input.attachments ? JSON.stringify(input.attachments) : null,
+      attachments: storageKeys ? JSON.stringify(storageKeys) : null,
       metadata: JSON.stringify({
         fiscalYear,
         source: input.channel,
