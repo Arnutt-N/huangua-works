@@ -282,7 +282,6 @@ export interface BroadcastRecipientOption {
 
 export interface MediaItem {
   id: string;
-  url: string;
   filename: string;
   mimeType: string;
   sizeBytes: number;

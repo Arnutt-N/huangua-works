@@ -87,10 +87,13 @@ function broadcastInbound(args: InboundPayloadArgs): void {
     conversationId: args.conversationId,
     payload: {
       id: args.id,
+      conversationId: args.conversationId,
       sender: 'user',
       messageType: args.messageType,
       textContent: args.textContent,
-      mediaUrl: args.mediaUrl,
+      // § ไม่ส่งที่อยู่ไฟล์ทาง SSE — client ขอ presigned URL ผ่าน read-url แทน
+      // (พาธนี้ไม่ผ่าน GET ที่ปิด url ไว้ จึงต้องปิดตรงนี้เอง)
+      hasMedia: args.mediaUrl != null,
       metadata: args.mediaMetadata,
       createdAt: new Date().toISOString(),
     },
