@@ -263,3 +263,57 @@ describe('createCase · ด่าน identity + PDPA metadata', () => {
     expect(meta).toHaveProperty('source', 'web');
   });
 });
+
+describe('createCase · attachments ต้องชี้ storage ของเราเท่านั้น', () => {
+  // § endpoint /api/cases/submit ไม่ต้อง login — เดิมรับ URL ภายนอกอะไรก็ได้
+  // ที่ผ่านแค่ http/https แล้วเก็บลง DB
+  const OUR = 'https://abc.supabase.co/storage/v1/s3/media';
+
+  beforeEach(() => {
+    vi.stubEnv('S3_ENDPOINT', 'https://abc.supabase.co/storage/v1/s3');
+    vi.stubEnv('S3_BUCKET', 'media');
+  });
+
+  it('URL ของ storage เรา → เก็บเป็น key ไม่เก็บ URL', async () => {
+    const result = await createCase(
+      webInput({ attachments: [{ url: `${OUR}/cases/a.jpg`, type: 'image/jpeg', size: 1234 }] }),
+    );
+
+    expect(result.ok).toBe(true);
+    const stored = JSON.parse(String(mockState.insertedCases[0]?.attachments)) as Array<Record<string, unknown>>;
+    expect(stored).toEqual([{ key: 'cases/a.jpg', type: 'image/jpeg', size: 1234 }]);
+    expect(JSON.stringify(stored)).not.toContain('http');
+  });
+
+  it('URL ภายนอกถูกปฏิเสธด้วย invalid_attachment และไม่เขียน DB', async () => {
+    const result = await createCase(
+      webInput({ attachments: [{ url: 'https://evil.example/x.jpg', type: 'image/jpeg', size: 1 }] }),
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errorCode).toBe('invalid_attachment');
+    expect(mockState.insertedCases).toHaveLength(0);
+  });
+
+  it('ไฟล์ที่ถูกต้องผสมไฟล์ปลอม = ปฏิเสธทั้งชุด ไม่เขียนบางส่วน', async () => {
+    const result = await createCase(
+      webInput({
+        attachments: [
+          { url: `${OUR}/cases/ok.jpg`, type: 'image/jpeg', size: 1 },
+          { url: 'https://evil.example/x.jpg', type: 'image/jpeg', size: 1 },
+        ],
+      }),
+    );
+
+    expect(result.ok).toBe(false);
+    expect(mockState.insertedCases).toHaveLength(0);
+  });
+
+  it('ไม่มี attachments → attachments เป็น null เหมือนเดิม', async () => {
+    const result = await createCase(webInput());
+
+    expect(result.ok).toBe(true);
+    expect(mockState.insertedCases[0]?.attachments).toBeNull();
+  });
+});
