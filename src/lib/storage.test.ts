@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { keyFromUrl, readUrlForKey } from './storage';
+import { dispositionFor, keyFromUrl, readUrlForKey, resolveReadKey } from './storage';
 
 /**
  * § URL ที่ uploadFile เก็บลง DB คือ `${S3_ENDPOINT}/${bucket}/${key}` — keyFromUrl
@@ -129,5 +129,34 @@ describe('readUrlForKey', () => {
 
   it('reject key ที่มี .. — กัน path traversal ออกนอก prefix', async () => {
     await expect(readUrlForKey('line-inbound/../../secret')).rejects.toThrow();
+  });
+});
+
+describe('dispositionFor', () => {
+  it('รูป inline, อย่างอื่น attachment', () => {
+    expect(dispositionFor('image/jpeg')).toBe('inline');
+    expect(dispositionFor('image/png')).toBe('inline');
+    expect(dispositionFor('image/webp')).toBe('inline');
+    expect(dispositionFor('application/pdf')).toBe('attachment');
+    expect(dispositionFor('text/html')).toBe('attachment');
+    expect(dispositionFor('application/octet-stream')).toBe('attachment');
+  });
+});
+
+describe('resolveReadKey', () => {
+  it('storageKey มาก่อนเสมอ', () => {
+    stubStorage('https://abc.supabase.co/storage/v1/s3');
+    expect(resolveReadKey({ storageKey: 'a/b.jpg', legacyUrl: 'https://abc.supabase.co/storage/v1/s3/media/c/d.jpg' })).toBe('a/b.jpg');
+  });
+
+  it('fallback ไป legacyUrl เมื่อ storageKey ว่าง', () => {
+    stubStorage('https://abc.supabase.co/storage/v1/s3');
+    expect(resolveReadKey({ storageKey: null, legacyUrl: 'https://abc.supabase.co/storage/v1/s3/media/c/d.jpg' })).toBe('c/d.jpg');
+  });
+
+  it('คืน null เมื่อไม่มีทั้งคู่ หรือ legacyUrl ไม่ตรงรูปแบบ', () => {
+    stubStorage('https://abc.supabase.co/storage/v1/s3');
+    expect(resolveReadKey({ storageKey: null, legacyUrl: null })).toBeNull();
+    expect(resolveReadKey({ storageKey: null, legacyUrl: 'https://other.example/x.jpg' })).toBeNull();
   });
 });

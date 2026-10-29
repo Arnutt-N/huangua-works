@@ -65,6 +65,29 @@ export interface ReadUrlOptions {
 const READ_URL_DEFAULT_TTL = 300;
 const READ_URL_MAX_TTL = 900;
 
+/** § route ใช้ค่านี้ตอบ client — ที่เดียว ไม่ให้ hardcode 300 ซ้ำในสอง route */
+export const READ_URL_TTL_SECONDS = READ_URL_DEFAULT_TTL;
+
+/** § mime ที่แสดงในเบราว์เซอร์ได้อย่างปลอดภัย — ที่เหลือบังคับดาวน์โหลด (กัน stored-XSS) */
+const INLINE_MIMES: ReadonlySet<string> = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+]);
+
+export function dispositionFor(mimeType: string): 'inline' | 'attachment' {
+  return INLINE_MIMES.has(mimeType) ? 'inline' : 'attachment';
+}
+
+/**
+ * § key ของแถว — storage_key ก่อน แล้ว fallback ไป URL เดิมของแถวก่อน backfill
+ * ใช้ร่วมกันสอง route เพื่อไม่ให้ fallback เขียนต่างกันคนละแบบ
+ */
+export function resolveReadKey(row: { storageKey: string | null; legacyUrl: string | null }): string | null {
+  return row.storageKey ?? (row.legacyUrl ? keyFromUrl(row.legacyUrl) : null);
+}
+
 /**
  * § presigned GET สำหรับอ่านไฟล์ — ต้องเซ็น GetObject ไม่ใช่ PutObject
  * (ของเดิม `getPresignedUrl` เซ็น PutObject และไม่มี caller = dead export ที่ใช้ดาวน์โหลดไม่ได้)

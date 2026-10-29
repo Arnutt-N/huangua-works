@@ -59,14 +59,19 @@ export function FilesClient() {
 
   // § ปุ่ม "คัดลอก URL" เดิมลบออก — URL ที่ได้จาก read-url อายุ 5 นาที
   // ลิงก์ที่คัดลอกไปจะตายก่อนถึงมือผู้รับ จึงเหลือแค่ "เปิด" ที่ขอ URL ใหม่ทุกครั้ง
+  // § เปิดหน้าต่างเปล่าก่อน await — window.open หลัง await ถือว่าไม่มี user gesture
+  // และถูก popup blocker ตัดทิ้ง (Safari บล็อกแน่นอน, Chrome บ่อย)
   async function openFile(item: MediaItem) {
+    const tab = window.open('', '_blank', 'noreferrer');
     try {
       const res = await fetch(`/api/line/admin/media/${item.id}/read-url`, { cache: 'no-store' });
       if (!res.ok) throw new Error(String(res.status));
       const data = (await res.json()) as { url?: unknown };
       if (typeof data.url !== 'string') throw new Error('malformed');
-      window.open(data.url, '_blank', 'noreferrer');
+      if (tab) tab.location.href = data.url;
+      else window.open(data.url, '_blank', 'noreferrer');
     } catch {
+      tab?.close();
       notify('error', 'เปิดไฟล์ไม่ได้ — ลองใหม่อีกครั้ง');
     }
   }

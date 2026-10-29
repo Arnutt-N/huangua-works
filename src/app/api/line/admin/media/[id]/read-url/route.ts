@@ -5,11 +5,9 @@ import { mediaFiles } from '@/lib/db/schema';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { requireStaffApi } from '@/lib/auth/require-staff';
 import { ADMIN_ROLES } from '@/lib/auth/roles';
-import { keyFromUrl, readUrlForKey } from '@/lib/storage';
+import { readUrlForKey, dispositionFor, resolveReadKey, READ_URL_TTL_SECONDS } from '@/lib/storage';
 
 export const runtime = 'nodejs';
-
-const INLINE_MIMES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
 
 /**
  * § ออก presigned GET สำหรับไฟล์เดียว — รับ **id เท่านั้น**
@@ -39,7 +37,7 @@ export async function GET(
   );
   if (!row) return NextResponse.json({ error: 'ไม่พบไฟล์' }, { status: 404 });
 
-  const key = row.storageKey ?? keyFromUrl(row.url);
+  const key = resolveReadKey({ storageKey: row.storageKey, legacyUrl: row.url });
   if (!key) {
     return NextResponse.json(
       { error: 'ที่อยู่ไฟล์ไม่ตรงกับรูปแบบ storage — ออกลิงก์ไม่ได้' },
@@ -49,10 +47,10 @@ export async function GET(
 
   const url = await readUrlForKey(key, {
     contentType: row.mimeType,
-    disposition: INLINE_MIMES.has(row.mimeType) ? 'inline' : 'attachment',
+    disposition: dispositionFor(row.mimeType),
     filename: row.filename,
   });
 
   // § ไม่คืน key หรือ URL ของ storage — client ได้แค่ URL ที่เซ็นแล้ว
-  return NextResponse.json({ url, expiresIn: 300 });
+  return NextResponse.json({ url, expiresIn: READ_URL_TTL_SECONDS });
 }
