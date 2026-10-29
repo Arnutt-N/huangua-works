@@ -4,6 +4,7 @@ import { AlertCircle, Bot, CheckCheck, RefreshCw, User, UserCheck } from 'lucide
 import { cn } from '@/lib/cn';
 import { formatTime } from '../_lib/format';
 import type { Message } from '../_lib/types';
+import { useMediaReadUrl } from '../_lib/use-media-read-url';
 import { LineAvatar } from './line-avatar';
 
 const SENDER_LABELS: Record<string, string> = {
@@ -46,6 +47,18 @@ export function MessageBubble({
 }) {
   const isAdmin = msg.sender === 'admin';
   const isBot = msg.sender === 'bot';
+  // § ขอ presigned URL เมื่อ bubble มีไฟล์เท่านั้น — endpoint รับ messageId + conversationId
+  // ไม่รับ key (route ฝั่ง server resolve key จากแถวเอง)
+  const hasAttachment =
+    msg.hasMedia === true &&
+    (msg.messageType === 'image' ||
+      msg.messageType === 'file' ||
+      msg.messageType === 'video' ||
+      msg.messageType === 'audio');
+  const readEndpoint = hasAttachment
+    ? `/api/line/admin/conversations/${msg.conversationId}/messages/${msg.id}/read-url`
+    : null;
+  const readUrl = useMediaReadUrl(readEndpoint);
   // ฝั่งขวา = ข้อความที่ออกจากเรา (เจ้าหน้าที่ + บอทตอบแทนเรา), ฝั่งซ้าย = ลูกค้า
   const outgoing = isAdmin || isBot;
   const senderLabel = SENDER_LABELS[msg.sender] ?? customerName ?? 'ผู้ใช้ LINE';
@@ -112,13 +125,17 @@ export function MessageBubble({
                 : 'border border-border bg-surface-raised text-ink',
           )}
         >
-          {msg.messageType === 'image' && msg.mediaUrl ? (
-            <a href={msg.mediaUrl} target="_blank" rel="noreferrer" aria-label="เปิดรูปต้นฉบับที่ผู้ใช้ส่ง">
+          {msg.messageType === 'image' && readUrl.url ? (
+            <a href={readUrl.url} target="_blank" rel="noreferrer" aria-label="เปิดรูปต้นฉบับที่ผู้ใช้ส่ง">
               {/* eslint-disable-next-line @next/next/no-img-element -- รูปจาก storage ภายนอก ไม่ผ่าน Next image optimizer */}
-              <img src={msg.mediaUrl} alt="รูปที่ผู้ใช้ส่ง" className="max-h-64 w-auto rounded-md" />
+              <img src={readUrl.url} alt="รูปที่ผู้ใช้ส่ง" className="max-h-64 w-auto rounded-md" />
             </a>
-          ) : (msg.messageType === 'file' || msg.messageType === 'video' || msg.messageType === 'audio') && msg.mediaUrl ? (
-            <a href={msg.mediaUrl} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+          ) : hasAttachment && readUrl.loading ? (
+            <span className="text-muted">กำลังโหลดไฟล์...</span>
+          ) : hasAttachment && readUrl.failed ? (
+            <span className="text-muted">เปิดไฟล์ไม่ได้ — ลองรีเฟรชหน้าอีกครั้ง</span>
+          ) : (msg.messageType === 'file' || msg.messageType === 'video' || msg.messageType === 'audio') && readUrl.url ? (
+            <a href={readUrl.url} target="_blank" rel="noreferrer" className="underline underline-offset-2">
               {msg.metadata?.fileName ?? (msg.messageType === 'file' ? 'ไฟล์แนบ' : msg.messageType === 'video' ? 'วิดีโอแนบ' : 'เสียงแนบ')} (เปิดดู)
             </a>
           ) : (msg.messageType === 'image' || msg.messageType === 'file' || msg.messageType === 'video' || msg.messageType === 'audio') && msg.metadata?.skipped ? (

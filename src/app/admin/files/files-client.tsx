@@ -4,15 +4,32 @@ import { useRef, useState } from 'react';
 import type { MediaItem } from '@/app/admin/_lib/admin-api';
 import { adminApi } from '@/app/admin/_lib/admin-api';
 import { useResource } from '@/app/admin/_lib/use-resource';
-import { Upload, Trash2, Copy, Image as ImageIcon, FileIcon } from 'lucide-react';
+import { Upload, Trash2, ExternalLink, Image as ImageIcon, FileIcon } from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import { AdminErrorState } from '@/components/admin/admin-error-state';
 import { Button } from '@/components/ui/button';
+import { useMediaItemReadUrl } from './use-media-item-read-url';
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** § ต้องเป็น component แยกเพื่อเรียก hook ได้ — ห้ามเรียก hook ใน .map() */
+function MediaThumb({ item }: { item: MediaItem }) {
+  const isImage = item.mimeType.startsWith('image/');
+  const url = useMediaItemReadUrl(item.id, isImage);
+  return (
+    <div className="mb-2 flex h-20 items-center justify-center rounded bg-surface-raised">
+      {isImage && url ? (
+        /* eslint-disable-next-line @next/next/no-img-element -- รูปจาก storage ภายนอก ไม่ผ่าน Next image optimizer */
+        <img src={url} alt={item.filename} className="max-h-20 rounded object-contain" />
+      ) : (
+        <FileIcon className="h-8 w-8 text-muted" aria-label={isImage ? 'กำลังโหลดรูป' : 'ไฟล์'} />
+      )}
+    </div>
+  );
 }
 
 export function FilesClient() {
@@ -40,9 +57,18 @@ export function FilesClient() {
     await mutate(() => adminApi.deleteMedia(item.id), 'ลบสำเร็จ');
   }
 
-  function copyUrl(url: string) {
-    navigator.clipboard.writeText(url);
-    notify('success', 'คัดลอก URL แล้ว');
+  // § ปุ่ม "คัดลอก URL" เดิมลบออก — URL ที่ได้จาก read-url อายุ 5 นาที
+  // ลิงก์ที่คัดลอกไปจะตายก่อนถึงมือผู้รับ จึงเหลือแค่ "เปิด" ที่ขอ URL ใหม่ทุกครั้ง
+  async function openFile(item: MediaItem) {
+    try {
+      const res = await fetch(`/api/line/admin/media/${item.id}/read-url`, { cache: 'no-store' });
+      if (!res.ok) throw new Error(String(res.status));
+      const data = (await res.json()) as { url?: unknown };
+      if (typeof data.url !== 'string') throw new Error('malformed');
+      window.open(data.url, '_blank', 'noreferrer');
+    } catch {
+      notify('error', 'เปิดไฟล์ไม่ได้ — ลองใหม่อีกครั้ง');
+    }
   }
 
   return (
@@ -84,18 +110,12 @@ export function FilesClient() {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {items.map((item) => (
               <div key={item.id} className="group relative rounded-lg border border-border/50 p-3">
-                <div className="mb-2 flex h-20 items-center justify-center rounded bg-surface-raised">
-                  {item.mimeType.startsWith('image/') ? (
-                    <img src={item.url} alt={item.filename} className="max-h-20 rounded object-contain" />
-                  ) : (
-                    <FileIcon className="h-8 w-8 text-muted" />
-                  )}
-                </div>
+                <MediaThumb item={item} />
                 <p className="truncate text-xs font-medium text-ink">{item.filename}</p>
                 <p className="text-xs text-muted">{formatSize(item.sizeBytes)} · {item.category}</p>
                 <div className="mt-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
-                  <button onClick={() => copyUrl(item.url)} className="min-h-touch min-w-touch flex items-center justify-center rounded hover:bg-accent/10" aria-label="คัดลอก URL">
-                    <Copy className="h-3.5 w-3.5 text-muted" />
+                  <button onClick={() => void openFile(item)} className="min-h-touch min-w-touch flex items-center justify-center rounded hover:bg-accent/10" aria-label={`เปิด ${item.filename}`}>
+                    <ExternalLink className="h-3.5 w-3.5 text-muted" />
                   </button>
                   <button onClick={() => handleDelete(item)} className="min-h-touch min-w-touch flex items-center justify-center rounded hover:bg-danger/10" aria-label={`ลบ ${item.filename}`}>
                     <Trash2 className="h-3.5 w-3.5 text-danger" />

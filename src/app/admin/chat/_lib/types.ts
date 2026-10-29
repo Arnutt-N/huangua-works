@@ -43,10 +43,13 @@ export interface ConversationDetail {
 
 export interface Message {
   id: string;
+  /** § ใช้ประกอบ read-url endpoint — server ส่งมากับแถวของ GET conversations/[id] */
+  conversationId?: string;
   sender: string;
   messageType: string;
   textContent: string | null;
-  mediaUrl?: string | null;
+  /** § server ไม่ส่งที่อยู่ไฟล์มาอีกแล้ว — ขอผ่าน read-url ตอนจะแสดง (T3/T4) */
+  hasMedia?: boolean;
   metadata?: { skipped?: string; fileName?: string; sizeBytes?: number; contentType?: string } | null;
   createdAt: string;
   clientTempId?: string | null;
