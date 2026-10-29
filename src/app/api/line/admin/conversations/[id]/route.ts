@@ -61,8 +61,25 @@ export async function GET(
 
   // cursor = message id (UUIDv7 เรียงตามเวลา) — ดึงใหม่สุด limit+1 แล้ว reverse
   // ให้ client ได้ messages เรียง asc เหมือนเดิม + รู้ว่ามีหน้าก่อนหน้าอีกไหม
+  // § select เฉพาะคอลัมน์ที่ client ใช้ — ห้ามส่ง media_url/storage_key ออกไป
+  // client ขอ URL ที่เซ็นแล้วผ่าน .../messages/[messageId]/read-url ตอนจะแสดงรูป
   const page = await db
-    .select()
+    .select({
+      id: chatMessages.id,
+      createdAt: chatMessages.createdAt,
+      conversationId: chatMessages.conversationId,
+      sender: chatMessages.sender,
+      messageType: chatMessages.messageType,
+      textContent: chatMessages.textContent,
+      flexPayload: chatMessages.flexPayload,
+      locationData: chatMessages.locationData,
+      lineMessageId: chatMessages.lineMessageId,
+      adminUserId: chatMessages.adminUserId,
+      clientTempId: chatMessages.clientTempId,
+      metadata: chatMessages.metadata,
+      // § client ต้องรู้ว่ามีไฟล์เพื่อเรนเดอร์ placeholder — แต่ไม่ได้ key/URL
+      hasMedia: sql<boolean>`(${chatMessages.storageKey} is not null or ${chatMessages.mediaUrl} is not null)`,
+    })
     .from(chatMessages)
     .where(
       and(
