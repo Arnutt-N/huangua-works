@@ -60,7 +60,20 @@ export function isAllowedActionUri(uri: string): boolean {
 /** § LINE imagemap ใช้ `linkUri` ไม่ใช่ `uri` — ต้องตรวจทั้งสองชื่อ */
 const ACTION_URI_FIELDS = ['uri', 'linkUri'] as const;
 
-/** rich menu action ต้องเป็น https เท่านั้น (ตรงกับ validateArea ฝั่ง client) */
+export function isValidRichMenuUri(uri: string): boolean {
+  const trimmed = uri.trim();
+  if (!trimmed.startsWith('https://')) return false;
+  // § <LIFF_ID> หรืออักขระ < > / ช่องว่าง ทำให้ URI parser ของ LINE API (java.net.URI) ตีตก 400
+  if (/[<>\s]/.test(trimmed)) return false;
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === 'https:' && parsed.hostname.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/** rich menu action ต้องเป็น https ที่สมบูรณ์และไม่มี placeholder เช่น <LIFF_ID> */
 export function findInvalidRichMenuArea(areas: unknown): string | null {
   if (!Array.isArray(areas)) return null;
   for (const area of areas) {
@@ -69,9 +82,9 @@ export function findInvalidRichMenuArea(areas: unknown): string | null {
       | undefined;
     if (!action) continue;
     if (action.type !== 'uri') continue;
-    if (typeof action.uri !== 'string' || action.uri.trim() === '') continue;
+    if (typeof action.uri !== 'string' || action.uri.trim() === '') return '(ค่าว่าง)';
     const uri = action.uri.trim();
-    if (!uri.startsWith('https://')) return uri;
+    if (!isValidRichMenuUri(uri)) return uri;
   }
   return null;
 }

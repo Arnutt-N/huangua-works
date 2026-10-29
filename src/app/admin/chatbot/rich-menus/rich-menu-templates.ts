@@ -1,8 +1,11 @@
+import { isValidRichMenuUri } from '@/lib/contracts';
+
 export interface RichMenuAreaAction {
   type: 'uri' | 'message' | 'richmenuswitch';
   uri?: string;
   text?: string;
   richMenuAliasId?: string;
+  data?: string;
 }
 
 export interface RichMenuArea {
@@ -168,6 +171,7 @@ export function validateArea(action: RichMenuAreaAction): string | null {
     if (/<\s*LIFF_ID\s*>/i.test(action.uri) || action.uri.includes('<') || action.uri.includes('>')) {
       return 'กรุณาแทน <LIFF_ID> ด้วยค่า LINE_LIFF_ID จริงก่อนบันทึก';
     }
+    if (!isValidRichMenuUri(action.uri)) return 'รูปแบบ URL ไม่ถูกต้อง';
     return null;
   }
   if (!action.text?.trim()) return 'กรุณากรอกข้อความที่จะส่ง';
@@ -190,7 +194,13 @@ export function areaStyle(
 export function toLineAction(action: RichMenuAreaAction): RichMenuAreaAction {
   if (action.type === 'uri') return { type: 'uri', uri: action.uri?.trim() ?? '' };
   if (action.type === 'richmenuswitch') {
-    return { type: 'richmenuswitch', richMenuAliasId: action.richMenuAliasId };
+    const aliasId = action.richMenuAliasId?.trim() ?? '';
+    return {
+      type: 'richmenuswitch',
+      richMenuAliasId: aliasId,
+      // § LINE Messaging API บังคับฟิลด์ data (1–300 ตัวอักษร) บน richmenuswitch ไม่งั้นโดน 400
+      data: action.data?.trim() || `richmenuswitch:${aliasId}`,
+    };
   }
   return { type: 'message', text: action.text?.trim() ?? '' };
 }

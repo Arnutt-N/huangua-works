@@ -8,6 +8,7 @@ import {
   areaStyle,
   templateByKey,
   templatesByGroup,
+  toLineAction,
   validateArea,
 } from '../rich-menu-templates';
 import { RichMenuBuilderClient } from './rich-menu-builder-client';
@@ -52,9 +53,10 @@ describe('rich-menu-templates', () => {
     expect(templateByKey('ไม่มี')).toBe(RICH_MENU_TEMPLATES[0]);
   });
 
-  it('validateArea ตรวจ uri ต้อง https', () => {
+  it('validateArea ตรวจ uri ต้อง https และมี host ที่ถูกต้อง', () => {
     expect(validateArea({ type: 'uri', uri: '' })).toBeTruthy();
     expect(validateArea({ type: 'uri', uri: 'http://x' })).toBeTruthy();
+    expect(validateArea({ type: 'uri', uri: 'https://' })).toBe('รูปแบบ URL ไม่ถูกต้อง');
     expect(validateArea({ type: 'uri', uri: 'https://x' })).toBeNull();
   });
 
@@ -70,6 +72,11 @@ describe('rich-menu-templates', () => {
     );
     expect(validateArea({ type: 'richmenuswitch' })).toBe('ต้องเลือก alias ปลายทาง');
     expect(validateArea({ type: 'richmenuswitch', richMenuAliasId: 'a' })).toBeNull();
+    expect(toLineAction({ type: 'richmenuswitch', richMenuAliasId: 'a' })).toEqual({
+      type: 'richmenuswitch',
+      richMenuAliasId: 'a',
+      data: 'richmenuswitch:a',
+    });
   });
 
   it('areaStyle แปลง bounds เป็น percent', () => {
