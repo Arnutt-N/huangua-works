@@ -20,8 +20,17 @@ const createSchema = z
     content: z.array(contentSchema).min(1).max(5),
     target: broadcastTargetSchema.default({ kind: 'all' }),
     scheduledAt: z.string().datetime().nullable().optional(),
+    status: z.enum(['draft', 'scheduled']).optional(),
   })
   .superRefine((data, ctx) => {
+    // § FORM-01: ถ้า status ระบุเป็น 'scheduled' ต้องมี scheduledAt
+    if (data.status === 'scheduled' && !data.scheduledAt) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['scheduledAt'],
+        message: 'กรุณาระบุเวลาส่งสำหรับการตั้งเวลา — หรือเลือกสร้างเป็นร่าง',
+      });
+    }
     // § field เป็น nullable.optional → .refine บน field ตรง ๆ จะโดน null/undefined ด้วย
     // ใช้ superRefine ระดับ object แล้วเช็คเฉพาะค่าที่มีจริง
     if (data.scheduledAt && new Date(data.scheduledAt).getTime() <= Date.now()) {
@@ -102,7 +111,13 @@ export async function POST(request: Request) {
 
   const db = await getDb();
   const id = generateId();
-  const status = result.data.scheduledAt ? 'scheduled' : 'draft';
+  // § FORM-01: กำหนดสถานะตามที่ระบุ ถ้าไม่ระบุ fallback ตาม scheduledAt
+  const status = result.data.status ?? (result.data.scheduledAt ? 'scheduled' : 'draft');
+  // § ป้องกัน cron เผลอยิง: หากสถานะเป็น draft ต้องบันทึก scheduledAt เป็น null เสมอ
+  const scheduledAt =
+    status === 'scheduled' && result.data.scheduledAt
+      ? new Date(result.data.scheduledAt)
+      : null;
 
   await db.insert(chatBroadcasts).values({
     id,
@@ -110,7 +125,7 @@ export async function POST(request: Request) {
     content: result.data.content,
     status,
     target: result.data.target,
-    scheduledAt: result.data.scheduledAt ? new Date(result.data.scheduledAt) : null,
+    scheduledAt,
     createdBy: authz.ctx.user.id,
   });
 

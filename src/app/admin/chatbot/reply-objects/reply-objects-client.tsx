@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Eye, Pencil, Plus, Trash2 } from 'lucide-react';
 import { adminApi, type ReplyObject } from '@/app/admin/_lib/admin-api';
@@ -33,13 +33,27 @@ export function ReplyObjectsClient() {
   const [deleteTarget, setDeleteTarget] = useState<ReplyObject | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const created = params.get('created');
+    if (created) {
+      notify('success', `สร้าง ${created === '1' ? 'เทมเพลต' : created} เรียบร้อย`);
+      const url = new URL(window.location.href);
+      url.searchParams.delete('created');
+      const searchStr = url.searchParams.toString();
+      const cleanUrl = url.pathname + (searchStr ? `?${searchStr}` : '');
+      window.history.replaceState({}, '', cleanUrl);
+    }
+  }, [notify]);
+
   async function handleEditSave(form: ReplyObjectFormData): Promise<boolean> {
     if (!editing) return false;
     let payload: Record<string, unknown>;
     try {
       payload = JSON.parse(form.payload);
     } catch {
-      notify('error', 'Invalid JSON payload');
+      notify('error', 'รูปแบบ JSON ไม่ถูกต้อง');
       return false;
     }
     const res = await adminApi.updateReplyObject(editing.id, {
@@ -54,6 +68,7 @@ export function ReplyObjectsClient() {
       notify('error', res.error);
       return false;
     }
+    notify('success', `อัปเดต ${editing.objectId} เรียบร้อย`);
     setEditing(null);
     await reload();
     return true;
@@ -85,12 +100,12 @@ export function ReplyObjectsClient() {
     setPendingId(item.id);
     try {
       const res = await adminApi.deleteReplyObject(item.id);
+      setDeleteTarget(null);
       if (!res.ok) {
         notify('error', res.error);
         return;
       }
       notify('success', `ลบ ${item.objectId} เรียบร้อย`);
-      setDeleteTarget(null);
       await reload();
     } finally {
       setPendingId(null);
@@ -193,12 +208,13 @@ export function ReplyObjectsClient() {
                   type="button"
                   role="switch"
                   aria-checked={item.isActive}
+                  aria-busy={pendingId === item.id}
                   aria-label={`${item.isActive ? 'ปิด' : 'เปิด'}ใช้งาน ${item.objectId}`}
                   onClick={() => void handleToggleActive(item)}
                   disabled={pendingId !== null}
                   className={`relative inline-flex h-5 w-9 flex-none items-center rounded-pill transition-colors duration-normal ${
                     item.isActive ? 'bg-accent-strong' : 'bg-surface-sunken'
-                  }`}
+                  } ${pendingId === item.id ? 'opacity-50' : ''}`}
                 >
                   <span
                     aria-hidden="true"
@@ -211,8 +227,9 @@ export function ReplyObjectsClient() {
                   type="button"
                   onClick={() => setDeleteTarget(item)}
                   disabled={pendingId !== null}
+                  aria-busy={pendingId === item.id}
                   aria-label={`ลบ ${item.objectId}`}
-                  className="inline-flex min-h-touch min-w-touch items-center justify-center rounded-md text-danger hover:bg-danger-soft"
+                  className="inline-flex min-h-touch min-w-touch items-center justify-center rounded-md text-danger hover:bg-danger-soft disabled:opacity-50"
                 >
                   <Trash2 className="h-4 w-4" aria-hidden="true" />
                 </button>
@@ -297,7 +314,7 @@ export function ReplyObjectsClient() {
         onConfirm={() => {
           if (deleteTarget) void handleDelete(deleteTarget);
         }}
-        title={`ลบ $${deleteTarget?.objectId ?? ''}`}
+        title={`ลบ ${deleteTarget?.objectId ?? ''}`}
         description={`เทมเพลตนี้จะถูกลบถาวรและเรียกคืนไม่ได้`}
         confirmText="ลบ"
         danger

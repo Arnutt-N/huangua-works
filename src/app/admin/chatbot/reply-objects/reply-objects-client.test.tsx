@@ -210,4 +210,59 @@ describe('ReplyObjectsClient กริด JSK', () => {
       expect(screen.getByRole('status')).toHaveTextContent(/เรียบร้อย/);
     });
   });
+
+  it('handleDelete คืน error → ปิด ConfirmDialog และ banner แสดง error', async () => {
+    const user = userEvent.setup();
+    deleteReplyObject.mockResolvedValue({ ok: false, error: 'ไม่สามารถลบได้เนื่องจากถูกใช้งานอยู่' });
+    render(<ReplyObjectsClient />);
+    await screen.findByText('$$welcome_flex');
+
+    await user.click(screen.getByRole('button', { name: 'ลบ welcome_flex' }));
+    expect(await screen.findByText('เทมเพลตนี้จะถูกลบถาวรและเรียกคืนไม่ได้')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'ลบ' }));
+    await waitFor(() => {
+      expect(deleteReplyObject).toHaveBeenCalledWith('r1');
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText('เทมเพลตนี้จะถูกลบถาวรและเรียกคืนไม่ได้')).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole('status')).toHaveTextContent('ไม่สามารถลบได้เนื่องจากถูกใช้งานอยู่');
+  });
+
+  it('แก้ไขและบันทึกสำเร็จ → แสดง success banner และปิด modal', async () => {
+    const user = userEvent.setup();
+    updateReplyObject.mockResolvedValue({ ok: true, data: { ok: true } });
+    listReplyObjects
+      .mockResolvedValueOnce({ ok: true, data: { items: [item()] } })
+      .mockResolvedValueOnce({ ok: true, data: { items: [item({ name: 'Updated Name' })] } });
+
+    render(<ReplyObjectsClient />);
+    await screen.findByText('$$welcome_flex');
+
+    await user.click(screen.getByRole('button', { name: 'แก้ไข welcome_flex' }));
+    expect(await screen.findByText('Edit Object')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Save Modifications' }));
+    await waitFor(() => {
+      expect(updateReplyObject).toHaveBeenCalled();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent('อัปเดต welcome_flex เรียบร้อย');
+    });
+    expect(screen.queryByText('Edit Object')).not.toBeInTheDocument();
+  });
+
+  it('เปิดหน้าด้วย ?created=new_tpl → แสดง success banner สร้างเรียบร้อย', async () => {
+    window.history.pushState({}, '', '/admin/chatbot/reply-objects?created=welcome_flex');
+
+    render(<ReplyObjectsClient />);
+    await screen.findByText('$$welcome_flex');
+
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent('สร้าง welcome_flex เรียบร้อย');
+    });
+  });
 });

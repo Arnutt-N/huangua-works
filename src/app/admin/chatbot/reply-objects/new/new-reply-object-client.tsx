@@ -22,7 +22,7 @@ export function NewReplyObjectClient() {
     try {
       payload = JSON.parse(form.payload);
     } catch {
-      setServerError('Invalid JSON payload');
+      setServerError('รูปแบบ JSON ไม่ถูกต้อง');
       return false;
     }
     const res = await adminApi.createReplyObject({
@@ -38,7 +38,7 @@ export function NewReplyObjectClient() {
       setServerError(res.error);
       return false;
     }
-    back();
+    router.push(`/admin/chatbot/reply-objects?created=${encodeURIComponent(form.objectId.trim())}`);
     return true;
   }
 

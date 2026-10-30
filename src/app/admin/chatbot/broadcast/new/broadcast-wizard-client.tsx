@@ -147,6 +147,7 @@ export function BroadcastWizardClient() {
       title: title.trim() || null,
       content,
       target: currentTarget(),
+      status: mode === 'schedule' ? 'scheduled' : 'draft',
       scheduledAt: mode === 'schedule' ? new Date(scheduleAt).toISOString() : null,
     });
     if (res.ok && mode === 'send-now' && res.data.id) {
