@@ -57,6 +57,30 @@ describe('IntentDetailClient', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('ต้องเหลือ keyword อย่างน้อย 1 คำ');
     expect(updateIntent).not.toHaveBeenCalled();
   });
+
+  it('ลบ keyword เมื่อมีมากกว่า 1 คำ — เปิด confirm dialog ก่อนลบจริง', async () => {
+    const user = userEvent.setup();
+    const nativeConfirm = vi.spyOn(window, 'confirm');
+    getIntent.mockResolvedValue({
+      ok: true,
+      data: intent({
+        keywords: [
+          { id: 'k1', keyword: 'กี่โมง', matchType: 'contains' },
+          { id: 'k2', keyword: 'เปิดกี่โมง', matchType: 'contains' },
+        ],
+      }),
+    });
+    render(<IntentDetailClient intentId="i1" />);
+    await screen.findByText('เปิดกี่โมง');
+
+    await user.click(screen.getByRole('button', { name: 'ลบ keyword เปิดกี่โมง' }));
+    expect(await screen.findByText('ลบ keyword')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'ลบ' }));
+
+    await waitFor(() => expect(updateIntent).toHaveBeenCalled());
+    expect(nativeConfirm).not.toHaveBeenCalled();
+    nativeConfirm.mockRestore();
+  });
   it('แสดงชื่อ + readiness + tab keywords/responses', async () => {
     render(<IntentDetailClient intentId="i1" />);
     expect(await screen.findByText('เวลาทำการ')).toBeInTheDocument();

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { adminApi, type BroadcastContent } from '@/app/admin/_lib/admin-api';
 import { AdminCard } from '@/components/admin/admin-card';
+import { useConfirm } from '@/components/admin/use-confirm';
 import { Button } from '@/components/ui/button';
 import { FieldHint, Label, Textarea } from '@/components/ui/field';
 import { ThaiDatePicker } from '@/components/ui/thai-date-picker';
@@ -28,6 +29,7 @@ const STEPS = ['เลือกประเภท', 'เขียนข้อค
 export function BroadcastWizardClient() {
   const router = useRouter();
   const [step, setStep] = useState(0);
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [contentType, setContentType] = useState<ContentType>('text');
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
@@ -119,7 +121,12 @@ export function BroadcastWizardClient() {
       return;
     }
     if (mode === 'send-now') {
-      const ok = window.confirm('ส่งทันที — จะยกเลิกเวลาที่ตั้งไว้ (ถ้ามี) แล้วส่งเลย ต้องการดำเนินการต่อหรือไม่?');
+      // § FORM-06: ใช้ useConfirm แทน window.confirm
+      const ok = await confirm({
+        title: 'ยืนยันการส่งประกาศทันที',
+        description: 'ส่งทันที — จะยกเลิกเวลาที่ตั้งไว้ (ถ้ามี) แล้วส่งเลย ต้องการดำเนินการต่อหรือไม่?',
+        confirmText: 'ส่งทันที',
+      });
       if (!ok) return;
     }
     // § datetime-local เป็นเวลาท้องถิ่น — ตั้งอดีตผ่านจะค้าง scheduled ไม่ส่ง (cron ยิง <= NOW)
@@ -469,6 +476,7 @@ export function BroadcastWizardClient() {
           </div>
         )}
       </div>
+      {confirmDialog}
     </div>
   );
 }

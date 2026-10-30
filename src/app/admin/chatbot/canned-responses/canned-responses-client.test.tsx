@@ -114,15 +114,17 @@ describe('CannedResponsesClient ตาราง JSK', () => {
 
   it('ลบต้อง confirm ก่อน — ยกเลิกไม่ยิง API', async () => {
     const user = userEvent.setup();
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const nativeConfirm = vi.spyOn(window, 'confirm');
     fetchCannedResponses.mockResolvedValue([item()]);
     render(<CannedResponsesClient />);
     await screen.findByText('ทักทาย');
 
     await user.click(screen.getByRole('button', { name: 'ลบ ทักทาย' }));
-    expect(confirmSpy).toHaveBeenCalled();
+    expect(await screen.findByText('ลบข้อความสำเร็จรูป')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'ยกเลิก' }));
     expect(deleteCannedResponse).not.toHaveBeenCalled();
-    confirmSpy.mockRestore();
+    expect(nativeConfirm).not.toHaveBeenCalled();
+    nativeConfirm.mockRestore();
   });
 
   it('สร้างข้อความใหม่ต้องกรอกชอร์ตคัต + หมวดหมู่ถูกส่งไปด้วย', async () => {
@@ -180,16 +182,19 @@ describe('CannedResponsesClient ตาราง JSK', () => {
 
   it('ลบแล้ว reload ลิสต์', async () => {
     const user = userEvent.setup();
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const nativeConfirm = vi.spyOn(window, 'confirm');
     fetchCannedResponses.mockResolvedValueOnce([item()]).mockResolvedValueOnce([]);
     deleteCannedResponse.mockResolvedValue(true);
     render(<CannedResponsesClient />);
     await screen.findByText('ทักทาย');
 
     await user.click(screen.getByRole('button', { name: 'ลบ ทักทาย' }));
+    expect(await screen.findByText('ลบข้อความสำเร็จรูป')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'ลบ' }));
 
     await waitFor(() => expect(deleteCannedResponse).toHaveBeenCalledWith('c1'));
     expect(await screen.findByText('ยังไม่มีข้อความสำเร็จรูป')).toBeInTheDocument();
-    confirmSpy.mockRestore();
+    expect(nativeConfirm).not.toHaveBeenCalled();
+    nativeConfirm.mockRestore();
   });
 });

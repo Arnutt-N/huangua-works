@@ -316,8 +316,13 @@ function ConfirmDialog({
     if (state.success) onOpenChange(false);
   }, [state.success, onOpenChange]);
 
+  // § FORM-05: pending = กำลังส่ง server action — ปิดด้วย X/Escape/overlay ไม่ได้
+  const blockWhenPending = (event: Event) => {
+    if (pending) event.preventDefault();
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(next) => (!next && !pending ? onOpenChange(false) : undefined)}>
       <DialogTrigger asChild>
         <Button
           type="button"
@@ -329,7 +334,12 @@ function ConfirmDialog({
           {icon}
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent
+        showClose={!pending}
+        onEscapeKeyDown={blockWhenPending}
+        onPointerDownOutside={blockWhenPending}
+        onInteractOutside={blockWhenPending}
+      >
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
@@ -338,7 +348,7 @@ function ConfirmDialog({
           <input type="hidden" name="userId" value={row.id} />
           {state.error && <FormAlert>{state.error}</FormAlert>}
           <div className="flex justify-end gap-2 pt-1">
-            <Button type="button" variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="ghost" size="sm" onClick={() => onOpenChange(false)} disabled={pending}>
               ยกเลิก
             </Button>
             <Button type="submit" size="sm" variant={destructive ? 'destructive' : 'primary'} disabled={pending}>

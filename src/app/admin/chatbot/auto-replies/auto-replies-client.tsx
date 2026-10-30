@@ -15,6 +15,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/components/admin/use-confirm';
 import { Label, Input, Textarea } from '@/components/ui/field';
 
 interface FaqForm {
@@ -33,6 +34,7 @@ export function AutoRepliesClient() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FaqForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const { data, loading, feedback, error, errorCode, notify, mutate, reload } = useResource({
     load: adminApi.listFaq,
@@ -82,7 +84,14 @@ export function AutoRepliesClient() {
   }
 
   async function handleDelete(item: FaqItem) {
-    if (!confirm(`ปิดใช้งาน "${item.question}" ?`)) return;
+    // § FORM-06: ใช้ useConfirm แทน window.confirm
+    const ok = await confirm({
+      title: 'ปิดใช้งาน FAQ',
+      description: `ปิดใช้งาน "${item.question}" ใช่หรือไม่?`,
+      confirmText: 'ปิดใช้งาน',
+      danger: true,
+    });
+    if (!ok) return;
     // server คืน { error } ภาษาไทย (เช่น ไม่พบ FAQ) — mutate จะเอามาแจ้งให้เห็นตรง ๆ
     await mutate(() => adminApi.deleteFaq(item.id), 'ปิดใช้งาน FAQ แล้ว');
   }
@@ -285,6 +294,7 @@ export function AutoRepliesClient() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </>
   );
 }

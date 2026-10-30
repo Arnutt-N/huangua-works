@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { FieldError, FieldHint, Input, Label, Textarea } from '@/components/ui/field';
+import { useConfirm } from '@/components/admin/use-confirm';
 import { createCannedResponse, deleteCannedResponse, updateCannedResponse } from '../_lib/api';
 import type { CannedResponse } from '../_lib/types';
 
@@ -32,6 +33,7 @@ export function CannedManageDialog({
   const [content, setContent] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const startCreate = () => {
     setEditingId(null);
@@ -74,12 +76,18 @@ export function CannedManageDialog({
 
   const handleDelete = async (id: string, title: string) => {
     if (busy) return;
-    // § ลบถาวรไม่มี undo — confirm ก่อนทุกครั้งเหมือนหน้า canned หลัก
-    if (!confirm(`ลบ "${title}" ?`)) return;
+    // § FORM-06: ใช้ useConfirm แทน window.confirm — ลบถาวรไม่มี undo
+    const ok = await confirm({
+      title: 'ลบข้อความสำเร็จรูป',
+      description: `ลบ "${title}" ใช่หรือไม่? ลบแล้วกู้คืนไม่ได้`,
+      confirmText: 'ลบ',
+      danger: true,
+    });
+    if (!ok) return;
     setBusy(true);
-    const ok = await deleteCannedResponse(id);
+    const deleted = await deleteCannedResponse(id);
     setBusy(false);
-    if (!ok) {
+    if (!deleted) {
       setError('ลบไม่สำเร็จ');
       return;
     }
@@ -89,7 +97,8 @@ export function CannedManageDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>ข้อความสำเร็จรูป</DialogTitle>
@@ -196,5 +205,7 @@ export function CannedManageDialog({
         </div>
       </DialogContent>
     </Dialog>
+    {confirmDialog}
+  </>
   );
 }

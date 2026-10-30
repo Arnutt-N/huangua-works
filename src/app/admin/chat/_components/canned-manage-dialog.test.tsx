@@ -38,29 +38,36 @@ beforeEach(() => {
 describe('CannedManageDialog', () => {
   it('ยกเลิก confirm ไม่ยิง API', async () => {
     const user = userEvent.setup();
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(false);
+    const nativeConfirm = vi.spyOn(window, 'confirm');
     renderDialog();
     await user.click(screen.getByRole('button', { name: 'ลบ ทักทาย' }));
+    expect(await screen.findByText('ลบข้อความสำเร็จรูป')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'ยกเลิก' }));
     expect(deleteCannedResponse).not.toHaveBeenCalled();
+    expect(nativeConfirm).not.toHaveBeenCalled();
   });
 
   it('ลบสำเร็จเรียก onChanged + ล้าง error เก่า', async () => {
     const user = userEvent.setup();
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(true);
+    const nativeConfirm = vi.spyOn(window, 'confirm');
     deleteCannedResponse.mockResolvedValue(true);
     const onChanged = vi.fn();
     renderDialog([item()], onChanged);
     await user.click(screen.getByRole('button', { name: 'ลบ ทักทาย' }));
+    expect(await screen.findByText('ลบข้อความสำเร็จรูป')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'ลบ' }));
     await waitFor(() => expect(deleteCannedResponse).toHaveBeenCalledWith('c1'));
     expect(onChanged).toHaveBeenCalledTimes(1);
+    expect(nativeConfirm).not.toHaveBeenCalled();
   });
 
   it('ลบล้มเหลวเห็น error ค้างนอกฟอร์ม', async () => {
     const user = userEvent.setup();
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(true);
     deleteCannedResponse.mockResolvedValue(false);
     renderDialog();
     await user.click(screen.getByRole('button', { name: 'ลบ ทักทาย' }));
+    expect(await screen.findByText('ลบข้อความสำเร็จรูป')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'ลบ' }));
     expect(await screen.findByText('ลบไม่สำเร็จ')).toBeInTheDocument();
   });
 });

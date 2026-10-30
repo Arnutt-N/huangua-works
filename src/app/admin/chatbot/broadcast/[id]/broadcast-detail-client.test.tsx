@@ -82,7 +82,7 @@ describe('BroadcastDetailClient', () => {
 
   it('กดส่งยิง send + reload', async () => {
     const user = userEvent.setup();
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const nativeConfirm = vi.spyOn(window, 'confirm');
     getBroadcast
       .mockResolvedValueOnce({ ok: true, data: item() })
       .mockResolvedValueOnce({ ok: true, data: item({ status: 'sent' }) });
@@ -90,8 +90,12 @@ describe('BroadcastDetailClient', () => {
     await screen.findAllByText('ประกาศน้ำประปา');
 
     await user.click(screen.getByRole('button', { name: 'ส่ง' }));
+    expect(await screen.findByText('ส่งประกาศทันที')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'ส่งทันที' }));
+
     await waitFor(() => expect(sendBroadcast).toHaveBeenCalledWith('b1'));
-    confirmSpy.mockRestore();
+    expect(nativeConfirm).not.toHaveBeenCalled();
+    nativeConfirm.mockRestore();
   });
 
   it('ไม่มีข้อมูลแสดงข้อความไทย', async () => {

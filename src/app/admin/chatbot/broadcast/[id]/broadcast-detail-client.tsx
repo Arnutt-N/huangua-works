@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/components/admin/use-confirm';
 import { AdminErrorState } from '@/components/admin/admin-error-state';
 import {
   Dialog,
@@ -119,6 +120,7 @@ export function BroadcastDetailClient({ broadcastId }: { broadcastId: string }) 
   const [sending, setSending] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const { data, loading, feedback, error, errorCode, errorStatus, mutate, notify, reload } = useResource({
     load: (_q, opts) => adminApi.getBroadcast(broadcastId, opts),
   });
@@ -126,7 +128,13 @@ export function BroadcastDetailClient({ broadcastId }: { broadcastId: string }) 
 
   async function handleSend() {
     if (!item) return;
-    if (!confirm('ส่งประกาศนี้ทันที?')) return;
+    // § FORM-06: ใช้ useConfirm แทน window.confirm
+    const ok = await confirm({
+      title: 'ส่งประกาศทันที',
+      description: 'ส่งประกาศนี้ทันทีใช่หรือไม่?',
+      confirmText: 'ส่งทันที',
+    });
+    if (!ok) return;
     setSending(true);
     await mutate(() => adminApi.sendBroadcast(item.id), 'ส่งประกาศสำเร็จ');
     setSending(false);
@@ -283,6 +291,7 @@ export function BroadcastDetailClient({ broadcastId }: { broadcastId: string }) 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </div>
   );
 }

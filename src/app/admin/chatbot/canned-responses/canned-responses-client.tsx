@@ -14,6 +14,7 @@ import {
 import { DetailModal } from '@/components/admin/detail-modal';
 import { AdminErrorState } from '@/components/admin/admin-error-state';
 import { PageHeader } from '@/components/admin/page-header';
+import { useConfirm } from '@/components/admin/use-confirm';
 import { FieldError, Input, Label, Textarea } from '@/components/ui/field';
 import { useResource } from '@/app/admin/_lib/use-resource';
 import {
@@ -59,6 +60,7 @@ export function CannedResponsesClient() {
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [viewRow, setViewRow] = useState<CannedResponse | null>(null);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const startCreate = () => {
     setEditingId(null);
@@ -114,11 +116,18 @@ export function CannedResponsesClient() {
 
   const handleDelete = async (item: CannedResponse) => {
     if (busy) return;
-    if (!confirm(`ลบ "${item.title}" ?`)) return;
+    // § FORM-06: ใช้ useConfirm แทน window.confirm
+    const ok = await confirm({
+      title: 'ลบข้อความสำเร็จรูป',
+      description: `ลบ "${item.title}" ใช่หรือไม่? ลบแล้วกู้คืนไม่ได้`,
+      confirmText: 'ลบ',
+      danger: true,
+    });
+    if (!ok) return;
     setBusy(true);
-    const ok = await deleteCannedResponse(item.id);
+    const result = await deleteCannedResponse(item.id);
     setBusy(false);
-    if (!ok) {
+    if (!result) {
       notify('error', 'ลบไม่สำเร็จ');
       return;
     }
@@ -383,6 +392,7 @@ export function CannedResponsesClient() {
             : []
         }
       />
+      {confirmDialog}
     </div>
   );
 }
