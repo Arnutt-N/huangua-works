@@ -265,15 +265,15 @@ P3 = ปรับความสม่ำเสมอและประสบก
 
 แต่ละ Tranche ต้องตรวจโค้ดปัจจุบัน ทบทวนขอบเขต และมี Branch/PR ของตนตาม AGENTS.md ไม่ใช่คำสั่งให้ทำทั้งหมดพร้อมกัน
 
-| ลำดับ | งาน/ไฟล์เริ่มต้น | การทดสอบและ Dependencies |
-|---|---|---|
-| A | ยืนยัน Baseline, Protected dependencies และขอบเขต Tranche | ต้องมีภาพ/ข้อมูลทดสอบก่อนแก้ UI; ออกแบบ Test harness โดยไม่แก้ Landing |
-| B | FORM-01/02/03: Broadcast wizard/API, users client/actions และ Mutation callers | Unit/contract tests ว่าปุ่มตรงสถานะ Error ถูกแสดง Pending กันซ้ำ แล้ว Browser ทดสอบด้วยข้อมูลทดสอบ ไม่ส่งข้อความถึงประชาชนจริง |
-| C | FLOW-01/03/04: case detail, actions, reports/filter | Role matrix, URL return ที่ปลอดภัย, กรอกหลายฟอร์ม/เปลี่ยนหน้า/บันทึก |
-| D | A11Y-01/02/03/04: admin-layout, admin-specific dialogs, files และ Session warning | Keyboard, Focus return, 375px/จอเตี้ย/คีย์บอร์ดมือถือ, Screen reader; หากต้องแตะ shared dialog ให้ตรวจ callers และขอบเขต Landing ก่อน |
-| E | NET-02/03/04: admin-api, use-resource และผู้เรียก | จำลอง timeout/401/403/500/offline, Recovery และผลคำสั่งไม่แน่นอน ไม่ Retry Mutation แบบสุ่ม |
-| F | Design System เฉพาะแอดมิน และหน้าต้นแบบคิว/รายละเอียด | สร้างไฟล์ scoped styles/components/stories เท่าที่จำเป็นหลังสำรวจพาธจริง ตรวจ Contrast, Visual regression และ Reduced motion |
-| G | Query/Timeline/Thumbnail | วัดก่อนแก้, Batch queries, pagination tests, Web Vitals ก่อน–หลังบนข้อมูลเท่ากัน |
+| ลำดับ | งาน/ไฟล์เริ่มต้น | การทดสอบและ Dependencies | สถานะ |
+|---|---|---|---|
+| A | ยืนยัน Baseline, Protected dependencies และ FORM-05/06 | ตรวจ callers `confirm()`, ย้ายไปใช้ `ConfirmDialog` กลาง, ล็อก modal ตอน pending | **เสร็จสิ้น (PR #169)** |
+| B | FORM-01/02/03: Broadcast wizard/API, users client/actions และ Mutation callers | Unit/contract tests ว่าปุ่มตรงสถานะ Error ถูกแสดง Pending กันซ้ำ ตรวจผลจริง | **เสร็จสิ้น (PR #171, #172)** |
+| C | FLOW-01/03/04: case detail, actions, reports/filter | Role matrix, URL return ที่ปลอดภัย, กรอกหลายฟอร์ม/เปลี่ยนหน้า/บันทึก | **เสร็จสิ้น (PR #170)** |
+| D | A11Y-01/02/03/04: admin-layout, admin-specific dialogs, files และ Session warning | Keyboard, Focus return, 375px/จอเตี้ย/คีย์บอร์ดมือถือ, Dialog max-h, Thai warning | **เสร็จสิ้น (PR #173)** |
+| E | NET-01/02/03 และ FORM-04: geodata error recovery, admin-api, use-resource | ตรวจ response.ok ทุก geodata, แยก Loading/Empty/Error, ปุ่ม "ลองใหม่", timeout 15s | **เสร็จสิ้น (PR #174)** |
+| F | Design System เฉพาะแอดมิน, DatePresetFilter และ A11Y-05 (touch target/font size) | สร้างไฟล์ scoped styles/components เท่าที่จำเป็น, ปรับ touch target ≥44px, font ≥14px | รอดำเนินการ (ดู docs/handoff-20261031.md) |
+| G | Query/Timeline/Thumbnail (ลด N+1 ในหน้ารายละเอียดเรื่อง) | วัดก่อนแก้, Batch queries, pagination tests, Web Vitals ก่อน–หลังบนข้อมูลเท่ากัน | รอดำเนินการ |
 | แยกขอบเขต | NET-01 และ FORM-04 ส่วนรับเรื่อง/อัปโหลดที่กระทบสาธารณะ | รับมอบหมายก่อนแก้ พ��้อม Integration และ Browser test ของเส้นทางนั้น |
 
 - การแก้ FLOW-02 ต้องยืนยันกติกามอบหมายก่อนเขียนโค้ด
