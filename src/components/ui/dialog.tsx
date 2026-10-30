@@ -36,8 +36,11 @@ DialogOverlay.displayName = 'DialogOverlay';
 
 export const DialogContent = forwardRef<
   ElementRef<typeof DialogPrimitive.Content>,
-  ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+  ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+    /** § ซ่อนปุ่ม X ได้ (ค่าเริ่มต้นแสดง) — ใช้ตอนกำลังส่งคำสั่งที่ปิดกลางทางไม่ได้ เช่น ConfirmDialog ที่ busy */
+    showClose?: boolean;
+  }
+>(({ className, children, showClose = true, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
@@ -52,12 +55,14 @@ export const DialogContent = forwardRef<
       {...props}
     >
       {children}
-      <DialogPrimitive.Close
-        aria-label="ปิด"
-        className="absolute right-4 top-4 inline-flex min-h-touch min-w-touch items-center justify-center rounded-md text-muted hover:bg-accent-sunken hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
-      >
-        <X className="h-5 w-5" aria-hidden="true" />
-      </DialogPrimitive.Close>
+      {showClose && (
+        <DialogPrimitive.Close
+          aria-label="ปิด"
+          className="absolute right-4 top-4 inline-flex min-h-touch min-w-touch items-center justify-center rounded-md text-muted hover:bg-accent-sunken hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
+        >
+          <X className="h-5 w-5" aria-hidden="true" />
+        </DialogPrimitive.Close>
+      )}
     </DialogPrimitive.Content>
   </DialogPortal>
 ));

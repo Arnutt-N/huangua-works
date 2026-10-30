@@ -7,10 +7,12 @@ import { requireStaffApi } from '@/lib/auth/require-staff';
 import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit';
 import { uploadFile, isStorageConfigured } from '@/lib/storage';
+import { MEDIA_ALLOWED_MIME, MEDIA_MAX_SIZE_BYTES } from '@/lib/media-upload-rules';
 
 export const runtime = 'nodejs';
 
-const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+// § กติกาชนิด/ขนาดไฟล์ใช้ร่วมกับหน้า /admin/files ผ่าน lib/media-upload-rules.ts (FORM-04)
+const MAX_SIZE = MEDIA_MAX_SIZE_BYTES;
 
 // § category ไหลเข้า S3 key และเป็น pgEnum ใน media_files — ต้องตรวจกับ list ก่อน
 // ไม่งั้นค่าอย่าง `../../x` เขียน object นอก prefix ที่ตั้งใจ แล้วค่อยพัง 500 ตอน insert
@@ -32,11 +34,7 @@ function isMediaCategory(value: string): value is MediaCategory {
 
 // § allow-list ของชนิดไฟล์ — LINE rich menu/image message รับแค่ภาพ
 // กัน SVG และ HTML ที่ถูกเสิร์ฟกลับมาจาก S3 origin พร้อม Content-Type ที่ client เป็นคนบอก
-const ALLOWED_MIME: Record<string, string> = {
-  'image/png': 'png',
-  'image/jpeg': 'jpg',
-  'image/webp': 'webp',
-};
+const ALLOWED_MIME = MEDIA_ALLOWED_MIME;
 
 export async function GET() {
   const authz = await requireStaffApi(ADMIN_ROLES);

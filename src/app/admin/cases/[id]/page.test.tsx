@@ -91,7 +91,6 @@ beforeEach(() => {
     submitterName: 'นายสมชาย ใจดี',
     submitterPhone: '0812345678',
     assignedTo: 'officer-assigned',
-    assigneeName: 'นายสมชาย ใจดี',
     departmentId: 'dept-1',
     departmentName: 'กองช่าง',
     village: 'หมู่ 1',

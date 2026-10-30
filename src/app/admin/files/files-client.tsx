@@ -8,6 +8,8 @@ import { Upload, Trash2, ExternalLink, Image as ImageIcon, FileIcon } from 'luci
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import { AdminErrorState } from '@/components/admin/admin-error-state';
 import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/components/admin/use-confirm';
+import { MEDIA_ACCEPT_ATTR, validateMediaFile } from '@/lib/media-upload-rules';
 import { useMediaItemReadUrl } from './use-media-item-read-url';
 
 function formatSize(bytes: number): string {
@@ -35,6 +37,7 @@ function MediaThumb({ item }: { item: MediaItem }) {
 export function FilesClient() {
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const { confirm, dialog } = useConfirm();
 
   const { data, loading, feedback, error, errorCode, notify, mutate, reload } = useResource({
     load: adminApi.listMedia,
@@ -45,6 +48,14 @@ export function FilesClient() {
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    // § FORM-04: ตรวจชนิด/ขนาดก่อนส่ง — กติกาเดียวกับ API (lib/media-upload-rules) ผู้ใช้ไม่ต้องรออัปโหลดแล้วโดนปฏิเสธ
+    // เซิร์ฟเวอร์ยังตรวจซ้ำเสมอ ตรงนี้แค่แจ้งเร็วและไม่เปลืองแบนด์วิดท์
+    const invalid = validateMediaFile(file);
+    if (invalid) {
+      notify('error', invalid);
+      if (fileRef.current) fileRef.current.value = '';
+      return;
+    }
     setUploading(true);
     await mutate(() => adminApi.uploadMedia(file), 'อัปโหลดสำเร็จ');
     setUploading(false);
@@ -52,7 +63,14 @@ export function FilesClient() {
   }
 
   async function handleDelete(item: MediaItem) {
-    if (!confirm(`ลบ "${item.filename}" ?`)) return;
+    // § FORM-06: ใช้กล่องยืนยันมาตรฐานของระบบ แทน window.confirm
+    const ok = await confirm({
+      title: 'ลบไฟล์',
+      description: `ลบ "${item.filename}" ใช่หรือไม่? ลบแล้วกู้คืนไม่ได้`,
+      confirmText: 'ลบไฟล์',
+      danger: true,
+    });
+    if (!ok) return;
     // server คืน { error: 'ไม่พบไฟล์' } — mutate เอาข้อความนั้นมาแจ้ง ไม่โยนทิ้งเหมือนเดิม
     await mutate(() => adminApi.deleteMedia(item.id), 'ลบสำเร็จ');
   }
@@ -98,7 +116,7 @@ export function FilesClient() {
           icon={<ImageIcon className="h-4 w-4" />}
           action={
             <>
-              <input aria-label="อัปโหลดไฟล์สื่อ" ref={fileRef} type="file" className="hidden" onChange={handleUpload} accept="image/*,.pdf" />
+              <input aria-label="อัปโหลดไฟล์สื่อ" ref={fileRef} type="file" className="hidden" onChange={handleUpload} accept={MEDIA_ACCEPT_ATTR} />
               <Button onClick={() => fileRef.current?.click()} disabled={uploading || !storageOk} className="min-h-touch gap-1.5">
                 <Upload className="h-4 w-4" /> {uploading ? 'กำลังอัปโหลด...' : 'อัปโหลด'}
               </Button>
@@ -107,6 +125,8 @@ export function FilesClient() {
         >
           ไฟล์สื่อ ({items.length})
         </AdminCardTitle>
+
+        <p className="mb-3 text-xs text-muted">รองรับไฟล์ภาพ PNG, JPEG, WebP ขนาดไม่เกิน 10MB</p>
 
         {loading ? (
           <div className="py-12 text-center text-muted">กำลังโหลด...</div>
@@ -117,11 +137,12 @@ export function FilesClient() {
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {items.map((item) => (
-              <div key={item.id} className="group relative rounded-lg border border-border/50 p-3">
+              <div key={item.id} className="rounded-lg border border-border/50 p-3">
                 <MediaThumb item={item} />
                 <p className="truncate text-xs font-medium text-ink">{item.filename}</p>
                 <p className="text-xs text-muted">{formatSize(item.sizeBytes)} · {item.category}</p>
-                <div className="mt-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
+                {/* § A11Y-02: ปุ่มแสดงตลอด — เดิมซ่อนด้วย opacity-0 จน hover/focus ผู้ใช้คีย์บอร์ดและจอสัมผัสที่ไม่รองรับ pointer-coarse ต้องเดา */}
+                <div className="mt-2 flex gap-1">
                   <button onClick={() => void openFile(item)} className="min-h-touch min-w-touch flex items-center justify-center rounded hover:bg-accent/10" aria-label={`เปิด ${item.filename}`}>
                     <ExternalLink className="h-3.5 w-3.5 text-muted" />
                   </button>
@@ -134,6 +155,7 @@ export function FilesClient() {
           </div>
         )}
       </AdminCard>
+      {dialog}
     </>
   );
 }
