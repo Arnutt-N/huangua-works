@@ -267,6 +267,7 @@ export interface BroadcastInput {
   content: BroadcastContent[];
   target: BroadcastTarget;
   scheduledAt: string | null;
+  status?: 'draft' | 'scheduled';
 }
 
 export interface BroadcastPage extends ListOf<BroadcastItem> {

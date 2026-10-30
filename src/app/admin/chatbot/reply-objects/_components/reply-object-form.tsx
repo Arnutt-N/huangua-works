@@ -100,7 +100,7 @@ export function ReplyObjectForm({
     try {
       parsed = JSON.parse(form.payload);
     } catch {
-      setError('Invalid JSON payload');
+      setError('รูปแบบ JSON ไม่ถูกต้อง');
       return;
     }
     const invalidUri = findActionUriViolation(parsed);
