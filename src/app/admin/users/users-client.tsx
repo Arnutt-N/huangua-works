@@ -102,6 +102,19 @@ export function UsersClient({
       if (res?.error) {
         setActionError({ userId: confirmUser.id, message: res.error });
       }
+    } catch (err) {
+      if (
+        err instanceof Error &&
+        'digest' in err &&
+        typeof (err as { digest?: string }).digest === 'string' &&
+        (err as { digest: string }).digest.startsWith('NEXT_REDIRECT')
+      ) {
+        throw err;
+      }
+      setActionError({
+        userId: confirmUser.id,
+        message: err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการดำเนินการ',
+      });
     } finally {
       setPendingId(null);
       setConfirmUserId(null);
@@ -116,7 +129,7 @@ export function UsersClient({
         </p>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
-            <Button type="button" size="sm">
+            <Button type="button" size="sm" disabled={pendingId !== null}>
               <UserPlus className="h-4 w-4" aria-hidden="true" />
               เพิ่มผู้ใช้
             </Button>
@@ -197,14 +210,19 @@ export function UsersClient({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  disabled={u.id === currentUserId}
+                  disabled={u.id === currentUserId || pendingId !== null}
+                  aria-busy={pendingId === u.id}
                   aria-label={u.isActive ? 'ระงับบัญชี' : 'เปิดใช้งานบัญชี'}
                   onClick={() => {
                     setActionError(null);
                     setConfirmUserId(u.id);
                   }}
                 >
-                  <Power className="h-4 w-4" aria-hidden="true" />
+                  {pendingId === u.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Power className="h-4 w-4" aria-hidden="true" />
+                  )}
                   <span className="hidden sm:inline">
                     {u.isActive ? 'ระงับ' : 'เปิดใช้'}
                   </span>
@@ -221,7 +239,7 @@ export function UsersClient({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      disabled={u.id === currentUserId}
+                      disabled={u.id === currentUserId || pendingId !== null}
                       aria-label="แก้ไขบทบาท"
                     >
                       <Pencil className="h-4 w-4" aria-hidden="true" />
@@ -254,6 +272,7 @@ export function UsersClient({
                         type="button"
                         variant="ghost"
                         size="sm"
+                        disabled={pendingId !== null}
                         aria-label="รีเซ็ตรหัสผ่าน"
                       >
                         <KeyRound className="h-4 w-4" aria-hidden="true" />
@@ -507,7 +526,7 @@ function FormError({ children }: { children: React.ReactNode }) {
   return (
     <p
       role="alert"
-      className="flex items-start gap-2 rounded-md border border-danger-ink/30 bg-danger-soft px-3 py-2 text-sm font-semibold text-danger-ink"
+      className="flex w-full basis-full items-start gap-2 rounded-md border border-danger-ink/30 bg-danger-soft px-3 py-2 text-sm font-semibold text-danger-ink sm:w-auto sm:basis-auto"
     >
       <AlertCircle className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
       {children}
