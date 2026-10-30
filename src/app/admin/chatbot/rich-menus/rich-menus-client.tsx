@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { BarChart3, Eye, Link2, Plus, RefreshCw, SquarePen, Trash2, Users } from 'lucide-react';
+import { BarChart3, Eye, ImageUp, Link2, Plus, RefreshCw, SquarePen, Trash2, Users } from 'lucide-react';
 import type { RichMenuItem } from '@/app/admin/_lib/admin-api';
 import { adminApi } from '@/app/admin/_lib/admin-api';
 import { useResource } from '@/app/admin/_lib/use-resource';
@@ -13,6 +13,7 @@ import { AdminErrorState } from '@/components/admin/admin-error-state';
 import { DetailModal } from '@/components/admin/detail-modal';
 import { ConfirmDialog } from '@/components/admin/confirm-dialog';
 import { cn } from '@/lib/cn';
+import { fitRichMenuImage, RICH_MENU_FIT_GUIDANCE } from './rich-menu-image';
 import {
   menuStatusPill,
   needsResync,
@@ -23,20 +24,64 @@ import {
 
 export function RichMenusClient() {
   const router = useRouter();
-  const { data, loading, feedback, error, errorCode, mutate, reload } = useResource({ load: adminApi.listRichMenus });
+  const { data, loading, feedback, error, errorCode, notify, mutate, reload } = useResource({ load: adminApi.listRichMenus });
   const items = data?.items ?? [];
 
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [publishingId, setPublishingId] = useState<string | null>(null);
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [imageRev, setImageRev] = useState(0);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const [viewMenu, setViewMenu] = useState<RichMenuItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<RichMenuItem | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const uploadTargetRef = useRef<RichMenuItem | null>(null);
 
   async function handleSync(item: RichMenuItem) {
     setSyncingId(item.id);
     await mutate(() => adminApi.syncRichMenu(item.id), 'ซิงค์ไป LINE สำเร็จ');
     setSyncingId(null);
+  }
+
+  function pickImage(item: RichMenuItem) {
+    uploadTargetRef.current = item;
+    fileRef.current?.click();
+  }
+
+  async function handleImagePicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const item = uploadTargetRef.current;
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!item || !file) return;
+    setUploadingId(item.id);
+    try {
+      const fitted = await fitRichMenuImage(file);
+      if (!fitted.fits) {
+        notify('error', RICH_MENU_FIT_GUIDANCE);
+        return;
+      }
+      const uploadFile =
+        fitted.file instanceof File && !fitted.converted
+          ? fitted.file
+          : new File([fitted.file], fitted.filename, { type: 'image/jpeg' });
+      const ok = await mutate(
+        () => adminApi.uploadRichMenuImage(item.id, uploadFile),
+        'อัปรูปเมนูสำเร็จ — กด Set Active เพื่อเปิดใช้งานได้เลย',
+      );
+      if (ok) {
+        setFailedImages((prev) => {
+          const next = new Set(prev);
+          next.delete(item.id);
+          return next;
+        });
+        setImageRev((r) => r + 1);
+      }
+    } catch (err) {
+      notify('error', err instanceof Error ? err.message : 'รูปไม่พร้อมอัปโหลด');
+    } finally {
+      setUploadingId(null);
+    }
   }
 
   async function handlePublish(item: RichMenuItem) {
@@ -71,6 +116,15 @@ export function RichMenusClient() {
           </Button>
         </Link>
       </PageHeader>
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/png,image/jpeg"
+        aria-label="เลือกไฟล์รูปเมนู"
+        className="hidden"
+        onChange={handleImagePicked}
+      />
 
       {feedback && (
         <div
@@ -119,7 +173,7 @@ export function RichMenusClient() {
                           {item.lineRichMenuId && !imageFailed ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
-                              src={`/api/line/admin/rich-menus/${item.id}/image`}
+                              src={`/api/line/admin/rich-menus/${item.id}/image?v=${imageRev}`}
                               alt={item.name}
                               className="h-full w-full object-cover"
                               onError={() =>
@@ -187,6 +241,20 @@ export function RichMenusClient() {
                                 : needsResync(item)
                                   ? 'ซิงค์การแก้ไข'
                                   : 'Re-sync'}
+                            </Button>
+                          )}
+                          {item.lineRichMenuId && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-1 text-xs"
+                              onClick={() => pickImage(item)}
+                              disabled={uploadingId === item.id}
+                              aria-label={`อัปรูป ${item.name}`}
+                              title="อัปโหลดรูปภาพเมนูขึ้น LINE (PNG/JPEG ไม่เกิน 1 MB)"
+                            >
+                              <ImageUp className="h-3.5 w-3.5" />
+                              {uploadingId === item.id ? 'กำลังอัป...' : 'อัปรูป'}
                             </Button>
                           )}
                           {action === 'publish' && (

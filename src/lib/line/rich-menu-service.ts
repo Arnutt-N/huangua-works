@@ -12,6 +12,7 @@ import {
   getAliasOnLine,
   getDefaultLineRichMenu,
   getLineRichMenu,
+  getLineRichMenuImage,
   updateAliasOnLine,
   uploadLineRichMenuImage,
   setDefaultLineRichMenu,
@@ -346,6 +347,7 @@ export async function syncRichMenu(
 
     let lineId = menu.lineRichMenuId;
     let recreated = false;
+    let copiedImage = false;
 
     if (lineId) {
       const lineMenu = await getLineRichMenu(lineId);
@@ -365,6 +367,19 @@ export async function syncRichMenu(
         .update(richMenus)
         .set({ lineRichMenuId: lineId, updatedAt: new Date() })
         .where(eq(richMenus.id, id));
+      // § ดึงรูปจากเมนูเก่าบน LINE มาอัปเข้าเมนูใหม่ก่อนย้าย default และก่อนลบเมนูเก่า
+      // เพราะ LINE บังคับว่าเมนูต้องมีรูปก่อนเรียก setDefaultLineRichMenu (ไม่งั้นโดน 400 must upload richmenu image)
+      if (oldLineId && typeof getLineRichMenuImage === 'function') {
+        const existingImg = await getLineRichMenuImage(oldLineId).catch(() => null);
+        if (existingImg?.bytes) {
+          await uploadLineRichMenuImage(lineId, Buffer.from(existingImg.bytes)).then(
+            () => {
+              copiedImage = true;
+            },
+            () => {},
+          );
+        }
+      }
       if (menu.status === 'active') {
         // § ย้าย default ก่อนลบ — LINE ลบเมนูที่เป็น default อยู่ไม่ได้ (400)
         await setDefaultLineRichMenu(lineId);
@@ -378,9 +393,8 @@ export async function syncRichMenu(
       await db.update(richMenus).set({ lineRichMenuId: lineId, updatedAt: new Date() }).where(eq(richMenus.id, id));
     }
 
-    // § รูปเก็บเป็น URL ใน DB ไม่มี bytes ย้ายข้าม id ไม่ได้ — เตือนให้อัปใหม่ ไม่ fail sync
     const imageWarning =
-      recreated && menu.imageUrl
+      recreated && menu.imageUrl && !copiedImage
         ? 'รูปเดิมไม่ได้ย้ายมาเมนูใหม่ กรุณากดอัปรูปอีกครั้ง'
         : null;
     await db
@@ -402,13 +416,23 @@ export async function uploadMenuImage(id: string, imageBuffer: Buffer, imageUrl?
 
   try {
     await uploadLineRichMenuImage(menu.lineRichMenuId, imageBuffer);
-    if (imageUrl) {
-      await db.update(richMenus).set({ imageUrl, updatedAt: new Date() }).where(eq(richMenus.id, id));
-    }
+    const effectiveImageUrl = imageUrl ?? `/api/line/admin/rich-menus/${id}/image`;
+    await db
+      .update(richMenus)
+      .set({ imageUrl: effectiveImageUrl, lastSyncError: null, updatedAt: new Date() })
+      .where(eq(richMenus.id, id));
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'upload failed' };
   }
+}
+
+export function formatPublishRichMenuError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : 'publish failed';
+  if (/must upload richmenu image/i.test(raw)) {
+    return 'ต้องอัปโหลดรูปภาพเมนูก่อนตั้งเป็นเมนูหลัก — กรุณากดปุ่ม "อัปรูป" หรือเข้าไปที่หน้าแก้ไขเพื่ออัปโหลดรูปภาพก่อนกด Set Active';
+  }
+  return raw;
 }
 
 export async function publishRichMenu(id: string): Promise<{ ok: boolean; error?: string }> {
@@ -419,7 +443,7 @@ export async function publishRichMenu(id: string): Promise<{ ok: boolean; error?
   try {
     await setDefaultLineRichMenu(menu.lineRichMenuId);
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'publish failed' };
+    return { ok: false, error: formatPublishRichMenuError(err) };
   }
 
   await db.update(richMenus).set({ status: 'active', updatedAt: new Date() }).where(eq(richMenus.id, id));
