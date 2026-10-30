@@ -95,7 +95,7 @@ export function CustomerPanel({
           <h3 className="text-xs font-bold uppercase tracking-wide text-muted">เคสที่ผูกไว้</h3>
           {detail.linkedCaseId ? (
             <Link
-              href={`/admin/cases/${detail.linkedCaseId}`}
+              href={`/admin/cases/${detail.linkedCaseId}?return=${encodeURIComponent('/admin/chat')}`}
               className="inline-flex items-center gap-1.5 rounded-md bg-accent-sunken px-2.5 py-1.5 text-xs font-semibold text-accent-strong hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
             >
               <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />

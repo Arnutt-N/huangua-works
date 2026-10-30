@@ -49,7 +49,15 @@ export function CaseFilterBar({ categories }: { categories: CategoryOption[] }) 
   const [isPending, startTransition] = useTransition();
 
   // local state สำหรับ search box (instant typing, submit ที่กด Enter)
-  const [q, setQ] = useState(searchParams.get('q') ?? '');
+  // § FLOW-03: ซิงค์ draft กับ queryParam โดยตรง แทนการเรียก setState ใน useEffect
+  // (ตามกฎ react-hooks/set-state-in-effect) เพื่อให้ค่าคำค้นปรับตาม URL ทันทีตั้งแต่ render แรก
+  const queryParam = searchParams.get('q') ?? '';
+  const [draftQ, setDraftQ] = useState<{ base: string; value: string }>({
+    base: queryParam,
+    value: queryParam,
+  });
+  const q = draftQ.base === queryParam ? draftQ.value : queryParam;
+  const setQ = (value: string) => setDraftQ({ base: queryParam, value });
 
   const currentStatus = searchParams.get('status') ?? 'all';
   const currentCategory = searchParams.get('category') ?? 'all';
