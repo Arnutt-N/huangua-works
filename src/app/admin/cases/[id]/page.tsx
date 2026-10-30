@@ -80,7 +80,6 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
           submitterName: users.fullName,
           submitterPhone: users.phoneNumber,
           assignedTo: cases.assignedTo,
-          assigneeName: users.fullName,
           departmentId: cases.departmentId,
           departmentName: departments.name,
           village: cases.village,
@@ -97,7 +96,8 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
         .leftJoin(districts, eq(cases.districtId, districts.id))
         .leftJoin(subDistricts, eq(cases.subDistrictId, subDistricts.id))
         .leftJoin(villages, eq(cases.villageId, villages.id))
-        // § 2nd join to users for assignee — alias ไม่ได้ใน core query, ใช้ batch inArray แยกด้านล่าง
+        // § join users ของ query นี้คือ "ผู้แจ้ง" (submittedBy) เท่านั้น — ชื่อผู้รับผิดชอบดึงแยกด้วย inArray ด้านล่าง
+        // ห้ามเพิ่ม select ฟิลด์ชื่อผู้รับผิดชอบจาก join นี้ (เคยมี assigneeName ที่ได้ชื่อผู้แจ้งโดยไม่ตั้งใจ)
         .where(eq(cases.id, caseId))
         .limit(1)
     ),

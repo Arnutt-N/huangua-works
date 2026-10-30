@@ -7,10 +7,17 @@ import { requireStaffApi } from '@/lib/auth/require-staff';
 import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit';
 import { uploadFile, isStorageConfigured } from '@/lib/storage';
+import {
+  MEDIA_ALLOWED_MIME,
+  MEDIA_MAX_SIZE_BYTES,
+  MEDIA_SIZE_ERROR,
+  MEDIA_TYPE_ERROR,
+} from '@/lib/media-upload-rules';
 
 export const runtime = 'nodejs';
 
-const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+// § กติกาชนิด/ขนาดไฟล์ใช้ร่วมกับหน้า /admin/files ผ่าน lib/media-upload-rules.ts (FORM-04)
+const MAX_SIZE = MEDIA_MAX_SIZE_BYTES;
 
 // § category ไหลเข้า S3 key และเป็น pgEnum ใน media_files — ต้องตรวจกับ list ก่อน
 // ไม่งั้นค่าอย่าง `../../x` เขียน object นอก prefix ที่ตั้งใจ แล้วค่อยพัง 500 ตอน insert
@@ -32,11 +39,7 @@ function isMediaCategory(value: string): value is MediaCategory {
 
 // § allow-list ของชนิดไฟล์ — LINE rich menu/image message รับแค่ภาพ
 // กัน SVG และ HTML ที่ถูกเสิร์ฟกลับมาจาก S3 origin พร้อม Content-Type ที่ client เป็นคนบอก
-const ALLOWED_MIME: Record<string, string> = {
-  'image/png': 'png',
-  'image/jpeg': 'jpg',
-  'image/webp': 'webp',
-};
+const ALLOWED_MIME = MEDIA_ALLOWED_MIME;
 
 export async function GET() {
   const authz = await requireStaffApi(ADMIN_ROLES);
@@ -79,14 +82,14 @@ export async function POST(request: Request) {
   }
 
   if (!file) return NextResponse.json({ error: 'ไม่มีไฟล์' }, { status: 400 });
-  if (file.size > MAX_SIZE) return NextResponse.json({ error: 'ไฟล์ใหญ่เกิน 10MB' }, { status: 413 });
+  if (file.size > MAX_SIZE) return NextResponse.json({ error: MEDIA_SIZE_ERROR }, { status: 413 });
 
   // § นามสกุลมาจาก MIME ที่อยู่ใน allow-list ไม่ใช่จาก file.name ที่ผู้อัปโหลดตั้งเอง
   // (`a.png/../../evil` ทำให้ file.name.split('.').pop() คืน path segment ทั้งท่อน)
   const ext = ALLOWED_MIME[file.type];
   if (!ext) {
     return NextResponse.json(
-      { error: 'รองรับเฉพาะไฟล์ภาพ PNG, JPEG, WebP' },
+      { error: MEDIA_TYPE_ERROR },
       { status: 415 },
     );
   }
