@@ -188,48 +188,172 @@ export function IntakeForm({
   const [villagesList, setVillagesList] = useState<GeoOption[]>([]);
   const [loadingGeo, setLoadingGeo] = useState<'provinces' | 'districts' | 'subdistricts' | 'villages' | null>('provinces');
   const [geoError, setGeoError] = useState<string | null>(null);
+  const [failedGeoStep, setFailedGeoStep] = useState<'provinces' | 'districts' | 'subdistricts' | 'villages' | null>(null);
   const geoRequestId = useRef(0);
 
-  useEffect(() => {
+  // § NET-01: ตรวจ response.ok ทุก geodata endpoint, แยก Loading/Empty/Error และมี Retry โดยไม่ล้างข้อมูลอื่นในฟอร์ม
+  const loadProvinces = useCallback(() => {
+    const requestId = ++geoRequestId.current;
+    setLoadingGeo('provinces');
+    setGeoError(null);
     fetch('/api/provinces')
-      .then((r) => r.json())
-      .then((d) => setProvinces(d.provinces ?? []))
-      .catch(() => setGeoError('โหลดรายชื่อจังหวัดไม่สำเร็จ กรุณารีเฟรชหน้า'))
-      .finally(() => setLoadingGeo(null));
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((d) => {
+        if (geoRequestId.current === requestId) {
+          setProvinces(d.provinces ?? []);
+          setFailedGeoStep(null);
+          setGeoError(null);
+        }
+      })
+      .catch(() => {
+        if (geoRequestId.current === requestId) {
+          setFailedGeoStep('provinces');
+          setGeoError('โหลดรายชื่อจังหวัดไม่สำเร็จ กรุณาลองใหม่');
+        }
+      })
+      .finally(() => {
+        if (geoRequestId.current === requestId) setLoadingGeo(null);
+      });
+  }, []);
+
+  useEffect(() => {
+    const requestId = ++geoRequestId.current;
+    fetch('/api/provinces')
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((d) => {
+        if (geoRequestId.current === requestId) {
+          setProvinces(d.provinces ?? []);
+          setFailedGeoStep(null);
+          setGeoError(null);
+        }
+      })
+      .catch(() => {
+        if (geoRequestId.current === requestId) {
+          setFailedGeoStep('provinces');
+          setGeoError('โหลดรายชื่อจังหวัดไม่สำเร็จ กรุณาลองใหม่');
+        }
+      })
+      .finally(() => {
+        if (geoRequestId.current === requestId) setLoadingGeo(null);
+      });
   }, []);
 
   const loadDistricts = useCallback((provinceId: string) => {
-    if (!provinceId) { setDistricts([]); setSubdistricts([]); return; }
+    if (!provinceId) {
+      setDistricts([]);
+      setSubdistricts([]);
+      setVillagesList([]);
+      return;
+    }
     const requestId = ++geoRequestId.current;
     setLoadingGeo('districts');
-    fetch(`/api/districts?provinceId=${provinceId}`)
-      .then((r) => r.json())
-      .then((d) => { if (geoRequestId.current === requestId) setDistricts(d.districts ?? []); })
-      .catch(() => { if (geoRequestId.current === requestId) setDistricts([]); })
-      .finally(() => { if (geoRequestId.current === requestId) setLoadingGeo(null); });
+    setGeoError(null);
+    fetch(`/api/districts?provinceId=${encodeURIComponent(provinceId)}`)
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((d) => {
+        if (geoRequestId.current === requestId) {
+          setDistricts(d.districts ?? []);
+          setFailedGeoStep(null);
+          setGeoError(null);
+        }
+      })
+      .catch(() => {
+        if (geoRequestId.current === requestId) {
+          setDistricts([]);
+          setFailedGeoStep('districts');
+          setGeoError('โหลดรายชื่ออำเภอไม่สำเร็จ กรุณาลองใหม่');
+        }
+      })
+      .finally(() => {
+        if (geoRequestId.current === requestId) setLoadingGeo(null);
+      });
   }, []);
 
   const loadSubdistricts = useCallback((districtId: string) => {
-    if (!districtId) { setSubdistricts([]); return; }
+    if (!districtId) {
+      setSubdistricts([]);
+      setVillagesList([]);
+      return;
+    }
     const requestId = ++geoRequestId.current;
     setLoadingGeo('subdistricts');
-    fetch(`/api/subdistricts?districtId=${districtId}`)
-      .then((r) => r.json())
-      .then((d) => { if (geoRequestId.current === requestId) setSubdistricts(d.subdistricts ?? []); })
-      .catch(() => { if (geoRequestId.current === requestId) setSubdistricts([]); })
-      .finally(() => { if (geoRequestId.current === requestId) setLoadingGeo(null); });
+    setGeoError(null);
+    fetch(`/api/subdistricts?districtId=${encodeURIComponent(districtId)}`)
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((d) => {
+        if (geoRequestId.current === requestId) {
+          setSubdistricts(d.subdistricts ?? []);
+          setFailedGeoStep(null);
+          setGeoError(null);
+        }
+      })
+      .catch(() => {
+        if (geoRequestId.current === requestId) {
+          setSubdistricts([]);
+          setFailedGeoStep('subdistricts');
+          setGeoError('โหลดรายชื่อตำบลไม่สำเร็จ กรุณาลองใหม่');
+        }
+      })
+      .finally(() => {
+        if (geoRequestId.current === requestId) setLoadingGeo(null);
+      });
   }, []);
 
   const loadVillages = useCallback((subDistrictId: string) => {
-    if (!subDistrictId) { setVillagesList([]); return; }
+    if (!subDistrictId) {
+      setVillagesList([]);
+      return;
+    }
     const requestId = ++geoRequestId.current;
     setLoadingGeo('villages');
-    fetch(`/api/villages?subDistrictId=${subDistrictId}`)
-      .then((r) => r.json())
-      .then((d) => { if (geoRequestId.current === requestId) setVillagesList(d.villages ?? []); })
-      .catch(() => { if (geoRequestId.current === requestId) setVillagesList([]); })
-      .finally(() => { if (geoRequestId.current === requestId) setLoadingGeo(null); });
+    setGeoError(null);
+    fetch(`/api/villages?subDistrictId=${encodeURIComponent(subDistrictId)}`)
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((d) => {
+        if (geoRequestId.current === requestId) {
+          setVillagesList(d.villages ?? []);
+          setFailedGeoStep(null);
+          setGeoError(null);
+        }
+      })
+      .catch(() => {
+        if (geoRequestId.current === requestId) {
+          setVillagesList([]);
+          setFailedGeoStep('villages');
+          setGeoError('โหลดรายชื่อหมู่บ้านไม่สำเร็จ กรุณาลองใหม่');
+        }
+      })
+      .finally(() => {
+        if (geoRequestId.current === requestId) setLoadingGeo(null);
+      });
   }, []);
+
+  const handleGeoRetry = useCallback(() => {
+    if (failedGeoStep === 'provinces') {
+      loadProvinces();
+    } else if (failedGeoStep === 'districts' && form.provinceId) {
+      loadDistricts(form.provinceId);
+    } else if (failedGeoStep === 'subdistricts' && form.districtId) {
+      loadSubdistricts(form.districtId);
+    } else if (failedGeoStep === 'villages' && form.subDistrictId) {
+      loadVillages(form.subDistrictId);
+    }
+  }, [failedGeoStep, form.provinceId, form.districtId, form.subDistrictId, loadProvinces, loadDistricts, loadSubdistricts, loadVillages]);
 
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -240,6 +364,8 @@ export function IntakeForm({
     setDistricts([]);
     setSubdistricts([]);
     setVillagesList([]);
+    setFailedGeoStep(null);
+    setGeoError(null);
     loadDistricts(value);
   }
 
@@ -247,12 +373,16 @@ export function IntakeForm({
     setForm((prev) => ({ ...prev, districtId: value, subDistrictId: '', villageId: '', village: '' }));
     setSubdistricts([]);
     setVillagesList([]);
+    setFailedGeoStep(null);
+    setGeoError(null);
     loadSubdistricts(value);
   }
 
   function handleSubDistrictChange(value: string) {
     setForm((prev) => ({ ...prev, subDistrictId: value, villageId: '', village: '' }));
     setVillagesList([]);
+    setFailedGeoStep(null);
+    setGeoError(null);
     loadVillages(value);
   }
 
@@ -509,21 +639,41 @@ export function IntakeForm({
       <SectionCard>
         <SectionHeading icon={MapPin}>ที่ตั้ง</SectionHeading>
         {geoError && (
-          <p id="geo-error" role="alert" className="mt-4 flex items-start gap-2 rounded-xl border border-danger-ink/30 bg-danger-soft px-4 py-3 text-sm font-semibold text-danger-ink">
-            <AlertCircle className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
-            {geoError}
-          </p>
+          <div
+            id="geo-error"
+            role="alert"
+            className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-danger-ink/30 bg-danger-soft px-4 py-3 text-sm font-semibold text-danger-ink"
+          >
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 flex-none" aria-hidden="true" />
+              <span>{geoError}</span>
+            </div>
+            {failedGeoStep && (
+              <button
+                type="button"
+                onClick={handleGeoRetry}
+                disabled={loadingGeo !== null}
+                className="inline-flex items-center rounded-lg border border-danger-ink/40 bg-surface px-3 py-1 text-xs font-medium text-danger-ink shadow-xs transition hover:bg-surface-raised active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-ink disabled:opacity-50"
+              >
+                {loadingGeo !== null ? 'กำลังโหลด...' : 'ลองใหม่'}
+              </button>
+            )}
+          </div>
         )}
         <div className="mt-5 grid gap-4 sm:grid-cols-3">
           <div>
             <Label htmlFor="province">จังหวัด</Label>
-            <Select value={form.provinceId} onValueChange={handleProvinceChange}>
+            <Select
+              value={form.provinceId}
+              onValueChange={handleProvinceChange}
+              disabled={loadingGeo === 'provinces'}
+            >
               <SelectTrigger
                 id="province"
                 aria-invalid={!!fieldErrors.provinceId || undefined}
-                aria-describedby={[fieldErrors.provinceId && 'province-error', geoError && 'geo-error'].filter(Boolean).join(' ') || undefined}
+                aria-describedby={[fieldErrors.provinceId && 'province-error', failedGeoStep === 'provinces' && geoError && 'geo-error'].filter(Boolean).join(' ') || undefined}
               >
-                <SelectValue placeholder="เลือกจังหวัด" />
+                <SelectValue placeholder={loadingGeo === 'provinces' ? 'กำลังโหลด...' : 'เลือกจังหวัด'} />
               </SelectTrigger>
               <SelectContent>
                 {provinces.map((p) => (
@@ -545,7 +695,7 @@ export function IntakeForm({
               <SelectTrigger
                 id="district"
                 aria-invalid={!!fieldErrors.districtId || undefined}
-                aria-describedby={fieldErrors.districtId ? 'district-error' : undefined}
+                aria-describedby={[fieldErrors.districtId && 'district-error', failedGeoStep === 'districts' && geoError && 'geo-error'].filter(Boolean).join(' ') || undefined}
               >
                 <SelectValue placeholder={loadingGeo === 'districts' ? 'กำลังโหลด...' : 'เลือกอำเภอ'} />
               </SelectTrigger>
@@ -569,7 +719,7 @@ export function IntakeForm({
               <SelectTrigger
                 id="subdistrict"
                 aria-invalid={!!fieldErrors.subDistrictId || undefined}
-                aria-describedby={fieldErrors.subDistrictId ? 'subdistrict-error' : undefined}
+                aria-describedby={[fieldErrors.subDistrictId && 'subdistrict-error', failedGeoStep === 'subdistricts' && geoError && 'geo-error'].filter(Boolean).join(' ') || undefined}
               >
                 <SelectValue placeholder={loadingGeo === 'subdistricts' ? 'กำลังโหลด...' : 'เลือกตำบล'} />
               </SelectTrigger>
@@ -595,7 +745,10 @@ export function IntakeForm({
               }}
               disabled={!form.subDistrictId || loadingGeo === 'villages'}
             >
-              <SelectTrigger id="villageId">
+              <SelectTrigger
+                id="villageId"
+                aria-describedby={failedGeoStep === 'villages' && geoError ? 'geo-error' : undefined}
+              >
                 <SelectValue placeholder={loadingGeo === 'villages' ? 'กำลังโหลด...' : 'เลือกหมู่บ้าน'} />
               </SelectTrigger>
               <SelectContent>

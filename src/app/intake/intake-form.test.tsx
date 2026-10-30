@@ -104,4 +104,145 @@ describe('ฟอร์มแจ้งเรื่องสำหรับผู�
     expect(screen.getByLabelText('รายละเอียด')).toHaveAttribute('aria-describedby', 'detail-hint');
     expect(document.getElementById('detail-hint')).toHaveTextContent('ยิ่งละเอียด');
   });
+
+  it('NET-01: เมื่อโหลด geodata ล้มเหลว (500) จะแสดง alert พร้อมปุ่มลองใหม่ และไม่ล้างข้อมูลฟอร์มที่กรอกไว้', async () => {
+    let districtCallCount = 0;
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url === '/api/provinces') {
+        return { ok: true, json: async () => ({ provinces: [{ id: 46, nameTh: 'กาฬสินธุ์' }] }) };
+      }
+      if (url.startsWith('/api/districts')) {
+        districtCallCount++;
+        if (districtCallCount === 1) {
+          return { ok: false, status: 500, json: async () => ({ error: 'Database unavailable' }) };
+        }
+        return { ok: true, json: async () => ({ districts: [{ id: 4603, nameTh: 'ยางตลาด' }] }) };
+      }
+      return { ok: true, json: async () => ({}) };
+    }));
+
+    render(<IntakeForm categories={categories} />);
+    fireEvent.change(screen.getByLabelText('ชื่อ - นามสกุล'), { target: { value: 'สมชาย ใจดี' } });
+    fireEvent.change(screen.getByLabelText('หัวเรื่อง'), { target: { value: 'น้ำไม่ไหล' } });
+
+    await waitFor(() => expect(screen.getByLabelText('จังหวัด')).not.toBeDisabled(), {
+      timeout: INTAKE_QUERY_TIMEOUT_MS,
+    });
+    await choose('จังหวัด', 'กาฬสินธุ์');
+
+    const alert = await screen.findByRole('alert', undefined, { timeout: INTAKE_QUERY_TIMEOUT_MS });
+    expect(alert).toHaveTextContent('โหลดรายชื่ออำเภอไม่สำเร็จ กรุณาลองใหม่');
+    const retryBtn = screen.getByRole('button', { name: 'ลองใหม่' });
+    expect(retryBtn).toBeInTheDocument();
+
+    expect(screen.getByLabelText('ชื่อ - นามสกุล')).toHaveValue('สมชาย ใจดี');
+    expect(screen.getByLabelText('หัวเรื่อง')).toHaveValue('น้ำไม่ไหล');
+
+    fireEvent.click(retryBtn);
+
+    await waitFor(() => expect(screen.queryByText('โหลดรายชื่ออำเภอไม่สำเร็จ กรุณาลองใหม่')).not.toBeInTheDocument(), {
+      timeout: INTAKE_QUERY_TIMEOUT_MS,
+    });
+    await waitFor(() => expect(screen.getByLabelText('อำเภอ')).not.toBeDisabled(), {
+      timeout: INTAKE_QUERY_TIMEOUT_MS,
+    });
+    await choose('อำเภอ', 'ยางตลาด');
+    expect(screen.getByLabelText('อำเภอ')).toHaveTextContent('ยางตลาด');
+  });
+
+  it('NET-01: เมื่อโหลดจังหวัดล้มเหลว (network fail) จะมีปุ่มลองใหม่ และกดแล้วโหลดจังหวัดสำเร็จได้', async () => {
+    let provinceCallCount = 0;
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url === '/api/provinces') {
+        provinceCallCount++;
+        if (provinceCallCount === 1) {
+          throw new Error('Network error');
+        }
+        return { ok: true, json: async () => ({ provinces: [{ id: 46, nameTh: 'กาฬสินธุ์' }] }) };
+      }
+      return { ok: true, json: async () => ({}) };
+    }));
+
+    render(<IntakeForm categories={categories} />);
+
+    const alert = await screen.findByRole('alert', undefined, { timeout: INTAKE_QUERY_TIMEOUT_MS });
+    expect(alert).toHaveTextContent('โหลดรายชื่อจังหวัดไม่สำเร็จ กรุณาลองใหม่');
+
+    const retryBtn = screen.getByRole('button', { name: 'ลองใหม่' });
+    expect(retryBtn).toBeInTheDocument();
+
+    fireEvent.click(retryBtn);
+
+    await waitFor(() => expect(screen.queryByText('โหลดรายชื่อจังหวัดไม่สำเร็จ กรุณาลองใหม่')).not.toBeInTheDocument(), {
+      timeout: INTAKE_QUERY_TIMEOUT_MS,
+    });
+    await waitFor(() => expect(screen.getByLabelText('จังหวัด')).not.toBeDisabled(), {
+      timeout: INTAKE_QUERY_TIMEOUT_MS,
+    });
+    await choose('จังหวัด', 'กาฬสินธุ์');
+    expect(screen.getByLabelText('จังหวัด')).toHaveTextContent('กาฬสินธุ์');
+  });
+
+  it('NET-01: เมื่อสลับจังหวัดเร็ว ผลลัพธ์ที่มาช้าของจังหวัดเก่าจะไม่ทับอำเภอของจังหวัดใหม่', async () => {
+    let resolveFirstDistrict: (val: unknown) => void;
+    const firstDistrictPromise = new Promise((resolve) => {
+      resolveFirstDistrict = resolve;
+    });
+
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url === '/api/provinces') {
+        return {
+          ok: true,
+          json: async () => ({
+            provinces: [
+              { id: 46, nameTh: 'กาฬสินธุ์' },
+              { id: 40, nameTh: 'ขอนแก่น' },
+            ],
+          }),
+        };
+      }
+      if (url.startsWith('/api/districts?provinceId=46')) {
+        await firstDistrictPromise;
+        return {
+          ok: true,
+          json: async () => ({
+            districts: [{ id: 4603, nameTh: 'ยางตลาด' }],
+          }),
+        };
+      }
+      if (url.startsWith('/api/districts?provinceId=40')) {
+        return {
+          ok: true,
+          json: async () => ({
+            districts: [{ id: 4001, nameTh: 'เมืองขอนแก่น' }],
+          }),
+        };
+      }
+      return { ok: true, json: async () => ({}) };
+    }));
+
+    render(<IntakeForm categories={categories} />);
+    await waitFor(() => expect(screen.getByLabelText('จังหวัด')).not.toBeDisabled(), {
+      timeout: INTAKE_QUERY_TIMEOUT_MS,
+    });
+
+    // 1. เลือกกาฬสินธุ์ (ยิง request กาฬสินธุ์ ค้างไว้)
+    await choose('จังหวัด', 'กาฬสินธุ์');
+
+    // 2. เปลี่ยนเป็นขอนแก่นทันที (ยิง request ขอนแก่น)
+    await choose('จังหวัด', 'ขอนแก่น');
+
+    // ขอนแก่นตอบกลับก่อน
+    await waitFor(() => expect(screen.getByLabelText('อำเภอ')).not.toBeDisabled(), {
+      timeout: INTAKE_QUERY_TIMEOUT_MS,
+    });
+    await choose('อำเภอ', 'เมืองขอนแก่น');
+    expect(screen.getByLabelText('อำเภอ')).toHaveTextContent('เมืองขอนแก่น');
+
+    // 3. ปล่อยให้ request กาฬสินธุ์ resolve ช้ากว่า
+    resolveFirstDistrict!({ ok: true });
+
+    // อำเภอต้องยังเป็น เมืองขอนแก่น ไม่ถูกทับ
+    expect(screen.getByLabelText('อำเภอ')).toHaveTextContent('เมืองขอนแก่น');
+  });
 });
