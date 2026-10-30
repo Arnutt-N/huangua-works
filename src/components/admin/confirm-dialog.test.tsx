@@ -41,11 +41,22 @@ describe('ConfirmDialog — FORM-05 ปิดไม่ได้ระหว่�
     expect(screen.getByRole('button', { name: 'กำลังดำเนินการ...' })).toBeDisabled();
   });
 
-  it('busy: คลิกนอกกล่อง (overlay) ไม่ปิด', () => {
-    const { onClose } = setup(true);
+  // § Radix ผูก listener "คลิกนอกกล่อง" หลัง setTimeout(0) — ต้องรอก่อนยิง event ไม่งั้นเทสต์ผ่านแบบว่างเปล่า
+  // (ไม่มี listener ให้ตอบ) จึงมี control ที่ไม่ busy พิสูจน์ว่าเส้นทาง event นี้ปิดกล่องได้จริง
+  const waitForOutsideListener = () => new Promise((resolve) => setTimeout(resolve, 20));
+
+  it('ไม่ busy (control): คลิกนอกกล่องปิดได้ — พิสูจน์ว่า event ในเทสต์ถึง Radix จริง', async () => {
+    const { onClose } = setup(false);
+    await waitForOutsideListener();
     fireEvent.pointerDown(document.body);
-    fireEvent.pointerUp(document.body);
-    fireEvent.click(document.body);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('busy: คลิกนอกกล่อง (overlay) ไม่ปิด', async () => {
+    const { onClose } = setup(true);
+    await waitForOutsideListener();
+    fireEvent.pointerDown(document.body);
     expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 });

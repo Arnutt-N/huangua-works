@@ -7,7 +7,12 @@ import { requireStaffApi } from '@/lib/auth/require-staff';
 import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit';
 import { uploadFile, isStorageConfigured } from '@/lib/storage';
-import { MEDIA_ALLOWED_MIME, MEDIA_MAX_SIZE_BYTES } from '@/lib/media-upload-rules';
+import {
+  MEDIA_ALLOWED_MIME,
+  MEDIA_MAX_SIZE_BYTES,
+  MEDIA_SIZE_ERROR,
+  MEDIA_TYPE_ERROR,
+} from '@/lib/media-upload-rules';
 
 export const runtime = 'nodejs';
 
@@ -77,14 +82,14 @@ export async function POST(request: Request) {
   }
 
   if (!file) return NextResponse.json({ error: 'ไม่มีไฟล์' }, { status: 400 });
-  if (file.size > MAX_SIZE) return NextResponse.json({ error: 'ไฟล์ใหญ่เกิน 10MB' }, { status: 413 });
+  if (file.size > MAX_SIZE) return NextResponse.json({ error: MEDIA_SIZE_ERROR }, { status: 413 });
 
   // § นามสกุลมาจาก MIME ที่อยู่ใน allow-list ไม่ใช่จาก file.name ที่ผู้อัปโหลดตั้งเอง
   // (`a.png/../../evil` ทำให้ file.name.split('.').pop() คืน path segment ทั้งท่อน)
   const ext = ALLOWED_MIME[file.type];
   if (!ext) {
     return NextResponse.json(
-      { error: 'รองรับเฉพาะไฟล์ภาพ PNG, JPEG, WebP' },
+      { error: MEDIA_TYPE_ERROR },
       { status: 415 },
     );
   }
