@@ -242,17 +242,38 @@ export function RichMenuEditClient({ menuId }: { menuId: string }) {
     setBusy('action');
     setError(null);
     const res = await adminApi.syncRichMenu(menuId);
-    setBusy(null);
     if (!res.ok) {
+      setBusy(null);
       setError(res.error);
       return;
     }
+    if (imageFile) {
+      const uploadError = await uploadImage();
+      if (uploadError) {
+        setBusy(null);
+        setError(`ซิงค์แล้ว แต่อัปรูปไม่สำเร็จ: ${uploadError}`);
+        await loadMenu();
+        return;
+      }
+      setImageFile(null);
+    }
+    setBusy(null);
     await loadMenu();
   }
 
   async function handlePublishAction() {
     setBusy('action');
     setError(null);
+    // § หากเลือกไฟล์รูปค้างไว้ ต้องอัปโหลดขึ้น LINE ก่อนตั้งเป็นเมนูหลัก ไม่งั้น LINE ปฏิเสธ 400
+    if (imageFile) {
+      const uploadError = await uploadImage();
+      if (uploadError) {
+        setBusy(null);
+        setError(`อัปรูปไม่สำเร็จ: ${uploadError}`);
+        return;
+      }
+      setImageFile(null);
+    }
     const res = await adminApi.publishRichMenu(menuId);
     setBusy(null);
     if (!res.ok) {

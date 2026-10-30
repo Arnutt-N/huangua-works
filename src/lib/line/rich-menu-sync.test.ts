@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { findInvalidRichMenuArea, isValidRichMenuUri } from '@/lib/contracts';
-import { isRichMenuDrift, normalizeRichMenuConfig } from './rich-menu-service';
+import { formatPublishRichMenuError, isRichMenuDrift, normalizeRichMenuConfig } from './rich-menu-service';
 
 const BASE = {
   size: { width: 2500, height: 1686 },
@@ -131,5 +131,18 @@ describe('normalizeRichMenuConfig', () => {
     expect(changed).toBe(true);
     const areas = config.areas as Array<{ action: { data?: string } }>;
     expect(areas[0]!.action.data).toBe('richmenuswitch:main-menu');
+  });
+});
+
+describe('formatPublishRichMenuError', () => {
+  test('แปลง error must upload richmenu image ของ LINE เป็นข้อความภาษาไทยที่ชัดเจน', () => {
+    const err = new Error(
+      'LINE API /user/all/richmenu/richmenu-05fd3b3b9b580731c8c5358ec7da5352 failed (400): {"message":"must upload richmenu image before applying it to user","details":[]}',
+    );
+    expect(formatPublishRichMenuError(err)).toContain('ต้องอัปโหลดรูปภาพเมนูก่อนตั้งเป็นเมนูหลัก');
+  });
+
+  test('คืนข้อความเดิมสำหรับ error อื่น', () => {
+    expect(formatPublishRichMenuError(new Error('network timeout'))).toBe('network timeout');
   });
 });

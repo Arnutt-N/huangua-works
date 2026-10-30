@@ -61,13 +61,24 @@ describe('RichMenusClient ตาราง JSK', () => {
     expect(within(table).getAllByText('ACTIVE').length).toBeGreaterThanOrEqual(1);
   });
 
-  it('แถวยังไม่ sync แสดงปุ่ม Sync to LINE', async () => {
+  it('แถวยังไม่ sync แสดงปุ่ม Sync to LINE และไม่แสดงปุ่มอัปรูป', async () => {
     listRichMenus.mockResolvedValue({
       ok: true,
       data: { items: [menu({ lineRichMenuId: null, syncStatus: 'pending', status: 'draft' })] },
     });
     render(<RichMenusClient />);
     expect(await screen.findByRole('button', { name: /sync to line/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'อัปรูป jsk4.0-v2' })).not.toBeInTheDocument();
+  });
+
+  it('แถวที่ sync แล้วแสดงปุ่มอัปรูปเพื่อให้ส่งรูปขึ้น LINE ก่อนกด Set Active', async () => {
+    listRichMenus.mockResolvedValue({
+      ok: true,
+      data: { items: [menu({ status: 'draft' })] },
+    });
+    render(<RichMenusClient />);
+    expect(await screen.findByRole('button', { name: 'อัปรูป jsk4.0-v2' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Set Active' })).toBeInTheDocument();
   });
 
   it('แก้ไขแล้วยังไม่ซิงค์แสดงป้าย รอซิงค์ + ปุ่มซิงค์การแก้ไข', async () => {
