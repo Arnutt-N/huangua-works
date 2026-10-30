@@ -74,7 +74,7 @@ describe('FriendsClient bulk JSK', () => {
 
   it('เลือก 2 คน + bulk assign ยิงครบทุกราย', async () => {
     const user = userEvent.setup();
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const nativeConfirm = vi.spyOn(window, 'confirm');
     render(<FriendsClient />);
     await screen.findByText('Admin Somying');
 
@@ -86,8 +86,15 @@ describe('FriendsClient bulk JSK', () => {
 
     await user.selectOptions(screen.getByLabelText('เลือก Rich Menu (bulk)'), 'm1');
     await user.click(screen.getByRole('button', { name: 'ยืนยันกำหนด' }));
+
+    expect(await screen.findByText('กำหนดริชเมนูเป็นกลุ่ม')).toBeInTheDocument();
+    // คลิกปุ่ม "ยืนยันกำหนด" ใน dialog ของ useConfirm
+    const confirmButtons = screen.getAllByRole('button', { name: 'ยืนยันกำหนด' });
+    await user.click(confirmButtons[confirmButtons.length - 1]!);
+
     await waitFor(() => expect(assignUserRichMenu).toHaveBeenCalledTimes(2));
-    confirmSpy.mockRestore();
+    expect(nativeConfirm).not.toHaveBeenCalled();
+    nativeConfirm.mockRestore();
   });
 
   it('unsynced menu เลือกไม่ได้', async () => {

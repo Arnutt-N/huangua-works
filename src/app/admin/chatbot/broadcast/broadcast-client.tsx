@@ -18,6 +18,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import { AdminCard } from '@/components/admin/admin-card';
+import { useConfirm } from '@/components/admin/use-confirm';
 import { AdminErrorState } from '@/components/admin/admin-error-state';
 import { PageHeader } from '@/components/admin/page-header';
 import {
@@ -101,6 +102,7 @@ export function BroadcastClient() {
   const [page, setPage] = useState(0);
   const [cancelTarget, setCancelTarget] = useState<BroadcastItem | null>(null);
   const [actionSaving, setActionSaving] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const query = useMemo(() => {
     const params = new URLSearchParams({ page: String(page + 1), pageSize: String(PAGE_SIZE) });
@@ -167,7 +169,13 @@ export function BroadcastClient() {
     const scope = item.target?.kind === 'line_user_ids'
       ? `ผู้รับที่เลือก ${item.target.ids.length} คน`
       : 'ผู้ติดตามทุกคน';
-    if (!confirm(`ส่งประกาศ "${broadcastName(item)}" หา${scope}ทันที?`)) return;
+    // § FORM-06: ใช้ useConfirm แทน window.confirm
+    const ok = await confirm({
+      title: 'ส่งประกาศทันที',
+      description: `ส่งประกาศ "${broadcastName(item)}" หา${scope}ทันทีใช่หรือไม่?`,
+      confirmText: 'ส่งทันที',
+    });
+    if (!ok) return;
     // server คืน 409 { error: 'ส่งแล้วหรือกำลังส่ง' } / 404 / 502 เมื่อส่งไม่สำเร็จ — mutate โชว์ข้อความนั้น
     await mutate(() => adminApi.sendBroadcast(item.id), 'ส่งประกาศสำเร็จ');
   }
@@ -480,6 +488,7 @@ export function BroadcastClient() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </div>
   );
 }

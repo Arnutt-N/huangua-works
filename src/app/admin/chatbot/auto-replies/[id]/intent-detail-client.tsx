@@ -9,6 +9,7 @@ import { readinessOf } from '../readiness';
 import { useResource } from '@/app/admin/_lib/use-resource';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/components/admin/use-confirm';
 import { AdminErrorState } from '@/components/admin/admin-error-state';
 
 const MATCH_LABELS: Record<IntentMatchType, string> = {
@@ -31,6 +32,7 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
   const [newReplyType, setNewReplyType] = useState<'text' | 'reply_object'>('text');
   const [newResponseText, setNewResponseText] = useState('');
   const [mutating, setMutating] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   async function handleToggle() {
     if (!item || mutating) return;
@@ -55,7 +57,14 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
       notify('error', 'ต้องเหลือ keyword อย่างน้อย 1 คำ');
       return;
     }
-    if (!confirm('ลบ keyword นี้?')) return;
+    // § FORM-06: ใช้ useConfirm แทน window.confirm
+    const ok = await confirm({
+      title: 'ลบ keyword',
+      description: 'ลบ keyword นี้ใช่หรือไม่?',
+      confirmText: 'ลบ',
+      danger: true,
+    });
+    if (!ok) return;
     const res = await adminApi.updateIntent(item.id, {
       keywords: item.keywords.filter((k) => k.id !== keywordId).map((k) => ({ keyword: k.keyword, matchType: k.matchType })),
     });
@@ -73,7 +82,14 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
       notify('error', 'ต้องเหลือคำตอบอย่างน้อย 1 ข้อ');
       return;
     }
-    if (!confirm('ลบคำตอบนี้?')) return;
+    // § FORM-06: ใช้ useConfirm แทน window.confirm
+    const ok = await confirm({
+      title: 'ลบคำตอบ',
+      description: 'ลบคำตอบนี้ใช่หรือไม่?',
+      confirmText: 'ลบ',
+      danger: true,
+    });
+    if (!ok) return;
     const res = await adminApi.updateIntent(item.id, {
       responses: item.responses
         .filter((r) => r.id !== responseId)
@@ -387,6 +403,7 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
           <Pencil className="h-3.5 w-3.5" /> แก้ไข keyword/คำตอบแบบเต็มที่ปุ่มแก้ไขในตารางรายการ
         </span>
       </div>
+      {confirmDialog}
     </div>
   );
 }

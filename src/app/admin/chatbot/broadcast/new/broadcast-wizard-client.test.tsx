@@ -147,7 +147,7 @@ describe('BroadcastWizardClient ตัวช่วยสร้าง 4 ขั้
   });
 
   it('"ส่งเลย" สร้างแล้วยิง sendBroadcast ต่อทันที', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const nativeConfirm = vi.spyOn(window, 'confirm');
     const user = userEvent.setup();
     const send = adminApi.sendBroadcast as ReturnType<typeof vi.fn>;
     render(<BroadcastWizardClient />);
@@ -158,7 +158,12 @@ describe('BroadcastWizardClient ตัวช่วยสร้าง 4 ขั้
     await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
     await user.click(screen.getByRole('button', { name: 'ส่งเลย' }));
 
+    expect(await screen.findByText('ยืนยันการส่งประกาศทันที')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'ส่งทันที' }));
+
     await waitFor(() => expect(send).toHaveBeenCalledWith('new-1'));
+    expect(nativeConfirm).not.toHaveBeenCalled();
+    nativeConfirm.mockRestore();
   });
 
   it('flex ว่าง altText ถูกบล็อก — หยุดตั้งแต่หน้าเขียน', async () => {
@@ -219,7 +224,6 @@ describe('BroadcastWizardClient ตัวช่วยสร้าง 4 ขั้
   });
 
   it('send-now ส่ง scheduledAt=null แล้วเรียก /send', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     const user = userEvent.setup();
     render(<BroadcastWizardClient />);
 
@@ -229,6 +233,8 @@ describe('BroadcastWizardClient ตัวช่วยสร้าง 4 ขั้
     await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
 
     await user.click(screen.getByRole('button', { name: 'ส่งเลย' }));
+    expect(await screen.findByText('ยืนยันการส่งประกาศทันที')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'ส่งทันที' }));
 
     const create = adminApi.createBroadcast as ReturnType<typeof vi.fn>;
     const payload = create.mock.calls[0]?.[0] as { scheduledAt: string | null };

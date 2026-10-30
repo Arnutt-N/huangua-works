@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { History, LayoutGrid, Search, UsersRound } from 'lucide-react';
 import { AdminCard } from '@/components/admin/admin-card';
 import { PageHeader } from '@/components/admin/page-header';
+import { useConfirm } from '@/components/admin/use-confirm';
 import { AdminErrorState } from '@/components/admin/admin-error-state';
 import {
   Dialog,
@@ -73,6 +74,7 @@ export function FriendsClient() {
   const [menusError, setMenusError] = useState<string | null>(null);
   const [selectedMenu, setSelectedMenu] = useState('');
   const [assignSaving, setAssignSaving] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   async function openAssign(friend: FriendItem) {
     setAssignTarget(friend);
@@ -113,7 +115,13 @@ export function FriendsClient() {
 
   async function handleUnassign() {
     if (!assignTarget) return;
-    if (!confirm(`ปลดริชเมนูเฉพาะบุคคลของ "${assignTarget.displayName ?? 'เพื่อนคนนี้'}"?`)) return;
+    // § FORM-06: ใช้ useConfirm แทน window.confirm
+    const ok = await confirm({
+      title: 'ปลดริชเมนูเฉพาะบุคคล',
+      description: `ปลดริชเมนูเฉพาะบุคคลของ "${assignTarget.displayName ?? 'เพื่อนคนนี้'}" ใช่หรือไม่? จะกลับไปใช้เมนูเริ่มต้น`,
+      confirmText: 'ปลดริชเมนู',
+    });
+    if (!ok) return;
     setAssignSaving(true);
     const res = await adminApi.unassignUserRichMenu(assignTarget.id);
     setAssignSaving(false);
@@ -149,7 +157,13 @@ export function FriendsClient() {
       notify('error', 'กรุณาเลือกเพื่อนและ Rich Menu');
       return;
     }
-    if (!confirm(`กำหนดริชเมนูให้เพื่อน ${selected.size} คน?`)) return;
+    // § FORM-06: ใช้ useConfirm แทน window.confirm
+    const ok = await confirm({
+      title: 'กำหนดริชเมนูเป็นกลุ่ม',
+      description: `กำหนดริชเมนูให้เพื่อน ${selected.size} คน ใช่หรือไม่?`,
+      confirmText: 'ยืนยันกำหนด',
+    });
+    if (!ok) return;
     setBulkSaving(true);
     const ids = [...selected];
     // § chunk ละ 10 — LINE 429 ถ้ายิงรัว
@@ -485,6 +499,7 @@ export function FriendsClient() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </>
   );
 }
