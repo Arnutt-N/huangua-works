@@ -250,6 +250,18 @@ async function getRichMenuInsight(
     headers: getHeaders(),
     signal: AbortSignal.timeout(15_000),
   });
+  // § เมนูที่เพิ่งสร้าง/ซิงก์ใหม่ หรือยังไม่มีข้อมูลสะสมในถัง Insight ของ LINE จะได้ 404 —
+  // คืนโครงสร้างว่างพร้อม privacy_restricted: true เพื่อให้หน้าสถิติแสดงคำเตือนข้อมูลไม่เพียงพอแทนป้าย error 502
+  if (res.status === 404) {
+    return {
+      rich_menu_id: richMenuId,
+      metrics_from: null,
+      metrics_to: null,
+      impression: null,
+      clicks: null,
+      privacy_restricted: true,
+    };
+  }
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
     throw new LineApiError(`/insight/richmenu/${kind}`, res.status, detail.slice(0, 500));
