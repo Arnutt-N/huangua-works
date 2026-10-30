@@ -121,4 +121,54 @@ describe('UsersClient ระงับบัญชี', () => {
     });
     resolveAction({ error: null });
   });
+
+  it('ระหว่าง pending → ปุ่มคำสั่งอื่นๆ ในตาราง disabled ป้องกันกดซ้ำ', async () => {
+    let resolveAction!: (v: { error: string | null }) => void;
+    vi.mocked(toggleUserActive).mockReturnValue(
+      new Promise((res) => {
+        resolveAction = res;
+      }),
+    );
+    const user = userEvent.setup();
+    renderClient();
+
+    await user.click(screen.getByRole('button', { name: 'ระงับบัญชี' }));
+    await screen.findByText(dialogDescriptionMatcher);
+    await user.click(screen.getByRole('button', { name: 'ยืนยัน' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'กำลังดำเนินการ...' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'เปิดใช้งานบัญชี', hidden: true })).toBeDisabled();
+      expect(screen.getAllByRole('button', { name: 'แก้ไขบทบาท', hidden: true })[0]).toBeDisabled();
+      expect(screen.getAllByRole('button', { name: 'รีเซ็ตรหัสผ่าน', hidden: true })[0]).toBeDisabled();
+      expect(screen.getByRole('button', { name: /เพิ่มผู้ใช้/, hidden: true })).toBeDisabled();
+    });
+    resolveAction({ error: null });
+  });
+
+  it('action throw error (network/server fail) → แสดงข้อความ error ใน FormError และปิด dialog', async () => {
+    vi.mocked(toggleUserActive).mockRejectedValue(new Error('เครือข่ายขัดข้อง'));
+    const user = userEvent.setup();
+    renderClient();
+
+    await user.click(screen.getByRole('button', { name: 'ระงับบัญชี' }));
+    await screen.findByText(dialogDescriptionMatcher);
+    await user.click(screen.getByRole('button', { name: 'ยืนยัน' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('เครือข่ายขัดข้อง');
+    });
+    expect(screen.queryByText(dialogDescriptionMatcher)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ระงับบัญชี' })).not.toBeDisabled();
+  });
+
+  it('กด "เปิดใช้" บนบัญชีที่ถูกระงับ → เปิด ConfirmDialog ด้วยข้อความเปิดใช้งาน', async () => {
+    const user = userEvent.setup();
+    renderClient();
+
+    await user.click(screen.getByRole('button', { name: 'เปิดใช้งานบัญชี' }));
+
+    expect(await screen.findByText(/เปิดใช้งานบัญชีของ เจ้าหน้าที่ สอง อีกครั้ง/)).toBeInTheDocument();
+    expect(toggleUserActive).not.toHaveBeenCalled();
+  });
 });
