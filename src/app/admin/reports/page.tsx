@@ -47,14 +47,13 @@ export default async function CaseManagementPage({
 }) {
   const { user: staffUser } = await requireStaff();
   const params = await searchParams;
-  // § reconstruct current URL ฝั่ง server เพื่อส่งเป็น ?return= ให้หน้า detail
-  const currentUrl =
-    '/admin/reports?' +
-    new URLSearchParams(
-      Object.entries(params).flatMap(([k, v]) =>
-        v === undefined ? [] : [[k, Array.isArray(v) ? v[0] ?? '' : v]],
-      ) as [string, string][],
-    ).toString();
+  // § reconstruct current URL ฝั่ง server เพื่อส่งเป็น ?return= ให้หน้า detail (FLOW-03: ไม่ทิ้ง trailing ? เมื่อไม่มี params)
+  const searchStr = new URLSearchParams(
+    Object.entries(params).flatMap(([k, v]) =>
+      v === undefined ? [] : [[k, Array.isArray(v) ? v[0] ?? '' : v]],
+    ) as [string, string][],
+  ).toString();
+  const currentUrl = searchStr ? `/admin/reports?${searchStr}` : '/admin/reports';
   const db = await getDb();
 
   // § parse + validate filter params (defense-in-depth — ไม่ trust input)

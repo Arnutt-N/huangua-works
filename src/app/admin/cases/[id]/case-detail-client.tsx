@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useState } from 'react';
+import { useActionState, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -133,6 +133,24 @@ export function CaseDetailClient({
     if (successCount > 0) router.refresh();
   }, [successCount, router]);
 
+  // § FLOW-04: ref สำหรับฟอร์มเพื่อเคลียร์ค่าหลัง submit สำเร็จ โดยไม่ล้าง draft ในการ์ดอื่น
+  const commentFormRef = useRef<HTMLFormElement>(null);
+  const statusCommentRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (commentState.success) {
+      commentFormRef.current?.reset();
+    }
+  }, [commentState]);
+
+  useEffect(() => {
+    if (statusState.success) {
+      if (statusCommentRef.current) {
+        statusCommentRef.current.value = '';
+      }
+    }
+  }, [statusState]);
+
   // local state สำหรับ status dropdown (เพื่อเช็ค transition ฝั่ง client ก่อน submit)
   // § ผูก draft กับ currentStatus แทนการเรียก setState ใน useEffect (ผิดกฎ react-hooks/set-state-in-effect)
   // หลัง router.refresh() ได้ currentStatus ใหม่ selectedStatus จะเลื่อนตามทันทีตั้งแต่ render แรก
@@ -187,6 +205,7 @@ export function CaseDetailClient({
           <div>
             <Label htmlFor="status-comment">หมายเหตุ (ไม่จำเป็น)</Label>
             <Textarea
+              ref={statusCommentRef}
               id="status-comment"
               name="comment"
               rows={2}
@@ -249,9 +268,9 @@ export function CaseDetailClient({
         </form>
       </ActionCard>
 
-      {/* ── เปลี่ยนหน่วยงาน (เฉพาะ supervisor) ── */}
-      {canChangeDepartment && (
-        <ActionCard title="เปลี่ยนหน่วยงานรับผิดชอบ">
+      {/* ── หน่วยงานรับผิดชอบ (เฉพาะ supervisor แก้ไขได้) ── */}
+      {canChangeDepartment ? (
+        <ActionCard title="หน่วยงานรับผิดชอบ">
           <form action={deptAction} className="space-y-3">
             <input type="hidden" name="caseId" value={caseId} />
             <div>
@@ -274,11 +293,20 @@ export function CaseDetailClient({
               </Select>
             </div>
             {deptState.error && <ErrorText>{deptState.error}</ErrorText>}
-          {deptState.success && <SuccessText>{deptState.success}</SuccessText>}
+            {deptState.success && <SuccessText>{deptState.success}</SuccessText>}
             <Button type="submit" size="sm" variant="secondary" disabled={deptPending}>
               {deptPending ? 'กำลังบันทึก...' : 'บันทึกหน่วยงาน'}
             </Button>
           </form>
+        </ActionCard>
+      ) : (
+        <ActionCard title="หน่วยงานรับผิดชอบ">
+          <p className="text-sm text-muted">
+            หน่วยงาน:{' '}
+            <span className="font-semibold text-ink">
+              {departments.find((d) => d.id === currentDepartmentId)?.name ?? '(ไม่ระบุ)'}
+            </span>
+          </p>
         </ActionCard>
       )}
 
@@ -399,7 +427,7 @@ export function CaseDetailClient({
 
       {/* ── เพิ่มความคืบหน้า ── */}
       <ActionCard title="เพิ่มความคืบหน้า">
-        <form action={commentAction} className="space-y-3">
+        <form ref={commentFormRef} action={commentAction} className="space-y-3">
           <input type="hidden" name="caseId" value={caseId} />
           <div>
             <Label htmlFor="comment">ข้อความ</Label>
