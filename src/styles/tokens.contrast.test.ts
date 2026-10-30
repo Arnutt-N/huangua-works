@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { countFailures } from '../../scripts/check-contrast';
 
@@ -12,9 +14,19 @@ import { countFailures } from '../../scripts/check-contrast';
  *
  * การมีอยู่ในรูป test ทำให้มันรันทุกครั้งที่ใครก็ตามรันเทส ไม่ว่าจะเรียกด้วยคำสั่งไหน
  */
-describe('design tokens — WCAG contrast', () => {
+describe('design tokens — WCAG contrast & base cursor contract', () => {
   it('ทุกคู่สีใน tokens.css ผ่านเกณฑ์ทั้งธีม light และ dark', () => {
     // quiet = true — ไม่ให้ log ของ script ท่วม output ของ vitest
     expect(countFailures(true)).toBe(0);
+  });
+
+  it('กำหนด cursor: pointer ให้ปุ่ม/ลิงก์/อินเทอร์แอกทีฟ และ cursor: not-allowed เมื่อ disabled ใน @layer base', () => {
+    const css = readFileSync(resolve(__dirname, 'tokens.css'), 'utf8');
+    expect(css).toContain('button:not(:disabled)');
+    expect(css).toContain("select:not(:disabled)");
+    expect(css).toContain("[role='button']:not([aria-disabled='true'])");
+    expect(css).toContain('cursor: pointer;');
+    expect(css).toContain('button:disabled');
+    expect(css).toContain('cursor: not-allowed;');
   });
 });

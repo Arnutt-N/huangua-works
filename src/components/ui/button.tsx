@@ -13,7 +13,7 @@ export type ButtonVariant = 'primary' | 'secondary' | 'destructive' | 'ghost' | 
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 const base =
-  'inline-flex items-center justify-center gap-2 rounded-md font-semibold whitespace-nowrap ' +
+  'inline-flex cursor-pointer items-center justify-center gap-2 rounded-md font-semibold whitespace-nowrap ' +
   // transition-[color,background-color,border-color,opacity] แทน transition-colors
   // เพราะ primary hover เปลี่ยนที่ opacity (gradient ทำ transition สีตรง ๆ ไม่ได้)
   'transition-[color,background-color,border-color,opacity] duration-normal ease-out-expo ' +

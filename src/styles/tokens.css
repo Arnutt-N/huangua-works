@@ -228,6 +228,44 @@
       scroll-behavior: auto;
     }
   }
+
+  /* § Tailwind v4 ถอด cursor: pointer ออกจาก <button> และ interactive controls ใน preflight
+   * ทำให้ลิงก์ (<a>/<Link>) ขึ้นรูปมือคลิก แต่ปุ่ม (<button>/<select>/<summary>/checkbox/radio)
+   * กลายเป็นเมาส์ลูกศรธรรมดา (default) ไม่สม่ำเสมอกันทั้งระบบ — คืนค่า pointer ที่ base layer
+   * และแสดง not-allowed เมื่อถูก disabled */
+  a[href],
+  button:not(:disabled),
+  input:where(
+      [type='button'],
+      [type='reset'],
+      [type='submit'],
+      [type='checkbox'],
+      [type='radio'],
+      [type='file'],
+      [type='range'],
+      [type='color']
+    ):not(:disabled),
+  input:not(:disabled)::file-selector-button,
+  select:not(:disabled),
+  summary,
+  [role='button']:not([aria-disabled='true']),
+  [role='tab']:not([aria-disabled='true']),
+  [role='switch']:not([aria-disabled='true']),
+  [role='menuitem']:not([aria-disabled='true']),
+  [role='option']:not([aria-disabled='true']),
+  [role='link']:not([aria-disabled='true']),
+  label:has(input:where([type='checkbox'], [type='radio'], [type='file']):not(:disabled)),
+  input:where([type='checkbox'], [type='radio']):not(:disabled) + label[for] {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  input:disabled,
+  select:disabled,
+  textarea:disabled,
+  [aria-disabled='true'] {
+    cursor: not-allowed;
+  }
 }
 
 /* ---------- Custom utilities ---------- */
