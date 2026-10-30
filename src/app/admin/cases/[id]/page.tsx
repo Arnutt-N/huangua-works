@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, Calendar, Clock, MapPin, User, Users } from 'lucide-react';
-import { and, asc, eq, ne } from 'drizzle-orm';
+import { asc, eq, inArray } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import {
@@ -53,115 +53,97 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
 
   const db = await getDb();
 
-  // fetch case + relations ใน query เดียว (leftJoin เพราะไม่มี Drizzle relations())
-  const caseRow = await firstOrUndefined(
+  // § รัน query ที่เป็นอิสระต่อกันแบบขนาน (caseRow, timeline, officers, departments, canSupervise)
+  // เพื่อลดจำนวน round-trip ไปยังฐานข้อมูลจาก 6+ รอบซ้อนเหลือเพียง 2 รอบ
+  const [caseRow, timeline, officers, deptRows, canSupervise] = await Promise.all([
+    // fetch case + relations ใน query เดียว (leftJoin เพราะไม่มี Drizzle relations())
+    firstOrUndefined(
+      db
+        .select({
+          id: cases.id,
+          trackingCode: cases.trackingCode,
+          title: cases.title,
+          description: cases.description,
+          location: cases.location,
+          status: cases.status,
+          priority: cases.priority,
+          budgetStatus: cases.budgetStatus,
+          budgetAmount: cases.budgetAmount,
+          actionDetails: cases.actionDetails,
+          createdAt: cases.createdAt,
+          updatedAt: cases.updatedAt,
+          dueDate: cases.dueDate,
+          closedAt: cases.closedAt,
+          categoryId: cases.categoryId,
+          categoryName: categories.name,
+          submittedBy: cases.submittedBy,
+          submitterName: users.fullName,
+          submitterPhone: users.phoneNumber,
+          assignedTo: cases.assignedTo,
+          assigneeName: users.fullName,
+          departmentId: cases.departmentId,
+          departmentName: departments.name,
+          village: cases.village,
+          provinceName: provinces.nameTh,
+          districtName: districts.nameTh,
+          subDistrictName: subDistricts.nameTh,
+          villageName: villages.nameTh,
+        })
+        .from(cases)
+        .leftJoin(categories, eq(cases.categoryId, categories.id))
+        .leftJoin(departments, eq(cases.departmentId, departments.id))
+        .leftJoin(users, eq(cases.submittedBy, users.id))
+        .leftJoin(provinces, eq(cases.provinceId, provinces.id))
+        .leftJoin(districts, eq(cases.districtId, districts.id))
+        .leftJoin(subDistricts, eq(cases.subDistrictId, subDistricts.id))
+        .leftJoin(villages, eq(cases.villageId, villages.id))
+        // § 2nd join to users for assignee — alias ไม่ได้ใน core query, ใช้ batch inArray แยกด้านล่าง
+        .where(eq(cases.id, caseId))
+        .limit(1)
+    ),
+    // fetch timeline (case_updates) — ทั้ง public + internal (เจ้าหน้าที่เห็นได้หมด)
     db
       .select({
-        id: cases.id,
-        trackingCode: cases.trackingCode,
-        title: cases.title,
-        description: cases.description,
-        location: cases.location,
-        status: cases.status,
-        priority: cases.priority,
-        budgetStatus: cases.budgetStatus,
-        budgetAmount: cases.budgetAmount,
-        actionDetails: cases.actionDetails,
-        createdAt: cases.createdAt,
-        updatedAt: cases.updatedAt,
-        dueDate: cases.dueDate,
-        closedAt: cases.closedAt,
-        categoryId: cases.categoryId,
-        categoryName: categories.name,
-        submittedBy: cases.submittedBy,
-        submitterName: users.fullName,
-        submitterPhone: users.phoneNumber,
-        assignedTo: cases.assignedTo,
-        assigneeName: users.fullName,
-        departmentId: cases.departmentId,
-        departmentName: departments.name,
-        village: cases.village,
-        provinceName: provinces.nameTh,
-        districtName: districts.nameTh,
-        subDistrictName: subDistricts.nameTh,
-        villageName: villages.nameTh,
+        id: caseUpdates.id,
+        createdAt: caseUpdates.createdAt,
+        updateType: caseUpdates.updateType,
+        oldValue: caseUpdates.oldValue,
+        newValue: caseUpdates.newValue,
+        comment: caseUpdates.comment,
+        isPublic: caseUpdates.isPublic,
+        userId: caseUpdates.userId,
       })
-      .from(cases)
-      .leftJoin(categories, eq(cases.categoryId, categories.id))
-      .leftJoin(departments, eq(cases.departmentId, departments.id))
-      .leftJoin(users, eq(cases.submittedBy, users.id))
-      .leftJoin(provinces, eq(cases.provinceId, provinces.id))
-      .leftJoin(districts, eq(cases.districtId, districts.id))
-      .leftJoin(subDistricts, eq(cases.subDistrictId, subDistricts.id))
-      .leftJoin(villages, eq(cases.villageId, villages.id))
-      // § 2nd join to users for assignee — alias ไม่ได้ใน core query, ใช้ subquery แยกแทน (ด้านล่าง)
-      .where(eq(cases.id, caseId))
-      .limit(1)
-  );
+      .from(caseUpdates)
+      .where(eq(caseUpdates.caseId, caseId))
+      .orderBy(asc(caseUpdates.createdAt)),
+    // fetch officers ในระบบ (active, role != citizen) สำหรับ dropdown มอบหมาย
+    getActiveOfficers(db),
+    // fetch departments สำหรับ dropdown (เฉพาะ active)
+    getActiveDepartments(db),
+    // § compute ครั้งเดียวแล้ว reuse — helper อ่าน DB ห้าม await ซ้ำ 4 ครั้งต่อ render
+    canUseSupervisorAction(staffUser.role),
+  ]);
 
   if (!caseRow) {
     notFound();
   }
 
-  // fetch assignee name แยก (เพราะ join users 2 ครั้งใน query เดียวไม่ได้ใน core builder)
-  let assigneeName: string | null = null;
-  if (caseRow.assignedTo) {
-    const assignee = await firstOrUndefined(
-      db
-        .select({ fullName: users.fullName })
-        .from(users)
-        .where(eq(users.id, caseRow.assignedTo))
-        .limit(1)
-    );
-    assigneeName = assignee?.fullName ?? null;
-  }
-
-  // fetch timeline (case_updates) — ทั้ง public + internal (เจ้าหน้าที่เห็นได้หมด)
-  const timeline = await db
-    .select({
-      id: caseUpdates.id,
-      createdAt: caseUpdates.createdAt,
-      updateType: caseUpdates.updateType,
-      oldValue: caseUpdates.oldValue,
-      newValue: caseUpdates.newValue,
-      comment: caseUpdates.comment,
-      isPublic: caseUpdates.isPublic,
-      userId: caseUpdates.userId,
-    })
-    .from(caseUpdates)
-    .where(eq(caseUpdates.caseId, caseId))
-    .orderBy(asc(caseUpdates.createdAt));
-
-  // fetch timeline actor names ทีเดียว (batch lookup)
-  const actorIds = [...new Set(timeline.map((t) => t.userId))];
+  // § รวม assignedTo และผู้ทำรายการใน timeline เข้าด้วยกันแล้วดึงชื่อจาก users ในครั้งเดียวด้วย inArray (แก้ N+1)
+  const userIdsToFetch = [
+    ...new Set([
+      ...timeline.map((t) => t.userId),
+      ...(caseRow.assignedTo ? [caseRow.assignedTo] : []),
+    ]),
+  ];
   const actorRows =
-    actorIds.length === 0
+    userIdsToFetch.length === 0
       ? []
       : await db
           .select({ id: users.id, fullName: users.fullName, role: users.role })
           .from(users)
-          .where(
-            // Drizzle ไม่มี inArray ใน core builder แบบนี้ — ใช้ or() chain
-            // แต่ถ้า actor เยอะจะ verbose; สำหรับ case detail มักมีไม่กี่ actor
-            actorIds.length === 1
-              ? eq(users.id, actorIds[0]!)
-              : eq(users.id, actorIds[0]!)
-          );
-  // fallback: query ทีละ id ถ้ามีหลาย actor (rare for single case)
-  if (actorIds.length > 1) {
-    const more = await Promise.all(
-      actorIds.slice(1).map((id) =>
-        firstOrUndefined(
-          db.select({ id: users.id, fullName: users.fullName, role: users.role }).from(users).where(eq(users.id, id)).limit(1)
-        )
-      )
-    );
-    actorRows.push(...more.filter((r): r is NonNullable<typeof r> => !!r));
-  }
+          .where(inArray(users.id, userIdsToFetch));
   const actorMap = new Map(actorRows.map((a) => [a.id, a]));
-
-  // fetch officers ในระบบ (active, role != citizen) สำหรับ dropdown มอบหมาย
-  const officers = await getActiveOfficers(db);
+  const assigneeName = caseRow.assignedTo ? (actorMap.get(caseRow.assignedTo)?.fullName ?? null) : null;
 
   // filter officers: เจ้าหน้าที่ทั่วไปเห็นทุกคน (admin สามารถมอบหมายข้ามหน่วยงานได้ใน MVP)
   const officerOptions = officers.map((o) => ({
@@ -170,14 +152,9 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
     role: o.role,
   }));
 
-  // fetch departments สำหรับ dropdown (เฉพาะ active)
-  const deptRows = await getActiveDepartments(db);
-
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
 
-  // § compute ครั้งเดียวแล้ว reuse — helper อ่าน DB ห้าม await ซ้ำ 4 ครั้งต่อ render
-  const canSupervise = await canUseSupervisorAction(staffUser.role);
   const canChangeDepartment = canSupervise;
   const canChangeBudget = canSupervise;
   const canChangeBudgetAmount = canSupervise;
