@@ -179,7 +179,7 @@ export function RichMenuInsightsClient({ menuId }: { menuId: string }) {
           <div>
             <p className="text-sm font-medium text-warning-ink">ข้อมูลไม่เพียงพอ</p>
             <p className="mt-0.5 text-xs text-warning-ink/80">
-              LINE จะแสดงสถิติเมื่อมีผู้ใช้งานอย่างน้อย 20 คนในช่วงเวลาที่เลือก
+              LINE จะแสดงสถิติเมื่อเมนูมีข้อมูลสะสมรายวันแล้ว และมีผู้ใช้งานอย่างน้อย 20 คนในช่วงเวลาที่เลือก
             </p>
           </div>
         </div>
