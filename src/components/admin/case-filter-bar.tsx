@@ -12,7 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ThaiDatePicker } from '@/components/ui/thai-date-picker';
+import { DatePresetFilter } from '@/components/admin/date-preset-filter';
+import { STANDARD_DATE_PRESETS, presetOptionToDates } from '@/lib/date-range';
 import { ALL_STATUSES, STATUS_LABELS_TH } from '@/lib/cases/state-machine';
 
 /**
@@ -64,6 +65,8 @@ export function CaseFilterBar({ categories }: { categories: CategoryOption[] }) 
   const currentPriority = searchParams.get('priority') ?? 'all';
   const currentFrom = searchParams.get('from') ?? '';
   const currentTo = searchParams.get('to') ?? '';
+  const presetParam = searchParams.get('preset');
+  const currentPreset = presetParam ?? (currentFrom || currentTo ? 'custom' : null);
 
   const hasActiveFilter =
     currentStatus !== 'all' ||
@@ -71,6 +74,7 @@ export function CaseFilterBar({ categories }: { categories: CategoryOption[] }) 
     currentPriority !== 'all' ||
     !!currentFrom ||
     !!currentTo ||
+    !!presetParam ||
     !!searchParams.get('q');
 
   // สร้าง URL ใหม่จาก filter ปัจจุบัน + ล้าง page
@@ -86,6 +90,42 @@ export function CaseFilterBar({ categories }: { categories: CategoryOption[] }) 
     startTransition(() => {
       router.push(query ? `${pathname}?${query}` : pathname);
     });
+  }
+
+  // § Tranche F: อัปเดตช่วงวันที่พร้อม preset key ในครั้งเดียว ป้องกันหลาย transition
+  function updateDateFilter(nextPreset: string | null, nextFrom: string, nextTo: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextPreset) {
+      params.set('preset', nextPreset);
+    } else {
+      params.delete('preset');
+    }
+    if (nextFrom) {
+      params.set('from', nextFrom);
+    } else {
+      params.delete('from');
+    }
+    if (nextTo) {
+      params.set('to', nextTo);
+    } else {
+      params.delete('to');
+    }
+    params.delete('page');
+    const query = params.toString();
+    startTransition(() => {
+      router.push(query ? `${pathname}?${query}` : pathname);
+    });
+  }
+
+  function handlePresetChange(key: string) {
+    if (key === 'custom') {
+      updateDateFilter('custom', currentFrom, currentTo);
+      return;
+    }
+    const opt = STANDARD_DATE_PRESETS.find((p) => p.key === key);
+    if (!opt) return;
+    const dates = presetOptionToDates(opt);
+    updateDateFilter(key, dates.from, dates.to);
   }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -197,20 +237,18 @@ export function CaseFilterBar({ categories }: { categories: CategoryOption[] }) 
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <ThaiDatePicker
-            label="ตั้งแต่วันที่"
-            placeholder="ตั้งแต่วันที่"
-            value={currentFrom}
-            onChange={(v) => updateFilter('from', v)}
-          />
-          <ThaiDatePicker
-            label="ถึงวันที่"
-            placeholder="ถึงวันที่"
-            value={currentTo}
-            onChange={(v) => updateFilter('to', v)}
-          />
-        </div>
+        {/* Preset & Custom Date Filter (Tranche F) */}
+        <DatePresetFilter
+          preset={currentPreset}
+          customStart={currentFrom}
+          customEnd={currentTo}
+          onPresetChange={handlePresetChange}
+          onCustomStartChange={(v) => updateDateFilter('custom', v, currentTo)}
+          onCustomEndChange={(v) => updateDateFilter('custom', currentFrom, v)}
+          showClear={Boolean(currentFrom || currentTo || currentPreset)}
+          onClear={() => updateDateFilter(null, '', '')}
+          disabled={isPending}
+        />
 
         <div className="flex items-center justify-between gap-3">
           <p className="flex items-center gap-1.5 text-xs text-muted">
