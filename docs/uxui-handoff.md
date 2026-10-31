@@ -272,8 +272,8 @@ P3 = ปรับความสม่ำเสมอและประสบก
 | C | FLOW-01/03/04: case detail, actions, reports/filter | Role matrix, URL return ที่ปลอดภัย, กรอกหลายฟอร์ม/เปลี่ยนหน้า/บันทึก | **เสร็จสิ้น (PR #170)** |
 | D | A11Y-01/02/03/04: admin-layout, admin-specific dialogs, files และ Session warning | Keyboard, Focus return, 375px/จอเตี้ย/คีย์บอร์ดมือถือ, Dialog max-h, Thai warning | **เสร็จสิ้น (PR #173)** |
 | E | NET-01/02/03 และ FORM-04: geodata error recovery, admin-api, use-resource | ตรวจ response.ok ทุก geodata, แยก Loading/Empty/Error, ปุ่ม "ลองใหม่", timeout 15s | **เสร็จสิ้น (PR #174)** |
-| F | Design System เฉพาะแอดมิน, DatePresetFilter และ A11Y-05 (touch target/font size) | สร้างไฟล์ scoped styles/components เท่าที่จำเป็น, ปรับ touch target ≥44px, font ≥14px | รอดำเนินการ (ดู docs/handoff-20261031.md) |
-| G | Query/Timeline/Thumbnail (ลด N+1 ในหน้ารายละเอียดเรื่อง) | วัดก่อนแก้, Batch queries, pagination tests, Web Vitals ก่อน–หลังบนข้อมูลเท่ากัน | รอดำเนินการ |
+| F | Design System เฉพาะแอดมิน, DatePresetFilter และ A11Y-05 (touch target/font size) | สร้างไฟล์ scoped styles/components เท่าที่จำเป็น, ปรับ touch target ≥44px, font ≥14px | **เสร็จสิ้น (PR #175)** |
+| G | Query/Timeline/Thumbnail (ลด N+1 และ Viewport Lazy Loading) | Batch queries, Viewport Lazy Loading (useInView) สำหรับภาพสื่อ 100 รายการ | **เสร็จสิ้น (PR #176)** |
 | แยกขอบเขต | NET-01 และ FORM-04 ส่วนรับเรื่อง/อัปโหลดที่กระทบสาธารณะ | รับมอบหมายก่อนแก้ พ��้อม Integration และ Browser test ของเส้นทางนั้น |
 
 - การแก้ FLOW-02 ต้องยืนยันกติกามอบหมายก่อนเขียนโค้ด
