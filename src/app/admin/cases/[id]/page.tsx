@@ -26,6 +26,8 @@ import { formatThaiDateTime } from '@/lib/thai-date';
 import { CaseStatusBadge } from '@/components/ui/case-status-badge';
 import { CaseDetailClient } from './case-detail-client';
 import { safeInternalPath } from '@/lib/navigation';
+import { CaseAttachments } from '@/components/admin/case-attachments';
+import { isStorageConfigured, keyFromUrl, readUrlForKey } from '@/lib/storage';
 
 export const metadata: Metadata = { title: 'รายละเอียดเรื่อง' };
 
@@ -43,6 +45,42 @@ function formatAge(date: Date, now: number): string {
   if (diffHours < 1) return 'เมื่อครู่';
   if (diffHours < 24) return `${diffHours} ชม.`;
   return `${Math.floor(diffHours / 24)} วัน`;
+}
+
+interface RawAttachment {
+  key?: string;
+  url?: string;
+  type?: string;
+  size?: number;
+  name?: string;
+}
+
+/**
+ * § แยก parse โครงสร้าง attachments ทั้งแบบ modern ({ key, type, size }) และ legacy ({ url, type, size })
+ */
+function parseAttachments(raw: unknown): Array<{ key: string; type: string; size: number; name?: string }> {
+  if (!raw) return [];
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (!Array.isArray(parsed)) return [];
+    const items: Array<{ key: string; type: string; size: number; name?: string }> = [];
+    for (const item of parsed) {
+      if (typeof item !== 'object' || item === null) continue;
+      const obj = item as RawAttachment;
+      const key = obj.key || (obj.url ? keyFromUrl(obj.url) : null);
+      if (key && typeof key === 'string') {
+        items.push({
+          key,
+          type: typeof obj.type === 'string' ? obj.type : 'image/jpeg',
+          size: typeof obj.size === 'number' ? obj.size : 0,
+          name: typeof obj.name === 'string' ? obj.name : key.split('/').pop(),
+        });
+      }
+    }
+    return items;
+  } catch {
+    return [];
+  }
 }
 
 export default async function CaseDetailPage({ params, searchParams }: PageProps) {
@@ -87,6 +125,7 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
           districtName: districts.nameTh,
           subDistrictName: subDistricts.nameTh,
           villageName: villages.nameTh,
+          attachments: cases.attachments,
         })
         .from(cases)
         .leftJoin(categories, eq(cases.categoryId, categories.id))
@@ -127,6 +166,23 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
   if (!caseRow) {
     notFound();
   }
+
+  // § ดึงและเซ็น URL รูปถ่ายหลักฐานแบบขนาน — ล้อม per-item try/catch เพื่อไม่ให้หน้าเคสล่มถ้ามีรูปใดรูปหนึ่งผิดพลาด
+  const storageConfigured = isStorageConfigured();
+  const rawAttachments = parseAttachments(caseRow.attachments);
+  const signedAttachments = storageConfigured
+    ? await Promise.all(
+        rawAttachments.map(async (att) => {
+          try {
+            const url = await readUrlForKey(att.key, { disposition: 'inline', expiresIn: 900 });
+            return { ...att, url };
+          } catch (err) {
+            console.error(`[case-detail] เซ็น URL ล้มเหลวสำหรับ key=${att.key}:`, err);
+            return { ...att, url: null };
+          }
+        })
+      )
+    : rawAttachments.map((att) => ({ ...att, url: null }));
 
   // § รวม assignedTo และผู้ทำรายการใน timeline เข้าด้วยกันแล้วดึงชื่อจาก users ในครั้งเดียวด้วย inArray (แก้ N+1)
   const userIdsToFetch = [
@@ -260,6 +316,11 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
               <p className="whitespace-pre-wrap text-sm text-ink">{caseRow.actionDetails}</p>
             </div>
           )}
+
+          {/* § ภาพถ่ายหรือเอกสารประกอบที่ประชาชนแนบมา */}
+          <div className="pt-2">
+            <CaseAttachments attachments={signedAttachments} storageConfigured={storageConfigured} />
+          </div>
         </div>
       </header>
 
