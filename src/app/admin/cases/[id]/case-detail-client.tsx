@@ -163,6 +163,28 @@ export function CaseDetailClient({
   const setSelectedStatus = (value: CaseStatus) => setDraftStatus({ base: currentStatus, value });
   const transitionCheck = assertTransition(currentStatus, selectedStatus);
 
+  // § FLOW-02: ตรวจสอบเงื่อนไขว่าสถานะ 'assigned' (มอบหมายแล้ว) ต้องมีผู้รับผิดชอบอยู่แล้วเสมอ
+  const requiresAssignee = selectedStatus === 'assigned' && !currentAssignedTo;
+  const requiresAssigneeReason = requiresAssignee
+    ? 'ไม่สามารถเปลี่ยนเป็นสถานะ "มอบหมายแล้ว" ได้เนื่องจากยังไม่ได้ระบุเจ้าหน้าที่รับผิดชอบ (กรุณาระบุในกล่อง "มอบหมายเจ้าหน้าที่" ด้านล่างก่อน)'
+    : null;
+
+  // § FLOW-04 / FLOW-02: ดราฟต์เจ้าหน้าที่ที่เลือกใน dropdown
+  const [draftOfficer, setDraftOfficer] = useState<{ base: string | null; value: string }>({
+    base: currentAssignedTo,
+    value: currentAssignedTo ?? '__unassign__',
+  });
+  const selectedOfficer =
+    draftOfficer.base === currentAssignedTo
+      ? draftOfficer.value
+      : (currentAssignedTo ?? '__unassign__');
+  const setSelectedOfficer = (value: string) =>
+    setDraftOfficer({ base: currentAssignedTo, value });
+
+  // § FLOW-02: ห้ามยกเลิกผู้รับผิดชอบ (__unassign__) ขณะที่สถานะเรื่องยังเป็น 'assigned'
+  const cannotUnassignInAssigned =
+    currentStatus === 'assigned' && selectedOfficer === '__unassign__';
+
   return (
     <div className="space-y-6">
       {/* ── เปลี่ยนสถานะ ── */}
@@ -201,6 +223,11 @@ export function CaseDetailClient({
                 {transitionCheck.reason}
               </p>
             )}
+            {selectedStatus !== currentStatus && transitionCheck.ok && requiresAssignee && (
+              <p role="alert" className="mt-1.5 text-sm font-semibold text-warning-ink">
+                {requiresAssigneeReason}
+              </p>
+            )}
           </div>
           <div>
             <Label htmlFor="status-comment">หมายเหตุ (ไม่จำเป็น)</Label>
@@ -234,7 +261,11 @@ export function CaseDetailClient({
           </p>
           {statusState.error && <ErrorText>{statusState.error}</ErrorText>}
           {statusState.success && <SuccessText>{statusState.success}</SuccessText>}
-          <Button type="submit" size="sm" disabled={statusPending || !transitionCheck.ok}>
+          <Button
+            type="submit"
+            size="sm"
+            disabled={statusPending || !transitionCheck.ok || requiresAssignee}
+          >
             {statusPending ? 'กำลังบันทึก...' : 'บันทึกสถานะ'}
           </Button>
         </form>
@@ -246,7 +277,11 @@ export function CaseDetailClient({
           <input type="hidden" name="caseId" value={caseId} />
           <div>
             <Label htmlFor="officerId">เจ้าหน้าที่รับผิดชอบ</Label>
-            <Select name="officerId" defaultValue={currentAssignedTo ?? '__unassign__'}>
+            <Select
+              name="officerId"
+              value={selectedOfficer}
+              onValueChange={setSelectedOfficer}
+            >
               <SelectTrigger id="officerId">
                 <SelectValue />
               </SelectTrigger>
@@ -259,10 +294,25 @@ export function CaseDetailClient({
                 ))}
               </SelectContent>
             </Select>
+            {cannotUnassignInAssigned && (
+              <p role="alert" className="mt-1.5 text-sm font-semibold text-danger-ink">
+                {'ไม่สามารถยกเลิกผู้รับผิดชอบขณะเรื่องอยู่ในสถานะ "มอบหมายแล้ว" ได้ (กรุณาเปลี่ยนสถานะเรื่องกลับเป็น "กำลังตรวจสอบ" ก่อน)'}
+              </p>
+            )}
+            {(currentStatus === 'reviewing' || currentStatus === 'awaiting_budget') && !currentAssignedTo && (
+              <p className="mt-1.5 text-xs text-muted">
+                {'เมื่อบันทึกการมอบหมายแล้ว จึงจะสามารถเปลี่ยนสถานะเรื่องเป็น "มอบหมายแล้ว" ในกล่องเปลี่ยนสถานะด้านบนได้'}
+              </p>
+            )}
           </div>
           {assignState.error && <ErrorText>{assignState.error}</ErrorText>}
           {assignState.success && <SuccessText>{assignState.success}</SuccessText>}
-          <Button type="submit" size="sm" variant="secondary" disabled={assignPending}>
+          <Button
+            type="submit"
+            size="sm"
+            variant="secondary"
+            disabled={assignPending || cannotUnassignInAssigned}
+          >
             {assignPending ? 'กำลังบันทึก...' : 'บันทึกการมอบหมาย'}
           </Button>
         </form>
