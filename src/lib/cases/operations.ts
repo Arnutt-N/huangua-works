@@ -169,6 +169,14 @@ export function buildTimeline(
       const transition = assertTransition(current.status as CaseStatus, patch.newStatus);
       if (!transition.ok) return { error: transition.reason ?? 'การเปลี่ยนสถานะไม่ถูกต้อง' };
 
+      // § FLOW-02: ตรวจสอบเงื่อนไขสถานะ 'assigned' (มอบหมายแล้ว) ต้องมีผู้รับผิดชอบเสมอ
+      if (patch.newStatus === 'assigned' && !current.assignedTo) {
+        return {
+          error:
+            'ไม่สามารถเปลี่ยนเป็นสถานะ "มอบหมายแล้ว" ได้เนื่องจากยังไม่ได้ระบุเจ้าหน้าที่รับผิดชอบ (กรุณาระบุเจ้าหน้าที่ก่อน)',
+        };
+      }
+
       const isClosing = patch.newStatus === 'closed' || patch.newStatus === 'done';
       const isRejected = patch.newStatus === 'rejected';
 
@@ -189,6 +197,14 @@ export function buildTimeline(
     }
 
     case 'assignment': {
+      // § FLOW-02: ห้ามยกเลิกผู้รับผิดชอบขณะเรื่องอยู่ในสถานะ 'assigned' (ป้องกันสถานะมอบหมายแต่ไม่มีคนรับ)
+      if (patch.officerId === null && current.status === 'assigned') {
+        return {
+          error:
+            'ไม่สามารถยกเลิกผู้รับผิดชอบขณะเรื่องอยู่ในสถานะ "มอบหมายแล้ว" ได้ (กรุณาเปลี่ยนสถานะเรื่องกลับเป็น "กำลังตรวจสอบ" ก่อนยกเลิกการมอบหมาย)',
+        };
+      }
+
       const oldValue = current.assignedTo ?? '(ยังไม่มอบหมาย)';
       const newValue = patch.officerId ?? '(ยังไม่มอบหมาย)';
       return {

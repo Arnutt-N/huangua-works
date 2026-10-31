@@ -126,3 +126,71 @@ describe('buildTimeline — budget amount and action details', () => {
     }
   });
 });
+
+describe('buildTimeline — FLOW-02: assignment vs assigned status invariant', () => {
+  it('เปลี่ยนสถานะเป็น assigned แต่ยังไม่มี assignedTo → ปฏิเสธพร้อมแจ้งเตือนภาษาไทย', () => {
+    const unassignedCase = {
+      ...CURRENT,
+      status: 'reviewing',
+      assignedTo: null,
+    };
+    const result = buildTimeline(
+      { kind: 'status', newStatus: 'assigned', comment: null, isPublic: true },
+      unassignedCase
+    );
+    expect('error' in result).toBe(true);
+    if ('error' in result) {
+      expect(result.error).toContain('ไม่สามารถเปลี่ยนเป็นสถานะ "มอบหมายแล้ว" ได้เนื่องจากยังไม่ได้ระบุเจ้าหน้าที่รับผิดชอบ');
+    }
+  });
+
+  it('เปลี่ยนสถานะเป็น assigned เมื่อมี assignedTo แล้ว → ผ่าน', () => {
+    const assignedCase = {
+      ...CURRENT,
+      status: 'reviewing',
+      assignedTo: 'officer-1',
+    };
+    const result = buildTimeline(
+      { kind: 'status', newStatus: 'assigned', comment: null, isPublic: true },
+      assignedCase
+    );
+    expect('entry' in result).toBe(true);
+    if ('entry' in result) {
+      expect(result.entry.updateType).toBe('status_change');
+      expect(result.entry.newValue).toBe('assigned');
+    }
+  });
+
+  it('ยกเลิกผู้รับผิดชอบ (officerId: null) ขณะเรื่องอยู่ในสถานะ assigned → ปฏิเสธ', () => {
+    const assignedCase = {
+      ...CURRENT,
+      status: 'assigned',
+      assignedTo: 'officer-1',
+    };
+    const result = buildTimeline(
+      { kind: 'assignment', officerId: null },
+      assignedCase
+    );
+    expect('error' in result).toBe(true);
+    if ('error' in result) {
+      expect(result.error).toContain('ไม่สามารถยกเลิกผู้รับผิดชอบขณะเรื่องอยู่ในสถานะ "มอบหมายแล้ว" ได้');
+    }
+  });
+
+  it('เปลี่ยนผู้รับผิดชอบเป็นคนอื่นขณะสถานะเป็น assigned → ผ่าน', () => {
+    const assignedCase = {
+      ...CURRENT,
+      status: 'assigned',
+      assignedTo: 'officer-1',
+    };
+    const result = buildTimeline(
+      { kind: 'assignment', officerId: 'officer-2' },
+      assignedCase
+    );
+    expect('entry' in result).toBe(true);
+    if ('entry' in result) {
+      expect(result.entry.newValue).toBe('officer-2');
+    }
+  });
+});
+

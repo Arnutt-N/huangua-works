@@ -169,3 +169,74 @@ describe('CaseDetailClient — FLOW-04: กรอกหลายฟอร์ม 
     });
   });
 });
+
+describe('CaseDetailClient — FLOW-02: ความสอดคล้องระหว่างการมอบหมายกับสถานะ assigned', () => {
+  it('เลือกสถานะ "มอบหมายแล้ว" แต่เคสยังไม่มีผู้รับผิดชอบ (currentAssignedTo = null) → แสดงคำเตือนและปิดปุ่มบันทึกสถานะ', async () => {
+    const user = userEvent.setup();
+    render(
+      <CaseDetailClient
+        {...baseProps}
+        currentStatus="reviewing"
+        currentAssignedTo={null}
+      />
+    );
+
+    // เลือกสถานะ "มอบหมาย" (reviewing อนุญาตให้ไป assigned)
+    const statusTrigger = screen.getByRole('combobox', { name: 'สถานะใหม่' });
+    await user.click(statusTrigger);
+    const assignedOption = await screen.findByRole('option', { name: 'มอบหมาย' });
+    await user.click(assignedOption);
+
+    // ต้องแสดงคำเตือนว่ายังไม่ได้ระบุเจ้าหน้าที่
+    expect(
+      screen.getByText(/ไม่สามารถเปลี่ยนเป็นสถานะ "มอบหมายแล้ว" ได้เนื่องจากยังไม่ได้ระบุเจ้าหน้าที่รับผิดชอบ/)
+    ).toBeInTheDocument();
+
+    // ปุ่มบันทึกสถานะต้องถูกปิด (disabled)
+    const submitStatusBtn = screen.getByRole('button', { name: 'บันทึกสถานะ' });
+    expect(submitStatusBtn).toBeDisabled();
+  });
+
+  it('สถานะเรื่องเป็น "มอบหมายแล้ว" แต่เลือก "(ยังไม่มอบหมาย)" ในช่องเจ้าหน้าที่ → แสดงคำเตือนและปิดปุ่มบันทึกการมอบหมาย', async () => {
+    const user = userEvent.setup();
+    render(
+      <CaseDetailClient
+        {...baseProps}
+        currentStatus="assigned"
+        currentAssignedTo="off-1"
+      />
+    );
+
+    // เลือก "(ยังไม่มอบหมาย)"
+    const officerTrigger = screen.getByRole('combobox', { name: 'เจ้าหน้าที่รับผิดชอบ' });
+    await user.click(officerTrigger);
+    const unassignOption = await screen.findByRole('option', { name: '(ยังไม่มอบหมาย)' });
+    await user.click(unassignOption);
+
+    // ต้องแสดงคำเตือนว่าห้ามยกเลิกขณะสถานะเป็นมอบหมายแล้ว
+    expect(
+      screen.getByText(/ไม่สามารถยกเลิกผู้รับผิดชอบขณะเรื่องอยู่ในสถานะ "มอบหมายแล้ว" ได้/)
+    ).toBeInTheDocument();
+
+    // ปุ่มบันทึกการมอบหมายต้องถูกปิด (disabled)
+    const submitAssignBtn = screen.getByRole('button', { name: 'บันทึกการมอบหมาย' });
+    expect(submitAssignBtn).toBeDisabled();
+  });
+
+  it('เมื่อสถานะเป็น reviewing และยังไม่มีผู้รับผิดชอบ → แสดงคำแนะนำขั้นตอนการมอบหมาย', () => {
+    render(
+      <CaseDetailClient
+        {...baseProps}
+        currentStatus="reviewing"
+        currentAssignedTo={null}
+      />
+    );
+
+    expect(
+      screen.getByText(
+        /เมื่อบันทึกการมอบหมายแล้ว จึงจะสามารถเปลี่ยนสถานะเรื่องเป็น "มอบหมายแล้ว" ในกล่องเปลี่ยนสถานะด้านบนได้/
+      )
+    ).toBeInTheDocument();
+  });
+});
+
