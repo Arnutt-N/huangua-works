@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.setConfig({ testTimeout: 30_000 });
@@ -105,3 +105,68 @@ describe('หน้าไฟล์สื่อ — อ่านผ่าน read
     openSpy.mockRestore();
   });
 });
+
+describe('Tranche G: Media Thumbnail & Viewport Lazy Loading', () => {
+  it('แท็ก <img> มีแอตทริบิวต์ loading="lazy", decoding="async" และคลาสตรึงขนาด h-20 w-full', async () => {
+    render(<FilesClient />);
+    await screen.findByText('a.png');
+
+    const img = await screen.findByAltText('a.png');
+    expect(img.getAttribute('loading')).toBe('lazy');
+    expect(img.getAttribute('decoding')).toBe('async');
+    expect(img.className).toContain('h-20');
+    expect(img.className).toContain('w-full');
+    expect(img.className).toContain('object-contain');
+  });
+
+  it('การ์ดรูปที่อยู่นอก viewport จะยังไม่ยิงขอ read-url จนกว่าจะเลื่อนเข้ามาใน viewport', async () => {
+    const observers: ((isIntersecting: boolean) => void)[] = [];
+
+    class ViewportObserverMock implements IntersectionObserver {
+      readonly root: Element | Document | null = null;
+      readonly rootMargin: string = '';
+      readonly thresholds: readonly number[] = [];
+      takeRecords = vi.fn().mockReturnValue([]);
+
+      constructor(cb: (entries: IntersectionObserverEntry[]) => void) {
+        observers.push((isIntersecting: boolean) => {
+          cb([{ isIntersecting } as IntersectionObserverEntry]);
+        });
+      }
+      observe = vi.fn();
+      unobserve = vi.fn();
+      disconnect = vi.fn();
+    }
+
+    vi.stubGlobal('IntersectionObserver', ViewportObserverMock);
+
+    render(<FilesClient />);
+    await screen.findByText('a.png');
+
+    // ขณะที่ยังไม่ตัดเข้า viewport: ต้องยังไม่ยิงขอ read-url
+    expect(mocks.fetchCalls.filter((c) => c.includes('/f1/read-url'))).toHaveLength(0);
+    expect(screen.getByLabelText('กำลังโหลดรูป')).toBeInTheDocument();
+
+    // จำลองเมื่อเลื่อนเข้ามาใน viewport (trigger ทุก observer ที่ลงทะเบียนไว้)
+    act(() => {
+      observers.forEach((trigger) => trigger(true));
+    });
+
+    // หลังตัดเข้า viewport: ต้องยิงขอ read-url และแสดงรูปภาพ
+    await waitFor(() => {
+      expect(mocks.fetchCalls.filter((c) => c.includes('/f1/read-url'))).toHaveLength(1);
+    });
+    expect(await screen.findByAltText('a.png')).toBeInTheDocument();
+  });
+
+  it('เมื่อโหลดรูปภาพไม่สำเร็จ (onError) แสดงสถานะข้อผิดพลาดอย่างปลอดภัย', async () => {
+    render(<FilesClient />);
+    await screen.findByText('a.png');
+
+    const img = await screen.findByAltText('a.png');
+    fireEvent.error(img);
+
+    expect(await screen.findByLabelText('โหลดรูปไม่สำเร็จ')).toBeInTheDocument();
+  });
+});
+

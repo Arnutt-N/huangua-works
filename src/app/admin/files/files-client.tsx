@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/components/admin/use-confirm';
 import { MEDIA_ACCEPT_ATTR, validateMediaFile } from '@/lib/media-upload-rules';
 import { useMediaItemReadUrl } from './use-media-item-read-url';
+import { useInView } from './use-in-view';
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -18,15 +19,37 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/** § ต้องเป็น component แยกเพื่อเรียก hook ได้ — ห้ามเรียก hook ใน .map() */
+/**
+ * § MediaThumb — แสดงตัวอย่างรูปภาพหรือไอคอนไฟล์
+ * - เพิ่ม Viewport Lazy Loading: ใช้ useInView ตรวจจับเมื่อการ์ดเข้าใกล้จอ (rootMargin 200px) ก่อนยิงขอ read-url
+ *   ลดปัญหาการยิง HTTP request พร้อมกัน 100 รายการตอน mount (Tranche G)
+ * - ตรึงขนาด container (h-20 w-full) และเพิ่ม loading="lazy", decoding="async" เพื่อป้องกัน Layout Shift (CLS)
+ * - มี onError fallback เมื่อโหลดรูปจริงล้มเหลว
+ */
 function MediaThumb({ item }: { item: MediaItem }) {
   const isImage = item.mimeType.startsWith('image/');
-  const url = useMediaItemReadUrl(item.id, isImage);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inView = useInView(containerRef, { rootMargin: '200px' });
+  const url = useMediaItemReadUrl(item.id, isImage && inView);
+  const [imageError, setImageError] = useState(false);
+
   return (
-    <div className="mb-2 flex h-20 items-center justify-center rounded bg-surface-raised">
-      {isImage && url ? (
+    <div
+      ref={containerRef}
+      className="mb-2 flex h-20 w-full items-center justify-center overflow-hidden rounded bg-surface-raised"
+    >
+      {isImage && url && !imageError ? (
         /* eslint-disable-next-line @next/next/no-img-element -- รูปจาก storage ภายนอก ไม่ผ่าน Next image optimizer */
-        <img src={url} alt={item.filename} className="max-h-20 rounded object-contain" />
+        <img
+          src={url}
+          alt={item.filename}
+          loading="lazy"
+          decoding="async"
+          onError={() => setImageError(true)}
+          className="h-20 w-full rounded object-contain"
+        />
+      ) : isImage && imageError ? (
+        <ImageIcon className="h-8 w-8 text-danger/70" aria-label="โหลดรูปไม่สำเร็จ" />
       ) : (
         <FileIcon className="h-8 w-8 text-muted" aria-label={isImage ? 'กำลังโหลดรูป' : 'ไฟล์'} />
       )}
