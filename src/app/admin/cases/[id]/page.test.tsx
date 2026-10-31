@@ -34,6 +34,12 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
+vi.mock('@/lib/storage', () => ({
+  isStorageConfigured: vi.fn(() => true),
+  readUrlForKey: vi.fn(async (key: string) => `https://storage.huangua.go.th/media/${key}`),
+  keyFromUrl: vi.fn((url: string) => url.replace('https://storage.huangua.go.th/media/', '')),
+}));
+
 vi.mock('@/lib/db', async () => {
   const schema = await import('@/lib/db/schema');
   return {
@@ -63,6 +69,7 @@ vi.mock('@/lib/db', async () => {
 
 import CaseDetailPage from './page';
 import { cases, caseUpdates, users } from '@/lib/db/schema';
+import { isStorageConfigured } from '@/lib/storage';
 
 afterEach(() => {
   cleanup();
@@ -98,6 +105,7 @@ beforeEach(() => {
     districtName: 'ยางตลาด',
     subDistrictName: 'หัวงัว',
     villageName: 'บ้านหัวงัว',
+    attachments: null,
   };
   mockTimelineRows = [
     {
@@ -172,5 +180,58 @@ describe('CaseDetailPage — batch user lookup & parallel queries (Tranche G)', 
 
     const userQueries = selectCalls.filter((c) => c.table === users);
     expect(userQueries).toHaveLength(0);
+  });
+});
+
+describe('CaseDetailPage — citizen attachments view', () => {
+  it('แสดงภาพถ่ายหลักฐานของเรื่องร้องเรียนเมื่อมี attachments', async () => {
+    mockCaseRow = {
+      ...mockCaseRow,
+      attachments: [
+        {
+          key: 'cases/attachments/photo1.jpg',
+          type: 'image/jpeg',
+          size: 1048576,
+          name: 'photo1.jpg',
+        },
+      ],
+    };
+
+    const jsx = await CaseDetailPage({
+      params: Promise.resolve({ id: 'case-1' }),
+      searchParams: Promise.resolve({}),
+    });
+    render(jsx);
+
+    expect(screen.getByText('ภาพถ่ายหรือเอกสารประกอบ (1 รูป)')).toBeInTheDocument();
+    const img = screen.getByAltText('photo1.jpg');
+    expect(img).toBeInTheDocument();
+    expect(img).toHaveAttribute(
+      'src',
+      'https://storage.huangua.go.th/media/cases/attachments/photo1.jpg'
+    );
+  });
+
+  it('แสดงข้อความแจ้งเตือนเมื่อ Object Storage ยังไม่ได้เปิดใช้งาน (isStorageConfigured = false)', async () => {
+    vi.mocked(isStorageConfigured).mockReturnValueOnce(false);
+    mockCaseRow = {
+      ...mockCaseRow,
+      attachments: [
+        {
+          key: 'cases/attachments/photo1.jpg',
+          type: 'image/jpeg',
+          size: 1048576,
+          name: 'photo1.jpg',
+        },
+      ],
+    };
+
+    const jsx = await CaseDetailPage({
+      params: Promise.resolve({ id: 'case-1' }),
+      searchParams: Promise.resolve({}),
+    });
+    render(jsx);
+
+    expect(screen.getByText('ไม่สามารถแสดงภาพถ่ายหลักฐานได้')).toBeInTheDocument();
   });
 });
