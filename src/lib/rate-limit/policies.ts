@@ -47,6 +47,8 @@ export const RATE_LIMIT_POLICIES = {
   track: { prefix: 'rate:track', limit: 10, windowSeconds: 300, kind: 'public', failClosed: false },
   // กันสแปมดาว — เขียนครั้งเดียวต่อเคสอยู่แล้ว (unique) limit กันยิงมั่ว
   feedbackSubmit: { prefix: 'rate:feedback', limit: 10, windowSeconds: 300, kind: 'public', failClosed: false },
+  // แนบไฟล์ภาพประกอบเรื่องร้องเรียน — สูงสุด 10 รูป / 5 นาที ต่อ IP (บริการประชาชน fail-open)
+  caseUpload: { prefix: 'rate:case-upload', limit: 10, windowSeconds: 300, kind: 'public', failClosed: false },
 } as const satisfies Record<string, RateLimitPolicy>;
 
 export type RateLimitPolicyName = keyof typeof RATE_LIMIT_POLICIES;

@@ -3,11 +3,14 @@
 import {
   AlertCircle,
   ArrowRight,
+  Camera,
   CheckCircle2,
+  FileText,
   Loader2,
   MapPin,
+  Paperclip,
+  Trash2,
   User,
-  FileText,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
@@ -25,6 +28,8 @@ import { COPY } from '../../lib/copy';
 import { HONEYPOT_FIELD, MIN_SUBMIT_MS } from '../../lib/anti-spam';
 import { useLiff } from '../../components/liff/liff-provider';
 import { clearIntakeDraft, readIntakeDraft, saveIntakeDraft } from '../../components/forms/non-pii-draft';
+import { generateId } from '../../lib/id';
+import { MEDIA_ACCEPT_ATTR, MEDIA_MAX_SIZE_BYTES, validateMediaFile } from '../../lib/media-upload-rules';
 
 export interface IntakeCategory {
   id: string;
@@ -125,6 +130,34 @@ function SectionHeading({ icon: Icon, children }: { icon: typeof User; children:
   );
 }
 
+export interface UploadedAttachment {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  url?: string;
+  key?: string;
+  status: 'uploading' | 'done' | 'error';
+  error?: string;
+}
+
+/**
+ * § Request timeout helper — ป้องกัน network ค้างใน mobile 3G/EDGE
+ */
+function createTimeoutSignal(timeoutMs: number): AbortSignal {
+  if (typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal) {
+    return AbortSignal.timeout(timeoutMs);
+  }
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), timeoutMs);
+  return controller.signal;
+}
+
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 15000): Promise<Response> {
+  const signal = options.signal ?? createTimeoutSignal(timeoutMs);
+  return fetch(url, { ...options, signal });
+}
+
 export function IntakeForm({
   categories,
   initialCategorySlug,
@@ -189,14 +222,13 @@ export function IntakeForm({
   const [loadingGeo, setLoadingGeo] = useState<'provinces' | 'districts' | 'subdistricts' | 'villages' | null>('provinces');
   const [geoError, setGeoError] = useState<string | null>(null);
   const [failedGeoStep, setFailedGeoStep] = useState<'provinces' | 'districts' | 'subdistricts' | 'villages' | null>(null);
+  const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
   const geoRequestId = useRef(0);
 
-  // § NET-01: ตรวจ response.ok ทุก geodata endpoint, แยก Loading/Empty/Error และมี Retry โดยไม่ล้างข้อมูลอื่นในฟอร์ม
-  const loadProvinces = useCallback(() => {
+  // § NET-01: ตรวจ response.ok ทุก geodata endpoint, มี timeout 15s, แยก Loading/Empty/Error และมี Retry โดยไม่ล้างข้อมูลอื่นในฟอร์ม
+  const fetchProvinces = useCallback(() => {
     const requestId = ++geoRequestId.current;
-    setLoadingGeo('provinces');
-    setGeoError(null);
-    fetch('/api/provinces')
+    fetchWithTimeout('/api/provinces', {}, 15000)
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
@@ -219,30 +251,15 @@ export function IntakeForm({
       });
   }, []);
 
+  const loadProvinces = useCallback(() => {
+    setLoadingGeo('provinces');
+    setGeoError(null);
+    fetchProvinces();
+  }, [fetchProvinces]);
+
   useEffect(() => {
-    const requestId = ++geoRequestId.current;
-    fetch('/api/provinces')
-      .then(async (r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      })
-      .then((d) => {
-        if (geoRequestId.current === requestId) {
-          setProvinces(d.provinces ?? []);
-          setFailedGeoStep(null);
-          setGeoError(null);
-        }
-      })
-      .catch(() => {
-        if (geoRequestId.current === requestId) {
-          setFailedGeoStep('provinces');
-          setGeoError('โหลดรายชื่อจังหวัดไม่สำเร็จ กรุณาลองใหม่');
-        }
-      })
-      .finally(() => {
-        if (geoRequestId.current === requestId) setLoadingGeo(null);
-      });
-  }, []);
+    fetchProvinces();
+  }, [fetchProvinces]);
 
   const loadDistricts = useCallback((provinceId: string) => {
     if (!provinceId) {
@@ -254,7 +271,7 @@ export function IntakeForm({
     const requestId = ++geoRequestId.current;
     setLoadingGeo('districts');
     setGeoError(null);
-    fetch(`/api/districts?provinceId=${encodeURIComponent(provinceId)}`)
+    fetchWithTimeout(`/api/districts?provinceId=${encodeURIComponent(provinceId)}`, {}, 15000)
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
@@ -287,7 +304,7 @@ export function IntakeForm({
     const requestId = ++geoRequestId.current;
     setLoadingGeo('subdistricts');
     setGeoError(null);
-    fetch(`/api/subdistricts?districtId=${encodeURIComponent(districtId)}`)
+    fetchWithTimeout(`/api/subdistricts?districtId=${encodeURIComponent(districtId)}`, {}, 15000)
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
@@ -319,7 +336,7 @@ export function IntakeForm({
     const requestId = ++geoRequestId.current;
     setLoadingGeo('villages');
     setGeoError(null);
-    fetch(`/api/villages?subDistrictId=${encodeURIComponent(subDistrictId)}`)
+    fetchWithTimeout(`/api/villages?subDistrictId=${encodeURIComponent(subDistrictId)}`, {}, 15000)
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
@@ -386,6 +403,92 @@ export function IntakeForm({
     loadVillages(value);
   }
 
+  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
+    // reset input so same file can be re-selected if removed
+    e.target.value = '';
+
+    const currentCount = attachments.length;
+    const availableSlots = Math.max(0, 5 - currentCount);
+    if (availableSlots <= 0) return;
+
+    const filesToUpload = files.slice(0, availableSlots);
+    for (const file of filesToUpload) {
+      const clientErr = validateMediaFile(file);
+      const tempId = generateId();
+
+      if (clientErr) {
+        setAttachments((prev) => [
+          ...prev,
+          {
+            id: tempId,
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            status: 'error',
+            error: clientErr,
+          },
+        ]);
+        continue;
+      }
+
+      setAttachments((prev) => [
+        ...prev,
+        {
+          id: tempId,
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          status: 'uploading',
+        },
+      ]);
+
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await fetchWithTimeout(
+          '/api/cases/upload',
+          {
+            method: 'POST',
+            body: formData,
+          },
+          30000
+        );
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          setAttachments((prev) =>
+            prev.map((att) =>
+              att.id === tempId
+                ? { ...att, status: 'error', error: data.error || 'อัปโหลดไม่สำเร็จ' }
+                : att
+            )
+          );
+        } else {
+          setAttachments((prev) =>
+            prev.map((att) =>
+              att.id === tempId
+                ? { ...att, status: 'done', url: data.url, key: data.key, type: data.type }
+                : att
+            )
+          );
+        }
+      } catch {
+        setAttachments((prev) =>
+          prev.map((att) =>
+            att.id === tempId
+              ? { ...att, status: 'error', error: 'เครือข่ายขัดข้อง กรุณาลองใหม่' }
+              : att
+          )
+        );
+      }
+    }
+  }
+
+  function handleRemoveAttachment(id: string) {
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
+  }
+
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setSubmitError(null);
@@ -393,6 +496,15 @@ export function IntakeForm({
     const errors = validate(form, liffMode);
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
+
+    if (attachments.some((a) => a.status === 'uploading')) {
+      setSubmitError('กรุณารอให้อัปโหลดรูปภาพเสร็จสิ้นก่อนส่งเรื่อง');
+      return;
+    }
+
+    const uploadedAttachments = attachments
+      .filter((a) => a.status === 'done' && a.url)
+      .map((a) => ({ url: a.url!, type: a.type, size: a.size }));
 
     const websiteUrl = honeypotRef.current?.value || undefined;
     const formStartedAt = formStartedAtRef.current || undefined;
@@ -403,29 +515,34 @@ export function IntakeForm({
       // นาฬิกาถอยหลังระหว่างกรอกต้องไม่ทำให้รอนานเกิน 2 วินาที
       const remaining = formStartedAt === undefined ? 0 : Math.min(MIN_SUBMIT_MS, MIN_SUBMIT_MS - (Date.now() - formStartedAt));
       if (remaining > 0) await new Promise<void>((resolve) => window.setTimeout(resolve, remaining));
-      const res = await fetch('/api/cases/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...(liffMode ? {} : { cid: sanitizeCid(form.cid) }),
-          fullName: form.fullName.trim() || undefined,
-          phoneNumber: form.phone.trim() || undefined,
-          categoryId: form.categoryId,
-          title: form.title.trim(),
-          description: form.detail.trim(),
-          location: form.addr.trim() || undefined,
-          provinceId: Number(form.provinceId),
-          districtId: Number(form.districtId),
-          subDistrictId: Number(form.subDistrictId),
-          villageId: form.villageId ? Number(form.villageId) : undefined,
-          village: form.village.trim() || undefined,
-          consent: form.consent,
-          // § สัญญาณกันสแปม — ฟิลด์ลวง (บอทกรอก = โดนปฏิเสธ) + เวลา mount ฟอร์ม
-          // (0 = effect ยังไม่รัน ส่ง undefined ให้ server ข้ามสัญญาณเวลาไป)
-          websiteUrl,
-          formStartedAt,
-        }),
-      });
+      const res = await fetchWithTimeout(
+        '/api/cases/submit',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...(liffMode ? {} : { cid: sanitizeCid(form.cid) }),
+            fullName: form.fullName.trim() || undefined,
+            phoneNumber: form.phone.trim() || undefined,
+            categoryId: form.categoryId,
+            title: form.title.trim(),
+            description: form.detail.trim(),
+            location: form.addr.trim() || undefined,
+            provinceId: Number(form.provinceId),
+            districtId: Number(form.districtId),
+            subDistrictId: Number(form.subDistrictId),
+            villageId: form.villageId ? Number(form.villageId) : undefined,
+            village: form.village.trim() || undefined,
+            consent: form.consent,
+            // § สัญญาณกันสแปม — ฟิลด์ลวง (บอทกรอก = โดนปฏิเสธ) + เวลา mount ฟอร์ม
+            // (0 = effect ยังไม่รัน ส่ง undefined ให้ server ข้ามสัญญาณเวลาไป)
+            websiteUrl,
+            formStartedAt,
+            attachments: uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
+          }),
+        },
+        30000
+      );
 
       const data = await res.json();
 
@@ -440,8 +557,13 @@ export function IntakeForm({
 
       clearIntakeDraft();
       setResult({ caseId: data.caseId, trackingCode: data.trackingCode, message: data.message });
-    } catch {
-      setSubmitError('เชื่อมต่อระบบไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่');
+    } catch (err) {
+      const isTimeout = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError');
+      setSubmitError(
+        isTimeout
+          ? 'การเชื่อมต่อหมดเวลา (เซิร์ฟเวอร์ตอบสนองช้า) ข้อมูลที่กรอกยังคงอยู่ กรุณาลองกดส่งใหม่อีกครั้ง'
+          : 'เชื่อมต่อระบบไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่'
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -784,6 +906,77 @@ export function IntakeForm({
         </div>
       </SectionCard>
 
+      {/* ภาพถ่ายประกอบเรื่องร้องเรียน */}
+      <SectionCard>
+        <SectionHeading icon={Camera}>ภาพถ่ายหรือเอกสารประกอบ (ไม่จำเป็น)</SectionHeading>
+        <div className="mt-5 flex flex-col gap-4">
+          <p className="text-sm text-muted">
+            แนบภาพถ่ายจุดเกิดเหตุ ป้ายบอกทาง หรือความเสียหายเพื่อประกอบการพิจารณา สูงสุด 5 รูป (ไฟล์ JPG, PNG, WebP ขนาดไม่เกิน 10MB ต่อรูป)
+          </p>
+
+          <div>
+            <input
+              id="attachment-input"
+              type="file"
+              accept={MEDIA_ACCEPT_ATTR}
+              multiple
+              aria-label="เลือกรูปภาพแนบ"
+              disabled={attachments.length >= 5 || isSubmitting}
+              onChange={handleFileSelect}
+              className="sr-only"
+            />
+            <label
+              htmlFor="attachment-input"
+              className={`inline-flex min-h-touch cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border-strong bg-surface-raised px-5 py-3 text-sm font-semibold text-ink transition hover:border-accent-strong hover:bg-surface-sunken focus-within:ring-2 focus-within:ring-accent-strong focus-within:ring-offset-2 ${
+                attachments.length >= 5 || isSubmitting ? 'pointer-events-none opacity-50' : ''
+              }`}
+            >
+              <Paperclip className="h-4 w-4 text-accent-strong" aria-hidden="true" />
+              <span>{attachments.length >= 5 ? 'แนบไฟล์ครบ 5 รูปแล้ว' : 'เลือกรูปภาพแนบ (สูงสุด 5 รูป)'}</span>
+            </label>
+          </div>
+
+          {attachments.length > 0 && (
+            <ul className="flex flex-col gap-2.5" aria-label="รายการไฟล์แนบ">
+              {attachments.map((att) => (
+                <li
+                  key={att.id}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-raised p-3 text-sm"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-10 w-10 flex-none items-center justify-center rounded-lg bg-surface-sunken text-muted">
+                      {att.status === 'uploading' ? (
+                        <Loader2 className="h-5 w-5 animate-spin text-accent-strong motion-reduce:animate-none" aria-hidden="true" />
+                      ) : att.status === 'error' ? (
+                        <AlertCircle className="h-5 w-5 text-danger-ink" aria-hidden="true" />
+                      ) : (
+                        <CheckCircle2 className="h-5 w-5 text-success-ink" aria-hidden="true" />
+                      )}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-ink">{att.name}</p>
+                      <p className="text-xs text-muted">
+                        {(att.size / (1024 * 1024)).toFixed(2)} MB
+                        {att.status === 'uploading' && ' · กำลังอัปโหลด...'}
+                        {att.status === 'error' && ` · ${att.error || 'อัปโหลดไม่สำเร็จ'}`}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveAttachment(att.id)}
+                    aria-label={`ลบไฟล์ ${att.name}`}
+                    className="inline-flex min-h-touch min-w-touch items-center justify-center rounded-lg text-muted transition hover:bg-danger-soft hover:text-danger-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-ink"
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </SectionCard>
+
       {/* PDPA consent */}
       <div className="glass-panel rounded-xl p-6 shadow-sm sm:p-8">
         <label className="border-border bg-surface-sunken/30 flex items-start gap-3 rounded-xl border p-4">
@@ -821,6 +1014,7 @@ export function IntakeForm({
             setSubdistricts([]);
             setVillagesList([]);
             setGeoError(null);
+            setAttachments([]);
           }}
           className="h-12 px-6 text-base"
         >

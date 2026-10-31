@@ -24,6 +24,7 @@ beforeEach(() => {
       : url.startsWith('/api/districts') ? { districts: [{ id: 4603, nameTh: 'ยางตลาด' }] }
       : url.startsWith('/api/subdistricts') ? { subdistricts: [{ id: 460301, nameTh: 'หัวงัว' }] }
       : url.startsWith('/api/villages') ? { villages: [] }
+      : url === '/api/cases/upload' ? { ok: true, id: 'att-1', url: 'https://storage.huangua.go.th/media/cases/attachments/att-1.png', key: 'cases/attachments/att-1.png', type: 'image/png', size: 1024 }
       : { caseId: 'case-test', trackingCode: 'HG483729156', message: 'บันทึกเรื่องแล้ว' };
     return { ok: true, json: async () => data };
   }));
@@ -244,5 +245,124 @@ describe('ฟอร์มแจ้งเรื่องสำหรับผู�
 
     // อำเภอต้องยังเป็น เมืองขอนแก่น ไม่ถูกทับ
     expect(screen.getByLabelText('อำเภอ')).toHaveTextContent('เมืองขอนแก่น');
+  });
+});
+
+describe('IntakeForm — แนบรูปภาพและ Network Resilience (Scope 1A + 1B)', () => {
+  it('เลือกรูปภาพแนบ → แสดง preview พร้อมชื่อและขนาด และสามารถกดลบได้', async () => {
+    const user = userEvent.setup();
+    render(<IntakeForm categories={categories} />);
+
+    // input file
+    const fileInput = document.getElementById('attachment-input') as HTMLInputElement;
+    expect(fileInput).toBeInTheDocument();
+
+    // สร้าง mock file
+    const file = new File(['png-content'], 'damaged-road.png', { type: 'image/png' });
+    await user.upload(fileInput, file);
+
+    // ต้องแสดงชื่อไฟล์ และขนาด
+    await waitFor(() => {
+      expect(screen.getByText('damaged-road.png')).toBeInTheDocument();
+    });
+
+    // กดลบไฟล์
+    const deleteBtn = screen.getByRole('button', { name: 'ลบไฟล์ damaged-road.png' });
+    await user.click(deleteBtn);
+
+    // รายการต้องหายไป
+    expect(screen.queryByText('damaged-road.png')).not.toBeInTheDocument();
+  });
+
+  it('ส่งเรื่องพร้อมไฟล์แนบ → ส่ง attachments ไปยัง /api/cases/submit', async () => {
+    const user = userEvent.setup();
+    render(<IntakeForm categories={categories} />);
+
+    // กรอกข้อมูลฟอร์ม
+    await choose('หมวดเรื่อง', 'ถนน');
+    fireEvent.change(document.getElementById('name')!, { target: { value: 'สมศรี มีสุข' } });
+    fireEvent.change(document.getElementById('cid')!, { target: { value: '1100500123451' } });
+    fireEvent.change(document.getElementById('phone')!, { target: { value: '0812345678' } });
+    fireEvent.change(document.getElementById('title')!, { target: { value: 'ถนนหน้าบ้านชำรุด' } });
+    fireEvent.change(document.getElementById('detail')!, { target: { value: 'มีหลุมลึกขนาดใหญ่ น้ำท่วมขัง' } });
+
+    await choose('จังหวัด', 'กาฬสินธุ์');
+    await waitFor(() => expect(screen.getByLabelText('อำเภอ')).not.toBeDisabled(), { timeout: INTAKE_QUERY_TIMEOUT_MS });
+    await choose('อำเภอ', 'ยางตลาด');
+    await waitFor(() => expect(screen.getByLabelText('ตำบล')).not.toBeDisabled(), { timeout: INTAKE_QUERY_TIMEOUT_MS });
+    await choose('ตำบล', 'หัวงัว');
+
+    // แนบรูป
+    const fileInput = document.getElementById('attachment-input') as HTMLInputElement;
+    const file = new File(['png-content'], 'pothole.png', { type: 'image/png' });
+    await user.upload(fileInput, file);
+    await waitFor(() => expect(screen.getByText('pothole.png')).toBeInTheDocument());
+
+    // ติ๊ก consent
+    fireEvent.click(document.getElementById('consent')!);
+
+    // ส่งเรื่อง
+    const submitBtn = screen.getByRole('button', { name: 'ส่งเรื่อง' });
+    await user.click(submitBtn);
+
+    // ตรวจสอบว่า fetch /api/cases/submit ถูกเรียกพร้อม attachments
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/cases/submit',
+        expect.objectContaining({
+          body: expect.stringContaining('"attachments":[{"url":"https://storage.huangua.go.th/media/cases/attachments/att-1.png","type":"image/png","size":11}]'),
+        })
+      );
+    });
+  });
+
+  it('เมื่อการส่งเรื่องเกิด Timeout → แสดงข้อความเตือนและข้อมูลฟอร์มไม่หาย', async () => {
+    const user = userEvent.setup();
+
+    // Mock fetch ให้ /api/cases/submit throw TimeoutError
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url === '/api/cases/submit') {
+        const err = new Error('The operation was aborted');
+        err.name = 'TimeoutError';
+        throw err;
+      }
+      const data = url === '/api/provinces' ? { provinces: [{ id: 46, nameTh: 'กาฬสินธุ์' }] }
+        : url.startsWith('/api/districts') ? { districts: [{ id: 4603, nameTh: 'ยางตลาด' }] }
+        : url.startsWith('/api/subdistricts') ? { subdistricts: [{ id: 460301, nameTh: 'หัวงัว' }] }
+        : url.startsWith('/api/villages') ? { villages: [] }
+        : { caseId: 'case-test', trackingCode: 'HG483729156', message: 'บันทึกเรื่องแล้ว' };
+      return { ok: true, json: async () => data };
+    }));
+
+    render(<IntakeForm categories={categories} />);
+
+    // กรอกข้อมูลฟอร์ม
+    await choose('หมวดเรื่อง', 'ถนน');
+    fireEvent.change(document.getElementById('name')!, { target: { value: 'สมชาย รักชาติ' } });
+    fireEvent.change(document.getElementById('cid')!, { target: { value: '1100500123451' } });
+    fireEvent.change(document.getElementById('phone')!, { target: { value: '0898765432' } });
+    fireEvent.change(document.getElementById('title')!, { target: { value: 'เสาไฟทางดับ' } });
+    fireEvent.change(document.getElementById('detail')!, { target: { value: 'มืดมากตอนกลางคืน' } });
+
+    await choose('จังหวัด', 'กาฬสินธุ์');
+    await waitFor(() => expect(screen.getByLabelText('อำเภอ')).not.toBeDisabled(), { timeout: INTAKE_QUERY_TIMEOUT_MS });
+    await choose('อำเภอ', 'ยางตลาด');
+    await waitFor(() => expect(screen.getByLabelText('ตำบล')).not.toBeDisabled(), { timeout: INTAKE_QUERY_TIMEOUT_MS });
+    await choose('ตำบล', 'หัวงัว');
+
+    fireEvent.click(document.getElementById('consent')!);
+
+    const submitBtn = screen.getByRole('button', { name: 'ส่งเรื่อง' });
+    await user.click(submitBtn);
+
+    // ต้องแสดง error เกี่ยวกับการหมดเวลาการเชื่อมต่อ
+    await waitFor(() => {
+      expect(screen.getByText(/การเชื่อมต่อหมดเวลา/)).toBeInTheDocument();
+    });
+
+    // ข้อมูลฟอร์มยังคงอยู่ครบ ไม่ถูกล้าง
+    expect(document.getElementById('name')).toHaveValue('สมชาย รักชาติ');
+    expect(document.getElementById('title')).toHaveValue('เสาไฟทางดับ');
+    expect(document.getElementById('detail')).toHaveValue('มืดมากตอนกลางคืน');
   });
 });
