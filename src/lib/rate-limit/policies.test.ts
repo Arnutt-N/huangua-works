@@ -48,6 +48,7 @@ describe('RATE_LIMIT_POLICIES · ค่าเท่าเดิมก่อน r
     ['liffSession', 5, 300],
     ['consentWithdraw', 5, 600],
     ['submit', 3, 300],
+    ['caseUpload', 10, 300],
     ['track', 10, 300],
     ['lineWebhookIp', 60, 60],
   ])('%s = %i ครั้ง / %i วินาที', (name, limit, windowSeconds) => {
@@ -67,6 +68,7 @@ describe('rateLimitKey · รูปแบบ key เหมือนเดิม�
     ['liffSession', '::1', 'rate:liff-session:::1'],
     ['consentWithdraw', '203.0.113.5', 'rate:consent-withdraw:203.0.113.5'],
     ['submit', '::1', 'rate:submit:::1'],
+    ['caseUpload', '203.0.113.5', 'rate:case-upload:203.0.113.5'],
     ['track', '203.0.113.5', 'rate:track:203.0.113.5'],
     ['lineWebhookIp', '203.0.113.5', 'rate:line-webhook:ip:203.0.113.5'],
   ])('%s + %s → %s', (name, subject, expected) => {
