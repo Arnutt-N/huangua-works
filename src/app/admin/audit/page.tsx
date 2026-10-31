@@ -166,10 +166,10 @@ export default async function AuditPage({
                   <div className="min-w-0 flex-1 space-y-2">
                     {/* Action + resource */}
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-pill bg-accent-sunken px-3 py-0.5 font-mono text-xs font-semibold text-accent-strong ring-1 ring-accent-strong/20 ring-inset">
+                      <span className="rounded-pill bg-accent-sunken px-3 py-1 font-mono text-xs font-semibold text-accent-strong ring-1 ring-accent-strong/20 ring-inset">
                         {row.action}
                       </span>
-                      <span className="text-xs text-muted">
+                      <span className="text-sm text-muted">
                         resource: <code className="font-mono text-ink">{row.resource}</code>
                         {row.resourceId && (
                           <>
@@ -194,35 +194,35 @@ export default async function AuditPage({
                     </div>
 
                     {/* Meta: IP + time */}
-                    <div className="flex flex-wrap items-center gap-4 text-xs text-muted">
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-muted">
                       <span className="inline-flex items-center gap-1">
-                        <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                        <Clock className="h-4 w-4" aria-hidden="true" />
                         {formatThaiDateTime(row.createdAt)}
                       </span>
                       {row.ipAddress && (
                         <span className="inline-flex items-center gap-1">
-                          <Globe className="h-3.5 w-3.5" aria-hidden="true" />
+                          <Globe className="h-4 w-4" aria-hidden="true" />
                           <code className="font-mono">{row.ipAddress}</code>
                         </span>
                       )}
                       {row.userAgent && (
                         <span className="inline-flex items-center gap-1" title={row.userAgent}>
-                          <Fingerprint className="h-3.5 w-3.5" aria-hidden="true" />
+                          <Fingerprint className="h-4 w-4" aria-hidden="true" />
                           <span className="max-w-[200px] truncate">{row.userAgent}</span>
                         </span>
                       )}
                     </div>
 
-                    {/* Metadata (expandable) */}
+                    {/* Metadata (expandable) — § A11Y-05: touch target min-h-touch สำหรับ toggle บนมือถือ */}
                     {row.metadata != null && (
                       <details className="group">
-                        <summary className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-accent-strong hover:underline">
-                          <FileJson className="h-3.5 w-3.5" aria-hidden="true" />
+                        <summary className="inline-flex min-h-touch cursor-pointer items-center gap-1.5 text-sm font-semibold text-accent-strong hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong">
+                          <FileJson className="h-4 w-4" aria-hidden="true" />
                           metadata
                           <span className="text-muted group-open:hidden">(แสดง)</span>
                           <span className="hidden text-muted group-open:inline">(ซ่อน)</span>
                         </summary>
-                        <pre className="mt-2 overflow-x-auto rounded-md border border-border bg-surface-sunken p-3 text-xs text-ink">
+                        <pre className="mt-2 overflow-x-auto rounded-md border border-border bg-surface-sunken p-3 text-sm text-ink font-mono">
                           <code>{formatMetadata(row.metadata)}</code>
                         </pre>
                       </details>

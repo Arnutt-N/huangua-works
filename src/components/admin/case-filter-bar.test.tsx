@@ -79,4 +79,25 @@ describe('CaseFilterBar — FLOW-03: การรักษาสถานะค�
 
     expect(pushMock).toHaveBeenCalledWith(expect.stringContaining('q=%E0%B8%99%E0%B9%89%E0%B8%B3%E0%B8%97%E0%B9%88%E0%B8%A7%E0%B8%A1%E0%B8%82%E0%B8%B1%E0%B8%87'));
   });
+
+  it('เมื่อกดปุ่ม preset วันที่ เช่น "7 วัน" router.push ไปยัง query string ที่มี preset=7d, from และ to', async () => {
+    mockSearchParams = new URLSearchParams('status=received');
+    const user = userEvent.setup();
+    render(<CaseFilterBar categories={mockCategories} />);
+
+    const preset7dBtn = screen.getByRole('button', { name: '7 วัน' });
+    await user.click(preset7dBtn);
+
+    expect(pushMock).toHaveBeenCalledWith(expect.stringContaining('preset=7d'));
+    expect(pushMock).toHaveBeenCalledWith(expect.stringContaining('from='));
+    expect(pushMock).toHaveBeenCalledWith(expect.stringContaining('to='));
+  });
+
+  it('เมื่อเลือก preset กำหนดเอง แสดงช่องเลือกวันที่ตั้งแต่วันที่ และถึงวันที่', async () => {
+    mockSearchParams = new URLSearchParams('preset=custom&from=2026-10-01&to=2026-10-15');
+    render(<CaseFilterBar categories={mockCategories} />);
+
+    expect(screen.getByRole('button', { name: 'ตั้งแต่วันที่' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ถึงวันที่' })).toBeInTheDocument();
+  });
 });

@@ -187,7 +187,7 @@ export default async function CaseManagementPage({
               ({summary.feedbackCount} ครั้ง)
             </span>
           )}
-          <span className="ml-auto text-xs">
+          <span className="ml-auto text-sm">
             ทั้งหมด <strong className="text-ink">{total.toLocaleString('th-TH')}</strong>{' '}
             เรื่อง · หน้า {page}/{totalPages}
           </span>
@@ -218,7 +218,7 @@ export default async function CaseManagementPage({
           </div>
         ) : (
           <div className="glass-panel overflow-hidden rounded-xl shadow-sm">
-            <div className="hidden border-b border-border bg-surface-sunken/60 px-4 py-3 text-xs font-semibold text-muted sm:grid sm:grid-cols-[2.5fr_1fr_1fr_1.2fr_auto_auto] sm:gap-4">
+            <div className="hidden border-b border-border bg-surface-sunken/60 px-4 py-3 text-sm font-semibold text-muted sm:grid sm:grid-cols-[2.5fr_1fr_1fr_1.2fr_auto_auto] sm:gap-4">
               <span>เรื่อง</span>
               <span>หมวด</span>
               <span>ที่ตั้ง</span>
@@ -247,14 +247,25 @@ export default async function CaseManagementPage({
                   >
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-xs text-muted">{item.id}</span>
+                        <span className="font-mono text-sm font-medium text-muted">{item.id}</span>
                         {item.priority === 'urgent' ? (
-                          <span className="rounded-pill bg-danger-soft px-2 py-0.5 text-xs font-semibold text-danger-ink ring-1 ring-danger-ink/20 ring-inset">
+                          <span className="rounded-pill bg-danger-soft px-2.5 py-0.5 text-xs font-semibold text-danger-ink ring-1 ring-danger-ink/20 ring-inset">
                             ฉุกเฉิน
                           </span>
                         ) : null}
                       </div>
                       <p className="mt-0.5 truncate font-semibold text-ink">{item.title}</p>
+                      {/* § A11Y-05: แสดงข้อมูลบริบทสำคัญบนจอมือถือ (หมวด, ที่ตั้ง, ผู้รับผิดชอบ) ให้เจ้าหน้าที่สแกนได้ทันที */}
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted sm:hidden">
+                        {item.categoryName && <span>{item.categoryName}</span>}
+                        {item.location && (
+                          <span className="inline-flex min-w-0 items-center gap-1">
+                            <MapPin className="h-3.5 w-3.5 flex-none" aria-hidden="true" />
+                            <span className="truncate max-w-[180px]">{item.location}</span>
+                          </span>
+                        )}
+                        <span>{item.assigneeName ?? 'ยังไม่มอบหมาย'}</span>
+                      </div>
                     </div>
                     <span className="mt-1 hidden text-sm text-muted sm:mt-0 sm:block">
                       {item.categoryName ?? '—'}
@@ -270,11 +281,11 @@ export default async function CaseManagementPage({
                       <CaseStatusBadge status={item.status} />
                       <span
                         className={cn(
-                          'inline-flex items-center gap-1 whitespace-nowrap text-xs',
+                          'inline-flex items-center gap-1 whitespace-nowrap text-sm',
                           item.overSla ? 'font-semibold text-danger-ink' : 'text-muted',
                         )}
                       >
-                        <Clock className="h-3 w-3 flex-none" aria-hidden="true" />
+                        <Clock className="h-3.5 w-3.5 flex-none" aria-hidden="true" />
                         {formatAge(item.createdAt, now)}
                         {item.overSla ? ' · เลย SLA' : ''}
                       </span>
