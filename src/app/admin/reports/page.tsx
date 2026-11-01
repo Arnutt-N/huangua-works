@@ -1,7 +1,7 @@
 import Link from 'next/link';
-import { AlertTriangle, Clock, ChevronRight, MapPin, Inbox } from 'lucide-react';
+import { AlertTriangle, Clock, ChevronRight, MapPin, Inbox, X, Activity } from 'lucide-react';
 import type { Metadata } from 'next';
-import { and, desc, eq, gte, ilike, lte, or, count, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, ilike, lte, or, count, sql, isNotNull, lt, inArray } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { cases, caseFeedback, categories, users } from '@/lib/db/schema';
 import { requireStaff } from '@/lib/auth/require-staff';
@@ -31,6 +31,7 @@ interface SearchParams {
   to?: string;
   q?: string;
   page?: string;
+  overdue?: string;
 }
 
 function formatAge(date: Date, now: number): string {
@@ -58,6 +59,8 @@ export default async function CaseManagementPage({
 
   // § parse + validate filter params (defense-in-depth — ไม่ trust input)
   const filters: ReturnType<typeof and>[] = [];
+  const isOverdue = params.overdue === '1' || params.overdue === 'true';
+  const isOpenFilter = params.status === 'open';
   const statusFilter: CaseStatus | null =
     params.status && isCaseStatus(params.status) ? params.status : null;
   const priorityFilter =
@@ -68,7 +71,14 @@ export default async function CaseManagementPage({
   const q = params.q?.trim() ?? '';
   const page = Math.max(1, parseInt(params.page ?? '1', 10) || 1);
 
-  if (statusFilter) {
+  if (isOverdue) {
+    const now = new Date();
+    filters.push(inArray(cases.status, OPEN_STATUSES));
+    filters.push(isNotNull(cases.dueDate));
+    filters.push(lt(cases.dueDate, now));
+  } else if (isOpenFilter) {
+    filters.push(inArray(cases.status, OPEN_STATUSES));
+  } else if (statusFilter) {
     filters.push(eq(cases.status, statusFilter));
   }
   if (priorityFilter) {
@@ -155,7 +165,7 @@ export default async function CaseManagementPage({
     feedbackAvg: fb?.avg === null || fb?.avg === undefined ? null : Number(fb.avg).toFixed(1),
     feedbackCount: fb?.count ?? 0,
   };
-  const isFiltered = !!(statusFilter || priorityFilter || categoryFilter || fromStart || toEnd || q);
+  const isFiltered = !!(statusFilter || isOpenFilter || priorityFilter || categoryFilter || fromStart || toEnd || q || isOverdue);
 
   return (
     <AdminShell user={staffUser} active="reports" title="จัดการเรื่อง">
@@ -195,6 +205,39 @@ export default async function CaseManagementPage({
 
         {/* Filter bar */}
         <CaseFilterBar categories={categoryOptions} />
+
+        {/* ป้ายแสดงสถานะตัวกรองพิเศษ (Overdue หรือ เคสเปิดทั้งหมด) */}
+        {isOverdue && (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-danger-ink/25 bg-danger-soft px-4 py-2.5 text-sm text-danger-ink">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 flex-shrink-0 text-danger-ink" aria-hidden="true" />
+              <span className="font-semibold">กำลังกรอง: เรื่องที่เกินกำหนดเวลา (SLA Breach)</span>
+            </div>
+            <Link
+              href="/admin/reports"
+              className="inline-flex min-h-touch items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold text-danger-ink underline hover:bg-danger-ink/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-ink"
+            >
+              <X className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>ล้างตัวกรอง</span>
+            </Link>
+          </div>
+        )}
+
+        {isOpenFilter && !isOverdue && (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-accent/25 bg-accent-sunken px-4 py-2.5 text-sm text-ink">
+            <div className="flex items-center gap-2">
+              <Activity className="h-4 w-4 flex-shrink-0 text-accent-strong" aria-hidden="true" />
+              <span className="font-semibold">กำลังกรอง: เรื่องที่กำลังดำเนินการทั้งหมด (เคสเปิด)</span>
+            </div>
+            <Link
+              href="/admin/reports"
+              className="inline-flex min-h-touch items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold text-accent-strong underline hover:bg-accent-strong/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
+            >
+              <X className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>ล้างตัวกรอง</span>
+            </Link>
+          </div>
+        )}
 
         {/* คิวเรื่อง */}
         {queue.length === 0 ? (

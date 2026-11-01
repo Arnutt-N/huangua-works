@@ -100,4 +100,11 @@ describe('CaseFilterBar — FLOW-03: การรักษาสถานะค�
     expect(screen.getByRole('button', { name: 'ตั้งแต่วันที่' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'ถึงวันที่' })).toBeInTheDocument();
   });
+
+  it('เมื่อ searchParams มี status=open ตัวเลือกใน Select แสดงคำว่า "กำลังดำเนินการทั้งหมด (เปิด)"', () => {
+    mockSearchParams = new URLSearchParams('status=open');
+    render(<CaseFilterBar categories={mockCategories} />);
+
+    expect(screen.getByRole('combobox', { name: 'สถานะ' })).toHaveTextContent('กำลังดำเนินการทั้งหมด (เปิด)');
+  });
 });

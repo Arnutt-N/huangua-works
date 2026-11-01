@@ -1,5 +1,6 @@
+import Link from 'next/link';
 import { cn } from '@/lib/cn';
-import type { LucideIcon } from 'lucide-react';
+import { ChevronRight, type LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 /**
@@ -19,8 +20,11 @@ import type { ReactNode } from 'react';
  * โครงการ์ด = กรอบไอคอนสี + ตัวเลข + label เหมือนการ์ดบริการบน landing (Services.tsx)
  * ตั้งใจไม่ใส่แถบสีบนหัวการ์ด: variant สื่อผ่านสีไอคอนอยู่แล้ว การเติมช่องสีที่สอง
  * เป็นการตกแต่งซ้ำที่ landing ไม่ได้ทำ
+ *
+ * § Interactive Link: เมื่อส่ง `href` จะเรนเดอร์เป็น Next.js `<Link>` พร้อม hover affordance
+ * และ focus-visible ring ตาม design tokens เพื่อนำทางไปยังคิวเรื่องที่เกี่ยวข้อง
  */
-type KpiVariant = 'default' | 'gold' | 'danger';
+export type KpiVariant = 'default' | 'gold' | 'danger';
 
 const variantStyles: Record<
   KpiVariant,
@@ -43,6 +47,16 @@ const variantStyles: Record<
   },
 };
 
+export interface KpiCardProps {
+  label: string;
+  value: string | number;
+  icon: LucideIcon;
+  variant?: KpiVariant;
+  hint?: ReactNode;
+  className?: string;
+  href?: string;
+}
+
 export function KpiCard({
   label,
   value,
@@ -50,25 +64,13 @@ export function KpiCard({
   variant = 'default',
   hint,
   className,
-}: {
-  label: string;
-  value: string | number;
-  icon: LucideIcon;
-  variant?: KpiVariant;
-  hint?: ReactNode;
-  className?: string;
-}) {
+  href,
+}: KpiCardProps) {
   const styles = variantStyles[variant];
   const displayValue = typeof value === 'number' ? value.toLocaleString('th-TH') : value;
 
-  return (
-    <div
-      className={cn(
-        'glass-panel flex flex-col gap-3 rounded-xl p-5 shadow-sm',
-        'transition-shadow duration-normal ease-out-expo hover:shadow-md',
-        className,
-      )}
-    >
+  const content = (
+    <>
       <div className="flex items-center justify-between gap-2">
         <span
           className={cn(
@@ -78,7 +80,15 @@ export function KpiCard({
         >
           <Icon className={cn('h-5 w-5', styles.iconColor)} aria-hidden="true" />
         </span>
-        {hint && <span className="text-xs text-muted">{hint}</span>}
+        <div className="flex items-center gap-1.5">
+          {hint && <span className="text-xs text-muted">{hint}</span>}
+          {href && (
+            <ChevronRight
+              className="h-4 w-4 text-muted opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100"
+              aria-hidden="true"
+            />
+          )}
+        </div>
       </div>
       <div>
         <p className={cn('text-3xl font-bold tracking-tight', styles.valueColor)}>
@@ -86,6 +96,35 @@ export function KpiCard({
         </p>
         <p className="mt-1 text-sm text-muted">{label}</p>
       </div>
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link
+        href={href}
+        aria-label={`${label} ${displayValue} คลิกเพื่อดูรายการ`}
+        className={cn(
+          'glass-panel group flex flex-col gap-3 rounded-xl p-5 shadow-sm',
+          'transition duration-normal ease-out-expo hover:border-accent-strong hover:shadow-md',
+          'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong',
+          className,
+        )}
+      >
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        'glass-panel flex flex-col gap-3 rounded-xl p-5 shadow-sm',
+        'transition-shadow duration-normal ease-out-expo hover:shadow-md',
+        className,
+      )}
+    >
+      {content}
     </div>
   );
 }

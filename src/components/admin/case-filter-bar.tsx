@@ -34,6 +34,7 @@ interface CategoryOption {
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: 'all', label: 'ทุกสถานะ' },
+  { value: 'open', label: 'กำลังดำเนินการทั้งหมด (เปิด)' },
   ...ALL_STATUSES.map((s) => ({ value: s, label: STATUS_LABELS_TH[s] })),
 ];
 
