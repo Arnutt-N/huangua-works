@@ -141,14 +141,14 @@ export function AdminLayout({
   const groups = visibleNavGroups(user.role);
 
   return (
-    <div className="mesh-gradient relative min-h-dvh text-ink">
-      <div className="thai-pattern pointer-events-none fixed inset-0" aria-hidden="true" />
+    <div className="mesh-gradient relative min-h-dvh text-ink print:min-h-0 print:bg-white print:bg-none print:text-black">
+      <div className="thai-pattern pointer-events-none fixed inset-0 print:hidden" aria-hidden="true" />
 
       {/* ── ฉากหลังของ drawer บนมือถือ ── */}
       {mobileOpen && (
         <button
           type="button"
-          className="fixed inset-0 z-40 bg-ink/40 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 bg-ink/40 backdrop-blur-sm lg:hidden print:hidden"
           onClick={() => setMobileOpen(false)}
           aria-label="ปิดเมนู"
         />
@@ -166,6 +166,7 @@ export function AdminLayout({
           collapsed ? 'lg:w-[4.5rem]' : 'lg:w-64',
           'w-72 lg:translate-x-0',
           mobileOpen ? 'translate-x-0' : '-translate-x-full',
+          'print:hidden',
         )}
         id="admin-sidebar"
         aria-label="นำทางหลัก"
@@ -263,10 +264,11 @@ export function AdminLayout({
         className={cn(
           'relative z-10 flex min-h-dvh flex-col transition-[padding] duration-normal ease-out-expo',
           collapsed ? 'lg:pl-[4.5rem]' : 'lg:pl-64',
+          'print:m-0 print:min-h-0 print:pl-0',
         )}
       >
         {/* Topbar — แถวเดียว สูงคงที่ ไม่มีเมนูปน */}
-        <header className="glass sticky top-0 z-30 flex h-16 flex-none items-center gap-3 border-b border-border px-4 sm:px-6">
+        <header className="glass sticky top-0 z-30 flex h-16 flex-none items-center gap-3 border-b border-border px-4 sm:px-6 print:hidden">
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
@@ -291,7 +293,9 @@ export function AdminLayout({
         <main id="main" className="flex-1">{children}</main>
       </div>
 
-      <SessionTimeoutWarning />
+      <div className="print:hidden">
+        <SessionTimeoutWarning />
+      </div>
     </div>
   );
 }

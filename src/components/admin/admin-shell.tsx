@@ -42,7 +42,8 @@ export function AdminShell({
     >
       <div
         className={cn(
-          !bleed && 'mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8',
+          !bleed &&
+            'mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 print:m-0 print:max-w-none print:w-full print:p-0',
           className,
         )}
       >

@@ -53,7 +53,7 @@ export function SessionTimeoutWarning() {
       aria-modal="true"
       aria-labelledby="session-timeout-title"
       aria-describedby="session-timeout-desc"
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/40 p-4 backdrop-blur-[2px] motion-reduce:backdrop-blur-none"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/40 p-4 backdrop-blur-[2px] motion-reduce:backdrop-blur-none print:hidden"
     >
       <div ref={dialogRef} className="w-full max-w-md rounded-lg border border-border bg-surface-raised p-6 shadow-overlay">
         <div className="mb-4 flex items-center gap-3">
