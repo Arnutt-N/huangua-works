@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { Metadata } from 'next';
 import { and, count, desc, eq, inArray, isNotNull, lt } from 'drizzle-orm';
 import {
@@ -9,6 +10,7 @@ import {
   FolderTree,
   Building2,
   Activity,
+  ChevronRight,
 } from 'lucide-react';
 import { getDb } from '@/lib/db';
 import { cases, caseStatsDaily, categories, departments } from '@/lib/db/schema';
@@ -133,6 +135,7 @@ export default async function AdminDashboardPage() {
             value={totalReceived}
             icon={TrendingUp}
             variant="default"
+            href="/admin/reports"
           />
           <KpiCard
             label="กำลังดำเนินการ"
@@ -140,12 +143,14 @@ export default async function AdminDashboardPage() {
             icon={Activity}
             variant="gold"
             className="shadow-accent-drop"
+            href="/admin/reports?status=open"
           />
           <KpiCard
             label="ปิดสำเร็จ"
             value={totalClosed}
             icon={CheckCircle2}
             variant="default"
+            href="/admin/reports?status=closed"
           />
           <KpiCard
             label="เวลาดำเนินการเฉลี่ย"
@@ -157,19 +162,26 @@ export default async function AdminDashboardPage() {
 
         {/* SLA alert */}
         {slaBreach > 0 && (
-          <div className="flex items-center gap-3 rounded-xl border border-danger-ink/25 bg-danger-soft px-5 py-4 shadow-sm">
-            <span className="flex h-10 w-10 flex-none items-center justify-center rounded-md bg-danger-soft ring-1 ring-danger-ink/25 ring-inset">
-              <AlertTriangle className="h-5 w-5 text-danger-ink" aria-hidden="true" />
-            </span>
-            <div className="flex-1">
-              <p className="font-semibold text-danger-ink">
-                เลยกำหนด SLA {slaBreach.toLocaleString('th-TH')} เรื่อง
-              </p>
-              <p className="text-sm text-ink/80">
-                เรื่องที่ยังเปิดอยู่และเลยเวลาที่กำหนด — ควรเร่งดำเนินการ
-              </p>
+          <Link
+            href="/admin/reports?overdue=1"
+            aria-label={`เลยกำหนด SLA ${slaBreach.toLocaleString('th-TH')} เรื่อง คลิกเพื่อดูคิวเรื่อง`}
+            className="group flex items-center justify-between gap-3 rounded-xl border border-danger-ink/25 bg-danger-soft px-5 py-4 shadow-sm transition hover:border-danger-ink hover:bg-danger-soft/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-ink"
+          >
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 flex-none items-center justify-center rounded-md bg-danger-soft ring-1 ring-danger-ink/25 ring-inset">
+                <AlertTriangle className="h-5 w-5 text-danger-ink" aria-hidden="true" />
+              </span>
+              <div>
+                <p className="font-semibold text-danger-ink">
+                  เลยกำหนด SLA {slaBreach.toLocaleString('th-TH')} เรื่อง
+                </p>
+                <p className="text-sm text-ink/80">
+                  เรื่องที่ยังเปิดอยู่และเลยเวลาที่กำหนด — คลิกเพื่อเปิดดูคิวเรื่องที่ต้องเร่งดำเนินการ
+                </p>
+              </div>
             </div>
-          </div>
+            <ChevronRight className="h-5 w-5 text-danger-ink transition group-hover:translate-x-1" aria-hidden="true" />
+          </Link>
         )}
 
         {/* Breakdown by status */}
@@ -182,27 +194,34 @@ export default async function AdminDashboardPage() {
           ) : (
             <ul className="space-y-3">
               {statusBreakdown.map((item) => (
-                <li key={item.status} className="flex items-center gap-3">
-                  <div className="flex w-32 flex-none items-center gap-2">
-                    <CaseStatusBadge status={item.status} />
-                  </div>
-                  <div className="flex-1">
-                    <div className="h-2.5 overflow-hidden rounded-pill bg-ink/10 ring-1 ring-ink/5 ring-inset">
-                      <div
-                        className={
-                          item.status === 'done' || item.status === 'closed'
-                            ? 'h-full rounded-pill bg-success-ink transition-all duration-slow ease-out-expo'
-                            : item.status === 'rejected'
-                              ? 'h-full rounded-pill bg-danger-ink transition-all duration-slow ease-out-expo'
-                              : 'h-full rounded-pill bg-accent-strong transition-all duration-slow ease-out-expo'
-                        }
-                        style={{ width: `${(item.count / maxStatusCount) * 100}%` }}
-                      />
+                <li key={item.status}>
+                  <Link
+                    href={`/admin/reports?status=${item.status}`}
+                    aria-label={`ดูเรื่องสถานะ ${item.label} จำนวน ${item.count} เรื่อง`}
+                    className="group flex items-center gap-3 rounded-lg p-2 transition hover:bg-surface-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
+                  >
+                    <div className="flex w-32 flex-none items-center gap-2">
+                      <CaseStatusBadge status={item.status} />
                     </div>
-                  </div>
-                  <span className="w-12 flex-none text-right text-sm font-semibold text-ink">
-                    {item.count.toLocaleString('th-TH')}
-                  </span>
+                    <div className="flex-1">
+                      <div className="h-2.5 overflow-hidden rounded-pill bg-ink/10 ring-1 ring-ink/5 ring-inset">
+                        <div
+                          className={
+                            item.status === 'done' || item.status === 'closed'
+                              ? 'h-full rounded-pill bg-success-ink transition-all duration-slow ease-out-expo'
+                              : item.status === 'rejected'
+                                ? 'h-full rounded-pill bg-danger-ink transition-all duration-slow ease-out-expo'
+                                : 'h-full rounded-pill bg-accent-strong transition-all duration-slow ease-out-expo'
+                          }
+                          style={{ width: `${(item.count / maxStatusCount) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                    <span className="w-12 text-right text-sm font-semibold tabular-nums text-ink group-hover:text-accent-strong">
+                      {item.count.toLocaleString('th-TH')}
+                    </span>
+                    <ChevronRight className="h-4 w-4 text-muted opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100" aria-hidden="true" />
+                  </Link>
                 </li>
               ))}
             </ul>
