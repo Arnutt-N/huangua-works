@@ -84,4 +84,19 @@ describe('CaseManagementPage (admin/reports)', () => {
 
     expect(screen.queryByText(/กำลังกรอง:/)).not.toBeInTheDocument();
   });
+
+  it('renders Export CSV button with current search parameters in href', async () => {
+    const page = await CaseManagementPage({
+      searchParams: Promise.resolve({ status: 'open', category: 'cat-roads' }),
+    });
+
+    render(page);
+
+    const exportBtn = screen.getByRole('link', { name: /ส่งออก.*CSV/i });
+    expect(exportBtn).toBeInTheDocument();
+    expect(exportBtn).toHaveAttribute('href', expect.stringContaining('/api/admin/reports/export?'));
+    expect(exportBtn.getAttribute('href')).toContain('status=open');
+    expect(exportBtn.getAttribute('href')).toContain('category=cat-roads');
+    expect(exportBtn).toHaveAttribute('download');
+  });
 });
