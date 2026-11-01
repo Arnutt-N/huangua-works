@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { AlertTriangle, Clock, ChevronRight, MapPin, Inbox, X, Activity } from 'lucide-react';
+import { AlertTriangle, Clock, ChevronRight, MapPin, Inbox, X, Activity, Download } from 'lucide-react';
 import type { Metadata } from 'next';
 import { and, desc, eq, gte, ilike, lte, or, count, sql, isNotNull, lt, inArray } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
@@ -55,6 +55,7 @@ export default async function CaseManagementPage({
     ) as [string, string][],
   ).toString();
   const currentUrl = searchStr ? `/admin/reports?${searchStr}` : '/admin/reports';
+  const exportUrl = searchStr ? `/api/admin/reports/export?${searchStr}` : '/api/admin/reports/export';
   const db = await getDb();
 
   // § parse + validate filter params (defense-in-depth — ไม่ trust input)
@@ -170,9 +171,22 @@ export default async function CaseManagementPage({
   return (
     <AdminShell user={staffUser} active="reports" title="จัดการเรื่อง">
       <div className="space-y-6">
-        <p className="text-sm text-muted">
-          คลิกที่เรื่องเพื่อดูรายละเอียด เปลี่ยนสถานะ หรือมอบหมาย
-        </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted">
+            คลิกที่เรื่องเพื่อดูรายละเอียด เปลี่ยนสถานะ หรือมอบหมาย
+          </p>
+          <div className="flex items-center gap-2">
+            <a
+              href={exportUrl}
+              download
+              className="inline-flex min-h-touch items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-ink shadow-xs transition-colors hover:bg-surface-sunken hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
+              aria-label="ส่งออกข้อมูลเรื่องร้องเรียนเป็นไฟล์ CSV"
+            >
+              <Download className="h-4 w-4 text-muted" aria-hidden="true" />
+              <span>ส่งออก CSV</span>
+            </a>
+          </div>
+        </div>
 
         {/* สรุปยอดหน้านี้ */}
         <div className="glass-panel flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl px-4 py-3 text-sm text-muted shadow-sm">

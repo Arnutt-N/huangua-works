@@ -89,6 +89,7 @@ export const AUDIT_ACTIONS = {
   IMPORT_CASE: 'import_case',
   QUEUE_BOOKING_CREATE: 'queue_booking_create',
   QUEUE_BOOKING_UPDATE: 'queue_booking_update',
+  CASE_EXPORT_CSV: 'case_export_csv',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
