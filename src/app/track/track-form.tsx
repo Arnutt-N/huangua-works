@@ -1,6 +1,20 @@
 'use client';
 
-import { AlertCircle, CheckCircle2, Clock, Loader2, Search } from 'lucide-react';
+import {
+  AlertCircle,
+  Check,
+  CheckCircle2,
+  Clock,
+  Copy,
+  FolderTree,
+  Loader2,
+  Phone,
+  Search,
+  Star,
+  UserCheck,
+  Wrench,
+  XCircle,
+} from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { CaseStatusBadge } from '../../components/ui/case-status-badge';
 import { Button } from '../../components/ui/button';
@@ -8,12 +22,13 @@ import { FieldHint, Input, Label } from '../../components/ui/field';
 import { clearTrackDraft, readTrackDraft, saveTrackDraft } from '../../components/forms/non-pii-draft';
 import { cn } from '../../lib/cn';
 import { COPY } from '../../lib/copy';
-import type { CaseStatus } from '../../lib/cases/state-machine';
+import { statusProgress, type CaseStatus } from '../../lib/cases/state-machine';
 import { formatThaiDateTimeShort } from '../../lib/thai-date';
 
 interface CaseDetail {
   case: {
     id: string;
+    trackingCode?: string;
     createdAt: string;
     status: CaseStatus;
     title: string;
@@ -30,6 +45,41 @@ interface CaseDetail {
 interface TimelineEntry {
   status: CaseStatus;
   at: string;
+}
+
+// § คำอธิบายสถานะภาษาประชาชน ให้เข้าใจง่ายและทราบขั้นตอนต่อไป
+const CITIZEN_STATUS_DESCRIPTIONS: Record<CaseStatus, string> = {
+  pending: 'ระบบได้รับข้อมูลและรอเจ้าหน้าที่รับเรื่องเข้าสู่กระบวนการ',
+  received: 'เจ้าหน้าที่รับเรื่องเข้าสู่ระบบเรียบร้อยแล้ว',
+  reviewing: 'อยู่ระหว่างตรวจสอบข้อเท็จจริงและจัดสรรเจ้าหน้าที่รับผิดชอบ',
+  awaiting_budget: 'อยู่ระหว่างการพิจารณาจัดสรรและขออนุมัติงบประมาณ',
+  assigned: 'มอบหมายเจ้าหน้าที่ผู้รับผิดชอบเข้าพื้นที่แล้ว',
+  in_progress: 'เจ้าหน้าที่กำลังลงพื้นที่และดำเนินการแก้ไขปัญหา',
+  done: 'ดำเนินการแก้ไขปัญหาเสร็จสิ้นแล้ว',
+  closed: 'ปิดเรื่องสมบูรณ์',
+  rejected: 'ไม่สามารถรับเรื่องได้ เนื่องจากอยู่นอกเขตอำนาจหน้าที่หรือข้อมูลไม่เพียงพอ',
+};
+
+function getStatusIcon(status: CaseStatus) {
+  switch (status) {
+    case 'pending':
+    case 'received':
+      return Clock;
+    case 'reviewing':
+    case 'awaiting_budget':
+      return Search;
+    case 'assigned':
+      return UserCheck;
+    case 'in_progress':
+      return Wrench;
+    case 'done':
+    case 'closed':
+      return CheckCircle2;
+    case 'rejected':
+      return XCircle;
+    default:
+      return Clock;
+  }
 }
 
 function buildTimeline(detail: CaseDetail): TimelineEntry[] {
@@ -59,6 +109,19 @@ export function TrackForm({ initialId }: { initialId?: string }) {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CaseDetail | null>(null);
   const [draftReady, setDraftReady] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopyCode(code: string) {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(code);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch {
+        // fallback safely
+      }
+    }
+  }
 
   useEffect(() => {
     // § ไม่อ่าน storage ขณะ SSR และไม่ให้ draft ชนะเลขติดตามจาก URL
@@ -92,7 +155,7 @@ export function TrackForm({ initialId }: { initialId?: string }) {
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const trimmed = trackId.trim();
+    const trimmed = trackId.trim().toUpperCase();
     if (!trimmed) {
       setError('กรุณากรอกเลขติดตามเรื่อง');
       return;
@@ -102,6 +165,12 @@ export function TrackForm({ initialId }: { initialId?: string }) {
     setError(null);
     setResult(null);
 
+    // § ซิงค์ URL search params เพื่อให้บุ๊กมาร์กหรือแชร์ลิงก์ได้โดยไม่ต้อง reload
+    if (typeof window !== 'undefined') {
+      const nextUrl = `/track?id=${encodeURIComponent(trimmed)}`;
+      window.history.replaceState(null, '', nextUrl);
+    }
+
     const result = await fetchCase(trimmed);
     if (result.ok) setResult(result.data);
     else setError(result.error);
@@ -110,6 +179,7 @@ export function TrackForm({ initialId }: { initialId?: string }) {
 
   const timeline = result ? buildTimeline(result) : [];
   const canRate = !!result && (result.case.status === 'done' || result.case.status === 'closed');
+  const displayCode = result?.case.trackingCode || trackId.trim();
 
   return (
     <>
@@ -118,8 +188,8 @@ export function TrackForm({ initialId }: { initialId?: string }) {
         className="glass-panel mt-8 rounded-xl p-6 shadow-sm sm:p-8"
       >
         <div className="flex items-center gap-3">
-          <span className="bg-accent-100 flex h-10 w-10 items-center justify-center rounded-xl">
-            <Search className="text-accent-strong h-5 w-5" aria-hidden="true" />
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-sunken">
+            <Search className="h-5 w-5 text-accent-strong" aria-hidden="true" />
           </span>
           <h2 className="text-xl font-semibold">ค้นหาเรื่อง</h2>
         </div>
@@ -137,7 +207,7 @@ export function TrackForm({ initialId }: { initialId?: string }) {
             invalid={!!error}
             aria-describedby={error ? 'trackId-error' : 'trackId-hint'}
             value={trackId}
-            onChange={(e) => setTrackId(e.target.value)}
+            onChange={(e) => setTrackId(e.target.value.toUpperCase())}
           />
         </div>
 
@@ -163,6 +233,9 @@ export function TrackForm({ initialId }: { initialId?: string }) {
             setTrackId('');
             setError(null);
             setResult(null);
+            if (typeof window !== 'undefined') {
+              window.history.replaceState(null, '', '/track');
+            }
           }}
         >
           ล้างดราฟต์
@@ -182,20 +255,69 @@ export function TrackForm({ initialId }: { initialId?: string }) {
         <section aria-labelledby="result" className="mt-8">
           <div className="glass-panel rounded-xl p-6 shadow-sm sm:p-8">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-sm text-muted">
-                  {COPY.TRACKING_CODE}เรื่อง{' '}
-                  <span className="font-mono font-semibold text-ink">{trackId}</span>
-                </p>
-                <h3 className="mt-1 text-lg font-semibold">{result.case.title}</h3>
-                <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted">
-                  <span className="inline-flex items-center gap-1">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm text-muted">{COPY.TRACKING_CODE}เรื่อง</span>
+                  <div className="inline-flex items-center gap-1.5">
+                    <span className="font-mono font-semibold text-ink">{displayCode}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyCode(displayCode)}
+                      aria-label={copied ? 'คัดลอกเลขติดตามแล้ว' : 'คัดลอกเลขติดตาม'}
+                      className="inline-flex min-h-touch items-center gap-1 rounded-md border border-border bg-surface-raised px-2.5 py-1 text-xs font-medium text-ink transition hover:bg-surface-sunken focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
+                    >
+                      {copied ? (
+                        <>
+                          <Check className="h-3.5 w-3.5 text-success-ink" aria-hidden="true" />
+                          <span className="text-success-ink">คัดลอกแล้ว</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3.5 w-3.5 text-muted" aria-hidden="true" />
+                          <span>คัดลอก</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+                <h3 className="mt-1.5 text-lg font-semibold text-ink">{result.case.title}</h3>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted">
+                  {result.category && (
+                    <span className="inline-flex items-center gap-1 rounded-md border border-accent/20 bg-accent-sunken px-2 py-0.5 text-xs font-medium text-accent-strong">
+                      <FolderTree className="h-3.5 w-3.5" aria-hidden="true" />
+                      <span>{result.category.name}</span>
+                    </span>
+                  )}
+                  <span className="inline-flex items-center gap-1 text-xs text-muted">
                     <Clock className="h-3.5 w-3.5" aria-hidden="true" />
                     แจ้ง {formatThaiDateTimeShort(new Date(result.case.createdAt))}
                   </span>
-                </p>
+                </div>
               </div>
               <CaseStatusBadge status={result.case.status} register="citizen" />
+            </div>
+
+            {/* Overall Progress Bar */}
+            <div className="mt-6 rounded-xl border border-border bg-surface-raised p-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-semibold text-ink">ความคืบหน้าการดำเนินงาน</span>
+                <span className="font-bold tabular-nums text-accent-strong">
+                  {statusProgress(result.case.status)}%
+                </span>
+              </div>
+              <div className="mt-2 h-2.5 overflow-hidden rounded-pill bg-ink/10 ring-1 ring-ink/5 ring-inset">
+                <div
+                  className={cn(
+                    'h-full rounded-pill transition-all duration-slow ease-out-expo',
+                    result.case.status === 'rejected'
+                      ? 'bg-danger-ink'
+                      : result.case.status === 'done' || result.case.status === 'closed'
+                        ? 'bg-success-ink'
+                        : 'bg-accent-strong',
+                  )}
+                  style={{ width: `${statusProgress(result.case.status)}%` }}
+                />
+              </div>
             </div>
 
             <ol className="relative mt-6">
@@ -205,6 +327,7 @@ export function TrackForm({ initialId }: { initialId?: string }) {
               />
               {timeline.map((entry, i) => {
                 const isCurrent = i === timeline.length - 1;
+                const StatusIcon = getStatusIcon(entry.status);
                 return (
                   <li key={`${entry.status}-${entry.at}`} className="relative pb-6 last:pb-0">
                     <div className="flex gap-4">
@@ -216,15 +339,18 @@ export function TrackForm({ initialId }: { initialId?: string }) {
                             : 'bg-success-soft text-success-ink ring-success-ink/30',
                         )}
                       >
-                        {isCurrent ? (
-                          <span className="h-2.5 w-2.5 rounded-full bg-current" aria-hidden="true" />
-                        ) : (
-                          <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
-                        )}
+                        <StatusIcon className="h-5 w-5" aria-hidden="true" />
                       </span>
-                      <div className="pt-1.5">
-                        <CaseStatusBadge status={entry.status} register="citizen" />
-                        <p className="mt-1 text-sm text-muted">{formatThaiDateTimeShort(new Date(entry.at))}</p>
+                      <div className="flex-1 pt-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <CaseStatusBadge status={entry.status} register="citizen" />
+                        </div>
+                        <p className="mt-1 text-xs text-muted">
+                          {CITIZEN_STATUS_DESCRIPTIONS[entry.status]}
+                        </p>
+                        <p className="mt-1 text-xs text-muted">
+                          {formatThaiDateTimeShort(new Date(entry.at))}
+                        </p>
                       </div>
                     </div>
                   </li>
@@ -234,11 +360,45 @@ export function TrackForm({ initialId }: { initialId?: string }) {
           </div>
         </section>
       )}
+
       {/* § key ตาม code ที่ trim แล้ว — สลับเคสค้นหาแล้วฟอร์มรีเซ็ต ไม่ค้าง state เก่า (B-4) */}
-      {canRate && result && <FeedbackCard key={trackId.trim()} trackingCode={trackId.trim()} />}
+      {canRate && result && <FeedbackCard key={displayCode} trackingCode={displayCode} />}
+
+      {/* กล่องช่วยเหลือและติดต่อ อบต.หัวงัว */}
+      <div className="glass-panel mt-8 rounded-xl p-6 shadow-sm sm:p-8">
+        <h3 className="text-base font-semibold text-ink">ต้องการความช่วยเหลือหรือสอบถามเพิ่มเติม?</h3>
+        <p className="mt-1 text-sm text-muted">
+          หากมีข้อสงสัยหรือต้องการสอบถามความคืบหน้าเพิ่มเติม สามารถติดต่อเจ้าหน้าที่ อบต.หัวงัว ได้โดยตรง:
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <a
+            href={COPY.ORG_PHONE_TEL}
+            className="flex min-h-touch items-center gap-3 rounded-lg border border-border bg-surface-raised p-3 text-sm font-medium text-ink transition hover:border-accent-strong hover:bg-surface-sunken focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
+          >
+            <span className="flex h-9 w-9 flex-none items-center justify-center rounded-md bg-accent-sunken text-accent-strong">
+              <Phone className="h-4 w-4" aria-hidden="true" />
+            </span>
+            <div>
+              <p className="text-xs text-muted">โทรศัพท์สำนักงาน</p>
+              <p className="font-semibold text-ink">{COPY.ORG_PHONE}</p>
+            </div>
+          </a>
+          <div className="flex min-h-touch items-center gap-3 rounded-lg border border-border bg-surface-raised p-3 text-sm font-medium text-ink">
+            <span className="flex h-9 w-9 flex-none items-center justify-center rounded-md bg-success-soft text-success-ink">
+              <Clock className="h-4 w-4" aria-hidden="true" />
+            </span>
+            <div>
+              <p className="text-xs text-muted">เวลาทำการ</p>
+              <p className="font-semibold text-ink">จันทร์ - ศุกร์ 08:30 - 16:30 น.</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </>
   );
 }
+
+const RATING_LABELS = ['', 'ต้องปรับปรุง', 'พอใช้', 'ปานกลาง', 'ดี', 'ดีมาก'];
 
 /** ให้ดาวหลังเรื่องเสร็จ/ปิด — เคสละครั้ง ตอบหรือไม่ตอบก็ได้ (ไม่ขวางอะไร) */
 function FeedbackCard({ trackingCode }: { trackingCode: string }) {
@@ -286,13 +446,16 @@ function FeedbackCard({ trackingCode }: { trackingCode: string }) {
     <form onSubmit={handleSubmit} className="glass-panel mt-8 rounded-xl p-6 shadow-sm sm:p-8">
       <fieldset>
         <legend className="text-xl font-semibold">ให้คะแนนการบริการ</legend>
-        <div role="radiogroup" aria-label="คะแนน 1 ถึง 5 ดาว" className="mt-3 flex gap-2">
+        <div role="radiogroup" aria-label="คะแนน 1 ถึง 5 ดาว" className="mt-3 flex flex-wrap items-center gap-2">
           {[1, 2, 3, 4, 5].map((n) => (
             <label
               key={n}
               className={cn(
-                'flex min-h-touch min-w-touch cursor-pointer items-center justify-center rounded-lg border text-lg font-bold',
-                rating >= n ? 'border-accent-strong bg-accent-100 text-accent-strong' : 'border-border text-muted',
+                'group flex min-h-touch min-w-touch cursor-pointer items-center justify-center rounded-lg border p-2 transition',
+                'focus-within:ring-2 focus-within:ring-accent-strong focus-within:ring-offset-2',
+                rating >= n
+                  ? 'border-warning-ink bg-warning-soft text-warning-ink'
+                  : 'border-border text-muted hover:border-ink/30 hover:text-ink',
               )}
             >
               <input
@@ -304,9 +467,20 @@ function FeedbackCard({ trackingCode }: { trackingCode: string }) {
                 className="sr-only"
                 aria-label={`${n} ดาว`}
               />
-              ★
+              <Star
+                className={cn(
+                  'h-6 w-6 transition',
+                  rating >= n ? 'fill-warning-ink text-warning-ink' : 'text-muted group-hover:text-ink',
+                )}
+                aria-hidden="true"
+              />
             </label>
           ))}
+          {rating > 0 && (
+            <span className="ml-2 text-sm font-semibold text-ink">
+              {rating} ดาว — {RATING_LABELS[rating]}
+            </span>
+          )}
         </div>
       </fieldset>
       <div className="mt-4">
