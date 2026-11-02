@@ -13,6 +13,7 @@ import {
 import Link from 'next/link';
 import { useRef, useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
+import { ErrorSummary, type ErrorSummaryItem } from '@/components/ui/error-summary';
 import { FieldError, FieldHint, Input, Label, Textarea } from '@/components/ui/field';
 import {
   Select,
@@ -60,6 +61,28 @@ const CATEGORY_PRESETS: Record<QueueCategory, readonly string[]> = {
   ],
 };
 
+const QUEUE_FIELD_LABELS: Record<string, string> = {
+  date: 'วันที่นัด',
+  slot: 'ช่วงเวลาที่สะดวก',
+  fullName: 'ชื่อ-นามสกุล ผู้ติดต่อ',
+  phoneNumber: 'เบอร์โทรศัพท์ติดต่อกลับ',
+  villageId: 'หมู่บ้านที่ต้องการให้เข้าตรวจหน้างาน',
+  serviceType: 'เรื่องหรือหัวข้อที่ต้องการนัดหมาย',
+  note: 'รายละเอียดเพิ่มเติม',
+  consent: 'ความยินยอมเก็บรวบรวมข้อมูล',
+};
+
+const QUEUE_FIELD_DOM_IDS: Record<string, string> = {
+  date: 'queue-date',
+  slot: 'queue-slot',
+  fullName: 'queue-name',
+  phoneNumber: 'queue-phone',
+  villageId: 'queue-village',
+  serviceType: 'queue-service',
+  note: 'queue-note',
+  consent: 'queue-consent',
+};
+
 function SectionCard({ children }: { children: React.ReactNode }) {
   return <section className="glass mt-6 rounded-xl p-6 shadow-sm sm:p-8">{children}</section>;
 }
@@ -72,11 +95,11 @@ function SectionHeading({
   children: React.ReactNode;
 }) {
   return (
-    <h2 className="flex items-center gap-3 text-xl font-semibold">
-      <span className="bg-accent-100 flex h-10 w-10 items-center justify-center rounded-xl">
+    <h2 className="flex items-start gap-3 text-xl font-semibold">
+      <span className="bg-accent-100 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
         <Icon className="text-accent-strong h-5 w-5" aria-hidden="true" />
       </span>
-      {children}
+      <span className="pt-1">{children}</span>
     </h2>
   );
 }
@@ -96,6 +119,7 @@ export function QueueBookingForm() {
   const [note, setNote] = useState('');
   const [consent, setConsent] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [submitCount, setSubmitCount] = useState(0);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<BookingResult | null>(null);
@@ -189,7 +213,10 @@ export function QueueBookingForm() {
     if (note.trim().length > 500) errors.note = 'รายละเอียดยาวเกิน 500 ตัวอักษร';
     if (!consent) errors.consent = 'กรุณายินยอมให้เก็บชื่อ–เบอร์โทรเพื่อติดต่อเรื่องการนัดหมาย';
     setFieldErrors(errors);
-    if (Object.keys(errors).length > 0) return;
+    if (Object.keys(errors).length > 0) {
+      setSubmitCount((c) => c + 1);
+      return;
+    }
 
     setSubmitting(true);
     setSubmitError(null);
@@ -293,8 +320,15 @@ export function QueueBookingForm() {
 
   const isWeekendSelected = !!date && !isBusinessDay(date);
 
+  const errorSummaryItems: ErrorSummaryItem[] = Object.entries(fieldErrors).map(([key, msg]) => ({
+    fieldId: QUEUE_FIELD_DOM_IDS[key] ?? key,
+    fieldLabel: QUEUE_FIELD_LABELS[key],
+    message: msg,
+  }));
+
   return (
     <form onSubmit={handleSubmit} noValidate>
+      <ErrorSummary errors={errorSummaryItems} submitCount={submitCount} className="mt-6" />
       {authenticated && displayName && (
         <div className="glass mt-6 flex items-center justify-between rounded-xl border border-accent-strong/30 bg-accent-sunken p-4">
           <div className="flex items-center gap-3">
@@ -394,15 +428,21 @@ export function QueueBookingForm() {
           )}
 
           {!isWeekendSelected && (
-            <fieldset>
+            <fieldset aria-describedby={fieldErrors.slot ? 'queue-slot-error' : undefined}>
               <legend className="mb-2 block text-sm font-semibold text-ink">ช่วงเวลาที่สะดวก</legend>
               {slotsLoading ? (
                 <p className="text-muted flex min-h-touch items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
                   กำลังตรวจสอบช่วงว่าง…
                 </p>
               ) : (
-                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2" role="radiogroup" aria-label="ช่วงเวลา">
+                <div
+                  id="queue-slot"
+                  tabIndex={-1}
+                  className="grid grid-cols-1 gap-2.5 rounded-xl p-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong sm:grid-cols-2"
+                  role="radiogroup"
+                  aria-label="ช่วงเวลา"
+                >
                   {slots.map((s) => (
                     <button
                       key={s.id}
@@ -425,7 +465,7 @@ export function QueueBookingForm() {
                   ))}
                 </div>
               )}
-              <FieldError>{fieldErrors.slot}</FieldError>
+              <FieldError id="queue-slot-error">{fieldErrors.slot}</FieldError>
             </fieldset>
           )}
         </div>
@@ -444,9 +484,10 @@ export function QueueBookingForm() {
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               invalid={!!fieldErrors.fullName}
+              aria-describedby={fieldErrors.fullName ? 'queue-name-error' : undefined}
               placeholder="เช่น นายสมชาย ใจดี"
             />
-            <FieldError>{fieldErrors.fullName}</FieldError>
+            <FieldError id="queue-name-error">{fieldErrors.fullName}</FieldError>
           </div>
 
           <div>
@@ -459,17 +500,23 @@ export function QueueBookingForm() {
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
               invalid={!!fieldErrors.phoneNumber}
+              aria-describedby={fieldErrors.phoneNumber ? 'queue-phone-error' : 'queue-phone-hint'}
               placeholder="เช่น 0812345678"
             />
-            <FieldHint>เจ้าหน้าที่จะโทรประสานงานตามหมายเลขนี้ก่อนถึงวันนัด</FieldHint>
-            <FieldError>{fieldErrors.phoneNumber}</FieldError>
+            <FieldHint id="queue-phone-hint">เจ้าหน้าที่จะโทรประสานงานตามหมายเลขนี้ก่อนถึงวันนัด</FieldHint>
+            <FieldError id="queue-phone-error">{fieldErrors.phoneNumber}</FieldError>
           </div>
 
           {category === 'technician' && (
             <div>
               <Label htmlFor="queue-village">หมู่บ้านที่ต้องการให้เข้าตรวจหน้างาน (ตำบลหัวงัว)</Label>
               <Select value={villageId} onValueChange={(val) => setVillageId(val)}>
-                <SelectTrigger id="queue-village" aria-label="เลือกหมู่บ้าน">
+                <SelectTrigger
+                  id="queue-village"
+                  aria-label="เลือกหมู่บ้าน"
+                  aria-invalid={!!fieldErrors.villageId || undefined}
+                  aria-describedby={fieldErrors.villageId ? 'queue-village-error' : undefined}
+                >
                   <SelectValue placeholder="เลือกหมู่บ้าน (หมู่ 1 - หมู่ 13)" />
                 </SelectTrigger>
                 <SelectContent>
@@ -480,7 +527,7 @@ export function QueueBookingForm() {
                   ))}
                 </SelectContent>
               </Select>
-              <FieldError>{fieldErrors.villageId}</FieldError>
+              <FieldError id="queue-village-error">{fieldErrors.villageId}</FieldError>
             </div>
           )}
         </div>
@@ -500,13 +547,14 @@ export function QueueBookingForm() {
               value={serviceType}
               onChange={(e) => setServiceType(e.target.value)}
               invalid={!!fieldErrors.serviceType}
+              aria-describedby={fieldErrors.serviceType ? 'queue-service-error' : undefined}
               placeholder={
                 category === 'technician'
                   ? 'เช่น ซ่อมไฟฟ้าสาธารณะ, ท่อประปาแตก'
                   : 'เช่น ยื่นแบบขออนุญาตก่อสร้าง, ติดต่อภาษีที่ดิน'
               }
             />
-            <FieldError>{fieldErrors.serviceType}</FieldError>
+            <FieldError id="queue-service-error">{fieldErrors.serviceType}</FieldError>
 
             <div className="mt-3">
               <span className="block text-xs font-semibold text-muted">หัวข้อที่พบบ่อย (กดเพื่อเลือก):</span>
@@ -533,13 +581,14 @@ export function QueueBookingForm() {
               value={note}
               onChange={(e) => setNote(e.target.value)}
               invalid={!!fieldErrors.note}
+              aria-describedby={fieldErrors.note ? 'queue-note-error' : undefined}
               placeholder={
                 category === 'technician'
                   ? 'เช่น จุดสังเกต เสาไฟฟ้าต้นที่เท่าไร หรือจุดที่มีปัญหาน้ำรั่ว'
                   : 'เช่น ต้องการปรึกษาเอกสารประกอบ หรือสอบถามขั้นตอนเบื้องต้น'
               }
             />
-            <FieldError>{fieldErrors.note}</FieldError>
+            <FieldError id="queue-note-error">{fieldErrors.note}</FieldError>
           </div>
 
           <div>
@@ -548,6 +597,8 @@ export function QueueBookingForm() {
                 id="queue-consent"
                 type="checkbox"
                 aria-label="ยินยอมให้ อบต.หัวงัว เก็บชื่อ–เบอร์โทรเพื่อติดต่อเรื่องการนัดหมาย"
+                aria-invalid={!!fieldErrors.consent || undefined}
+                aria-describedby={fieldErrors.consent ? 'queue-consent-error' : undefined}
                 checked={consent}
                 onChange={(e) => setConsent(e.target.checked)}
                 className="mt-1 h-5 w-5 flex-none rounded border-border-strong text-accent-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
@@ -557,7 +608,7 @@ export function QueueBookingForm() {
                 เพื่อใช้สำหรับการประสานงานและแจ้งเตือนสถานะการนัดหมายตาม พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล (PDPA)
               </span>
             </label>
-            <FieldError>{fieldErrors.consent}</FieldError>
+            <FieldError id="queue-consent-error">{fieldErrors.consent}</FieldError>
           </div>
         </div>
       </SectionCard>
@@ -573,7 +624,7 @@ export function QueueBookingForm() {
       )}
 
       <Button type="submit" size="lg" disabled={submitting} className="mt-6 w-full">
-        {submitting && <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />}
+        {submitting && <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />}
         {submitting ? 'กำลังบันทึกการจองคิว…' : 'ยืนยันการจองคิว'}
       </Button>
     </form>

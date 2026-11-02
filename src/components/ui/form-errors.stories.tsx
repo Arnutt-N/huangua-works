@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { useState, type FormEvent } from 'react';
 import { Button } from './button';
+import { ErrorSummary, type ErrorSummaryItem } from './error-summary';
 import { FieldError, FieldHint, Input, Label, Textarea } from './field';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select';
 
@@ -84,3 +85,68 @@ function ValidationExample() {
 }
 
 export const InteractiveValidation: Story = { render: () => <ValidationExample /> };
+
+function ErrorSummaryExample() {
+  const [name, setName] = useState('');
+  const [detail, setDetail] = useState('');
+  const [submitCount, setSubmitCount] = useState(0);
+  const [errors, setErrors] = useState<ErrorSummaryItem[]>([]);
+
+  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const newErrors: ErrorSummaryItem[] = [];
+    if (!name.trim()) {
+      newErrors.push({
+        fieldId: 'demo-name',
+        fieldLabel: 'ชื่อผู้ติดต่อ',
+        message: 'กรุณากรอกชื่อ-นามสกุล',
+      });
+    }
+    if (!detail.trim()) {
+      newErrors.push({
+        fieldId: 'demo-detail',
+        fieldLabel: 'รายละเอียด',
+        message: 'กรุณากรอกรายละเอียดเรื่องที่แจ้ง',
+      });
+    }
+    setErrors(newErrors);
+    setSubmitCount((c) => c + 1);
+  }
+
+  return (
+    <form className="max-w-md space-y-4" noValidate onSubmit={handleSubmit}>
+      <ErrorSummary errors={errors} submitCount={submitCount} />
+      <div>
+        <Label htmlFor="demo-name">ชื่อผู้ติดต่อ</Label>
+        <Input
+          id="demo-name"
+          value={name}
+          invalid={errors.some((err) => err.fieldId === 'demo-name')}
+          aria-describedby={errors.some((err) => err.fieldId === 'demo-name') ? 'demo-name-error' : undefined}
+          onChange={(e) => setName(e.target.value)}
+        />
+        {errors.some((err) => err.fieldId === 'demo-name') && (
+          <FieldError id="demo-name-error">กรุณากรอกชื่อ-นามสกุล</FieldError>
+        )}
+      </div>
+      <div>
+        <Label htmlFor="demo-detail">รายละเอียด</Label>
+        <Textarea
+          id="demo-detail"
+          value={detail}
+          invalid={errors.some((err) => err.fieldId === 'demo-detail')}
+          aria-describedby={errors.some((err) => err.fieldId === 'demo-detail') ? 'demo-detail-error' : undefined}
+          onChange={(e) => setDetail(e.target.value)}
+        />
+        {errors.some((err) => err.fieldId === 'demo-detail') && (
+          <FieldError id="demo-detail-error">กรุณากรอกรายละเอียดเรื่องที่แจ้ง</FieldError>
+        )}
+      </div>
+      <Button type="submit">ส่งข้อมูลเพื่อตรวจสอบ</Button>
+    </form>
+  );
+}
+
+export const ErrorSummaryPattern: Story = {
+  render: () => <ErrorSummaryExample />,
+};
