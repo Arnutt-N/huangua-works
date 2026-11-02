@@ -642,13 +642,34 @@ export function IntakeForm({
       <SectionCard>
         <SectionHeading icon={User}>ข้อมูลผู้แจ้ง</SectionHeading>
         {liffMode && (
-          <p
+          <div
             role="status"
             data-testid="liff-auth-banner"
-            className="mt-4 rounded-xl border border-success/30 bg-success-soft px-4 py-3 text-sm font-semibold text-ink"
+            className="mt-4 flex items-center gap-3 rounded-xl border border-success/30 bg-success-soft p-4 text-ink"
           >
-            ยืนยันตัวตนผ่าน LINE เรียบร้อยแล้ว — ไม่ต้องกรอกเลขบัตรประชาชน
-          </p>
+            {liff.pictureUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={liff.pictureUrl}
+                alt=""
+                width={48}
+                height={48}
+                className="h-12 w-12 rounded-full border border-border object-cover"
+              />
+            ) : (
+              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-100 text-accent-strong">
+                <User className="h-6 w-6" aria-hidden="true" />
+              </span>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-semibold text-base">
+                {liff.displayName ? `บัญชี LINE: ${liff.displayName}` : 'เชื่อมต่อกับบัญชี LINE ของท่านเรียบร้อยแล้ว'}
+              </p>
+              <p className="text-sm text-muted">
+                ยืนยันตัวตนผ่าน LINE เรียบร้อยแล้ว — ไม่ต้องกรอกเลขบัตรประชาชน 13 หลัก
+              </p>
+            </div>
+          </div>
         )}
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <div>
@@ -658,10 +679,17 @@ export function IntakeForm({
               name="name"
               placeholder="เช่น นายสมชาย ใจดี"
               invalid={!!fieldErrors.fullName}
-              aria-describedby={fieldErrors.fullName ? 'name-error' : undefined}
+              aria-describedby={
+                fieldErrors.fullName ? 'name-error' : liffMode ? 'name-hint' : undefined
+              }
               value={form.fullName}
               onChange={(e) => updateField('fullName', e.target.value)}
             />
+            {liffMode && (
+              <FieldHint id="name-hint">
+                ระบบดึงชื่อเริ่มต้นจาก LINE ท่านสามารถแก้ไขเป็นชื่อ-นามสกุลจริง เพื่อให้เจ้าหน้าที่ประสานงานได้ถูกต้อง
+              </FieldHint>
+            )}
             <FieldError id="name-error">{fieldErrors.fullName}</FieldError>
           </div>
           {!liffMode && (

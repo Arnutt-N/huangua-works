@@ -163,16 +163,24 @@ export const submitCaseSchema = z.object({
     .optional(),
 });
 
+export const lineFullNameSchema = z
+  .string()
+  .min(1, 'กรุณาระบุชื่อ')
+  .max(100, 'ชื่อยาวเกินไป')
+  .transform((v) => v.trim())
+  .or(z.literal(''))
+  .optional();
+
 /**
  * POST /api/cases/submit แบบ LIFF — ใช้เมื่อ request มี liff session cookie
  * (server เป็นคนเลือก schema จาก cookie ไม่ใช่ client)
  *
  * § cid ไม่บังคับ (D1) — ตัวตนผูกกับ LINE ที่ผ่านการ verify ID token แล้ว
- * fullName optional เพราะบางบัญชี LINE ไม่มี displayName
+ * fullName optional เพราะบางบัญชี LINE ไม่มี displayName หรือมี 1 ตัวอักษร
  */
 export const submitCaseLineSchema = submitCaseSchema
   .omit({ cid: true })
-  .extend({ fullName: fullNameSchema.optional() });
+  .extend({ fullName: lineFullNameSchema });
 
 /**
  * POST /api/consent/withdraw — citizen withdraws PDPA consent

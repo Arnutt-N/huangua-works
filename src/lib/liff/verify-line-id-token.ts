@@ -17,9 +17,8 @@ export interface VerifiedLineIdentity {
 }
 
 export function isLiffMockEnabled(): boolean {
-  // § mock เปิดได้จาก env เท่านั้น — ถ้าเป็น query param/flag อื่นจะกลายเป็น
-  // ช่องปลอมตัวบน production (ใครก็ส่ง mock token เข้ามาได้)
-  return process.env.LIFF_E2E_MOCK === '1';
+  // § mock เปิดได้จาก env เท่านั้น และห้ามเปิดใน production เด็ดขาด
+  return process.env.NODE_ENV !== 'production' && process.env.LIFF_E2E_MOCK === '1';
 }
 
 interface LineVerifyResponse {
@@ -36,9 +35,19 @@ export async function verifyLineIdToken(
   opts: { fetchImpl?: typeof fetch } = {},
 ): Promise<VerifiedLineIdentity> {
   if (isLiffMockEnabled()) {
-    // รูปแบบ mock: 'mock.<lineUserId>' — สำหรับ e2e/unit เท่านั้น
+    // รูปแบบ mock: 'mock.<lineUserId>' หรือ 'mock.<lineUserId>.<displayName>'
     if (idToken.startsWith('mock.') && idToken.length > 'mock.'.length) {
-      return { lineUserId: idToken.slice('mock.'.length) };
+      const parts = idToken.slice('mock.'.length).split('.');
+      const lineUserId = parts[0];
+      if (!lineUserId) {
+        throw new Error('mock enabled — token ต้องอยู่ในรูป mock.<lineUserId>');
+      }
+      const displayName = parts[1] ? decodeURIComponent(parts[1]) : undefined;
+      return {
+        lineUserId,
+        displayName: displayName ?? `ผู้ใช้ LINE (${lineUserId.slice(0, 6)})`,
+        pictureUrl: 'https://profile.line-scdn.net/mock-avatar',
+      };
     }
     throw new Error('mock enabled — token ต้องอยู่ในรูป mock.<lineUserId>');
   }

@@ -1,4 +1,4 @@
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, User } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { cookies } from 'next/headers';
@@ -9,6 +9,8 @@ import { CaseStatusBadge } from '@/components/ui/case-status-badge';
 import { listMyCases } from '@/lib/cases/citizen-access';
 import { formatThaiDateLong } from '@/lib/thai-date';
 import { LIFF_SESSION_COOKIE, readLiffSessionValue } from '@/lib/liff/session';
+import { getDb } from '@/lib/db';
+import { findLineUserByRaw } from '@/lib/line/identity';
 import { COPY } from '@/lib/copy';
 import { TrackForm } from './track-form';
 
@@ -38,22 +40,105 @@ export default async function TrackPage({
   const liffSession = readLiffSessionValue(cookieStore.get(LIFF_SESSION_COOKIE)?.value);
   const myCases = liffSession ? await listMyCases(liffSession.lineUserId) : [];
 
+  let lineProfile: { displayName: string | null; pictureUrl: string | null } | null = null;
+  if (liffSession) {
+    try {
+      const db = await getDb();
+      const userRow = await findLineUserByRaw(db, liffSession.lineUserId);
+      if (userRow) {
+        lineProfile = {
+          displayName: userRow.displayName,
+          pictureUrl: userRow.pictureUrl,
+        };
+      }
+    } catch {
+      // fallback gracefully if DB query fails
+    }
+  }
+
   return (
     <div className="min-h-dvh bg-surface text-ink">
       <Navbar />
       <main id="main" className="relative overflow-hidden mesh-gradient">
         <div className="absolute inset-0 thai-pattern pointer-events-none" />
         <div className="relative z-10 mx-auto w-full max-w-3xl px-4 pb-16 pt-24 sm:px-6 sm:pb-20 sm:pt-28">
-          <Link
-            href="/"
-            className="inline-flex min-h-touch items-center gap-1.5 text-sm text-muted hover:text-ink"
-          >
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            {COPY.BACK_HOME}
-          </Link>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Link
+              href="/"
+              className="inline-flex min-h-touch items-center gap-1.5 text-sm text-muted hover:text-ink"
+            >
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+              {COPY.BACK_HOME}
+            </Link>
+            {id && (
+              <Link
+                href="/track"
+                className="inline-flex min-h-touch items-center gap-1.5 text-sm font-medium text-accent-strong hover:underline"
+              >
+                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                กลับสู่รายการเรื่องของฉัน
+              </Link>
+            )}
+          </div>
 
           <h1 className="mt-4 text-3xl font-bold sm:text-4xl">{COPY.TRACK_LABEL}</h1>
           <p className="mt-3 text-lg text-muted">กรอกเลขติดตามเรื่อง เพื่อดูสถานะเรื่องที่ท่านแจ้ง</p>
+
+          {liffSession && (
+            <div
+              role="status"
+              data-testid="liff-connected-banner"
+              className="mt-6 flex items-center gap-3 rounded-xl border border-success/30 bg-success-soft p-4 text-ink"
+            >
+              {lineProfile?.pictureUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={lineProfile.pictureUrl}
+                  alt=""
+                  width={44}
+                  height={44}
+                  className="h-11 w-11 rounded-full border border-border object-cover"
+                />
+              ) : (
+                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-accent-100 text-accent-strong">
+                  <User className="h-5 w-5" aria-hidden="true" />
+                </span>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-semibold text-base">
+                  {lineProfile?.displayName
+                    ? `บัญชี LINE: ${lineProfile.displayName}`
+                    : 'เชื่อมต่อกับบัญชี LINE ของท่านเรียบร้อยแล้ว'}
+                </p>
+                <p className="text-sm text-muted">
+                  แสดงรายการเรื่องร้องเรียนที่ผูกกับบัญชี LINE ของท่านโดยอัตโนมัติ
+                </p>
+              </div>
+            </div>
+          )}
+
+          {liffSession && myCases.length === 0 && (
+            <section
+              className="glass-panel mt-8 rounded-xl p-6 text-center shadow-sm"
+              aria-labelledby="empty-cases-heading"
+              data-testid="liff-empty-cases"
+            >
+              <h2 id="empty-cases-heading" className="text-lg font-semibold text-ink">
+                ยังไม่มีรายการเรื่องแจ้งจากบัญชี LINE นี้
+              </h2>
+              <p className="mt-2 text-sm text-muted">
+                หากท่านเคยแจ้งเรื่องผ่านระบบเดิมหรือมีเรื่องร้องทุกข์ใหม่ สามารถแจ้งเรื่องผ่านระบบได้ทันที
+              </p>
+              <div className="mt-5">
+                <Link
+                  href="/intake"
+                  className="bg-accent-gradient shadow-accent-glow inline-flex min-h-touch items-center justify-center gap-2 rounded-md px-6 text-sm font-semibold text-on-accent"
+                >
+                  แจ้งเรื่องใหม่
+                </Link>
+              </div>
+            </section>
+          )}
 
           {myCases.length > 0 && (
             <section className="glass-panel mt-8 rounded-xl p-6 shadow-sm" aria-labelledby="my-cases-heading">

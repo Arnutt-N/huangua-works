@@ -99,4 +99,10 @@ describe('mock mode (LIFF_E2E_MOCK)', () => {
     vi.stubEnv('LIFF_E2E_MOCK', '');
     expect(isLiffMockEnabled()).toBe(false);
   });
+
+  it('ใน production mode แม้ตั้ง LIFF_E2E_MOCK=1 ก็ต้องปิด mock เสมอ', () => {
+    vi.stubEnv('LIFF_E2E_MOCK', '1');
+    vi.stubEnv('NODE_ENV', 'production');
+    expect(isLiffMockEnabled()).toBe(false);
+  });
 });
