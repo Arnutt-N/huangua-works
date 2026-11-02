@@ -17,47 +17,10 @@ import {
   MEDIA_MAX_SIZE_BYTES,
   MEDIA_SIZE_ERROR,
   MEDIA_TYPE_ERROR,
+  sniffImageMime,
 } from '@/lib/media-upload-rules';
 
-/**
- * § ตรวจจับ MIME type จาก Magic bytes ของไฟล์จริง
- * รองรับเฉพาะ JPEG, PNG, และ WebP
- */
-export function sniffImageMime(bytes: Uint8Array): { mime: string; ext: string } | null {
-  // JPEG: FF D8 FF
-  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
-    return { mime: 'image/jpeg', ext: 'jpg' };
-  }
-  // PNG: 89 50 4E 47 0D 0A 1A 0A
-  if (
-    bytes.length >= 8 &&
-    bytes[0] === 0x89 &&
-    bytes[1] === 0x50 &&
-    bytes[2] === 0x4e &&
-    bytes[3] === 0x47 &&
-    bytes[4] === 0x0d &&
-    bytes[5] === 0x0a &&
-    bytes[6] === 0x1a &&
-    bytes[7] === 0x0a
-  ) {
-    return { mime: 'image/png', ext: 'png' };
-  }
-  // WebP: RIFF (bytes 0-3) + WEBP (bytes 8-11)
-  if (
-    bytes.length >= 12 &&
-    bytes[0] === 0x52 &&
-    bytes[1] === 0x49 &&
-    bytes[2] === 0x46 &&
-    bytes[3] === 0x46 &&
-    bytes[8] === 0x57 &&
-    bytes[9] === 0x45 &&
-    bytes[10] === 0x42 &&
-    bytes[11] === 0x50
-  ) {
-    return { mime: 'image/webp', ext: 'webp' };
-  }
-  return null;
-}
+export { sniffImageMime };
 
 export async function POST(req: NextRequest) {
   const ip = clientIpFromHeaders(req.headers);

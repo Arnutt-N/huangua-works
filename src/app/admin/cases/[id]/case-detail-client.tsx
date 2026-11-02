@@ -35,6 +35,8 @@ import {
   type CaseStatus,
 } from '@/lib/cases/state-machine';
 import type { UserRole } from '@/lib/auth/roles';
+import { ResolutionPhotoManager } from '@/components/admin/resolution-photo-manager';
+import type { ResolutionPhoto } from '@/lib/cases/resolution-photos';
 
 interface OfficerOption {
   id: string;
@@ -62,6 +64,8 @@ interface CaseDetailClientProps {
   canChangeBudget: boolean;
   canChangeBudgetAmount: boolean;
   canChangeActionDetails: boolean;
+  resolutionPhotos?: ResolutionPhoto[];
+  storageConfigured?: boolean;
 }
 
 const initialActionState: CaseActionState = { error: null };
@@ -81,6 +85,8 @@ export function CaseDetailClient({
   canChangeBudget,
   canChangeBudgetAmount,
   canChangeActionDetails,
+  resolutionPhotos,
+  storageConfigured,
 }: CaseDetailClientProps) {
   // แยก useActionState ตาม action — แต่ละ form มี state อิสระ
   const [statusState, statusAction, statusPending] = useActionState(
@@ -516,6 +522,13 @@ export function CaseDetailClient({
           </Button>
         </form>
       </ActionCard>
+
+      {/* ── ภาพถ่ายผลการดำเนินงาน (ก่อนทำ / หลังทำ) ── */}
+      <ResolutionPhotoManager
+        caseId={caseId}
+        photos={resolutionPhotos ?? []}
+        storageConfigured={storageConfigured ?? true}
+      />
     </div>
   );
 }

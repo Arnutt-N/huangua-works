@@ -7,6 +7,12 @@ import { AUDIT_ACTIONS, logAudit } from '../../audit';
 import { normalizeTrackingCode } from '../../case-tracking';
 import type { CaseStatus } from '../state-machine';
 import { consentActiveFor } from './consent-policy';
+import { isStorageConfigured, readUrlForKey } from '../../storage';
+import {
+  parseResolutionPhotos,
+  sanitizeResolutionPhotosForCitizen,
+  type PublicResolutionPhoto,
+} from '../resolution-photos';
 
 type CaseRow = typeof cases.$inferSelect;
 type CategoryRow = typeof categories.$inferSelect;
@@ -29,6 +35,7 @@ export interface TrackedCaseView {
   };
   category: Pick<CategoryRow, 'id' | 'name' | 'icon'> | null;
   updates: Pick<CaseUpdateRow, 'id' | 'createdAt' | 'updateType' | 'oldValue' | 'newValue' | 'comment'>[];
+  resolutionPhotos?: PublicResolutionPhoto[];
 }
 
 /** แถว "เรื่องของฉัน" — updatedAt เป็น ISO string เพื่อข้าม server→client boundary ได้ */
@@ -73,6 +80,7 @@ export async function findTrackableCase(
         dueDate: cases.dueDate,
         closedAt: cases.closedAt,
         categoryId: cases.categoryId,
+        metadata: cases.metadata,
       })
       .from(cases)
       .where(and(eq(cases.trackingCode, trackingCode), consentActiveFor(cases.submittedBy)))
@@ -102,6 +110,24 @@ export async function findTrackableCase(
     .where(and(eq(caseUpdates.caseId, row.id), eq(caseUpdates.isPublic, true)))
     .orderBy(caseUpdates.createdAt);
 
+  // § ภาพถ่ายผลการดำเนินงานของเจ้าหน้าที่ (Before & After) — ตัด PII (uploadedBy, S3 key) ออกทั้งหมด
+  const rawPhotos = parseResolutionPhotos(row.metadata);
+  const storageReady = isStorageConfigured();
+  const signedPhotos = storageReady
+    ? await Promise.all(
+        rawPhotos.map(async (p) => {
+          try {
+            const url = await readUrlForKey(p.key, { disposition: 'inline', expiresIn: 900 });
+            return { ...p, url };
+          } catch {
+            return { ...p, url: null };
+          }
+        }),
+      )
+    : rawPhotos.map((p) => ({ ...p, url: null }));
+
+  const resolutionPhotos = sanitizeResolutionPhotosForCitizen(signedPhotos);
+
   await logAudit(
     {
       action: AUDIT_ACTIONS.VIEW_CASE,
@@ -128,6 +154,7 @@ export async function findTrackableCase(
     },
     category: category ?? null,
     updates,
+    resolutionPhotos,
   };
 }
 
