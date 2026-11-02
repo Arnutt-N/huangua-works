@@ -1,591 +1,318 @@
-# 📗 คู่มือ Deploy สำหรับมือใหม่ (Non-IT)
+# คู่มือ Deploy สำหรับผู้ดูแลระบบ (Non-IT)
 
 > **ระบบรับเรื่องร้องเรียน อบต.หัวงัว**
-> คู่มือนี้เขียนให้คนที่ **ไม่เคยเขียนโปรแกรม / ไม่เคย deploy** มาก่อน ทำตามได้ทีละขั้น ใช้เวลาประมาณ 1–2 ชั่วโมง
+> คู่มือนี้เขียนให้ผู้ดูแลระบบสามารถทำตามได้ทีละขั้น ใช้เวลาประมาณ 1-2 ชั่วโมง
 >
 > เมื่อทำเสร็จ เว็บไซต์จะออนไลน์ให้ประชาชนใช้งานได้ผ่านลิงก์ เช่น `https://huangua-citizen-help.vercel.app`
 
 ---
 
-## 📋 สิ่งที่คุณจะได้เรียนรู้ (ภาพรวม)
+## สิ่งที่คุณจะได้เรียนรู้ (ภาพรวม)
 
-เว็บไซต์เราต้องใช้บริการออนไลน์ (คล้ายกับเครื่องมือต่าง ๆ ที่รวมกันทำงาน) ทั้งหมด **5 ตัว**:
+เว็บไซต์ของเราใช้บริการออนไลน์ทั้งหมด **5 ตัว**:
 
-| ลำดับ | บริการ | หน้าที่ | ฟรีไหม? |
-|------|--------|---------|---------|
-| 1️⃣ | **GitHub** | เก็บไฟล์โค้ดของเว็บไซต์ | ✅ ฟรี |
-| 2️⃣ | **Supabase** | เก็บข้อมูล (ฐานข้อมูล PostgreSQL) | ✅ ฟรี |
-| 3️⃣ | **Upstash** (Redis) | ช่วยป้องกันสแปม (rate limiting) | ✅ ฟรี |
-| 4️⃣ | **cron-job.org** | ตัวตั้งเวลาทำงานอัตโนมัติ (cron) | ✅ ฟรี |
-| 5️⃣ | **Vercel** | เอาเว็บขึ้นออนไลน์ให้คนเข้าได้ | ✅ ฟรี |
+| ลำดับ | บริการ | หน้าที่ | ค่าใช้จ่าย |
+|---|---|---|---|
+| 1 | **GitHub** | เก็บไฟล์โค้ดของเว็บไซต์ | ฟรี |
+| 2 | **Supabase** | เก็บข้อมูล (ฐานข้อมูล PostgreSQL และ Storage สำหรับไฟล์ภาพ) | ฟรี |
+| 3 | **Upstash** (Redis) | ช่วยป้องกันสแปม (Rate Limiting) และ Live Cache | ฟรี |
+| 4 | **cron-job.org** | ตัวตั้งเวลาทำงานอัตโนมัติ (Cron 7 รายการ) | ฟรี |
+| 5 | **Vercel** | นำเว็บไซต์ขึ้นออนไลน์สู่สาธารณะ | ฟรี |
 
-> 📌 **ทำไมใช้ cron-job.org แทน Vercel Cron?** Vercel แบบฟรี (Hobby) จำกัด cron ให้รันได้แค่ **วันละ 1 ครั้ง** แต่ระบบเรามีหน้าที่ต้องทำงานอัตโนมัติหลายอย่าง (ปิดเคสเก่า, ล้างข้อมูล, อัปเดตสถิติ, health check) → จึงใช้ cron-job.org ฟรีแทน
+> [หมายเหตุ] **ทำไมใช้ cron-job.org แทน Vercel Cron?** Vercel แบบฟรี (Hobby) จำกัดให้รัน Cron ได้เพียง **วันละ 1 ครั้ง** แต่ระบบรับเรื่องร้องเรียนจำเป็นต้องประมวลผลอัตโนมัติหลายส่วนตลอดวัน (ปิดเคสเก่า, ลบ hash ป้องกันสแปม, ลบ audit log ตามอายุ, สรุปสถิติ, ส่งบรอดแคสต์ LINE, สลับ Rich Menu, และ Health check) จึงใช้ cron-job.org ฟรีแทน
 
-> 💡 **คำแนะนำ**: ทำตามลำดับ 1→2→3→4→5 อย่าข้ามขั้น เพราะแต่ละขั้นจะมี "รหัสผ่าน/ลิงก์" ที่ต้องนำไปใช้ในขั้นถัดไป
+> [คำแนะนำ] ทำตามลำดับ 1 -> 2 -> 3 -> 4 -> 5 อย่าข้ามขั้น เพราะแต่ละขั้นจะสร้างรหัสผ่านหรือลิงก์ที่ต้องนำไปใช้ในขั้นถัดไป
 
 ---
 
-## 🎯 ก่อนเริ่ม: เตรียมของก่อน
+## ก่อนเริ่ม: เตรียมข้อมูล
 
 ให้เตรียมสิ่งเหล่านี้ให้พร้อม:
 
-- [ ] **อีเมล** (แนะนำอีเมลองค์กร เช่น `@huangua.go.th`) — ใช้สมัครบริการทั้งหมด
-- [ ] **เบอร์โทรศัพท์** (บางบริการขอยืนยันตัวตน)
+- [ ] **อีเมล** (แนะนำอีเมลหน่วยงาน เช่น `@huangua.go.th`) - ใช้สมัครบริการทั้งหมด
+- [ ] **เบอร์โทรศัพท์** (บางบริการจำเป็นต้องยืนยันตัวตน)
 - [ ] **เว็บเบราว์เซอร์** เช่น Google Chrome หรือ Microsoft Edge (เวอร์ชันล่าสุด)
-- [ ] **ไฟล์โค้ด** — อยู่ในโฟลเดอร์โปรเจกต์นี้ (เดี๋ยวเราจะอัปโหลดขึ้น GitHub)
+- [ ] **ไฟล์โค้ด** - อยู่ในโฟลเดอร์โปรเจกต์นี้
 
-> ⚠️ **สำคัญมาก**: เก็บ "รหัสผ่าน/ลิงก์/คีย์" ทุกตัวที่ได้รับ ลงใน **โปรแกรมจดบันทึก (เช่น Notepad)** ไว้ต่างหาก เพราะต้องใช้หลายครั้ง
+> [คำเตือนสำคัญ] จดบันทึกรหัสผ่าน ลิงก์ และคีย์ทุกตัวที่ได้รับ ลงในโปรแกรมจดบันทึกเฉพาะ (เช่น Notepad) แยกไว้ต่างหาก
 
 ---
 
-## 1️⃣ ขั้นที่ 1: สมัคร GitHub และอัปโหลดโค้ด
+## ขั้นที่ 1: สมัคร GitHub และเตรียมที่เก็บโค้ด
 
-GitHub คือที่เก็บไฟล์โค้ดบนคลาวด์ (เหมือน Google Drive สำหรับโค้ด)
+GitHub คือที่เก็บไฟล์โค้ดบนคลาวด์สำหรับนำไปเชื่อมโยงกับ Vercel
 
 ### 1.1 สมัคร GitHub
-
 1. เปิดเว็บ **https://github.com/signup**
-2. ใส่ **อีเมล** → **รหัสผ่าน** (ตั้งให้แข็งแรง) → **ชื่อผู้ใช้** (username)
-3. กดปุ่มยืนยัน แล้วยืนยันอีเมลตามลิงก์ที่ส่งไป
+2. ใส่ **อีเมล** -> **รหัสผ่าน** -> **ชื่อผู้ใช้** (username)
+3. กดยืนยันตัวตนและยืนยันอีเมลตามลิงก์ที่ได้รับ
 
-### 1.2 สร้าง "Repository" (ที่เก็บโค้ด)
-
-1. หลังล็อกอินแล้ว คลิกปุ่มเขียว **`+`** มุมขวาบน → เลือก **New repository**
+### 1.2 สร้าง Repository (ที่เก็บโค้ด)
+1. หลังล็อกอิน คลิกเครื่องหมาย **+** มุมขวาบน -> เลือก **New repository**
 2. ตั้งชื่อ เช่น `huangua-citizen-help`
-3. เลือก **Private** (ส่วนตัว — เพื่อความปลอดภัย) ❌ อย่าเลือก Public
-4. คลิกปุ่มเขียว **Create repository**
+3. เลือก **Private** (ส่วนตัว เพื่อความปลอดภัย)
+4. คลิก **Create repository**
 
 ### 1.3 อัปโหลดไฟล์โค้ดขึ้น GitHub
-
-วิธีง่ายสุดสำหรับมือใหม่ — ใช้ **GitHub Desktop** (โปรแกรมลงเครื่อง):
-
-1. ดาวน์โหลด **GitHub Desktop** จาก https://desktop.github.com
-2. ติดตั้งแล้วเปิด → ล็อกอินด้วยบัญชี GitHub
-3. คลิก **File → Add local repository**
-4. เลือกโฟลเดอร์โปรเจกต์ (ที่มีไฟล์ `package.json`)
-5. ถ้าขึ้นให้ initialize ให้ทำตามขั้น
-6. พิมพ์ข้อความสั้น ๆ ในช่อง **Summary** เช่น `เริ่มต้นโปรเจกต์`
-7. คลิก **Commit to main** แล้วคลิก **Push origin** (อัปโหลดขึ้น)
-
-> ✅ **ตรวจสอบ**: เปิดเว็บ GitHub จะเห็นไฟล์โค้ดปรากฏขึ้นมา
->
-> ⚠️ **หมายเหตุ**: ไฟล์ `.env` และ `.env.local` จะไม่ขึ้นไป — นี่คือการออกแบบเพื่อความปลอดภัย (ไม่ให้รหัสลับรั่ว)
+ใช้โปรแกรม **GitHub Desktop** (https://desktop.github.com):
+1. ติดตั้งแล้วล็อกอินด้วยบัญชี GitHub
+2. คลิก **File -> Add local repository**
+3. เลือกโฟลเดอร์โปรเจกต์
+4. พิมพ์ข้อความในช่อง Summary เช่น `initial commit`
+5. คลิก **Commit to main** แล้วคลิก **Push origin**
 
 ---
 
-## 2️⃣ ขั้นที่ 2: สมัคร Supabase (ฐานข้อมูล)
+## ขั้นที่ 2: สมัคร Supabase (ฐานข้อมูล PostgreSQL และ Storage)
 
-Supabase คือที่เก็บข้อมูลทั้งหมดของระบบ (เคสที่ประชาชนแจ้ง, บัญชีเจ้าหน้าที่, ฯลฯ)
+Supabase ทำหน้าที่เก็บข้อมูลทั้งหมด (เรื่องร้องเรียน, ผู้ใช้, ภูมิศาสตร์, ไฟล์แนบ)
 
 ### 2.1 สมัคร Supabase
-
 1. เปิดเว็บ **https://supabase.com**
-2. คลิก **Start your project** → **Sign in with GitHub** (ใช้บัญชี GitHub ที่สมัครในขั้นที่ 1)
-3. อนุญาตให้ Supabase เข้าถึง GitHub
+2. คลิก **Start your project** -> **Sign in with GitHub**
+3. อนุญาตให้ Supabase เข้าถึงบัญชี GitHub
 
-### 2.2 สร้าง "Project" (ฐานข้อมูลใหม่)
-
+### 2.2 สร้าง Project ใหม่
 1. คลิก **New project**
 2. ตั้งชื่อ เช่น `huangua-citizen-help`
-3. ตั้งรหัสผ่านฐานข้อมูล:
-   - คลิกปุ่ม **Generate a password** (ให้ระบบสุ่มให้)
-   - 📝 **จดรหัสผ่านนี้เก็บไว้ดี ๆ** — ถ้าหายจะกู้คืนไม่ได้!
-4. เลือก Region: **Southeast Asia (Singapore)** — ใกล้ไทยที่สุด
-5. คลิก **Create new project** แล้วรอประมาณ 2 นาที
+3. ตั้งรหัสผ่านฐานข้อมูล (Database Password):
+   - คลิกปุ่ม **Generate a password**
+   - จดบันทึกรหัสผ่านนี้เก็บไว้ (ไม่สามารถกู้คืนได้)
+4. เลือก Region: **Southeast Asia (Singapore)**
+5. คลิก **Create new project** และรอระบบตั้งค่าประมาณ 2 นาที
 
-### 2.3 คัดลอก "Connection String" (ที่อยู่ฐานข้อมูล)
-
-1. หลังสร้างเสร็จ ไปที่เมนู **Project Settings** (ไอคอนรูปเฟือง มุมซ้ายล่าง)
+### 2.3 คัดลอก Connection String (ที่อยู่ฐานข้อมูล)
+1. ไปที่เมนู **Project Settings** (ไอคอนรูปเฟืองมุมซ้ายล่าง)
 2. เลือก **Database**
-3. หาส่วน **Connection string** → เลือกแท็บ **URI**
-4. เลือกโหมด **Transaction** (พอร์ต `6543`) — เหมาะกับ serverless ของ Vercel
-5. คัดลอกลิงก์ทั้งบรรทัด เช่น:
+3. เลื่อนลงมาที่ส่วน **Connection string** -> เลือกแท็บ **URI**
+4. เลือกโหมด **Transaction** (พอร์ต `6543`) - สำหรับ Vercel Serverless:
    ```
-   postgresql://postgres.huangua:[YOUR-PASSWORD]@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres
+   postgresql://postgres.<project>:[YOUR-PASSWORD]@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres
    ```
-6. 📝 **แทนที่ `[YOUR-PASSWORD]` ด้วยรหัสผ่านที่จดไว้ในขั้น 2.2**
+5. แทนที่ `[YOUR-PASSWORD]` ด้วยรหัสผ่านที่จดไว้ในขั้น 2.2
+6. จดบันทึกค่านี้เป็น `DATABASE_URL`
 
-ลิงก์สุดท้ายจะหน้าตาประมาณนี้ (ตัวอย่าง):
-```
-postgresql://postgres.huangua:abc123XYZ@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres
-```
+> [ข้อควรทราบเรื่องพอร์ต Connection String]
+> - **พอร์ต 6543 (Transaction Mode):** ใช้สำหรับ Vercel Production runtime เพื่อให้รองรับ Serverless connection pooling ได้หลายร้อยคำขอพร้อมกันโดยไม่ล้น pool
+> - **พอร์ต 5432 (Session Mode):** ใช้สำหรับการรัน Migration ผ่าน Terminal ในเครื่อง (`npx drizzle-kit push`) หรือรันสคริปต์ seed
 
-> 📝 **จดค่านี้ชื่อ `DATABASE_URL`** — จะใช้ในขั้นที่ 5
-
-### 2.4 (เสร็จสิ้นส่วน Supabase ชั่วคราว)
-
-เดี๋ยวเราจะกลับมาสร้างตารางข้อมูลในขั้นที่ 5 หลังตั้งค่า Vercel เสร็จ
+### 2.4 ตั้งค่า Supabase Storage (สำหรับภาพถ่ายประชาชนและเจ้าหน้าที่)
+ระบบรองรับการแนบภาพถ่ายเรื่องร้องเรียนจากประชาชน (สูงสุด 5 รูป) และภาพผลการดำเนินงานของเจ้าหน้าที่ (Before & After):
+1. ไปที่เมนู **Storage** ใน Supabase Dashboard
+2. คลิก **New bucket**
+3. ตั้งชื่อ Bucket ว่า: `media`
+4. ตั้งค่า Bucket เป็น **Private** (ปิด Public bucket เพราะระบบใช้ Presigned URL ที่มีอายุ 15 นาที เพื่อความปลอดภัยของข้อมูลประชาชน)
+5. สร้าง S3 Access Keys สำหรับโปรแกรม:
+   - ไปที่ **Project Settings** -> **Storage** -> เลื่อนลงไปที่ **S3 Access Keys**
+   - คลิก **New access key**
+   - จดบันทึกค่า:
+     - `S3_ENDPOINT`: `https://<project-ref>.supabase.co/storage/v1/s3`
+     - `S3_REGION`: `ap-southeast-1`
+     - `S3_BUCKET`: `media`
+     - `S3_ACCESS_KEY_ID`: รหัส Access Key
+     - `S3_SECRET_ACCESS_KEY`: รหัส Secret Key
 
 ---
 
-## 3️⃣ ขั้นที่ 3: สมัคร Upstash (Redis สำหรับป้องกันสแปม)
+## ขั้นที่ 3: สมัคร Upstash Redis (สำหรับป้องกันสแปมและ Live Cache)
 
-Upstash Redis ช่วย **จำกัดอัตราการส่งฟอร์ม** (กันคนส่งเรื่องร้องเรียนซ้ำ ๆ เพื่อรบกวนระบบ)
+Upstash Redis ทำหน้าที่จำกัดอัตราการส่งเรื่อง (Rate Limiting) และซิงค์ Live Chat:
 
 ### 3.1 สมัคร Upstash
-
 1. เปิดเว็บ **https://upstash.com**
-2. คลิก **Login** → **Login with GitHub** (ใช้บัญชี GitHub)
-3. อนุญาตให้ Upstash เข้าถึง
+2. คลิก **Login** -> **Login with GitHub**
 
 ### 3.2 สร้าง Redis Database
-
 1. คลิก **Create Database**
 2. ตั้งชื่อ: `huangua-redis`
 3. เลือก Region: **AWS ap-southeast-1 (Singapore)**
 4. คลิก **Create**
 
-### 3.3 คัดลอกข้อมูล Redis
-
-หลังสร้างเสร็จ หน้าจอจะแสดงข้อมูล 2 ตัว ที่ต้องใช้:
-
-1. **REST URL** — มีหน้าตา `https://xxx-xxx.upstash.io`
-   - 📝 จดค่านี้ชื่อ `UPSTASH_REDIS_REST_URL`
-2. **REST Token** — ข้อความยาว ๆ (คลิกปุ่ม copy)
-   - 📝 จดค่านี้ชื่อ `UPSTASH_REDIS_REST_TOKEN`
-
-> ✅ **ตรวจสอบ**: Token ต้องยาวไม่ต่ำกว่า 16 ตัวอักษร
+### 3.3 คัดลอกข้อมูลการเชื่อมต่อ
+ในหน้าแสดงข้อมูล Database ส่วน **REST API**:
+1. คัดลอก **UPSTASH_REDIS_REST_URL** (รูปแบบ `https://...upstash.io`)
+2. คัดลอก **UPSTASH_REDIS_REST_TOKEN** (ต้องยาว >= 16 ตัวอักษร)
 
 ---
 
-## 4️⃣ ขั้นที่ 4: สมัคร cron-job.org (ตัวตั้งเวลาอัตโนมัติ)
+## ขั้นที่ 4: สมัคร cron-job.org (ตัวตั้งเวลางานอัตโนมัติทั้ง 7 รายการ)
 
-cron-job.org คือบริการฟรีที่จะ **เรียกเว็บไซต์ของเราตามเวลาที่ตั้ง** เพื่อทำงานอัตโนมัติ เช่น ปิดเคสเก่า, ล้างข้อมูลหมดอายุ, อัปเดตสถิติ
-
-> 💡 **เลือกใช้ cron-job.org แทน Vercel Cron** เพราะ Vercel แบบฟรี (Hobby) จำกัดให้ cron รันได้วันละ 1 ครั้งเท่านั้น ส่วน cron-job.org ไม่จำกัด
+ระบบมีงานอัตโนมัติ 7 รายการที่ต้องตั้งเวลาให้ทำงานผ่าน https://cron-job.org:
 
 ### 4.1 สมัคร cron-job.org
-
 1. เปิดเว็บ **https://cron-job.org/en/**
-2. คลิก **REGISTER** (มุมขวาบน)
-3. กรอก **อีเมล** + **รหัสผ่าน** + ยอมรับเงื่อนไข
-4. คลิก **Register**
-5. ไปที่อีเมลของคุณ → คลิกลิงก์ยืนยัน → เข้าสู่ระบบ
+2. คลิก **REGISTER** -> กรอกอีเมลและรหัสผ่าน -> ยืนยันอีเมล
 
-### 4.2 เตรียม "ลิงก์ + รหัส" ก่อนสร้าง job
+### 4.2 สิ่งที่ต้องเตรียม
+- **URL เว็บไซต์:** `https://<ชื่อโปรเจกต์>.vercel.app` (ได้หลัง Deploy ในขั้นที่ 6)
+- **CRON_SECRET:** สตริงสุ่มยาว >= 16 ตัวอักษร (สร้างในขั้นที่ 5)
 
-ก่อนสร้าง cron job ในขั้นนี้ คุณต้องมี 2 อย่างนี้พร้อม:
+### 4.3 สร้าง Cron Jobs ทั้ง 7 รายการ
+ในแดชบอร์ด cron-job.org คลิก **CREATE CRONJOB** สำหรับแต่ละรายการ:
 
-| สิ่งที่ต้องมี | รูปแบบ | หาจากไหน |
-|--------------|--------|---------|
-| **URL เว็บคุณ** | `https://<ชื่อโปรเจกต์>.vercel.app` | ได้จากขั้นที่ 6 (หลัง deploy) |
-| **CRON_SECRET** | สตริง ≥ 16 ตัว | สร้างเองในขั้น 5.3 |
+| # | ชื่อ Job | URL Path | Schedule | คำอธิบายงาน |
+|---|---|---|---|---|
+| 1 | `close-stale` | `/api/cron/close-stale` | `0 8 * * *` | ปิดเคสที่เสร็จสิ้น (done) เกิน 7 วัน (ทุกวัน เวลา 08:00) |
+| 2 | `cleanup-hashes` | `/api/cron/cleanup-hashes` | `30 8 * * *` | ลบ hash ป้องกันสแปมที่หมดอายุ (ทุกวัน เวลา 08:30) |
+| 3 | `cleanup-audit-logs` | `/api/cron/cleanup-audit-logs` | `0 2 * * *` | ลบประวัติ Audit Logs ที่เก่ากว่ากำหนด (ทุกวัน เวลา 02:00) |
+| 4 | `stats-refresh` | `/api/cron/stats-refresh` | `0 9 * * *` | อัปเดตตารางสถิติสรุปรายวัน (ทุกวัน เวลา 09:00) |
+| 5 | `broadcast-send` | `/api/cron/broadcast-send` | `*/30 * * * *` | ตรวจสอบและส่ง LINE Broadcast ที่ตั้งเวลาไว้ (ทุก 30 นาที) |
+| 6 | `rich-menu-display` | `/api/cron/rich-menu-display` | `0 * * * *` | สลับเปิด/ปิด Rich Menu อัตโนมัติตามช่วงเวลา (ทุก 1 ชั่วโมง) |
+| 7 | `ping` | `/api/cron/ping` | `*/15 * * * *` | ตรวจสอบความพร้อมทำงานของระบบ (ทุก 15 นาที) |
 
-> ⚠️ **สำคัญ**: ขั้นนี้จะทำได้ **หลัง deploy เว็บขึ้น Vercel แล้ว** เพราะต้องใช้ URL เว็บจริง
-> → ถ้ายังไม่ได้ deploy ให้ **ข้ามไปขั้นที่ 5 ก่อน** แล้วกลับมาทำขั้น 4 นี้ภายหลัง
-
-### 4.3 สร้าง Cron Job ทั้ง 4 ตัว
-
-เว็บระบบเรามี **งานอัตโนมัติ 4 อย่าง** ที่ต้องตั้งใน cron-job.org ทำซ้ำ 4 รอบ เปลี่ยนแค่ URL + schedule:
-
-**วิธีสร้างแต่ละ job:**
-1. ในแดชบอร์ด cron-job.org คลิก **CREATE CRONJOB**
-2. กรอกรายละเอียดตามตารางด้านล่าง
-3. คลิก **CREATE** ท้ายหน้า
-
-**📝 ข้อมูลที่ต้องกรอก (เหมือนทุก job ยกเว้นช่อง Title/URL/Schedule):**
-
-| ช่อง | ค่าที่กรอก |
-|-----|---------|
-| **Title** | (ตามตารางด้านล่าง) |
-| **URL** | `https://<URL-เว็บคุณ><path>` (ตามตาราง) |
-| **Execution Schedule** | เลือก **Schedule** (ไม่ใช่ Every 5 minutes) → ใส่ expression (ตามตาราง) |
-| **Request Method** | **GET** |
-| **Request Headers** | คลิก **+ Add Notification** หรือขยายส่วน Headers → เพิ่ม header:<br>• Name: `Authorization`<br>• Value: `Bearer <CRON_SECRET-ของคุณ>` |
-| **Notifications** (optional) | ติ๊ก **Notify on failure** + ใส่อีเมล ระบบจะเมล์แจ้งเมื่อ cron ล้มเหลว |
-
-**4 jobs ที่ต้องสร้าง:**
-
-| # | Title | URL Path | Schedule | หน้าที่ |
-|---|-------|----------|----------|---------|
-| 1 | `close-stale` | `/api/cron/close-stale` | `0 8 * * *` | ปิดเคสที่ done เกิน 7 วัน (08:00 ทุกวัน) |
-| 2 | `cleanup-hashes` | `/api/cron/cleanup-hashes` | `30 8 * * *` | ลบ dedup hash หมดอายุ (08:30 ทุกวัน) |
-| 3 | `stats-refresh` | `/api/cron/stats-refresh` | `0 9 * * *` | อัปเดตสถิติรายวัน (09:00 ทุกวัน) |
-| 4 | `ping` | `/api/cron/ping` | `*/15 * * * *` | Health check ทุก 15 นาที |
-
-> 🕐 **เวลา**: schedule ใช้เขตเวลา **เว็บที่คุณตั้ง** (cron-job.org รับค่าเขตเวลาจาก browser) → เลขด้านบน = เวลาไทย
->
-> 🧩 **ไวยากรณ์ cron**: `* * * * *` = `นาที ชั่วโมง วัน เดือน วันในสัปดาห์`
-> - `0 8 * * *` = 08:00 ทุกวัน
-> - `*/15 * * * *` = ทุก 15 นาที
-
-### 4.4 ตัวอย่างการกรอก job แรก (close-stale)
-
-```
-Title:           close-stale
-URL:             https://huangua-citizen-help.vercel.app/api/cron/close-stale
-Schedule:        0 8 * * *
-Request Method:  GET
-Headers:
-  Authorization: Bearer AbCdEf1234567890YOUR_CRON_SECRET
-```
-
-> ✅ **ตรวจสอบก่อน SAVE**: header Authorization ต้องมีคำว่า `Bearer ` (มีเว้นวรรค) นำหน้า CRON_SECRET เสมอ
-
-### 4.5 ทดสอบว่าแต่ละ job ทำงาน
-
-หลังสร้างครบ 4 jobs แล้ว:
-1. ในรายการ cron jobs จะเห็นทั้ง 4 ตัว
-2. คลิก job → กดปุ่ม **Run** (หรือ "Run now") เพื่อทดสอบทันที
-3. ส่วน **Last Execution** ควรขึ้น **Success** (หรือ 2xx)
-4. ❌ ถ้าขึ้น **401** = `CRON_SECRET` ผิด / ลืมใส่ `Bearer `
-5. ❌ ถ้าขึ้น **404** = URL ผิด / เว็บยังไม่ deploy
-
-> 💡 **เคล็ดลับ**: cron-job.org มีประวัติการรัน 20 ครั้งล่าสุดต่อ job → ดูได้ว่าแต่ละครั้งสำเร็จหรือไม่
+**การตั้งค่าในแต่ละ Job:**
+1. **URL:** `https://<URL-เว็บของคุณ><URL Path>`
+2. **Request Method:** ต้องเลือก **`GET`** เท่านั้น
+3. **Request Headers:**
+   - Name: `Authorization`
+   - Value: `Bearer <CRON_SECRET-ของคุณ>` (มีคำว่า `Bearer ` นำหน้า)
+4. **Schedule:** เลือกตามตารางด้านบน
 
 ---
 
-## 5️⃣ ขั้นที่ 5: สร้างรหัสลับ 3 ตัว
+## ขั้นที่ 5: สร้างรหัสลับความปลอดภัย 4 รายการ
 
-ระบบเราต้องใช้รหัสลับอีก 3 ตัวที่เรา **สร้างเอง** ด้วยเครื่องมือออนไลน์ (ไม่ต้องเขียนโค้ด):
+สร้างสตริงสุ่มยาว ๆ แต่ละตัวไม่ซ้ำกัน (ห้ามใช้ค่าเดียวกัน):
 
-### 5.1 AUTH_SECRET (รหัสเข้ารหัส session ของเจ้าหน้าที่)
+### 5.1 AUTH_SECRET (เซ็น session และ JWT ของเจ้าหน้าที่)
+- ความยาว: >= 32 ตัวอักษร
+- สร้างผ่าน Terminal: `openssl rand -base64 32`
 
-1. เปิดเว็บ **https://generate-secret.vercel.app/32** หรือ **https://randomkeygen.com** (เลือก 50 random characters)
-2. คัดลอกสตริงที่ได้ (ต้องยาว **≥ 32 ตัวอักษร**)
-3. 📝 จดชื่อ `AUTH_SECRET`
+### 5.2 CID_HMAC_KEY (เข้ารหัสเลขบัตรประชาชน 13 หลัก ตาม PDPA)
+- ความยาว: >= 32 ตัวอักษร
+- สร้างผ่าน Terminal: `openssl rand -base64 32`
 
-> 💡 **ทางเลือก**: ถ้าคุณมี Command Prompt / Terminal พิมพ์ `openssl rand -base64 32` (Enter) จะได้สตริงยาว ๆ ออกมา
+### 5.3 LINE_ID_HMAC_KEY (เข้ารหัสสร้างนามแฝง LINE ID ตาม PDPA)
+- ความยาว: >= 32 ตัวอักษร (ห้ามใช้ค่าเดียวกับ CID_HMAC_KEY)
+- สร้างผ่าน Terminal: `openssl rand -base64 32`
 
-### 5.2 CID_HMAC_KEY (รหัสเข้ารหัสเลขบัตรประชาชน เพื่อความปลอดภัย)
-
-1. ใช้เครื่องมือเดียวกับขั้นบน สร้างสตริงยาว **≥ 32 ตัวอักษร**
-2. 📝 จดชื่อ `CID_HMAC_KEY`
-
-### 5.3 CRON_SECRET (รหัสยืนยันตัวตนสำหรับงานอัตโนมัติ)
-
-1. สร้างสตริงยาว **≥ 16 ตัวอักษร**
-2. 📝 จดชื่อ `CRON_SECRET`
+### 5.4 CRON_SECRET (ยืนยันตัวตนงานอัตโนมัติจาก cron-job.org)
+- ความยาว: >= 16 ตัวอักษร
+- สร้างผ่าน Terminal: `openssl rand -hex 16`
 
 ---
 
-## 6️⃣ ขั้นที่ 6: สมัคร Vercel และตั้งค่าเริ่มต้น
-
-Vercel คือบริการที่ **ทำให้เว็บออนไลน์** ให้คนเข้าได้
+## ขั้นที่ 6: สมัคร Vercel และตั้งค่า Environment Variables
 
 ### 6.1 สมัคร Vercel
+1. เปิดเว็บ **https://vercel.com** -> ล็อกอินด้วย GitHub
+2. คลิก **Add New... -> Project** -> เลือก Import โปรเจกต์ `huangua-citizen-help`
 
-1. เปิดเว็บ **https://vercel.com**
-2. คลิก **Sign Up** → **Continue with GitHub** (ใช้บัญชี GitHub)
-3. อนุญาตให้ Vercel เข้าถึง GitHub
+### 6.2 กรอก Environment Variables ใน Vercel
+ในหน้า Configure Project ขยายส่วน **Environment Variables** แล้วเพิ่มค่าทั้งหมด:
 
-### 6.2 นำเข้าโปรเจกต์ (Import)
+| Key | Value ตัวอย่าง | ที่มา |
+|---|---|---|
+| `DATABASE_URL` | `postgresql://postgres.xxx:[PW]@...pooler.supabase.com:6543/postgres` | ขั้นที่ 2.3 (พอร์ต 6543) |
+| `UPSTASH_REDIS_REST_URL` | `https://xxx.upstash.io` | ขั้นที่ 3.3 |
+| `UPSTASH_REDIS_REST_TOKEN` | สตริง token จาก Upstash | ขั้นที่ 3.3 |
+| `AUTH_SECRET` | สตริงสุ่ม >= 32 ตัวอักษร | ขั้นที่ 5.1 |
+| `CID_HMAC_KEY` | สตริงสุ่ม >= 32 ตัวอักษร | ขั้นที่ 5.2 |
+| `LINE_ID_HMAC_KEY` | สตริงสุ่ม >= 32 ตัวอักษร | ขั้นที่ 5.3 |
+| `CRON_SECRET` | สตริงสุ่ม >= 16 ตัวอักษร | ขั้นที่ 5.4 |
+| `AUTH_URL` | `https://<ชื่อโปรเจกต์>.vercel.app` (หรือใส่ชั่วคราวก่อน) | ขั้นที่ 6 |
+| `S3_ENDPOINT` | `https://<project-ref>.supabase.co/storage/v1/s3` | ขั้นที่ 2.4 |
+| `S3_REGION` | `ap-southeast-1` | ขั้นที่ 2.4 |
+| `S3_BUCKET` | `media` | ขั้นที่ 2.4 |
+| `S3_ACCESS_KEY_ID` | Access key จาก Supabase | ขั้นที่ 2.4 |
+| `S3_SECRET_ACCESS_KEY` | Secret key จาก Supabase | ขั้นที่ 2.4 |
+| `LINE_CHANNEL_SECRET` | Channel secret จาก LINE Developers | ตัวเลือกเสริม (LINE OA) |
+| `LINE_CHANNEL_ACCESS_TOKEN` | Access token จาก LINE Developers | ตัวเลือกเสริม (LINE OA) |
+| `NEXT_PUBLIC_LIFF_ID` | LIFF ID จาก LINE Developers | ตัวเลือกเสริม (LINE LIFF) |
 
-1. คลิก **Add New...** → **Project**
-2. ในส่วน "Import Git Repository" จะเห็นโปรเจกต์ `huangua-citizen-help` ของคุณ
-3. คลิก **Import**
-4. **ห้ามคลิก Deploy ทันที!** ⚠️ — ต้องตั้งค่า Environment Variables ก่อน (ขั้น 6.3)
-
-### 6.3 ตั้งค่า Environment Variables (สำคัญที่สุด)
-
-ในหน้า Configure Project ให้หาส่วน **Environment Variables** แล้วเพิ่มตัวแปรทีละตัว:
-
-> 💡 คลิกปุ่มเครื่องหมายบวก (+) เพื่อเพิ่มแถวใหม่
-
-เติมค่าตามที่คุณจดไว้ในขั้นก่อน ๆ:
-
-| Name (ชื่อ) | Value (ค่า) | มาจากขั้นที่ |
-|------|------|------|
-| `DATABASE_URL` | (ลิงก์ connection string จาก Supabase ขั้น 2.3) | 2️⃣ |
-| `UPSTASH_REDIS_REST_URL` | (จาก Upstash Redis ขั้น 3.3) | 3️⃣ |
-| `UPSTASH_REDIS_REST_TOKEN` | (จาก Upstash Redis ขั้น 3.3) | 3️⃣ |
-| `AUTH_SECRET` | (สร้างเอง ขั้น 5.1) | 5️⃣ |
-| `CID_HMAC_KEY` | (สร้างเอง ขั้น 5.2) | 5️⃣ |
-| `CRON_SECRET` | (สร้างเอง ขั้น 5.3) | 5️⃣ |
-| `AUTH_URL` | `https://ชื่อโปรเจกต์ของคุณ.vercel.app` *(เดี๋ยวแก้ในขั้น 7.1)* | - |
-
-> ⚠️ **สำคัญมาก**: ทุกค่าต้อง **ไม่** มีคำว่า `YOUR_` หรือ `CHANGE_ME` ข้างหน้า ระบบจะตรวจสอบและบล็อกการ deploy ถ้าค่ายังเป็นตัวอย่าง
-
-### 6.4 Deploy ครั้งแรก
-
-1. คลิกปุ่ม **Deploy** (สีน้ำเงิน)
-2. รอประมาณ 3–5 นาที ระบบจะ build อัตโนมัติ
-3. ถ้าสำเร็จ จะขึ้นข้อความ **Congratulations** และได้ลิงก์เว็บ เช่น `https://huangua-citizen-help.vercel.app`
-4. 📝 **จดลิงก์นี้** — คือเว็บไซต์ของคุณ!
-
-> ❌ **ถ้าขึ้น Error**: ดูส่วน **🔧 แก้ปัญหา** ด้านล่าง ส่วนใหญ่เกิดจากกรอก env var ผิด
+### 6.3 Deploy ครั้งแรก
+1. คลิกปุ่ม **Deploy**
+2. รอประมาณ 2-3 นาทีจนขึ้นข้อความสำเร็จ
+3. จดบันทึกโดเมนที่ได้ เช่น `https://huangua-citizen-help.vercel.app`
 
 ---
 
-## 7️⃣ ขั้นที่ 7: แก้ AUTH_URL และสร้างตารางฐานข้อมูล
+## ขั้นที่ 7: อัปเดต AUTH_URL และเตรียมฐานข้อมูล (Database Push & Seed)
 
-หลัง deploy สำเร็จ ต้องทำขั้นนี้ให้ครบ ไม่งั้นเว็บจะใช้งานไม่ได้จริง
+### 7.1 อัปเดต AUTH_URL ให้ตรงกับโดเมนจริง
+1. ใน Vercel ไปที่ **Settings -> Environment Variables**
+2. แก้ไข `AUTH_URL` เป็น URL เว็บจริง เช่น `https://huangua-citizen-help.vercel.app` (ห้ามมี `/` ปิดท้าย)
+3. ไปที่แท็บ **Deployments** -> คลิกปุ่มจุด 3 จุด -> **Redeploy**
 
-### 7.1 แก้ค่า AUTH_URL ให้เป็นโดเมนจริง
-
-1. ในแดชบอร์ด Vercel คลิกชื่อโปรเจกต์
-2. ไปที่ **Settings** → **Environment Variables**
-3. หา `AUTH_URL` → แก้ค่าเป็นลิงก์เว็บจริงของคุณ เช่น `https://huangua-citizen-help.vercel.app`
-   - ❌ ห้ามมี `/` ปิดท้าย
-   - ❌ ห้ามใช้ `http://localhost`
-4. คลิก **Save**
-
-### 7.2 Redeploy ใหม่
-
-1. ไปที่แท็บ **Deployments**
-2. คลิกจุด 3 จุด (⋮) ข้าง deployment ล่าสุด → **Redeploy** → **Redeploy**
-3. รอ 2–3 นาที
-
-### 7.3 สร้างตารางฐานข้อมูล (สำคัญมาก!)
-
-> ตอนนี้ฐานข้อมูลใน Supabase **ยังว่างเปล่า** ต้องสร้างตารางก่อน ไม่งั้นเว็บจะ error เมื่อประชาชนส่งเรื่อง
-
-**วิธี A — ง่ายสุด ใช้หน้าเว็บ Supabase (แนะนำสำหรับมือใหม่):**
-
-1. กลับไปที่เว็บ **Supabase** → เปิด project ของคุณ
-2. ไปที่เมนู **SQL Editor** (แถบซ้าย)
-3. คลิก **New query**
-4. replay ไฟล์ migration **ทุกไฟล์ตาม `drizzle/meta/_journal.json`** (source of truth — นับไฟล์จริงจาก journal ตอนทำ อย่ายึดตัวเลขใน docs เพราะ migration เพิ่มได้ทุก PR) ตามลำดับ `idx`/`tag` ใน journal ทีละไฟล์ query เดียว แยกไฟล์เพื่อให้เจอไฟล์พังทันที รวมหลายไฟล์ใน query เดียวหาตัวพังไม่เจอ
-5. วิธีรันแต่ละไฟล์: เปิดไฟล์จากโฟลเดอร์โปรเจกต์ด้วย Notepad/VS Code → คัดลอกเนื้อหาทั้งหมด → วางในช่อง SQL Editor → คลิกปุ่ม **Run** ด้านล่าง
-6. **กรณีรันค้างไว้แล้ว (resume)**: เช็ค state prod ก่อนว่าถึงไฟล์ไหนแล้ว แล้วรันต่อจากไฟล์ถัดไป ห้ามรันไฟล์เดิมซ้ำ (SQL ไม่มี `IF NOT EXISTS` — รันซ้ำ error)
-   ```sql
-   -- ดูว่า users มีคอลัมน์ password_version หรือยัง (migration 0018)
-   SELECT column_name FROM information_schema.columns
-   WHERE table_name = 'users' AND column_name = 'password_version';
-   -- มีแถว = รัน 0018 แล้ว ข้ามไปไฟล์ถัดไป / ไม่มีแถว = ยังไม่รัน รัน 0018
-   -- ดูว่ามีตาราง tier_roles หรือยัง (migration 0019)
-   SELECT tablename FROM pg_tables WHERE tablename = 'tier_roles';
-   ```
-7. ✅ รันครบทุกไฟล์ใน journal จะขึ้น "Success. No rows returned" ทุกไฟล์ — แต่นั่นยังไม่พิสูจน์ว่า schema ครบ ต้องทำ post-check ข้างล่างต่อ
-8. **post-check หลัง replay ทุกครั้ง** (รันใน SQL Editor):
-   ```sql
-   -- ต้องได้ 1 แถวทั้งคู่ ไม่งั้น migration ขาด
-   SELECT column_name FROM information_schema.columns
-   WHERE table_name = 'users' AND column_name = 'password_version';
-   SELECT tablename FROM pg_tables WHERE tablename IN ('tier_roles', 'queue_bookings');
-   ```
-   แล้วลองล็อกอิน `/admin` จริง — เข้าได้ = schema ครบ เข้าไม่ได้ = กลับไปดูไฟล์ที่ข้าม
-
-> 💡 **วิธี B — สำหรับผู้ที่มี Node.js** (ทางเลือก):
-> ```bash
-> # ในโฟลเดอร์โปรเจกต์ หลังตั้ง DATABASE_URL ใน .env.local แล้ว
-> pnpm install
-> pnpm db:push
-> ```
-
-### 7.4 เพิ่มบัญชีเจ้าหน้าที่ (Superadmin) ตัวแรก
-
-> ต้องมีบัญชีเจ้าหน้าที่อย่างน้อย 1 บัญชี ถึงจะเข้าส่วน admin ได้
-
-**วิธี A — ใช้ SQL Editor ของ Supabase:**
-
-1. ใน SQL Editor ของ Supabase วางโค้ดด้านล่าง (แก้อีเมล + ชื่อให้เป็นของคุณ):
-
-```sql
--- สร้างแผนกตัวอย่างก่อน
-INSERT INTO departments (id, name, slug, is_active)
-VALUES ('dept-001', 'สำนักปลัด', 'clerk', true)
-ON CONFLICT (slug) DO NOTHING;
-
--- ⚠️ ต้องสร้าง password hash แล้วมาแทนที่ $2a$... (ดูคำอธิบายด้านล่าง)
-INSERT INTO users (id, email, role, department_id, is_active, full_name, password_hash)
-VALUES (
-  'user-001',
-  'admin@huangua.go.th',
-  'superadmin',
-  'dept-001',
-  true,
-  'ผู้ดูแลระบบ',
-  '$2a$10$REPLACE_WITH_REAL_BCRYPT_HASH'
-);
-```
-
-> ⚠️ **สำคัญ**: ค่า `password_hash` ด้านบนเป็น dummy — ต้องแทนด้วย bcrypt hash จริง ของรหัสผ่านที่คุณตั้ง
->
-> **วิธีสร้าง bcrypt hash (บนเครื่องตัวเองเท่านั้น — ห้ามเอารหัสผ่านไปกรอกเว็บนอก)**:
-> ```bash
-> # ในโฟลเดอร์โปรเจกต์ (มี bcryptjs ใน dependencies อยู่แล้ว)
-> node -e "require('bcryptjs').hash('รหัสผ่านของคุณ', 10).then(console.log)"
-> ```
-> คัดลอกเฉพาะ hash ที่ได้ (ขึ้นต้น `$2a$10$...` ยาว ~60 ตัวอักษร) ไปแทนที่ใน SQL หลังเสร็จลบรหัสผ่านออกจาก terminal history/clipboard
->
-> **ก่อนกด Run เช็ค 2 ข้อ**: (1) ไม่มีคำว่า `REPLACE_` หลงเหลือ (ลืมแทน = INSERT ผ่านแต่ล็อกอินไม่เคยได้) (2) hash ขึ้นต้น `$2a$`/`$2b$` และยาว ~60 ตัวอักษร
-
-2. แก้ค่าในโค้ดให้เป็นของคุณ (อีเมล, ชื่อ, password_hash)
-3. คลิก **Run**
-4. ✅ ตอนนี้คุณมีบัญชีเจ้าหน้าที่สำหรับล็อกอินเข้า `/admin` แล้ว
-
-> 💡 **วิธี B — สำหรับผู้ที่มี Node.js**: `pnpm db:seed` (รันสคริปต์ seed ที่มีข้อมูลตัวอย่าง)
-
----
-
-## 8️⃣ ขั้นที่ 8: ตรวจสอบว่าใช้งานได้จริง ✅
-
-หลังทำทุกอย่างเสร็จ ทดสอบดังนี้:
-
-### 8.1 ทดสอบหน้าประชาชน
-
-1. เปิดลิงก์เว็บของคุณ เช่น `https://huangua-citizen-help.vercel.app`
-2. ✅ ควรเห็นหน้าแรกของระบบรับเรื่องร้องเรียน
-3. ลองกดเข้าหน้า "แจ้งเรื่อง" → กรอกทดสอบ → ส่ง
-   - ✅ ถ้าขึ้นว่า "ส่งสำเร็จ" = ฐานข้อมูลทำงานปกติ
-   - ❌ ถ้าขึ้น error = ตรวจสอบตารางฐานข้อมูล (ขั้น 7.3)
-
-### 8.2 ทดสอบหน้าเจ้าหน้าที่
-
-1. เปิดลิงก์ `/admin/login` เช่น `https://huangua-citizen-help.vercel.app/admin/login`
-2. ลอกอินด้วยบัญชีที่สร้างในขั้น 7.4
-3. ✅ ควรเข้าสู่หน้า admin ได้ และเห็นเคสทดสอบที่ส่งในขั้น 8.1
-
-### 8.3 ทดสอบงานอัตโนมัติ (Cron)
-
-งานอัตโนมัติของเรา **รันผ่าน cron-job.org** ไม่ใช่ Vercel:
-
-1. ไปที่เว็บ **https://cron-job.org** → เข้าสู่ระบบ
-2. ✅ ควรเห็น 4 jobs: `close-stale`, `cleanup-hashes`, `stats-refresh`, `ping`
-3. คลิกแต่ละ job → ดูคอลัมน์ **Last Execution** ควรขึ้นสีเขียว (**Success**)
-4. กดปุ่ม **Run** ในแต่ละ job เพื่อทดสอบทันที → ดูผลลัพธ์
-5. ❌ ถ้าขึ้น **401** = ลืมใส่ `Bearer ` หรือ CRON_SECRET ผิด
-6. ❌ ถ้าขึ้น **404** = URL ผิด / เว็บยังไม่ deploy
-
----
-
-## 🔧 แก้ปัญหาที่พบบ่อย (Troubleshooting)
-
-### ❌ ปัญหา: Deploy ล้มเหลว / Build Error
-
-**อาการ**: ใน Vercel ขึ้น "Build Failed" หรือมี error สีแดง
-
-**วิธีแก้**:
-1. ดู error log ในหน้า Build ของ Vercel (คลิกที่ deployment ที่ fail)
-2. ส่วนใหญ่เกิดจาก **ตัวแปรสภาพแวดล้อมผิด** — ตรวจสอบ:
-   - ทุกค่าต้องไม่มี `YOUR_` หรือ `CHANGE_ME` นำหน้า
-   - `AUTH_SECRET` ≥ 32 ตัวอักษร
-   - `CID_HMAC_KEY` ≥ 32 ตัวอักษร
-   - `CRON_SECRET` ≥ 16 ตัวอักษร
-   - `UPSTASH_REDIS_REST_TOKEN` ≥ 16 ตัวอักษร
-   - `QSTASH_TOKEN` ≥ 16 ตัวอักษร
-3. แก้แล้ว Redeploy ใหม่
-
-### ❌ ปัญหา: เว็บขาว / หน้า error 500
-
-**สาเหตุที่พบบ่อย**: ยังไม่ได้สร้างตารางฐานข้อมูล
-
-**วิธีแก้**: ทำตาม **ขั้น 7.3** อีกครั้ง — รัน SQL ใน Supabase
-
-### ❌ ปัญหา: ล็อกอินเข้า /admin ไม่ได้
-
-**สาเหตุ**: ยังไม่มีบัญชีเจ้าหน้าที่ หรือรหัสผ่านผิด
-
-**วิธีแก้**:
-1. ทำตาม **ขั้น 7.4** สร้างบัญชี superadmin ตัวแรก
-2. ตรวจสอบว่าใช้ bcrypt hash จริง (ไม่ใช่รหัสผ่าน plain text)
-3. ตรวจสอบว่า `AUTH_URL` ตรงกับลิงก์เว็บจริง (ขั้น 7.1)
-
-### ❌ ปัญหา: ส่งเรื่องร้องเรียนไม่สำเร็จ / สแปม
-
-**สาเหตุ**: Upstash Redis ตั้งค่าผิด
-
-**วิธีแก้**:
-1. ตรวจสอบ `UPSTASH_REDIS_REST_URL` และ `UPSTASH_REDIS_REST_TOKEN` ใน Vercel
-2. ลองทดสอบด้วยคำสั่งใน terminal (ถ้ามี):
-   ```bash
-   curl -X POST "$UPSTASH_REDIS_REST_URL/ping" -H "Authorization: Bearer $UPSTASH_REDIS_REST_TOKEN"
-   ```
-   ถ้าได้ `{"result":"PONG"}` = ใช้ได้
-
-### ❌ ปัญหา: Cron Jobs ไม่ทำงาน (cron-job.org)
-
-**อาการ**: ใน cron-job.org ส่วน Last Execution ขึ้นสีแดง (4xx/5xx) หรือไม่มีประวัติเลย
-
-**วิธีแก้** — ตรวจตามลำดับ:
-
-1. **เช็คว่า job เปิดอยู่**: ในรายการ cron jobs ต้องมีจุดสีเขียว (Active) ไม่ใช่สีเทา (Paused)
-2. **เช็ค `CRON_SECRET`**:
-   - ค่าใน cron-job.org (header Authorization) ต้องตรงกับค่าใน Vercel
-   - ต้องมีคำว่า `Bearer ` (มีเว้นวรรค) นำหน้าเสมอ: `Bearer AbCd123...`
-3. **เช็ค URL**: ต้องเป็น `https://<ชื่อเว็บ>.vercel.app/api/cron/...` (ห้ามลืม `https://`)
-4. **เช็ค AUTH_URL**: ใน Vercel ต้องเป็น URL เว็บจริง ไม่ใช่ `localhost` (ขั้น 7.1)
-5. **เช็คเขตเวลา**: schedule ใน cron-job.org ใช้เขตเวลา browser — ถ้าผิดจะรันเวลาผิด
-6. **กด "Run now"** ในแต่ละ job เพื่อทดสอบทันที แล้วดู response code
-
-> รหัสผิดพลาดที่พบบ่อย:
-> - `401 Unauthorized` → CRON_SECRET ผิด / ลืม `Bearer `
-> - `404 Not Found` → URL/path ผิด
-> - `500` / `502` → เว็บ error ดู Vercel logs (ขั้น 7.3 อาจลืมสร้างตารางฐานข้อมูล)
-
----
-
-## 📞 ติดต่อ / ขอความช่วยเหลือ
-
-หากทำตามคู่มือแล้วยังติดปัญหา ให้เตรียมข้อมูลต่อไปนี้ก่อนติดต่อผู้ดูแลระบบ:
-
-1. **ลิงก์ deployment ที่ error** ใน Vercel (URL ของหน้า build log)
-2. **ภาพหน้าจอ** ของ error message
-3. **ขั้นที่คุณทำถึง** เมื่อเกิดปัญหา
-
----
-
-## 🛡️ ความปลอดภัย: ข้อควรจำตลอด
-
-| ห้ามทำ ❌ | ให้ทำ ✅ |
-|----------|---------|
-| ส่งรหัสผ่าน/คีย์ทาง LINE/อีเมล | เก็บไว้ในเครื่องเท่านั้น (เช่นโปรแกรมจดรหัสผ่าน) |
-| แชร์บัญชี GitHub/Supabase ร่วมกัน | ใช้บัญชีเฉพาะของแต่ละคน |
-| ตั้งรหัสผ่านง่าย เช่น `12345678` | ตั้งรหัสแรง ผสมตัวอักษร-ตัวเลข-สัญลักษณ์ |
-| Commit ไฟล์ `.env` ขึ้น GitHub | เก็บ `.env` ไว้ในเครื่อง (ถูก ignore อยู่แล้ว) |
-| เผยแพร่ลิงก์ admin สู่สาธารณะ | เก็บลิงก์ `/admin` เป็นความลับ |
-
----
-
-## 📚 ภาคผนวก: รายการไฟล์/คำสั่งสำคัญ (สำหรับผู้ดูแล)
-
-### ไฟล์ตั้งค่าที่สำคัญ
-- `.env.example` — ตัวอย่างรายการตัวแปรทั้งหมด
-- `.env.local` — ค่าจริงสำหรับใช้ในเครื่อง (ถูก .gitignore)
-- `vercel.json` — ตั้งค่า Vercel (region, install command) — **ไม่มี crons** แล้ว เพราะใช้ cron-job.org
-- `drizzle.config.ts` — ตั้งค่าฐานข้อมูล + ORM
-- `scripts/verify-env.ts` — ตรวจสอบ env vars ครบถ้วนตอน build
-
-### คำสั่งที่ใช้บ่อย (สำหรับคนที่มี Node.js)
+### 7.2 นำโครงสร้างตารางเข้าสู่ฐานข้อมูล (Schema Push)
+รันคำสั่งจาก Terminal บนเครื่องคอมพิวเตอร์ของคุณ (ตรวจสอบว่า `.env.local` ชี้ไปยัง Supabase):
 ```bash
-pnpm install              # ลง dependencies
-pnpm dev                  # รันเว็บในเครื่อง (สำหรับทดสอบ)
-pnpm build                # build production
-pnpm verify-env           # ตรวจสอบ env vars ครบไหม
-pnpm db:push              # อัปเดมตารางฐานข้อมูล (เมื่อมีการเปลี่ยน schema)
-pnpm db:seed              # เพิ่มข้อมูลตัวอย่าง
-pnpm db:studio            # เปิดเครื่องมือดู/แก้ข้อมูลในฐานข้อมูล
+npx drizzle-kit push
 ```
 
-### ตัวแปรทั้งหมดที่ต้องตั้งใน Vercel (รวม 7 ตัว)
-1. `AUTH_SECRET` (≥32)
-2. `AUTH_URL` (https://... เว็บจริง)
-3. `DATABASE_URL` (connection string จาก Supabase)
-4. `UPSTASH_REDIS_REST_URL`
-5. `UPSTASH_REDIS_REST_TOKEN` (≥16)
-6. `CID_HMAC_KEY` (≥32)
-7. `CRON_SECRET` (≥16)
+### 7.3 ใส่ข้อมูลตั้งต้นของระบบ (Seed Data)
+รันคำสั่งตามลำดับดังต่อไปนี้:
+```bash
+# 1. ข้อมูลหน่วยงาน หมวดหมู่เรื่อง และบัญชี Superadmin ตัวแรก
+npx tsx scripts/seed.ts
 
-> 📌 **ไม่ต้องตั้ง `QSTASH_*` อีกต่อไป** — ระบบเปลี่ยนไปใช้ cron-job.org ตรวจสอบผ่าน `CRON_SECRET` (header Authorization) แทนการ verify signature ของ QStash
+# 2. ข้อมูลจังหวัด อำเภอ และตำบล
+npx tsx scripts/seed-geodata.ts
 
-### Cron Jobs ทั้ง 4 ตัว (ตั้งใน cron-job.org)
-| Path | Schedule | หน้าที่ |
-|------|----------|---------|
-| `/api/cron/close-stale` | `0 8 * * *` | ปิดเคสที่ done เกิน 7 วัน |
-| `/api/cron/cleanup-hashes` | `30 8 * * *` | ลบ dedup hash หมดอายุ |
-| `/api/cron/stats-refresh` | `0 9 * * *` | อัปเดตสถิติรายวัน |
-| `/api/cron/ping` | `*/15 * * * *` | Health check ทุก 15 นาที |
+# 3. ข้อมูลหมู่บ้านทั่วประเทศ
+npx tsx scripts/seed-villages.ts
+
+# 4. ข้อมูล Intent สำหรับแชตบอทตอบคำถามอัตโนมัติ
+npx tsx scripts/seed-faq.ts
+```
 
 ---
 
-## ✅ Checklist สรุปก่อนใช้งานจริง
+## ขั้นที่ 8: ตรวจสอบความพร้อมก่อนเปิดใช้งานจริง (Pre-Flight Verification)
 
-ก่อนประกาศให้ประชาชนใช้ ให้ตรวจสอบว่า:
+ก่อนเปิดให้ประชาชนและเจ้าหน้าที่เข้าใช้งานจริง ให้รันเครื่องมือตรวจสอบอัตโนมัติ:
 
-- [ ] Deploy สำเร็จ (ขึ้น Congratulations ใน Vercel)
-- [ ] ตั้ง `AUTH_URL` เป็นลิงก์เว็บจริงแล้ว และ Redeploy แล้ว
-- [ ] replay migration ทุกไฟล์ตาม `drizzle/meta/_journal.json` (นับไฟล์จริงจาก journal ตอนทำ) ตามลำดับ `idx` ใน Supabase แล้ว + post-check `password_version`/`tier_roles` ผ่าน + ล็อกอิน `/admin` ได้
-- [ ] สร้างบัญชีเจ้าหน้าที่ superadmin อย่างน้อย 1 บัญชี
-- [ ] ทดสอบส่งเรื่องร้องเรียนผ่านหน้าประชาชน สำเร็จ
-- [ ] ทดสอบล็อกอินเข้า `/admin` เห็นเคสที่ส่ง สำเร็จ
-- [ ] สร้าง cron jobs ครบ 4 ตัวใน **cron-job.org** แล้ว
-- [ ] กด **Run** ใน cron-job.org ทุก job แล้ว Last Execution ขึ้นสีเขียว
-- [ ] ทดสอบบนมือถือ (เปิดลิงก์ในโทรศัพท์) ใช้งานได้ปกติ
-- [ ] เก็บรหัสผ่าน/คีย์ทั้งหมดไว้ในที่ปลอดภัย
+### 8.1 ตรวจสอบข้อมูลตั้งต้นในฐานข้อมูล
+```bash
+npx tsx scripts/verify-seed-data.ts
+```
+ผลลัพธ์ที่ถูกต้องควรขึ้นสถานะ `[PASS]` ครบทุกส่วน (Superadmin, Departments, Categories, Geodata, Villages)
+
+### 8.2 ตรวจสอบความพร้อมของระบบภายนอก (Pre-Flight Check)
+```bash
+npx tsx scripts/verify-production.ts
+```
+สคริปต์จะทำการทดสอบ:
+- สัญญาตัวแปรสภาพแวดล้อม (Environment Contract)
+- การเชื่อมต่อ PostgreSQL และวัด Latency
+- การเชื่อมต่อ Upstash Redis
+- การเชื่อมต่อ S3 Storage
+- การเชื่อมต่อ LINE Messaging API และสถานะ LIFF
+- ตรวจสอบความปลอดภัยของ Cron Endpoints ทั้ง 7 ตัว (ยิง ping สำเร็จ และ endpoints อื่นติด guard 401 ปลอดภัย)
 
 ---
 
-> 🎉 **ยินดีด้วย!** หากทำครบทุกขั้น เว็บไซต์ระบบรับเรื่องร้องเรียนของ อบต.หัวงัว พร้อมใช้งานจริงแล้ว
->
-> หากมีปัญหา ดูส่วน **🔧 แก้ปัญหา** ด้านบน หรือติดต่อผู้ดูแลระบบพร้อมแนบภาพหน้าจอ error
+## การแก้ปัญหาที่พบบ่อย (Troubleshooting)
+
+### ปัญหา 1: Vercel Build Failed
+- ตรวจสอบว่าไม่มีตัวแปรใดขึ้นต้นด้วย `CHANGE_ME_` หรือ `YOUR_`
+- ตรวจสอบความยาวของ Secret: `AUTH_SECRET` (>= 32), `CID_HMAC_KEY` (>= 32), `LINE_ID_HMAC_KEY` (>= 32), `CRON_SECRET` (>= 16)
+- ตรวจสอบ `AUTH_URL` ต้องขึ้นต้นด้วย `https://` และห้ามใช้ localhost
+
+### ปัญหา 2: ล็อกอินเข้าแอดมินไม่ได้ (`/admin/login`)
+- ตรวจสอบว่าได้รัน `npx tsx scripts/seed.ts` หรือยัง
+- บัญชีเริ่มต้นคือ `admin@huangua.go.th` รหัสผ่าน `ChangeMe123!` (ให้เปลี่ยนรหัสผ่านทันทีหลังล็อกอินครั้งแรกที่หน้าโปรไฟล์)
+
+### ปัญหา 3: อัปโหลดภาพถ่ายไม่ผ่าน
+- ตรวจสอบว่าสร้าง Bucket ชื่อ `media` ใน Supabase Storage แล้ว
+- ตรวจสอบ `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` ใน Vercel
+
+---
+
+## สรุปรายการคำสั่งสำหรับผู้ดูแลระบบ
+```bash
+# ตรวจสอบ Environment Variables
+npx tsx scripts/verify-env.ts
+
+# ตรวจสอบข้อมูล Master Data ในฐานข้อมูล
+npx tsx scripts/verify-seed-data.ts
+
+# ตรวจสอบความพร้อมก่อน Go-Live
+npx tsx scripts/verify-production.ts
+
+# รันชุดทดสอบระบบทั้งหมด
+npx vitest run
+
+# ตรวจสอบความถูกต้องของ Type
+npx tsc --noEmit
+```
