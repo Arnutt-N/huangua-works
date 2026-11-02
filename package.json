@@ -22,6 +22,8 @@
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "verify-env": "tsx scripts/verify-env.ts",
+    "verify-prod": "tsx scripts/verify-production.ts",
+    "verify-seed": "tsx scripts/verify-seed-data.ts",
     "check-contrast": "tsx scripts/check-contrast.ts",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
