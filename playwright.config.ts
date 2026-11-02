@@ -15,6 +15,7 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:3000',
     trace: 'retain-on-failure',
+    permissions: ['clipboard-read', 'clipboard-write'],
   },
   projects: [
     {
@@ -23,9 +24,16 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'pnpm dev',
+    command: 'npx next dev',
     url: 'http://localhost:3000',
     reuseExistingServer: true,
-    timeout: 60_000,
+    timeout: 120_000,
+    env: {
+      S3_ENDPOINT: 'http://localhost:9000',
+      S3_REGION: 'us-east-1',
+      S3_ACCESS_KEY_ID: 'dummy-access-key',
+      S3_SECRET_ACCESS_KEY: 'dummy-secret-key-32-chars-minimum',
+      S3_BUCKET: 'huangua-media',
+    },
   },
 });

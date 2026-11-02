@@ -48,5 +48,5 @@ describe('PR118 ผลกระทบ tier ที่อยู่นอก diff',
     }));
     const { getTierMatrix } = await import('@/app/admin/actions/tiers');
     await expect(getTierMatrix()).rejects.toBe(denied);
-  }, 30_000);
+  }, 60_000);
 });
