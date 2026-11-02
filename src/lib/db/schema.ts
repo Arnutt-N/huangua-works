@@ -1132,8 +1132,13 @@ export const tierRoles = pgTable('tier_roles', {
 });
 // ────────────────────────────────────────────────────────────────────────────
 // § Queue Bookings (จองคิวนัดช่าง — P2-03)
-// ช่องทางประชาชนจองวัน/ช่วงเวลาให้ช่าง อบต. เข้าดูหน้างาน (ไฟฟ้า/ประปา/ถนน)
+// ช่องทางประชาชนจองวัน/ช่วงเวลาให้ช่าง อบต. เข้าดูหน้างาน หรือติดต่อราชการ อบต. (P2-03)
 // ────────────────────────────────────────────────────────────────────────────
+
+export const queueCategoryEnum = pgEnum('queue_category', [
+  'technician',
+  'government',
+]);
 
 export const queueBookingStatusEnum = pgEnum('queue_booking_status', [
   'booked',
@@ -1151,8 +1156,10 @@ export const queueBookings = pgTable(
 
     fullName: text('full_name').notNull(),
     phoneNumber: text('phone_number').notNull(), // ช่องทางติดต่อกลับ — บังคับ
-    serviceType: text('service_type').notNull(), // ประเภทงานช่าง (ข้อความอิสระ)
+    category: queueCategoryEnum('category').notNull().default('technician'),
+    serviceType: text('service_type').notNull(), // ประเภทงานหรือเรื่องที่ติดต่อ
     note: text('note'), // รายละเอียดเพิ่มเติมจากผู้จอง
+    villageId: text('village_id'), // หมู่บ้านสำหรับงานช่างลงพื้นที่ (FK villages.id)
 
     // § เก็บเป็น date (YYYY-MM-DD) ไม่ใช่ timestamp — คิวนัดอ้าง "วัน" ปฏิทินไทย
     // ไม่มีประเด็น timezone; slot แยกเป็นคอลัมน์ข้อความตาม QUEUE_SLOT_IDS
@@ -1161,14 +1168,21 @@ export const queueBookings = pgTable(
 
     status: queueBookingStatusEnum().notNull().default('booked'),
     adminNote: text('admin_note'), // โน้ตภายในของเจ้าหน้าที่
+
+    // § ข้อมูลแจ้งเตือน LINE แบบ pseudonymized ตาม PDPA
+    lineUserIdHash: text('line_user_id_hash'),
+    lineUserIdEnc: text('line_user_id_enc'),
+    lineNotificationStatus: text('line_notification_status'), // 'pending' | 'sent' | 'failed'
+    lineNotificationAt: timestamp('line_notification_at', { mode: 'date' }),
   },
   (table) => ({
     dateIdx: index('queue_bookings_booking_date_idx').on(table.bookingDate),
     statusIdx: index('queue_bookings_status_idx').on(table.status),
-    // § กันจองซ้ำช่วงเดียวกันระดับ DB (หนึ่งช่วงรับหนึ่งคิว) — ยกเว้นคิวที่
-    // ยกเลิกแล้วให้จองทับได้ จึงต้องเป็น partial index ไม่ใช่ unique ธรรมดา
-    slotTakenIdx: uniqueIndex('queue_bookings_date_slot_idx')
-      .on(table.bookingDate, table.slot)
+    categoryIdx: index('queue_bookings_category_idx').on(table.category),
+    // § กันจองซ้ำช่วงเดียวกันระดับ DB แยกตามหมวดหมู่ (หนึ่งหมวดหนึ่งช่วงรับหนึ่งคิว)
+    // ยกเว้นคิวที่ยกเลิกแล้วให้จองทับได้ จึงต้องเป็น partial unique index
+    slotTakenIdx: uniqueIndex('queue_bookings_date_slot_category_idx')
+      .on(table.category, table.bookingDate, table.slot)
       .where(sql`status <> 'cancelled'`),
   })
 );

@@ -2,14 +2,17 @@ import { ArrowLeft } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Navbar } from '@/components/landing/Navbar';
-import { SiteFooter } from '../../components/site/site-footer';
+import { SiteFooter } from '@/components/site/site-footer';
+import { LiffProvider } from '@/components/liff/liff-provider';
 import { QueueBookingForm } from './queue-booking-form';
 
-export const metadata: Metadata = { title: 'จองคิวนัดช่าง' };
+export const metadata: Metadata = {
+  title: 'จองคิวนัดหมาย อบต.หัวงัว',
+  description: 'ระบบจองคิวนัดช่างและนัดหมายติดต่อราชการ อบต.หัวงัว อ.ยางตลาด จ.กาฬสินธุ์',
+};
 
 /**
- * /queue — ประชาชนจองวัน/ช่วงเวลาให้ช่าง อบต. เข้าดูหน้างาน (P2-03)
- * หน้า static — ตารางช่วงว่างดึงผ่าน GET /api/queue ฝั่ง client
+ * /queue — ประชาชนจองวัน/ช่วงเวลาสำหรับงานช่างและติดต่อราชการ อบต.หัวงัว (P2-03)
  */
 export default function QueuePage() {
   return (
@@ -26,12 +29,14 @@ export default function QueuePage() {
             กลับหน้าแรก
           </Link>
 
-          <h1 className="mt-4 text-3xl font-bold sm:text-4xl">จองคิวนัดช่าง</h1>
+          <h1 className="mt-4 text-3xl font-bold sm:text-4xl">จองคิวนัดหมาย อบต.หัวงัว</h1>
           <p className="mt-3 text-lg text-muted">
-            เลือกวันและช่วงเวลาที่สะดวก เจ้าหน้าที่จะโทรยืนยันนัดหมายกับท่านอีกครั้ง
+            บริการจองคิวนัดช่างลงพื้นที่ตรวจงาน หรือนัดหมายติดต่อราชการ ณ ที่ทำการ อบต.หัวงัว
           </p>
 
-          <QueueBookingForm />
+          <LiffProvider>
+            <QueueBookingForm />
+          </LiffProvider>
         </div>
       </main>
       <SiteFooter />

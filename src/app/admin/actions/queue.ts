@@ -12,7 +12,9 @@ import {
   validateFormData,
   QUEUE_BOOKING_STATUS_LABELS,
   type QueueBookingStatus,
+  type QueueCategory,
 } from '@/lib/validation';
+import { sendQueueBookingStatusUpdate } from '@/lib/line/notify/queue-booking-notify';
 
 export interface QueueActionState {
   error: string | null;
@@ -73,7 +75,7 @@ export async function updateQueueBooking(
         resourceId: id,
         ipAddress: auth.ipAddress,
         userAgent: auth.userAgent,
-        metadata: { from, to: status },
+        metadata: { from, to: status, hasLineNotify: !!booking.lineUserIdEnc },
       },
       db,
     );
@@ -81,6 +83,43 @@ export async function updateQueueBooking(
     return { error: 'บันทึกข้อมูลไม่สำเร็จ กรุณาลองใหม่', success: undefined };
   }
 
+  // § Non-blocking LINE notification dispatch เมื่อแอดมินเปลี่ยนสถานะคิว
+  if (booking.lineUserIdEnc) {
+    sendQueueBookingStatusUpdate(
+      {
+        id: booking.id,
+        fullName: booking.fullName,
+        phoneNumber: booking.phoneNumber,
+        category: booking.category as QueueCategory,
+        serviceType: booking.serviceType,
+        bookingDate: booking.bookingDate,
+        slot: booking.slot,
+        note: booking.note,
+        lineUserIdEnc: booking.lineUserIdEnc,
+      },
+      status,
+      adminNote,
+    )
+      .then(async (sent) => {
+        try {
+          await db
+            .update(queueBookings)
+            .set({
+              lineNotificationStatus: sent ? 'sent' : 'failed',
+              lineNotificationAt: new Date(),
+            })
+            .where(eq(queueBookings.id, id));
+        } catch (err) {
+          console.warn('[admin-queue] failed to update notification status', err);
+        }
+      })
+      .catch((err) => console.warn('[admin-queue] failed to send LINE status notification', err));
+  }
+
   revalidatePath('/admin/queue');
-  return { error: null, success: `อัปเดตคิวเป็น “${QUEUE_BOOKING_STATUS_LABELS[status]}” แล้ว` };
+  const notifySuffix = booking.lineUserIdEnc ? ' (พร้อมส่งแจ้งเตือนทาง LINE)' : '';
+  return {
+    error: null,
+    success: `อัปเดตคิวเป็น “${QUEUE_BOOKING_STATUS_LABELS[status]}” แล้ว${notifySuffix}`,
+  };
 }
