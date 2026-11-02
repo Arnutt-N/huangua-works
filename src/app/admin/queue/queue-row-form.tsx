@@ -12,16 +12,9 @@ import {
 } from '@/components/ui/select';
 import {
   QUEUE_BOOKING_STATUS_LABELS,
+  QUEUE_TRANSITIONS,
   type QueueBookingStatus,
 } from '@/lib/validation';
-
-/** สถานะปลายทางที่เลือกได้จากสถานะปัจจุบัน — ตัวกรองฝั่ง UI เท่านั้น server ตรวจซ้ำเสมอ */
-const NEXT_STATUSES: Record<QueueBookingStatus, QueueBookingStatus[]> = {
-  booked: ['confirmed', 'cancelled'],
-  confirmed: ['done', 'cancelled'],
-  done: [],
-  cancelled: [],
-};
 
 const initialState: QueueActionState = { error: null };
 
@@ -35,7 +28,7 @@ export function QueueRowForm({
   currentNote: string | null;
 }) {
   const [state, formAction, pending] = useActionState(updateQueueBooking, initialState);
-  const next = NEXT_STATUSES[currentStatus];
+  const next = QUEUE_TRANSITIONS[currentStatus];
   const [status, setStatus] = useState<QueueBookingStatus>(next[0] ?? 'confirmed');
   const [showCancelWarning, setShowCancelWarning] = useState(false);
 

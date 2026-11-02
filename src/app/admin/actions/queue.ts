@@ -10,6 +10,7 @@ import { logAudit, AUDIT_ACTIONS } from '@/lib/audit';
 import {
   updateQueueBookingFormSchema,
   validateFormData,
+  assertQueueTransition,
   QUEUE_BOOKING_STATUS_LABELS,
   type QueueBookingStatus,
   type QueueCategory,
@@ -21,18 +22,6 @@ export interface QueueActionState {
   success?: string;
 }
 
-/**
- * ผังสถานะคิว (ตรวจใน action ก่อน update ทุกครั้ง):
- * จองแล้ว → ยืนยันแล้ว/ยกเลิกแล้ว · ยืนยันแล้ว → เสร็จแล้ว/ยกเลิกแล้ว
- * (เสร็จแล้ว/ยกเลิกแล้ว เป็นสถานะปลายทาง)
- */
-const QUEUE_TRANSITIONS: Record<QueueBookingStatus, QueueBookingStatus[]> = {
-  booked: ['confirmed', 'cancelled'],
-  confirmed: ['done', 'cancelled'],
-  done: [],
-  cancelled: [],
-};
-
 export async function updateQueueBooking(
   _prevState: QueueActionState,
   formData: FormData,
@@ -43,22 +32,15 @@ export async function updateQueueBooking(
   const { id, status, adminNote } = v.data;
 
   const db = await getDb();
-  let booking;
-  try {
-    booking = await firstOrUndefined(
-      db.select().from(queueBookings).where(eq(queueBookings.id, id)).limit(1),
-    );
-  } catch (err) {
-    console.error('[queue] read failed', err);
-    return { error: 'โหลดข้อมูลไม่สำเร็จ กรุณาลองใหม่' };
-  }
+  const booking = await firstOrUndefined(
+    db.select().from(queueBookings).where(eq(queueBookings.id, id)).limit(1),
+  );
   if (!booking) return { error: 'ไม่พบคิวที่ระบุ' };
 
   const from = booking.status as QueueBookingStatus;
-  if (!QUEUE_TRANSITIONS[from].includes(status)) {
-    return {
-      error: `เปลี่ยนจาก “${QUEUE_BOOKING_STATUS_LABELS[from]}” เป็น “${QUEUE_BOOKING_STATUS_LABELS[status]}” ไม่ได้`,
-    };
+  const transition = assertQueueTransition(from, status);
+  if (!transition.ok) {
+    return { error: transition.reason };
   }
 
   try {

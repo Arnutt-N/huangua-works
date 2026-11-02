@@ -12,23 +12,23 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRef, useState, type FormEvent } from 'react';
-import { Button } from '../../components/ui/button';
-import { FieldError, FieldHint, Input, Label, Textarea } from '../../components/ui/field';
+import { Button } from '@/components/ui/button';
+import { FieldError, FieldHint, Input, Label, Textarea } from '@/components/ui/field';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../../components/ui/select';
+} from '@/components/ui/select';
 import {
   QUEUE_BOOKING_WINDOW_DAYS,
   QUEUE_CATEGORY_LABELS,
   queuePhoneSchema,
   type QueueCategory,
-} from '../../lib/validation';
-import { formatThaiDateLong } from '../../lib/thai-date';
-import { useLiff } from '../../components/liff/liff-provider';
+} from '@/lib/validation';
+import { formatThaiDateLong } from '@/lib/thai-date';
+import { useLiff } from '@/components/liff/liff-provider';
 import {
   buildSlotAvailability,
   isBusinessDay,
