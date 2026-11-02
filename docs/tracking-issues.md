@@ -91,7 +91,7 @@
 | P1-02 | ติดตาม + admin timeline (Realtime) | P1 | P0 | feat | subscribe `case_events` channel; `aria-live="polite"`; Realtime authorization ผูก RLS | Realtime ทำงาน; aria-live ประกาศสถานะ; ผ่าน RLS | P1-01 | L |
 | P1-03 | Notification อีเมล/SMS | P1 | P0 | feat | บันทึกใน `audit_log` + opt-out ตาม PDPA | notification ส่ง; opt-out ทำงาน; audit บันทึก | P1-01 | M |
 | P1-04 | SLA escalation (QStash filter ฝั่ง producer) | P1 | P0 | feat | filter เฉพาะเรื่องงบ > 50,000 หรือ overdue > 7 วัน (ประหยัด 200 msg/day free) | filter ทำงาน; ภายใน 200 msg/day; escalation enqueue | P1-01, P0-22 | M |
-| P1-05 | รายงานสรุปเดือน/ไตรมาส + CSV export (watermark + audit + DPIA) | P1 | P0 | feat/sec | ออกทันเดือน 100% (KPI); CSV export watermark + audit; one-time signed URL หมดอายุ 5 นาที; MFA ก่อนโหลด; AES-256 at rest; DPIA `docs/dpia-export.md` | รายงานออกทันเดือน; signed URL 5 นาที; MFA บังคับ; AES-256; DPIA มี | P1-01 | L |
+| P1-05 | รายงานสรุปเดือน/ไตรมาส + CSV export (watermark + audit + DPIA) | P1 | P0 | feat/sec | ออกทันเดือน 100% (KPI); CSV export watermark + audit; one-time signed URL หมดอายุ 5 นาที; MFA ก่อนโหลด; AES-256 at rest; DPIA `docs/dpia-export.md` (เสร็จสมบูรณ์ใน PR #184) | รายงานออกทันเดือน; signed URL 5 นาที; MFA บังคับ; AES-256; DPIA มี; CSV export ใช้งานได้จริงใน /admin/reports | P1-01 | L |
 | P1-06 | ย้าย Vercel/Supabase → Pro | P1 | P0 | infra | Vercel Pro $25/ด + Supabase Pro $25/ด + QStash Pro ถ้าเกิน 200 msg/day; re-enter Sensitive env; enable Vercel Cron; ปรับ Function Duration 10s → 60s | Pro ใช้งาน; env Sensitive re-enter; Cron ทำงาน; `verify-env.ts` ผ่าน | P1-01 | M |
 | P1-07 | Admin queue cursor pagination + RPC (M-D2, M-P3) | P1 | P1 | db/perf | cursor pagination `WHERE (received_at, id) < ($last_received, $last_id)`; single RPC `get_case_list(page)` คืน JSON รวม complainant/assignment/budget | cursor pagination ทำงาน; RPC คืน JSON รวม; query count ≤3/page | P0-05, P1-01 | M |
 | P1-08 | Admin timeline RPC `get_case_timeline` ป้องกัน N+1 (M-D1) | P1 | P1 | db/perf | single RPC `get_case_timeline(p_complaint_id)` `jsonb_agg` ทุก relation ใน transaction เดียว; integration test นับ query count ≤3 per page | RPC ทำงาน; query count ≤3; ไม่มี N+1 | P1-02 | M |
@@ -111,7 +111,7 @@
 | P2-02 | Live Chat + Telegram | P2 | P1 | feat | `src/modules/live-chat/*` Live Chat + Telegram integration | live chat ทำงาน; Telegram ส่งได้; audit บันทึก | P1-13 | L |
 | P2-03 | จองคิวนัดช่าง | P2 | P1 | feat | `src/app/(public)/queue/page.tsx` จองคิวนัดช่าง | จองคิวทำงาน; calendar slot; แจ้งเตือน | P1-13 | M |
 | P2-04 | a11y ผู้สูงอายุเพิ่มเติม (M-A1, M-A2, M-A3) | P2 | P1 | a11y | `prefers-reduced-motion` ตรวจก่อน (SC 2.3.3); draft เก็บเฉพาะ non-PII ใน `localStorage`; auto-fill จาก server หลัง OTP; `aria-describedby` + `role="alert"` ทุก input; error pattern ใน Storybook | reduced-motion ตรวจ; ไม่เก็บ PII ใน client; error pattern ทำงาน; ผ่าน axe | P1-13 | M |
-| P2-05 | PMQA reporting | P2 | P2 | feat | PMQA reporting integration | PMQA report ออก; ฟอร์แมตตามมาตรฐาน | P1-13 | M |
+| P2-05 | PMQA reporting | P2 | P2 | feat | PMQA reporting integration (เสร็จสมบูรณ์ใน PR #185) | PMQA report ออก; ฟอร์แมตตามมาตรฐานเกณฑ์ PMQA หมวด 3/7 พร้อม layout พิมพ์ A4 ใน /admin/reports/pmqa | P1-13 | M |
 | P2-06 | Honeypot anti-spam (L-S1) | P2 | P2 | sec | invisible honeypot field `website_url` (hidden + `tabindex=-1` + `aria-hidden`) + reject if filled OR submit < 2 วินาที; ไม่ใช้ reCAPTCHA หนัก | honeypot ทำงาน; บล็อก bot; ไม่กระทบ a11y | P1-01 | S |
 
 ---
