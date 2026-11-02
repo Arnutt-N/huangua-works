@@ -6,7 +6,8 @@ import { parseBody } from '@/lib/api-helpers';
 import { liffSessionSchema } from '@/lib/validation';
 import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
 import { resolveCitizen } from '@/lib/cases/citizen-access';
-import { lookupHash } from '@/lib/line/identity';
+import { getDb } from '@/lib/db';
+import { findLineUserByRaw, lookupHash } from '@/lib/line/identity';
 import { verifyLineIdToken, type VerifiedLineIdentity } from '@/lib/liff/verify-line-id-token';
 import {
   LIFF_SESSION_COOKIE,
@@ -67,7 +68,11 @@ export async function POST(req: NextRequest) {
     metadata: { via: 'liff_session' },
   });
 
-  const res = NextResponse.json({ ok: true, displayName: identity.displayName ?? null });
+  const res = NextResponse.json({
+    ok: true,
+    displayName: identity.displayName ?? null,
+    pictureUrl: identity.pictureUrl ?? null,
+  });
   res.cookies.set(LIFF_SESSION_COOKIE, createLiffSessionValue(identity.lineUserId), {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -81,11 +86,28 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const session = readLiffSessionValue(req.cookies.get(LIFF_SESSION_COOKIE)?.value);
   if (!session) return NextResponse.json({ authenticated: false });
-  return NextResponse.json({ authenticated: true });
+
+  try {
+    const db = await getDb();
+    const lineRow = await findLineUserByRaw(db, session.lineUserId);
+    return NextResponse.json({
+      authenticated: true,
+      displayName: lineRow?.displayName ?? null,
+      pictureUrl: lineRow?.pictureUrl ?? null,
+    });
+  } catch {
+    return NextResponse.json({ authenticated: true });
+  }
 }
 
 export async function DELETE() {
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(LIFF_SESSION_COOKIE, '', { httpOnly: true, path: '/', maxAge: 0 });
+  res.cookies.set(LIFF_SESSION_COOKIE, '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 0,
+  });
   return res;
 }

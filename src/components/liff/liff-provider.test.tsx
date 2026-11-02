@@ -20,6 +20,7 @@ function Probe() {
       <span data-testid="authenticated">{String(liff.authenticated)}</span>
       <span data-testid="in-client">{String(liff.isInClient)}</span>
       <span data-testid="display-name">{liff.displayName ?? '-'}</span>
+      <span data-testid="picture-url">{liff.pictureUrl ?? '-'}</span>
       <span data-testid="children">ok</span>
     </div>
   );
@@ -30,7 +31,14 @@ function mockFetch(overrides: { get?: Response; post?: Response } = {}) {
     if (init?.method === 'POST') {
       return (
         overrides.post ??
-        new Response(JSON.stringify({ ok: true, displayName: 'สมชาย ไลน์' }), { status: 200 })
+        new Response(
+          JSON.stringify({
+            ok: true,
+            displayName: 'สมชาย ไลน์',
+            pictureUrl: 'https://profile.line-scdn.net/somchai',
+          }),
+          { status: 200 },
+        )
       );
     }
     return overrides.get ?? new Response(JSON.stringify({ authenticated: false }), { status: 200 });
@@ -81,8 +89,8 @@ describe('LiffProvider', () => {
     });
     expect(screen.getByTestId('status')).toHaveTextContent('ready');
     expect(screen.getByTestId('in-client')).toHaveTextContent('true');
-    // mock path ไม่มีโปรไฟล์จริง — displayName ใช้ userId ตาม ensureMockSession
-    expect(screen.getByTestId('display-name')).toHaveTextContent('Utest123');
+    expect(screen.getByTestId('display-name')).toHaveTextContent('สมชาย ไลน์');
+    expect(screen.getByTestId('picture-url')).toHaveTextContent('https://profile.line-scdn.net/somchai');
 
     // ส่ง mock token รูปแบบ mock.<lineUserId> — server env เป็นด่านจริง
     const postCall = fetchMock.mock.calls.find((c) => (c[1] as RequestInit | undefined)?.method === 'POST');
@@ -90,9 +98,18 @@ describe('LiffProvider', () => {
     expect(JSON.parse((postCall![1] as RequestInit).body as string)).toEqual({ idToken: 'mock.Utest123' });
   });
 
-  it('session ที่มีอยู่แล้ว (GET authenticated) → ไม่ POST ซ้ำ', async () => {
+  it('session ที่มีอยู่แล้ว (GET authenticated) → ไม่ POST ซ้ำ และโหลด profile จาก GET', async () => {
     window.history.pushState({}, '', '/intake?liffmock=Utest123');
-    const fetchMock = mockFetch({ get: new Response(JSON.stringify({ authenticated: true }), { status: 200 }) });
+    const fetchMock = mockFetch({
+      get: new Response(
+        JSON.stringify({
+          authenticated: true,
+          displayName: 'สมศรี ไลน์',
+          pictureUrl: 'https://profile.line-scdn.net/somsri',
+        }),
+        { status: 200 },
+      ),
+    });
 
     render(
       <LiffProvider>
@@ -103,6 +120,8 @@ describe('LiffProvider', () => {
     await waitFor(() => expect(screen.getByTestId('authenticated')).toHaveTextContent('true'), {
       timeout: 3000,
     });
+    expect(screen.getByTestId('display-name')).toHaveTextContent('สมศรี ไลน์');
+    expect(screen.getByTestId('picture-url')).toHaveTextContent('https://profile.line-scdn.net/somsri');
     const postCall = fetchMock.mock.calls.find((c) => (c[1] as RequestInit | undefined)?.method === 'POST');
     expect(postCall).toBeUndefined();
   });

@@ -31,6 +31,7 @@ export interface LiffContextValue {
    */
   authenticated: boolean;
   displayName: string | null;
+  pictureUrl: string | null;
   logout: () => Promise<void>;
 }
 
@@ -39,6 +40,7 @@ const LiffContext = createContext<LiffContextValue>({
   isInClient: false,
   authenticated: false,
   displayName: null,
+  pictureUrl: null,
   logout: async () => {},
 });
 
@@ -58,39 +60,66 @@ function mockParam(): string | null {
  * env LIFF_E2E_MOCK=1 เท่านั้น ผู้ใช้จริงใส่ param นี้เองก็ได้แค่ 401 จาก server
  * (จึงไม่ใช่ช่องปลอมตัว ตามข้อห้าม query-param mock ใน PRP §1.4)
  */
-async function ensureMockSession(userId: string): Promise<{ authenticated: boolean; displayName: string | null }> {
+async function ensureMockSession(userId: string): Promise<{
+  authenticated: boolean;
+  displayName: string | null;
+  pictureUrl: string | null;
+}> {
   try {
     const check = await fetch('/api/liff/session');
-    if (check.ok && (await check.json()).authenticated === true) {
-      return { authenticated: true, displayName: userId };
+    if (check.ok) {
+      const data = (await check.json()) as { authenticated?: boolean; displayName?: string | null; pictureUrl?: string | null };
+      if (data.authenticated === true) {
+        return {
+          authenticated: true,
+          displayName: data.displayName ?? userId,
+          pictureUrl: data.pictureUrl ?? 'https://profile.line-scdn.net/mock-avatar',
+        };
+      }
     }
     const res = await fetch('/api/liff/session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ idToken: `mock.${userId}` }),
     });
-    return { authenticated: res.ok, displayName: userId };
+    const data = res.ok ? ((await res.json()) as { displayName?: string | null; pictureUrl?: string | null }) : {};
+    return {
+      authenticated: res.ok,
+      displayName: data.displayName ?? userId,
+      pictureUrl: data.pictureUrl ?? 'https://profile.line-scdn.net/mock-avatar',
+    };
   } catch {
-    return { authenticated: false, displayName: null };
+    return { authenticated: false, displayName: null, pictureUrl: null };
   }
 }
 
-async function ensureSession(): Promise<{ authenticated: boolean; displayName: string | null }> {
+async function ensureSession(): Promise<{
+  authenticated: boolean;
+  displayName: string | null;
+  pictureUrl: string | null;
+}> {
   const sdk = window.liff;
-  if (!sdk) return { authenticated: false, displayName: null };
+  if (!sdk) return { authenticated: false, displayName: null, pictureUrl: null };
 
   try {
     const check = await fetch('/api/liff/session');
-    if (check.ok && (await check.json()).authenticated === true) {
-      const profile = await sdk.getProfile().catch(() => null);
-      return { authenticated: true, displayName: profile?.displayName ?? null };
+    if (check.ok) {
+      const sessionData = (await check.json()) as { authenticated?: boolean; displayName?: string | null; pictureUrl?: string | null };
+      if (sessionData.authenticated === true) {
+        const profile = await sdk.getProfile().catch(() => null);
+        return {
+          authenticated: true,
+          displayName: profile?.displayName ?? sessionData.displayName ?? null,
+          pictureUrl: profile?.pictureUrl ?? sessionData.pictureUrl ?? null,
+        };
+      }
     }
   } catch {
     // GET พัง (offline ชั่วคราว) — ลอง POST ต่อได้
   }
 
   const idToken = sdk.getIDToken();
-  if (!idToken) return { authenticated: false, displayName: null };
+  if (!idToken) return { authenticated: false, displayName: null, pictureUrl: null };
 
   try {
     const res = await fetch('/api/liff/session', {
@@ -98,11 +127,16 @@ async function ensureSession(): Promise<{ authenticated: boolean; displayName: s
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ idToken }),
     });
-    if (!res.ok) return { authenticated: false, displayName: null };
-    const data = (await res.json()) as { displayName?: string | null };
-    return { authenticated: true, displayName: data.displayName ?? null };
+    if (!res.ok) return { authenticated: false, displayName: null, pictureUrl: null };
+    const data = (await res.json()) as { displayName?: string | null; pictureUrl?: string | null };
+    const profile = await sdk.getProfile().catch(() => null);
+    return {
+      authenticated: true,
+      displayName: profile?.displayName ?? data.displayName ?? null,
+      pictureUrl: profile?.pictureUrl ?? data.pictureUrl ?? null,
+    };
   } catch {
-    return { authenticated: false, displayName: null };
+    return { authenticated: false, displayName: null, pictureUrl: null };
   }
 }
 
@@ -112,6 +146,7 @@ export function LiffProvider({ children }: { children: ReactNode }) {
   const [isInClient, setIsInClient] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [pictureUrl, setPictureUrl] = useState<string | null>(null);
   // § กัน refresh ซ้ำ — สนใจเฉพาะ transition false→true ครั้งแรก
   const refreshedOnAuth = useRef(false);
 
@@ -128,6 +163,7 @@ export function LiffProvider({ children }: { children: ReactNode }) {
         setIsInClient(true);
         setAuthenticated(result.authenticated);
         setDisplayName(result.displayName);
+        setPictureUrl(result.pictureUrl);
         return;
       }
 
@@ -151,6 +187,7 @@ export function LiffProvider({ children }: { children: ReactNode }) {
           if (cancelled) return;
           setAuthenticated(result.authenticated);
           setDisplayName(result.displayName);
+          setPictureUrl(result.pictureUrl);
         }
       } catch {
         if (!cancelled) setStatus('error');
@@ -167,6 +204,7 @@ export function LiffProvider({ children }: { children: ReactNode }) {
     await fetch('/api/liff/session', { method: 'DELETE' }).catch(() => {});
     setAuthenticated(false);
     setDisplayName(null);
+    setPictureUrl(null);
   }, []);
 
   // § เมื่อเพิ่งได้ session (cookie ถูก set ระหว่างที่หน้า render ไปแล้ว) ให้ refresh
@@ -181,8 +219,8 @@ export function LiffProvider({ children }: { children: ReactNode }) {
   }, [authenticated, router]);
 
   const value = useMemo<LiffContextValue>(
-    () => ({ status, isInClient, authenticated, displayName, logout }),
-    [status, isInClient, authenticated, displayName, logout],
+    () => ({ status, isInClient, authenticated, displayName, pictureUrl, logout }),
+    [status, isInClient, authenticated, displayName, pictureUrl, logout],
   );
 
   return <LiffContext.Provider value={value}>{children}</LiffContext.Provider>;

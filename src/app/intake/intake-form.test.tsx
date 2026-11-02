@@ -7,8 +7,12 @@ import { INTAKE_DRAFT_KEY, saveIntakeDraft } from '../../components/forms/non-pi
 import { IntakeForm } from './intake-form';
 import { INTAKE_FILE_TIMEOUT_MS, INTAKE_QUERY_TIMEOUT_MS } from './intake-test-timeouts';
 
+const { mockUseLiff } = vi.hoisted(() => ({
+  mockUseLiff: vi.fn(() => ({ authenticated: false, displayName: null, pictureUrl: null })),
+}));
+
 vi.mock('../../components/liff/liff-provider', () => ({
-  useLiff: () => ({ authenticated: false, displayName: null }),
+  useLiff: mockUseLiff,
 }));
 
 vi.setConfig({ testTimeout: INTAKE_FILE_TIMEOUT_MS });
@@ -16,6 +20,7 @@ vi.setConfig({ testTimeout: INTAKE_FILE_TIMEOUT_MS });
 const categories = [{ id: 'roads', name: 'ถนน' }];
 
 beforeEach(() => {
+  mockUseLiff.mockReturnValue({ authenticated: false, displayName: null, pictureUrl: null });
   window.localStorage.clear();
   Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() });
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
@@ -364,5 +369,68 @@ describe('IntakeForm — แนบรูปภาพและ Network Resilience
     expect(document.getElementById('name')).toHaveValue('สมชาย รักชาติ');
     expect(document.getElementById('title')).toHaveValue('เสาไฟทางดับ');
     expect(document.getElementById('detail')).toHaveValue('มืดมากตอนกลางคืน');
+  });
+
+  it('LIFF mode: แสดง avatar, banner, คำแนะนำแก้ไขชื่อ, ซ่อนช่อง CID และส่งเรื่องได้โดยไม่ต้องกรอก CID', async () => {
+    const user = userEvent.setup();
+    mockUseLiff.mockReturnValue({
+      authenticated: true,
+      displayName: 'สมใจ สบายดี',
+      pictureUrl: 'https://profile.line-scdn.net/somjai.jpg',
+    });
+
+    render(<IntakeForm categories={categories} />);
+
+    // ตรวจสอบ banner และ avatar
+    const banner = screen.getByTestId('liff-auth-banner');
+    expect(banner).toBeInTheDocument();
+    expect(banner).toHaveTextContent('บัญชี LINE: สมใจ สบายดี');
+    expect(banner).toHaveTextContent('ยืนยันตัวตนผ่าน LINE เรียบร้อยแล้ว — ไม่ต้องกรอกเลขบัตรประชาชน 13 หลัก');
+    const avatarImg = banner.querySelector('img');
+    expect(avatarImg).toHaveAttribute('src', 'https://profile.line-scdn.net/somjai.jpg');
+
+    // ต้องไม่พบช่องกรอกเลขบัตรประชาชน
+    expect(screen.queryByLabelText('เลขบัตรประชาชน 13 หลัก')).not.toBeInTheDocument();
+
+    // ชื่อเริ่มต้นถูกดึงมาจาก LINE และมีข้อความแนะนำ
+    expect(document.getElementById('name')).toHaveValue('สมใจ สบายดี');
+    expect(screen.getByText(/ระบบดึงชื่อเริ่มต้นจาก LINE ท่านสามารถแก้ไขเป็นชื่อ-นามสกุลจริง/)).toBeInTheDocument();
+
+    // ผู้ใช้สามารถแก้ไขชื่อได้
+    fireEvent.change(document.getElementById('name')!, { target: { value: 'สมใจ มีทรัพย์' } });
+    expect(document.getElementById('name')).toHaveValue('สมใจ มีทรัพย์');
+
+    // กรอกข้อมูลฟิลด์ที่จำเป็นอื่นๆ
+    await choose('หมวดเรื่อง', 'ถนน');
+    fireEvent.change(document.getElementById('title')!, { target: { value: 'ท่อระบายน้ำอุดตัน' } });
+    fireEvent.change(document.getElementById('detail')!, { target: { value: 'น้ำล้นขังเวลามีฝนตก' } });
+
+    await choose('จังหวัด', 'กาฬสินธุ์');
+    await waitFor(() => expect(screen.getByLabelText('อำเภอ')).not.toBeDisabled(), { timeout: INTAKE_QUERY_TIMEOUT_MS });
+    await choose('อำเภอ', 'ยางตลาด');
+    await waitFor(() => expect(screen.getByLabelText('ตำบล')).not.toBeDisabled(), { timeout: INTAKE_QUERY_TIMEOUT_MS });
+    await choose('ตำบล', 'หัวงัว');
+
+    fireEvent.click(document.getElementById('consent')!);
+
+    const submitBtn = screen.getByRole('button', { name: 'ส่งเรื่อง' });
+    await user.click(submitBtn);
+
+    // ยืนยันว่า API ถูกเรียกโดยไม่มีฟิลด์ cid และส่ง fullName ที่แก้ไขแล้ว
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/cases/submit',
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.not.stringContaining('"cid":'),
+        }),
+      );
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/cases/submit',
+        expect.objectContaining({
+          body: expect.stringContaining('"fullName":"สมใจ มีทรัพย์"'),
+        }),
+      );
+    });
   });
 });
