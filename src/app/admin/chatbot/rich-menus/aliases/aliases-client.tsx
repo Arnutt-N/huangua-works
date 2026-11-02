@@ -22,6 +22,7 @@ export function RichMenuAliasesClient() {
   const [creating, setCreating] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [repointingAlias, setRepointingAlias] = useState<string | null>(null);
 
   const menusRes = useResource({ load: adminApi.listRichMenus });
   const aliasesRes = useResource({ load: adminApi.listMenuAliases });
@@ -54,14 +55,19 @@ export function RichMenuAliasesClient() {
   }
 
   async function handleRepoint(alias: string, menuId: string) {
-    if (!menuId) return;
-    const res = await adminApi.repointMenuAlias(alias, menuId);
-    if (!res.ok) {
-      setFormError(res.error);
+    if (!menuId || repointingAlias) return;
+    setRepointingAlias(alias);
+    try {
+      const res = await adminApi.repointMenuAlias(alias, menuId);
+      if (!res.ok) {
+        setFormError(res.error);
+        await aliasesRes.reload();
+        return;
+      }
       await aliasesRes.reload();
-      return;
+    } finally {
+      setRepointingAlias(null);
     }
-    await aliasesRes.reload();
   }
 
   async function handleDelete() {
@@ -172,8 +178,9 @@ export function RichMenuAliasesClient() {
                       <select
                         aria-label={`เมนูเป้าหมายของ ${alias.aliasId}`}
                         value={alias.richMenuId}
+                        disabled={repointingAlias === alias.aliasId}
                         onChange={(e) => void handleRepoint(alias.aliasId, e.target.value)}
-                        className="min-h-touch rounded-lg border border-border bg-surface px-2 text-sm"
+                        className="min-h-touch rounded-lg border border-border bg-surface px-2 text-sm disabled:opacity-50"
                       >
                         {!syncedMenus.some((m) => m.id === alias.richMenuId) && (
                           <option value={alias.richMenuId}>{alias.menuName ?? alias.richMenuId}</option>

@@ -94,14 +94,20 @@ export async function changeOwnPassword(
     return { error: `เปลี่ยนรหัสผ่านถี่เกินไป กรุณารอ ${formatReset(limit.reset)}` };
   }
 
-  const db = await getDb();
-  const row = await firstOrUndefined(
-    db
-      .select({ passwordHash: users.passwordHash })
-      .from(users)
-      .where(eq(users.id, actor.id))
-      .limit(1),
-  );
+  let row;
+  try {
+    const db = await getDb();
+    row = await firstOrUndefined(
+      db
+        .select({ passwordHash: users.passwordHash })
+        .from(users)
+        .where(eq(users.id, actor.id))
+        .limit(1),
+    );
+  } catch (err) {
+    console.error('[changeOwnPassword] fetch user failed', err);
+    return { error: 'เกิดข้อผิดพลาดในการตรวจสอบข้อมูลผู้ใช้' };
+  }
 
   if (!row?.passwordHash) {
     return { error: 'บัญชีนี้ยังไม่ได้ตั้งรหัสผ่าน กรุณาติดต่อผู้ดูแลระบบ' };
@@ -122,6 +128,7 @@ export async function changeOwnPassword(
   }
 
   try {
+    const db = await getDb();
     const passwordHash = await hashPassword(newPassword);
     // § bump passwordVersion ตัด session อื่นของบัญชีนี้ (session ปัจจุบันก็โดนด้วย
     // resolveStaff จะเตะใน request ถัดไป — ผู้ใช้ login ใหม่ด้วยรหัสใหม่ตามข้อความ success)

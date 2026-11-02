@@ -138,18 +138,7 @@ export function CitizensClient({ rows, query }: { rows: CitizenRow[]; query: str
                   icon={<Trash2 className="h-4 w-4" aria-hidden="true" />}
                   ariaLabel={`ลบบัญชี ${c.fullName}`}
                 />
-                <form action={toggleCitizenAction}>
-                  <input type="hidden" name="userId" value={c.id} />
-                  <Button
-                    type="submit"
-                    variant="ghost"
-                    size="sm"
-                    aria-label={`${c.isActive ? 'ระงับ' : 'เปิดใช้งาน'}บัญชี ${c.fullName}`}
-                    title={c.isActive ? 'ระงับ (เรื่องซ่อนจากช่องทางประชาชน)' : 'เปิดใช้งาน'}
-                  >
-                    <Power className="h-4 w-4" aria-hidden="true" />
-                  </Button>
-                </form>
+                <ToggleCitizenButton citizen={c} />
               </div>
             </li>
           ))}
@@ -368,12 +357,34 @@ function ConfirmDialog({
   );
 }
 
-/**
- * toggleCitizenActive ถูกเรียกแบบ inline (ไม่ใช่ dialog) — ใช้ wrapper เพื่อให้ signature
- * ตรงกับ form action expectation (void return) เหมือน toggleUserAction ใน users-client
- */
-async function toggleCitizenAction(formData: FormData): Promise<void> {
-  await toggleCitizenActive({ error: null }, formData);
+function ToggleCitizenButton({ citizen }: { citizen: CitizenRow }) {
+  const [state, formAction, pending] = useActionState(toggleCitizenActive, initial);
+
+  return (
+    <form action={formAction} className="inline-flex items-center gap-1">
+      <input type="hidden" name="userId" value={citizen.id} />
+      <Button
+        type="submit"
+        variant="ghost"
+        size="sm"
+        disabled={pending}
+        aria-busy={pending}
+        aria-label={`${citizen.isActive ? 'ระงับ' : 'เปิดใช้งาน'}บัญชี ${citizen.fullName}`}
+        title={citizen.isActive ? 'ระงับ (เรื่องซ่อนจากช่องทางประชาชน)' : 'เปิดใช้งาน'}
+      >
+        {pending ? (
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+        ) : (
+          <Power className="h-4 w-4" aria-hidden="true" />
+        )}
+      </Button>
+      {state?.error && (
+        <span role="alert" className="text-xs text-danger-ink">
+          {state.error}
+        </span>
+      )}
+    </form>
+  );
 }
 
 function FormAlert({ children }: { children: ReactNode }) {

@@ -73,19 +73,24 @@ export async function updateTierRoles(
     return { error: 'ห้ามตัดบทบาทตัวเองออกจาก tier บริหารระบบ' };
   }
 
-  for (const { key, roles } of parsed) {
-    const res = await setTierRoles(key, roles);
-    if (!res.ok) return { error: res.error ?? 'บันทึกไม่สำเร็จ' };
-    await logAudit({
-      userId: actor.id,
-      action: AUDIT_ACTIONS.ROLE_TIER_UPDATE,
-      resource: 'tier_roles',
-      resourceId: key,
-      ipAddress,
-      userAgent,
-      // § audit ค่าที่เก็บจริง (รวม superadmin ที่บังคับ) ไม่ใช่ค่าดิบจากฟอร์ม
-      metadata: { tier: key, label: TIER_LABELS[key], roles: res.stored ?? roles },
-    });
+  try {
+    for (const { key, roles } of parsed) {
+      const res = await setTierRoles(key, roles);
+      if (!res.ok) return { error: res.error ?? 'บันทึกไม่สำเร็จ' };
+      await logAudit({
+        userId: actor.id,
+        action: AUDIT_ACTIONS.ROLE_TIER_UPDATE,
+        resource: 'tier_roles',
+        resourceId: key,
+        ipAddress,
+        userAgent,
+        // § audit ค่าที่เก็บจริง (รวม superadmin ที่บังคับ) ไม่ใช่ค่าดิบจากฟอร์ม
+        metadata: { tier: key, label: TIER_LABELS[key], roles: res.stored ?? roles },
+      });
+    }
+  } catch (err) {
+    console.error('[updateTierRoles] failed', err);
+    return { error: 'เกิดข้อผิดพลาดในการบันทึกสิทธิ์' };
   }
 
   revalidatePath('/admin/users');

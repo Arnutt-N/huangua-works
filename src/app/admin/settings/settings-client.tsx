@@ -30,6 +30,7 @@ export function SettingsClient() {
   const conns = useResource({ load: adminApi.listApiConnections });
   const quota = useResource({ load: adminApi.getLineQuota });
   const [quotaRefreshing, setQuotaRefreshing] = useState(false);
+  const [refreshingProvider, setRefreshingProvider] = useState<string | null>(null);
   const [sysSaving, setSysSaving] = useState(false);
   const [maintenance, setMaintenance] = useState<boolean | null>(null);
   const [retentionText, setRetentionText] = useState<string | null>(null);
@@ -91,7 +92,13 @@ export function SettingsClient() {
   }
 
   async function handleRefresh(provider: string) {
-    await conns.mutate(() => adminApi.refreshApiConnection(provider), 'ตรวจสถานะสำเร็จ', { reload: true });
+    if (refreshingProvider) return;
+    setRefreshingProvider(provider);
+    try {
+      await conns.mutate(() => adminApi.refreshApiConnection(provider), 'ตรวจสถานะสำเร็จ', { reload: true });
+    } finally {
+      setRefreshingProvider(null);
+    }
   }
 
   function toggleDay(day: number) {
@@ -191,8 +198,14 @@ export function SettingsClient() {
                   <span className="font-medium text-ink">{conn.provider}</span>
                   <span className="text-muted"> — {conn.status}{conn.lastCheckedAt ? ` (ตรวจล่าสุด ${conn.lastCheckedAt})` : ''}</span>
                 </div>
-                <Button onClick={() => handleRefresh(conn.provider)} className="min-h-touch" variant="secondary">
-                  ตรวจใหม่
+                <Button
+                  onClick={() => handleRefresh(conn.provider)}
+                  disabled={refreshingProvider === conn.provider}
+                  aria-busy={refreshingProvider === conn.provider}
+                  className="min-h-touch"
+                  variant="secondary"
+                >
+                  {refreshingProvider === conn.provider ? 'กำลังตรวจ...' : 'ตรวจใหม่'}
                 </Button>
               </div>
             ))}

@@ -66,6 +66,7 @@ export function IntentSection() {
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<IntentItem | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const { data, loading, feedback, error, errorCode, notify, mutate, reload } = useResource({
     load: adminApi.listIntents,
@@ -160,13 +161,21 @@ export function IntentSection() {
   }
 
   async function handleToggle(item: IntentItem) {
-    const res = await adminApi.updateIntent(item.id, { isActive: !item.isActive });
-    if (!res.ok) {
-      notify('error', res.error);
-      return;
+    if (togglingId) return;
+    setTogglingId(item.id);
+    try {
+      const res = await adminApi.updateIntent(item.id, { isActive: !item.isActive });
+      if (!res.ok) {
+        notify('error', res.error);
+        return;
+      }
+      notify('success', item.isActive ? 'ปิดหมวดแล้ว' : 'เปิดหมวดแล้ว');
+      await reload();
+    } catch {
+      notify('error', 'เกิดข้อผิดพลาดในการเปลี่ยนสถานะ');
+    } finally {
+      setTogglingId(null);
     }
-    notify('success', item.isActive ? 'ปิดหมวดแล้ว' : 'เปิดหมวดแล้ว');
-    await reload();
   }
 
   return (
@@ -246,24 +255,27 @@ export function IntentSection() {
                         </div>
                       </td>
                       <td className="px-3 py-3 text-center">
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={item.isActive}
-                          aria-label={`${item.isActive ? 'ปิด' : 'เปิด'} ${item.name}`}
-                          title={reason}
-                          onClick={() => handleToggle(item)}
-                          className={`relative inline-flex h-5 w-9 flex-none items-center rounded-pill transition-colors duration-normal ${
-                            item.isActive ? 'bg-accent-strong' : 'bg-surface-sunken'
-                          }`}
-                        >
-                          <span
-                            aria-hidden="true"
-                            className={`inline-block h-4 w-4 rounded-pill bg-white shadow transition-transform duration-normal ${
-                              item.isActive ? 'translate-x-4' : 'translate-x-0.5'
-                            }`}
-                          />
-                        </button>
+                        <div className="inline-flex min-h-touch min-w-touch items-center justify-center">
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={item.isActive}
+                            aria-label={`${item.isActive ? 'ปิด' : 'เปิด'} ${item.name}`}
+                            disabled={togglingId === item.id}
+                            title={reason}
+                            onClick={() => handleToggle(item)}
+                            className={`relative inline-flex h-5 w-9 flex-none items-center rounded-pill transition-colors duration-normal ${
+                              item.isActive ? 'bg-accent-strong' : 'bg-surface-sunken'
+                            } ${togglingId === item.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          >
+                            <span
+                              aria-hidden="true"
+                              className={`inline-block h-4 w-4 rounded-pill bg-white shadow transition-transform duration-normal ${
+                                item.isActive ? 'translate-x-4' : 'translate-x-0.5'
+                              }`}
+                            />
+                          </button>
+                        </div>
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex justify-end gap-1">
