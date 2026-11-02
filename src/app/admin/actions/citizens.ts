@@ -57,13 +57,18 @@ function readMetadata(raw: unknown): Record<string, unknown> {
 async function getCitizenOrError(
   userId: string,
 ): Promise<{ target: typeof users.$inferSelect } | { error: string }> {
-  const db = await getDb();
-  const target = await firstOrUndefined(
-    db.select().from(users).where(eq(users.id, userId)).limit(1),
-  );
-  if (!target) return { error: 'ไม่พบบัญชีนี้' };
-  if (target.role !== 'citizen') return { error: 'บัญชีนี้ไม่ใช่บัญชีประชาชน' };
-  return { target };
+  try {
+    const db = await getDb();
+    const target = await firstOrUndefined(
+      db.select().from(users).where(eq(users.id, userId)).limit(1),
+    );
+    if (!target) return { error: 'ไม่พบบัญชีนี้' };
+    if (target.role !== 'citizen') return { error: 'บัญชีนี้ไม่ใช่บัญชีประชาชน' };
+    return { target };
+  } catch (err) {
+    console.error('[getCitizenOrError] query failed', err);
+    return { error: 'เกิดข้อผิดพลาดในการตรวจสอบข้อมูลประชาชน' };
+  }
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -201,10 +206,16 @@ export async function setCitizenCid(
   if ('error' in found) return { error: found.error };
 
   const placeholder = cidPlaceholderEmail(cid);
-  const db = await getDb();
-  const owner = await firstOrUndefined(
-    db.select({ id: users.id }).from(users).where(eq(users.email, placeholder)).limit(1),
-  );
+  let owner;
+  try {
+    const db = await getDb();
+    owner = await firstOrUndefined(
+      db.select({ id: users.id }).from(users).where(eq(users.email, placeholder)).limit(1),
+    );
+  } catch (err) {
+    console.error('[setCitizenCid] check owner failed', err);
+    return { error: 'เกิดข้อผิดพลาดในการตรวจสอบข้อมูลผู้ใช้' };
+  }
   if (owner && owner.id !== userId) {
     return { error: 'เลขบัตรประชาชนนี้ถูกใช้กับบัญชีอื่นแล้ว ไม่สามารถรวมบัญชีอัตโนมัติได้' };
   }
@@ -213,6 +224,7 @@ export async function setCitizenCid(
   }
 
   try {
+    const db = await getDb();
     await db.transaction(async (tx) => {
       await tx
         .update(users)
@@ -311,15 +323,22 @@ export async function deleteCitizen(
   const found = await getCitizenOrError(userId);
   if ('error' in found) return { error: found.error };
 
-  const db = await getDb();
-  const referenced = await firstOrUndefined(
-    db.select({ id: cases.id }).from(cases).where(eq(cases.submittedBy, userId)).limit(1),
-  );
+  let referenced;
+  try {
+    const db = await getDb();
+    referenced = await firstOrUndefined(
+      db.select({ id: cases.id }).from(cases).where(eq(cases.submittedBy, userId)).limit(1),
+    );
+  } catch (err) {
+    console.error('[deleteCitizen] check referenced failed', err);
+    return { error: 'เกิดข้อผิดพลาดในการตรวจสอบเรื่องร้องเรียนที่เกี่ยวข้อง' };
+  }
   if (referenced) {
     return { error: 'ลบบัญชีนี้ไม่ได้ เพราะยังมีเรื่องแจ้งที่อ้างถึงอยู่ (ให้ปิดใช้งานแทน)' };
   }
 
   try {
+    const db = await getDb();
     await db.transaction(async (tx) => {
       // § ตัดผูก LINE ก่อนลบ — กัน linkedUserId ลอยชี้ไปหา id ที่ไม่มีแล้ว
       await tx

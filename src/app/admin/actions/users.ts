@@ -54,12 +54,17 @@ export async function createUser(
     return { error: GRANT_DENIED };
   }
 
-  const db = await getDb();
-
   // § เช็ค email ซ้ำ (zod validate format แล้ว แต่ uniqueness ต้องเช็ค DB)
-  const existing = await firstOrUndefined(
-    db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1),
-  );
+  let existing;
+  try {
+    const db = await getDb();
+    existing = await firstOrUndefined(
+      db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1),
+    );
+  } catch (err) {
+    console.error('[createUser] check email failed', err);
+    return { error: 'เกิดข้อผิดพลาดในการตรวจสอบข้อมูลผู้ใช้' };
+  }
   if (existing) {
     return { error: 'อีเมลนี้มีอยู่ในระบบแล้ว' };
   }
@@ -70,6 +75,7 @@ export async function createUser(
     departmentId && departmentId !== '__none__' ? departmentId : null;
 
   try {
+    const db = await getDb();
     // § เขียนข้อมูลผู้ใช้และ audit ใน tx เดียว — audit ล้มต้อง rollback ทั้งก้อน
     await db.transaction(async (tx) => {
       await tx.insert(users).values({
@@ -121,10 +127,16 @@ export async function toggleUserActive(
     return { error: 'ไม่สามารถระงับบัญชีตัวเองได้' };
   }
 
-  const db = await getDb();
-  const target = await firstOrUndefined(
-    db.select({ id: users.id, isActive: users.isActive, fullName: users.fullName, email: users.email, role: users.role }).from(users).where(eq(users.id, userId)).limit(1),
-  );
+  let target;
+  try {
+    const db = await getDb();
+    target = await firstOrUndefined(
+      db.select({ id: users.id, isActive: users.isActive, fullName: users.fullName, email: users.email, role: users.role }).from(users).where(eq(users.id, userId)).limit(1),
+    );
+  } catch (err) {
+    console.error('[toggleUserActive] find user failed', err);
+    return { error: 'เกิดข้อผิดพลาดในการตรวจสอบข้อมูลผู้ใช้' };
+  }
 
   if (!target) {
     return { error: 'ไม่พบผู้ใช้' };
@@ -138,6 +150,7 @@ export async function toggleUserActive(
   const newActive = !target.isActive;
 
   try {
+    const db = await getDb();
     // § เขียนข้อมูลผู้ใช้และ audit ใน tx เดียว — audit ล้มต้อง rollback ทั้งก้อน
     await db.transaction(async (tx) => {
       await tx
@@ -188,10 +201,16 @@ export async function updateUserRole(
     return { error: GRANT_DENIED };
   }
 
-  const db = await getDb();
-  const target = await firstOrUndefined(
-    db.select({ id: users.id, role: users.role, fullName: users.fullName, email: users.email }).from(users).where(eq(users.id, userId)).limit(1),
-  );
+  let target;
+  try {
+    const db = await getDb();
+    target = await firstOrUndefined(
+      db.select({ id: users.id, role: users.role, fullName: users.fullName, email: users.email }).from(users).where(eq(users.id, userId)).limit(1),
+    );
+  } catch (err) {
+    console.error('[updateUserRole] find user failed', err);
+    return { error: 'เกิดข้อผิดพลาดในการตรวจสอบข้อมูลผู้ใช้' };
+  }
 
   if (!target) {
     return { error: 'ไม่พบผู้ใช้' };
@@ -205,6 +224,7 @@ export async function updateUserRole(
   const deptValue = departmentId && departmentId !== '__none__' ? departmentId : null;
 
   try {
+    const db = await getDb();
     // § เขียนข้อมูลผู้ใช้และ audit ใน tx เดียว — audit ล้มต้อง rollback ทั้งก้อน
     await db.transaction(async (tx) => {
       await tx
@@ -255,16 +275,23 @@ export async function resetPassword(
     return { error: 'ไม่สามารถรีเซ็ตรหัสผ่านตัวเองได้จากที่นี่' };
   }
 
-  const db = await getDb();
-  const target = await firstOrUndefined(
-    db.select({ id: users.id, fullName: users.fullName, email: users.email, role: users.role }).from(users).where(eq(users.id, userId)).limit(1),
-  );
+  let target;
+  try {
+    const db = await getDb();
+    target = await firstOrUndefined(
+      db.select({ id: users.id, fullName: users.fullName, email: users.email, role: users.role }).from(users).where(eq(users.id, userId)).limit(1),
+    );
+  } catch (err) {
+    console.error('[resetPassword] find user failed', err);
+    return { error: 'เกิดข้อผิดพลาดในการตรวจสอบข้อมูลผู้ใช้' };
+  }
 
   if (!target) {
     return { error: 'ไม่พบผู้ใช้' };
   }
 
   try {
+    const db = await getDb();
     // § bcrypt อยู่นอก tx แต่ใน try เดิม เพื่อไม่ถือ connection ระหว่าง hash และคง error เดิม
     const passwordHash = await hashPassword(newPassword);
     // § เขียนข้อมูลผู้ใช้และ audit ใน tx เดียว — audit ล้มต้อง rollback ทั้งก้อน

@@ -51,133 +51,158 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
   }
 
   async function handleDeleteKeyword(keywordId: string) {
-    if (!item) return;
+    if (!item || mutating) return;
     // § server min(1) — ลบตัวสุดท้ายฝั่ง client ก่อนยิง ไม่ให้ 400 แล้วงง
     if (item.keywords.length <= 1) {
       notify('error', 'ต้องเหลือ keyword อย่างน้อย 1 คำ');
       return;
     }
-    // § FORM-06: ใช้ useConfirm แทน window.confirm
-    const ok = await confirm({
-      title: 'ลบ keyword',
-      description: 'ลบ keyword นี้ใช่หรือไม่?',
-      confirmText: 'ลบ',
-      danger: true,
-    });
-    if (!ok) return;
-    const res = await adminApi.updateIntent(item.id, {
-      keywords: item.keywords.filter((k) => k.id !== keywordId).map((k) => ({ keyword: k.keyword, matchType: k.matchType })),
-    });
-    if (!res.ok) {
-      notify('error', res.error);
-      return;
+    setMutating(true);
+    try {
+      // § FORM-06: ใช้ useConfirm แทน window.confirm
+      const ok = await confirm({
+        title: 'ลบ keyword',
+        description: 'ลบ keyword นี้ใช่หรือไม่?',
+        confirmText: 'ลบ',
+        danger: true,
+      });
+      if (!ok) return;
+      const res = await adminApi.updateIntent(item.id, {
+        keywords: item.keywords.filter((k) => k.id !== keywordId).map((k) => ({ keyword: k.keyword, matchType: k.matchType })),
+      });
+      if (!res.ok) {
+        notify('error', res.error);
+        return;
+      }
+      await reload();
+    } finally {
+      setMutating(false);
     }
-    await reload();
   }
 
   async function handleDeleteResponse(responseId: string) {
-    if (!item) return;
+    if (!item || mutating) return;
     // § server min(1) — เหมือน keyword
     if (item.responses.length <= 1) {
       notify('error', 'ต้องเหลือคำตอบอย่างน้อย 1 ข้อ');
       return;
     }
-    // § FORM-06: ใช้ useConfirm แทน window.confirm
-    const ok = await confirm({
-      title: 'ลบคำตอบ',
-      description: 'ลบคำตอบนี้ใช่หรือไม่?',
-      confirmText: 'ลบ',
-      danger: true,
-    });
-    if (!ok) return;
-    const res = await adminApi.updateIntent(item.id, {
-      responses: item.responses
-        .filter((r) => r.id !== responseId)
-        .map((r, i) => ({
-          replyType: r.replyType,
-          textContent: r.textContent,
-          replyObjectId: r.replyObjectId,
-          displayOrder: i,
-        })),
-    });
-    if (!res.ok) {
-      notify('error', res.error);
-      return;
+    setMutating(true);
+    try {
+      // § FORM-06: ใช้ useConfirm แทน window.confirm
+      const ok = await confirm({
+        title: 'ลบคำตอบ',
+        description: 'ลบคำตอบนี้ใช่หรือไม่?',
+        confirmText: 'ลบ',
+        danger: true,
+      });
+      if (!ok) return;
+      const res = await adminApi.updateIntent(item.id, {
+        responses: item.responses
+          .filter((r) => r.id !== responseId)
+          .map((r, i) => ({
+            replyType: r.replyType,
+            textContent: r.textContent,
+            replyObjectId: r.replyObjectId,
+            displayOrder: i,
+          })),
+      });
+      if (!res.ok) {
+        notify('error', res.error);
+        return;
+      }
+      await reload();
+    } finally {
+      setMutating(false);
     }
-    await reload();
   }
 
   async function saveMeta() {
-    if (!item || nameDraft === null) return;
+    if (!item || nameDraft === null || mutating) return;
     const trimmed = nameDraft.trim();
     if (!trimmed) {
       notify('error', 'ชื่อหมวดต้องไม่ว่าง');
       return;
     }
-    const res = await adminApi.updateIntent(item.id, {
-      name: trimmed,
-      description: (descDraft ?? '').trim() || null,
-    });
-    if (!res.ok) {
-      notify('error', res.error);
-      return;
+    setMutating(true);
+    try {
+      const res = await adminApi.updateIntent(item.id, {
+        name: trimmed,
+        description: (descDraft ?? '').trim() || null,
+      });
+      if (!res.ok) {
+        notify('error', res.error);
+        return;
+      }
+      notify('success', 'บันทึกชื่อ/คำอธิบายแล้ว');
+      setNameDraft(null);
+      setDescDraft(null);
+      await reload();
+    } finally {
+      setMutating(false);
     }
-    notify('success', 'บันทึกชื่อ/คำอธิบายแล้ว');
-    setNameDraft(null);
-    setDescDraft(null);
-    await reload();
   }
 
   async function addKeyword() {
-    if (!item) return;
+    if (!item || mutating) return;
     const kw = newKeyword.trim();
     if (!kw) {
       notify('error', 'กรุณากรอก keyword');
       return;
     }
-    const res = await adminApi.updateIntent(item.id, {
-      keywords: [
-        ...item.keywords.map((k) => ({ keyword: k.keyword, matchType: k.matchType })),
-        { keyword: kw, matchType: newMatchType },
-      ],
-    });
-    if (!res.ok) {
-      notify('error', res.error);
-      return;
+    setMutating(true);
+    try {
+      const res = await adminApi.updateIntent(item.id, {
+        keywords: [
+          ...item.keywords.map((k) => ({ keyword: k.keyword, matchType: k.matchType })),
+          { keyword: kw, matchType: newMatchType },
+        ],
+      });
+      if (!res.ok) {
+        notify('error', res.error);
+        return;
+      }
+      setNewKeyword('');
+      await reload();
+    } finally {
+      setMutating(false);
     }
-    setNewKeyword('');
-    await reload();
   }
 
   async function addResponse() {
-    if (!item) return;
+    if (!item || mutating) return;
     const value = newResponseText.trim();
     if (!value) {
       notify('error', newReplyType === 'text' ? 'กรุณากรอกข้อความคำตอบ' : 'กรุณากรอก reply object id');
       return;
     }
-    const res = await adminApi.updateIntent(item.id, {
-      responses: [
-        ...item.responses.map((r) => ({
-          replyType: r.replyType,
-          textContent: r.textContent,
-          replyObjectId: r.replyObjectId,
-          displayOrder: r.displayOrder,
-        })),
-        {
-          replyType: newReplyType,
-          textContent: newReplyType === 'text' ? value : null,
-          replyObjectId: newReplyType === 'reply_object' ? value : null,
-          displayOrder: item.responses.length,
-        },
-      ],
-    });
-    if (!res.ok) {
-      notify('error', res.error);
-      return;
+    setMutating(true);
+    try {
+      const res = await adminApi.updateIntent(item.id, {
+        responses: [
+          ...item.responses.map((r) => ({
+            replyType: r.replyType,
+            textContent: r.textContent,
+            replyObjectId: r.replyObjectId,
+            displayOrder: r.displayOrder,
+          })),
+          {
+            replyType: newReplyType,
+            textContent: newReplyType === 'text' ? value : null,
+            replyObjectId: newReplyType === 'reply_object' ? value : null,
+            displayOrder: item.responses.length,
+          },
+        ],
+      });
+      if (!res.ok) {
+        notify('error', res.error);
+        return;
+      }
+      setNewResponseText('');
+      await reload();
+    } finally {
+      setMutating(false);
     }
-    setNewResponseText('');
-    await reload();
   }
 
   if (loading) return <div className="py-12 text-center text-muted">กำลังโหลด...</div>;
@@ -247,8 +272,8 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
               className="min-h-touch w-full rounded-md border border-border bg-surface-raised px-3 text-sm text-ink"
             />
             <div className="flex gap-2">
-              <Button onClick={() => void saveMeta()} className="text-xs">บันทึก</Button>
-              <Button variant="ghost" onClick={() => { setNameDraft(null); setDescDraft(null); }}>
+              <Button disabled={mutating} onClick={() => void saveMeta()} className="text-xs">บันทึก</Button>
+              <Button disabled={mutating} variant="ghost" onClick={() => { setNameDraft(null); setDescDraft(null); }}>
                 ยกเลิก
               </Button>
             </div>
@@ -292,8 +317,9 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
                   </span>
                   <button
                     type="button"
+                    disabled={mutating}
                     onClick={() => handleDeleteKeyword(kw.id)}
-                    className="flex min-h-touch min-w-touch items-center justify-center rounded-md hover:bg-danger/10"
+                    className="flex min-h-touch min-w-touch items-center justify-center rounded-md hover:bg-danger/10 disabled:opacity-50"
                     aria-label={`ลบ keyword ${kw.keyword}`}
                   >
                     <Trash2 className="h-4 w-4 text-danger" />
@@ -329,7 +355,7 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
                 <option value="regex">regex</option>
               </select>
             </div>
-            <Button onClick={() => void addKeyword()} className="gap-1 text-xs">
+            <Button disabled={mutating} onClick={() => void addKeyword()} className="gap-1 text-xs">
               <Plus className="h-3.5 w-3.5" /> เพิ่ม
             </Button>
           </div>
@@ -353,8 +379,9 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
                   </span>
                   <button
                     type="button"
+                    disabled={mutating}
                     onClick={() => handleDeleteResponse(r.id)}
-                    className="flex min-h-touch min-w-touch items-center justify-center rounded-md hover:bg-danger/10"
+                    className="flex min-h-touch min-w-touch items-center justify-center rounded-md hover:bg-danger/10 disabled:opacity-50"
                     aria-label="ลบคำตอบนี้"
                   >
                     <Trash2 className="h-4 w-4 text-danger" />
@@ -388,7 +415,7 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
                 <option value="reply_object">reply object</option>
               </select>
             </div>
-            <Button onClick={() => void addResponse()} className="gap-1 text-xs">
+            <Button disabled={mutating} onClick={() => void addResponse()} className="gap-1 text-xs">
               <Plus className="h-3.5 w-3.5" /> เพิ่ม
             </Button>
           </div>

@@ -411,8 +411,12 @@ export async function uploadResolutionPhotoAction(
     } catch {
       // ignore rollback cleanup failure
     }
+    const isDomainError =
+      err instanceof Error &&
+      (err.message === 'ไม่พบเรื่องที่ระบุ' ||
+        err.message === 'สามารถแนบภาพถ่ายผลการดำเนินงานได้เฉพาะเรื่องที่กำลังดำเนินการหรือเสร็จสิ้นแล้วเท่านั้น');
     return {
-      error: err instanceof Error ? err.message : 'บันทึกข้อมูลไม่สำเร็จ กรุณาลองใหม่',
+      error: isDomainError ? err.message : 'บันทึกข้อมูลไม่สำเร็จ กรุณาลองใหม่',
     };
   }
 }
@@ -528,8 +532,11 @@ export async function deleteResolutionPhotoAction(
     return { error: null, success: 'ลบภาพถ่ายเรียบร้อย' };
   } catch (err) {
     console.error('[deleteResolutionPhotoAction] failed:', err);
+    const isDomainError =
+      err instanceof Error &&
+      (err.message === 'ไม่พบเรื่องที่ระบุ' || err.message === 'ไม่พบภาพถ่ายที่ต้องการลบ');
     return {
-      error: err instanceof Error ? err.message : 'ลบภาพถ่ายไม่สำเร็จ กรุณาลองใหม่',
+      error: isDomainError ? err.message : 'ลบภาพถ่ายไม่สำเร็จ กรุณาลองใหม่',
     };
   }
 }

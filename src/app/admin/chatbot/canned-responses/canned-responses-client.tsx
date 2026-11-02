@@ -60,6 +60,8 @@ export function CannedResponsesClient() {
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [viewRow, setViewRow] = useState<CannedResponse | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const { confirm, dialog: confirmDialog } = useConfirm();
 
   const startCreate = () => {
@@ -105,34 +107,45 @@ export function CannedResponsesClient() {
   };
 
   const handleToggleActive = async (item: CannedResponse) => {
-    const isActive = !(item.isActive ?? true);
-    const result = await updateCannedResponse(item.id, { isActive });
-    if (!result.ok) {
-      notify('error', result.error ?? 'อัปเดตสถานะไม่สำเร็จ');
-      return;
+    if (togglingId) return;
+    setTogglingId(item.id);
+    try {
+      const isActive = !(item.isActive ?? true);
+      const result = await updateCannedResponse(item.id, { isActive });
+      if (!result.ok) {
+        notify('error', result.error ?? 'อัปเดตสถานะไม่สำเร็จ');
+        return;
+      }
+      await reload();
+    } finally {
+      setTogglingId(null);
     }
-    await reload();
   };
 
   const handleDelete = async (item: CannedResponse) => {
-    if (busy) return;
-    // § FORM-06: ใช้ useConfirm แทน window.confirm
-    const ok = await confirm({
-      title: 'ลบข้อความสำเร็จรูป',
-      description: `ลบ "${item.title}" ใช่หรือไม่? ลบแล้วกู้คืนไม่ได้`,
-      confirmText: 'ลบ',
-      danger: true,
-    });
-    if (!ok) return;
-    setBusy(true);
-    const result = await deleteCannedResponse(item.id);
-    setBusy(false);
-    if (!result) {
-      notify('error', 'ลบไม่สำเร็จ');
-      return;
+    if (busy || deletingId) return;
+    setDeletingId(item.id);
+    try {
+      // § FORM-06: ใช้ useConfirm แทน window.confirm
+      const ok = await confirm({
+        title: 'ลบข้อความสำเร็จรูป',
+        description: `ลบ "${item.title}" ใช่หรือไม่? ลบแล้วกู้คืนไม่ได้`,
+        confirmText: 'ลบ',
+        danger: true,
+      });
+      if (!ok) return;
+      setBusy(true);
+      const result = await deleteCannedResponse(item.id);
+      setBusy(false);
+      if (!result) {
+        notify('error', 'ลบไม่สำเร็จ');
+        return;
+      }
+      if (editingId === item.id) setFormOpen(false);
+      await reload();
+    } finally {
+      setDeletingId(null);
     }
-    if (editingId === item.id) setFormOpen(false);
-    await reload();
   };
 
   return (
@@ -220,10 +233,11 @@ export function CannedResponsesClient() {
                           role="switch"
                           aria-checked={isActive}
                           aria-label={`${isActive ? 'ปิด' : 'เปิด'}ใช้งาน ${item.title}`}
+                          disabled={togglingId === item.id}
                           onClick={() => void handleToggleActive(item)}
                           className={`relative inline-flex h-5 w-9 flex-none items-center rounded-pill transition-colors duration-normal ${
                             isActive ? 'bg-accent-strong' : 'bg-surface-sunken'
-                          }`}
+                          } ${togglingId === item.id ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                           <span
                             aria-hidden="true"
@@ -257,9 +271,10 @@ export function CannedResponsesClient() {
                         </button>
                         <button
                           type="button"
+                          disabled={deletingId === item.id || busy}
                           onClick={() => void handleDelete(item)}
                           aria-label={`ลบ ${item.title}`}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted hover:bg-danger-soft hover:text-danger focus-visible:outline focus-visible:outline-2 focus-visible:outline-danger"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted hover:bg-danger-soft hover:text-danger focus-visible:outline focus-visible:outline-2 focus-visible:outline-danger disabled:opacity-50"
                         >
                           <Trash2 className="h-4 w-4" aria-hidden="true" />
                         </button>

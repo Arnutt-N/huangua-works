@@ -149,18 +149,7 @@ export function ResponsibleClient({
                     />
                   </DialogContent>
                 </Dialog>
-                <form action={toggleResponsibleAction}>
-                  <input type="hidden" name="raw" value={r.raw} />
-                  <Button
-                    type="submit"
-                    variant="ghost"
-                    size="sm"
-                    aria-label={`${r.isActive ? 'ปิดใช้งาน' : 'เปิดใช้งาน'} mapping ${r.raw}`}
-                    title={r.isActive ? 'ปิดใช้งาน (แถวที่อ้างถึงค้าง blocked)' : 'เปิดใช้งาน'}
-                  >
-                    <Power className="h-4 w-4" aria-hidden="true" />
-                  </Button>
-                </form>
+                <ToggleResponsibleButton row={r} />
                 <DeleteDialog row={r} open={openId === `del-${r.raw}`} onOpenChange={(o) => setOpenId(o ? `del-${r.raw}` : null)} />
               </div>
             </li>
@@ -306,12 +295,34 @@ function DeleteDialog({ row, open, onOpenChange }: { row: ResponsibleRow; open: 
   );
 }
 
-/**
- * toggle ถูกเรียกแบบ inline (ไม่ใช่ dialog) — wrapper ให้ signature ตรงกับ
- * form action expectation (void return) เหมือน toggleUserAction ใน users-client
- */
-async function toggleResponsibleAction(formData: FormData): Promise<void> {
-  await toggleResponsibleActive({ error: null }, formData);
+function ToggleResponsibleButton({ row }: { row: ResponsibleRow }) {
+  const [state, formAction, pending] = useActionState(toggleResponsibleActive, initial);
+
+  return (
+    <form action={formAction} className="inline-flex items-center gap-1">
+      <input type="hidden" name="raw" value={row.raw} />
+      <Button
+        type="submit"
+        variant="ghost"
+        size="sm"
+        disabled={pending}
+        aria-busy={pending}
+        aria-label={`${row.isActive ? 'ปิดใช้งาน' : 'เปิดใช้งาน'} mapping ${row.raw}`}
+        title={row.isActive ? 'ปิดใช้งาน (แถวที่อ้างถึงค้าง blocked)' : 'เปิดใช้งาน'}
+      >
+        {pending ? (
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+        ) : (
+          <Power className="h-4 w-4" aria-hidden="true" />
+        )}
+      </Button>
+      {state?.error && (
+        <span role="alert" className="text-xs text-danger-ink">
+          {state.error}
+        </span>
+      )}
+    </form>
+  );
 }
 
 function PendingBadge() {

@@ -1,7 +1,6 @@
 'use client';
 
 import { useActionState, useEffect, useState } from 'react';
-import { useFormStatus } from 'react-dom';
 import {
   AlertCircle,
   Building2,
@@ -472,30 +471,33 @@ function ToggleButton({
   isActive: boolean;
   name: string;
 }) {
-  // § กันดับเบิลคลิกสลับ isActive สองรอบโดยผู้ใช้ไม่รู้ตัว (NET-04) — form action เป็น
-  // server action จึงใช้ useFormStatus ใน child ตามที่ Next แนะนำ ไม่ใช่ useState ใน parent
+  const [state, formAction, pending] = useActionState(toggleActive, initial);
+
   return (
-    <form action={toggleActive}>
+    <form action={formAction} className="inline-flex items-center gap-1">
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="kind" value={kind} />
-      <ToggleSubmit isActive={isActive} name={name} />
+      <Button
+        type="submit"
+        variant="ghost"
+        size="sm"
+        disabled={pending}
+        aria-busy={pending}
+        aria-label={`${isActive ? 'ปิดใช้งาน' : 'เปิดใช้งาน'} ${name}`}
+        title={isActive ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}
+      >
+        {pending ? (
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+        ) : (
+          <Power className="h-4 w-4" aria-hidden="true" />
+        )}
+      </Button>
+      {state?.error && (
+        <span role="alert" className="text-xs text-danger-ink">
+          {state.error}
+        </span>
+      )}
     </form>
-  );
-}
-
-function ToggleSubmit({ isActive, name }: { isActive: boolean; name: string }) {
-  const { pending } = useFormStatus();
-  return (
-    <Button
-      type="submit"
-      variant="ghost"
-      size="sm"
-      disabled={pending}
-      aria-label={`${isActive ? 'ปิดใช้งาน' : 'เปิดใช้งาน'} ${name}`}
-      title={isActive ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}
-    >
-      <Power className="h-4 w-4" aria-hidden="true" />
-    </Button>
   );
 }
 

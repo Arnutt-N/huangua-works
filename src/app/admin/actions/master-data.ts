@@ -47,27 +47,27 @@ export async function saveDepartment(
   if (!v.success) return { error: v.error };
   const { id, name, slug, description } = v.data;
 
-  const db = await getDb();
-
-  // name และ slug เป็น unique ทั้งคู่ — เช็คก่อนเพื่อคืนข้อความไทยแทน error ของ Postgres
-  // ตอนแก้ไขต้องยกเว้นแถวตัวเอง ไม่งั้นบันทึกทับตัวเองไม่ได้
-  const clash = await firstOrUndefined(
-    db
-      .select({ id: departments.id })
-      .from(departments)
-      .where(
-        id
-          ? and(
-              or(eq(departments.name, name), eq(departments.slug, slug)),
-              ne(departments.id, id),
-            )
-          : or(eq(departments.name, name), eq(departments.slug, slug)),
-      )
-      .limit(1),
-  );
-  if (clash) return { error: 'มีหน่วยงานที่ใช้ชื่อหรือ slug นี้แล้ว' };
-
   try {
+    const db = await getDb();
+
+    // name และ slug เป็น unique ทั้งคู่ — เช็คก่อนเพื่อคืนข้อความไทยแทน error ของ Postgres
+    // ตอนแก้ไขต้องยกเว้นแถวตัวเอง ไม่งั้นบันทึกทับตัวเองไม่ได้
+    const clash = await firstOrUndefined(
+      db
+        .select({ id: departments.id })
+        .from(departments)
+        .where(
+          id
+            ? and(
+                or(eq(departments.name, name), eq(departments.slug, slug)),
+                ne(departments.id, id),
+              )
+            : or(eq(departments.name, name), eq(departments.slug, slug)),
+        )
+        .limit(1),
+    );
+    if (clash) return { error: 'มีหน่วยงานที่ใช้ชื่อหรือ slug นี้แล้ว' };
+
     if (id) {
       await db
         .update(departments)
@@ -90,7 +90,8 @@ export async function saveDepartment(
       userAgent,
       metadata: { name, slug },
     });
-  } catch {
+  } catch (err) {
+    console.error('[master-data] saveDepartment failed', err);
     return { error: 'บันทึกไม่สำเร็จ กรุณาลองใหม่' };
   }
 
@@ -112,41 +113,41 @@ export async function saveCategory(
   if (!v.success) return { error: v.error };
   const { id, name, slug, description, defaultDepartmentId, estimatedDays } = v.data;
 
-  const db = await getDb();
+  try {
+    const db = await getDb();
 
-  const clash = await firstOrUndefined(
-    db
-      .select({ id: categories.id })
-      .from(categories)
-      .where(
-        id
-          ? and(
-              or(eq(categories.name, name), eq(categories.slug, slug)),
-              ne(categories.id, id),
-            )
-          : or(eq(categories.name, name), eq(categories.slug, slug)),
-      )
-      .limit(1),
-  );
-  if (clash) return { error: 'มีหมวดหมู่ที่ใช้ชื่อหรือ slug นี้แล้ว' };
-
-  const deptValue =
-    defaultDepartmentId && defaultDepartmentId !== '__none__' ? defaultDepartmentId : null;
-
-  // § ตรวจว่าหน่วยงานที่อ้างมีจริง — categories.default_department_id ไม่มี FK constraint
-  // ในสคีมา ถ้าไม่ตรวจจะบันทึก id ที่ไม่มีอยู่ได้และหน้าอื่นจะ join ไม่เจอเงียบ ๆ
-  if (deptValue) {
-    const dept = await firstOrUndefined(
+    const clash = await firstOrUndefined(
       db
-        .select({ id: departments.id })
-        .from(departments)
-        .where(eq(departments.id, deptValue))
+        .select({ id: categories.id })
+        .from(categories)
+        .where(
+          id
+            ? and(
+                or(eq(categories.name, name), eq(categories.slug, slug)),
+                ne(categories.id, id),
+              )
+            : or(eq(categories.name, name), eq(categories.slug, slug)),
+        )
         .limit(1),
     );
-    if (!dept) return { error: 'ไม่พบหน่วยงานที่เลือก' };
-  }
+    if (clash) return { error: 'มีหมวดหมู่ที่ใช้ชื่อหรือ slug นี้แล้ว' };
 
-  try {
+    const deptValue =
+      defaultDepartmentId && defaultDepartmentId !== '__none__' ? defaultDepartmentId : null;
+
+    // § ตรวจว่าหน่วยงานที่อ้างมีจริง — categories.default_department_id ไม่มี FK constraint
+    // ในสคีมา ถ้าไม่ตรวจจะบันทึก id ที่ไม่มีอยู่ได้และหน้าอื่นจะ join ไม่เจอเงียบ ๆ
+    if (deptValue) {
+      const dept = await firstOrUndefined(
+        db
+          .select({ id: departments.id })
+          .from(departments)
+          .where(eq(departments.id, deptValue))
+          .limit(1),
+      );
+      if (!dept) return { error: 'ไม่พบหน่วยงานที่เลือก' };
+    }
+
     if (id) {
       await db
         .update(categories)
@@ -177,7 +178,8 @@ export async function saveCategory(
       userAgent,
       metadata: { name, slug, estimatedDays },
     });
-  } catch {
+  } catch (err) {
+    console.error('[master-data] saveCategory failed', err);
     return { error: 'บันทึกไม่สำเร็จ กรุณาลองใหม่' };
   }
 
@@ -189,43 +191,48 @@ export async function saveCategory(
 // เปิด/ปิดใช้งาน (แทนการลบ)
 // ────────────────────────────────────────────────────────────────────────────
 
-export async function toggleActive(formData: FormData): Promise<void> {
+export async function toggleActive(
+  prevStateOrFormData: MasterDataActionState | FormData,
+  maybeFormData?: FormData,
+): Promise<MasterDataActionState> {
   const { user: actor, ipAddress, userAgent } = await requireStaff(ADMIN_ROLES);
 
+  const formData = maybeFormData instanceof FormData ? maybeFormData : (prevStateOrFormData as FormData);
   const v = validateFormData(toggleActiveFormSchema, formData);
-  if (!v.success) return;
+  if (!v.success) return { error: v.error };
   const { id, kind } = v.data;
 
-  const db = await getDb();
-  const table = kind === 'department' ? departments : categories;
-
-  const row = await firstOrUndefined(
-    db.select({ isActive: table.isActive, name: table.name }).from(table).where(eq(table.id, id)).limit(1),
-  );
-  if (!row) return;
-
-  const next = !row.isActive;
+  let next = false;
   try {
+    const db = await getDb();
+    const table = kind === 'department' ? departments : categories;
+
+    const row = await firstOrUndefined(
+      db.select({ isActive: table.isActive, name: table.name }).from(table).where(eq(table.id, id)).limit(1),
+    );
+    if (!row) return { error: 'ไม่พบข้อมูลที่ระบุ' };
+
+    next = !row.isActive;
     await db.update(table).set({ isActive: next }).where(eq(table.id, id));
+
+    await logAudit({
+      userId: actor.id,
+      action: next
+        ? (kind === 'department' ? AUDIT_ACTIONS.DEPARTMENT_ACTIVATE : AUDIT_ACTIONS.CATEGORY_ACTIVATE)
+        : (kind === 'department' ? AUDIT_ACTIONS.DEPARTMENT_DEACTIVATE : AUDIT_ACTIONS.CATEGORY_DEACTIVATE),
+      resource: kind === 'department' ? 'departments' : 'categories',
+      resourceId: id,
+      ipAddress,
+      userAgent,
+      metadata: { name: row.name },
+    });
   } catch (err) {
-    // § toggle ผ่าน form action (ไม่มี return) — error ไปทาง log + ไม่ throw ให้ Next แสดงหน้า error ดิบ
     console.error('[master-data] toggle failed', err);
-    return;
+    return { error: 'สลับสถานะไม่สำเร็จ กรุณาลองใหม่' };
   }
 
-  await logAudit({
-    userId: actor.id,
-    action: next
-      ? (kind === 'department' ? AUDIT_ACTIONS.DEPARTMENT_ACTIVATE : AUDIT_ACTIONS.CATEGORY_ACTIVATE)
-      : (kind === 'department' ? AUDIT_ACTIONS.DEPARTMENT_DEACTIVATE : AUDIT_ACTIONS.CATEGORY_DEACTIVATE),
-    resource: kind === 'department' ? 'departments' : 'categories',
-    resourceId: id,
-    ipAddress,
-    userAgent,
-    metadata: { name: row.name },
-  });
-
   revalidatePath('/admin/master-data');
+  return { error: null, success: next ? 'เปิดใช้งานแล้ว' : 'ปิดใช้งานแล้ว' };
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -240,22 +247,23 @@ export async function deleteDepartment(
 
   const id = String(formData.get('id') ?? '').trim();
   if (!id) return { error: 'ไม่พบหน่วยงานที่ระบุ' };
-  const db = await getDb();
-  const target = await firstOrUndefined(
-    db.select({ id: departments.id, name: departments.name }).from(departments).where(eq(departments.id, id)).limit(1),
-  );
-  if (!target) return { error: 'ไม่พบหน่วยงานที่ระบุ' };
-
-  // § ลบไม่ได้ถ้ามีอ้างถึงจาก 4 ที่ — ให้ปิดใช้งานแทน (pattern เดียวกับ responsible)
-  const refs = await Promise.all([
-    firstOrUndefined(db.select({ id: cases.id }).from(cases).where(eq(cases.departmentId, id)).limit(1)),
-    firstOrUndefined(db.select({ id: users.id }).from(users).where(eq(users.departmentId, id)).limit(1)),
-    firstOrUndefined(db.select({ id: categories.id }).from(categories).where(eq(categories.defaultDepartmentId, id)).limit(1)),
-    firstOrUndefined(db.select({ raw: legacyResponsibleMap.raw }).from(legacyResponsibleMap).where(eq(legacyResponsibleMap.departmentId, id)).limit(1)),
-  ]);
-  if (refs.some(Boolean)) return { error: 'ลบหน่วยงานนี้ไม่ได้ — มีเรื่อง ผู้ใช้ หมวดหมู่ หรือแผนที่อ้างถึงอยู่ ให้ปิดใช้งานแทน' };
 
   try {
+    const db = await getDb();
+    const target = await firstOrUndefined(
+      db.select({ id: departments.id, name: departments.name }).from(departments).where(eq(departments.id, id)).limit(1),
+    );
+    if (!target) return { error: 'ไม่พบหน่วยงานที่ระบุ' };
+
+    // § ลบไม่ได้ถ้ามีอ้างถึงจาก 4 ที่ — ให้ปิดใช้งานแทน (pattern เดียวกับ responsible)
+    const refs = await Promise.all([
+      firstOrUndefined(db.select({ id: cases.id }).from(cases).where(eq(cases.departmentId, id)).limit(1)),
+      firstOrUndefined(db.select({ id: users.id }).from(users).where(eq(users.departmentId, id)).limit(1)),
+      firstOrUndefined(db.select({ id: categories.id }).from(categories).where(eq(categories.defaultDepartmentId, id)).limit(1)),
+      firstOrUndefined(db.select({ raw: legacyResponsibleMap.raw }).from(legacyResponsibleMap).where(eq(legacyResponsibleMap.departmentId, id)).limit(1)),
+    ]);
+    if (refs.some(Boolean)) return { error: 'ลบหน่วยงานนี้ไม่ได้ — มีเรื่อง ผู้ใช้ หมวดหมู่ หรือแผนที่อ้างถึงอยู่ ให้ปิดใช้งานแทน' };
+
     await db.delete(departments).where(eq(departments.id, id));
     await logAudit({
       userId: actor.id,
@@ -266,7 +274,8 @@ export async function deleteDepartment(
       userAgent,
       metadata: { name: target.name },
     });
-  } catch {
+  } catch (err) {
+    console.error('[master-data] deleteDepartment failed', err);
     return { error: 'ลบข้อมูลไม่สำเร็จ กรุณาลองใหม่' };
   }
   revalidatePath('/admin/master-data');

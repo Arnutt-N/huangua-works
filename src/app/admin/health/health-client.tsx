@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { HeartPulse, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import { AdminErrorState } from '@/components/admin/admin-error-state';
@@ -8,11 +9,22 @@ import { adminApi } from '@/app/admin/_lib/admin-api';
 import { useResource } from '@/app/admin/_lib/use-resource';
 
 export function HealthClient() {
+  const [refreshing, setRefreshing] = useState(false);
   const { data, loading, error, errorCode, feedback, reload } = useResource({
     load: adminApi.getHealth,
     intervalMs: 30_000,
     loadingOnReload: false, // คงพฤติกรรมเดิม: refresh ไม่ปิดข้อมูลระหว่างโหลด
   });
+
+  async function handleReload() {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await reload();
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   if (loading) return <div className="py-12 text-center text-muted">กำลังตรวจสอบ...</div>;
   // § ห้าม return ก่อน banner — reload ล้มขณะมี data เดิมต้องเห็นข้อความจาก server ด้วย
@@ -24,8 +36,14 @@ export function HealthClient() {
       <AdminCardTitle
         icon={<HeartPulse className="h-4 w-4" />}
         action={
-          <Button variant="outline" onClick={() => void reload()} className="min-h-touch gap-1.5 text-sm">
-            <RefreshCw className="h-3.5 w-3.5" /> Refresh
+          <Button
+            variant="outline"
+            onClick={() => void handleReload()}
+            disabled={refreshing}
+            aria-busy={refreshing}
+            className="min-h-touch gap-1.5 text-sm"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} /> Refresh
           </Button>
         }
       >
