@@ -17,6 +17,7 @@ vi.mock('@/lib/line/client', () => ({
     return `line-new-${line.created.length}`;
   }),
   getLineRichMenu: vi.fn(async () => line.remoteMenu),
+  getLineRichMenuImage: vi.fn(async () => null),
   deleteLineRichMenu: vi.fn(async (id: string) => {
     line.deleted.push(id);
   }),
