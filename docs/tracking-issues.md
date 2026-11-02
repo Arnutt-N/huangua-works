@@ -108,7 +108,7 @@
 | ID | ชื่อ | Milestone | Priority | ประเภท | คำอธิบาย | Acceptance Criteria | Dependency | Estimate |
 |---|---|---|---|---|---|---|---|---|
 | P2-01 | LINE LIFF OAuth bridge + Mobile Integration | P2 | P1 | feat | บูรณาการ LINE LIFF เต็มรูปแบบ (`/intake`, `/track`) พร้อม Session Cookie HMAC และดึงข้อมูลโปรไฟล์อัตโนมัติ (เสร็จสมบูรณ์ใน PR #191) | LIFF login ทำงาน; กรอกฟอร์มอัตโนมัติ; แสดงเรื่องของฉัน; ผ่านการทดสอบเจาะระบบ | P1-13 | L |
-| P2-02 | Live Chat + Telegram | P2 | P1 | feat | `src/modules/live-chat/*` Live Chat + Telegram integration | live chat ทำงาน; Telegram ส่งได้; audit บันทึก | P1-13 | L |
+| P2-02 | Staff Telegram Multi-channel Alerts | P2 | P1 | feat | ระบบแจ้งเตือนเจ้าหน้าที่และผู้บริหารผ่าน Telegram Bot สำหรับคิวใหม่และเรื่องเร่งด่วน พร้อมระบบทดสอบการเชื่อมต่อ (เสร็จสมบูรณ์ใน PR #195) | แจ้งเตือน Telegram ทำงาน; probe เชื่อมต่อผ่าน; หน้าตั้งค่าแอดมิน; audit บันทึก | P1-13 | M |
 | P2-03 | จองคิวนัดช่างและนัดหมาย อบต. | P2 | P1 | feat | ระบบบริการจองคิวออนไลน์สำหรับงานช่างและติดต่อราชการ พร้อมปฏิทินเลือกช่วงเวลาและการแจ้งเตือน LINE (เสร็จสมบูรณ์ใน PR #192, ปรับปรุง State Machine ใน PR #193) | จองคิวทำงาน; calendar slot 4 ช่วง/วัน; แจ้งเตือน LINE; admin queue page | P1-13 | M |
 | P2-04 | a11y ผู้สูงอายุเพิ่มเติม (M-A1, M-A2, M-A3) | P2 | P1 | a11y | `prefers-reduced-motion` ตรวจก่อน (SC 2.3.3); draft เก็บเฉพาะ non-PII ใน `localStorage`; auto-fill จาก server หลัง OTP; `aria-describedby` + `role="alert"` ทุก input; error pattern ใน Storybook | reduced-motion ตรวจ; ไม่เก็บ PII ใน client; error pattern ทำงาน; ผ่าน axe | P1-13 | M |
 | P2-05 | PMQA reporting | P2 | P2 | feat | PMQA reporting integration (เสร็จสมบูรณ์ใน PR #185) | PMQA report ออก; ฟอร์แมตตามมาตรฐานเกณฑ์ PMQA หมวด 3/7 พร้อม layout พิมพ์ A4 ใน /admin/reports/pmqa | P1-13 | M |
@@ -120,7 +120,7 @@
 
 | ID | ชื่อ | Milestone | Priority | ประเภท | คำอธิบาย | Acceptance Criteria | Dependency | Estimate |
 |---|---|---|---|---|---|---|---|---|
-| P3-01 | Field App offline (PWA) + sync conflict resolution | P3 | P1 | feat | `src/app/(field)/` PWA offline + sync conflict resolution | offline ทำงาน; sync resolve; ไม่ conflict ข้อมูล | P1-13 | XL |
+| P3-01 | Field App offline (PWA) + sync conflict resolution | P3 | P1 | feat | เว็บแอปออฟไลน์สำหรับช่างลงพื้นที่ 13 หมู่บ้าน พร้อม Web App Manifest, Service Worker และ IndexedDB Store (เสร็จสมบูรณ์ใน PR #196) | offline ทำงาน; sync draft; pwa installable; cache fallback | P1-13 | XL |
 | P3-02 | AI classification | P3 | P2 | feat | `src/modules/ai-classification/*` AI classification + suggest taxonomy | AI suggest ทำงาน; accuracy ≥80%; human review ก่อน accept | P1-01 | XL |
 | P3-03 | e-Sign | P3 | P2 | feat | `src/modules/e-sign/*` e-Signature | e-sign ทำงาน; audit บันทึก; legal compliance | P1-01 | L |
 | P3-04 | Multi-tenant shared schema + `org_id` + RLS | P3 | P1 | arch | `org_id` + shared schema + RLS (ออกแบบตั้งแต่ P0 — เพิ่ม tenant isolation); `SET LOCAL app.org_id` service-role + RLS `current_setting('app.org_id')` | tenant isolation ทำงาน; cross-tenant ไม่รั่ว; audit ตรวจ | P0-01 | L |
