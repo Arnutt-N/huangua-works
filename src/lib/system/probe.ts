@@ -7,7 +7,7 @@ import { isStorageConfigured } from '../storage';
  * unknown แปลว่าตั้งค่าไม่ครบจน probe ไม่ได้ ไม่ใช่ล่ม
  */
 
-export const CONNECTION_PROVIDERS = ['line', 's3', 'smtp'] as const;
+export const CONNECTION_PROVIDERS = ['line', 's3', 'smtp', 'telegram'] as const;
 
 export type ConnectionProvider = (typeof CONNECTION_PROVIDERS)[number];
 
@@ -75,10 +75,23 @@ async function probeSmtp(): Promise<{ status: ConnectionProbeStatus; endpoint: s
   return { status: reachable ? 'connected' : 'degraded', endpoint };
 }
 
+async function probeTelegram(): Promise<{ status: ConnectionProbeStatus; endpoint: string }> {
+  const endpoint = 'https://api.telegram.org';
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return { status: 'unknown', endpoint };
+  try {
+    const res = await fetchWithTimeout(`${endpoint}/bot${token}/getMe`);
+    return { status: res.ok ? 'connected' : 'degraded', endpoint };
+  } catch {
+    return { status: 'degraded', endpoint };
+  }
+}
+
 export async function probeProvider(
   provider: ConnectionProvider,
 ): Promise<{ status: ConnectionProbeStatus; endpoint: string }> {
   if (provider === 'line') return probeLine();
   if (provider === 's3') return probeS3();
+  if (provider === 'telegram') return probeTelegram();
   return probeSmtp();
 }

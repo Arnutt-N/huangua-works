@@ -84,3 +84,79 @@ export async function notifyNewCase(notice: NewCaseNotice): Promise<NotifyDelive
     return [];
   }
 }
+
+export interface NewQueueBookingNotice {
+  bookingId: string;
+  categoryLabel: string;
+  serviceType: string;
+  dateTh: string;
+  slotLabel: string;
+  villageName?: string | null;
+  note?: string | null;
+}
+
+/** ข้อความแจ้งเตือนการจองคิวใหม่ — ภาษาไทย ไม่ใส่ข้อมูลเบอร์โทรหรือชื่อผู้จอง (PDPA) */
+export function buildNewQueueNoticeText(notice: NewQueueBookingNotice): string {
+  return [
+    `หมวดหมู่: ${notice.categoryLabel}`,
+    `เรื่องที่นัดหมาย: ${notice.serviceType}`,
+    `วันนัดหมาย: ${notice.dateTh}`,
+    `ช่วงเวลา: ${notice.slotLabel}`,
+    `พื้นที่: ${notice.villageName?.trim() || 'ที่ทำการ อบต.หัวงัว'}`,
+    notice.note ? `หมายเหตุ: ${notice.note.trim()}` : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+/**
+ * แจ้งเจ้าหน้าที่เมื่อมีการจองคิวนัดหมายใหม่ — fail-open เหมือน sendNotification
+ */
+export async function notifyNewQueueBooking(notice: NewQueueBookingNotice): Promise<NotifyDelivery[]> {
+  try {
+    return await sendNotification({
+      subject: 'มีการจองคิวนัดหมายใหม่',
+      message: buildNewQueueNoticeText(notice),
+    });
+  } catch (error) {
+    console.warn('[notify] new-queue notice failed', error);
+    return [];
+  }
+}
+
+export interface UrgentCaseNotice {
+  trackingCode?: string | null;
+  title: string;
+  categoryName?: string | null;
+  assignedToName?: string | null;
+  reason?: string | null;
+}
+
+/** ข้อความแจ้งเตือนเคสเร่งด่วน — ภาษาไทย */
+export function buildUrgentCaseNoticeText(notice: UrgentCaseNotice): string {
+  return [
+    `เลขอ้างอิง: ${notice.trackingCode?.trim() || '-'}`,
+    `หัวข้อ: ${notice.title}`,
+    notice.categoryName ? `หมวดหมู่: ${notice.categoryName}` : null,
+    notice.assignedToName ? `ผู้รับผิดชอบ: ${notice.assignedToName}` : 'ผู้รับผิดชอบ: ยังไม่ได้มอบหมาย',
+    notice.reason ? `เหตุผล: ${notice.reason.trim()}` : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+/**
+ * แจ้งเจ้าหน้าที่เมื่อเรื่องร้องเรียนถูกปรับเป็นเรื่องเร่งด่วน — fail-open เหมือน sendNotification
+ */
+export async function notifyUrgentCase(notice: UrgentCaseNotice): Promise<NotifyDelivery[]> {
+  try {
+    return await sendNotification({
+      subject: 'แจ้งเตือนเรื่องร้องเรียนเร่งด่วน',
+      message: buildUrgentCaseNoticeText(notice),
+    });
+  } catch (error) {
+    console.warn('[notify] urgent-case notice failed', error);
+    return [];
+  }
+}
+
