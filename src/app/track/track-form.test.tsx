@@ -187,8 +187,8 @@ describe('ฟอร์มติดตามเรื่องสำหรับ�
 
     await waitFor(() => {
       expect(writeTextMock).toHaveBeenCalledWith('HG483729156');
+      expect(screen.getByText('คัดลอกแล้ว')).toBeInTheDocument();
     });
-    expect(screen.getByText('คัดลอกแล้ว')).toBeInTheDocument();
   });
 
   it('แสดงกล่องติดต่อ อบต.หัวงัว พร้อมเบอร์โทรศัพท์และเวลาทำการ', async () => {
@@ -281,5 +281,76 @@ describe('ฟอร์มติดตามเรื่องสำหรับ�
     await userEvent.setup().click(submitBtn);
 
     expect(screen.getByRole('alert')).toHaveTextContent('กรุณาเลือกดาวก่อนส่ง');
+  });
+
+  it('แสดงภาพถ่ายผลการดำเนินงานของเจ้าหน้าที่ (Before & After) เมื่อมีรูปถ่าย และเปิดขยายรูปได้', async () => {
+    const mockCaseWithPhotos = {
+      case: {
+        id: 'c-3',
+        trackingCode: 'HG123456789',
+        createdAt: '2026-10-25T08:00:00.000Z',
+        status: 'done',
+        title: 'ซ่อมท่อระบายน้ำอุดตัน',
+      },
+      category: { id: 'cat-3', name: 'การระบายน้ำ' },
+      updates: [],
+      resolutionPhotos: [
+        {
+          id: 'rp-1',
+          url: 'https://storage.local/photo1.jpg',
+          tag: 'before',
+          caption: 'ท่อระบายน้ำมีเศษขยะอุดตัน',
+          uploadedAt: '2026-10-25T09:00:00.000Z',
+        },
+        {
+          id: 'rp-2',
+          url: 'https://storage.local/photo2.jpg',
+          tag: 'after',
+          caption: 'ขุดลอกและทำความสะอาดเรียบร้อย',
+          uploadedAt: '2026-10-26T14:00:00.000Z',
+        },
+      ],
+    };
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => mockCaseWithPhotos,
+    }));
+
+    render(<TrackForm initialId="HG123456789" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('ซ่อมท่อระบายน้ำอุดตัน')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('ภาพถ่ายผลการดำเนินงานของเจ้าหน้าที่ (Before & After)')).toBeInTheDocument();
+    expect(screen.getByText('ก่อนดำเนินการ (Before)')).toBeInTheDocument();
+    expect(screen.getByText('หลังดำเนินการ (After)')).toBeInTheDocument();
+    expect(screen.getByText('ท่อระบายน้ำมีเศษขยะอุดตัน')).toBeInTheDocument();
+    expect(screen.getByText('ขุดลอกและทำความสะอาดเรียบร้อย')).toBeInTheDocument();
+
+    const zoomBeforeBtn = screen.getByRole('button', { name: /ดูภาพขยาย ท่อระบายน้ำมีเศษขยะอุดตัน/i });
+    await userEvent.setup().click(zoomBeforeBtn);
+
+    await waitFor(() => {
+      const dialog = screen.getByRole('dialog');
+      expect(dialog).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'ภาพก่อนดำเนินการ (Before)' })).toBeInTheDocument();
+    });
+  });
+
+  it('ไม่แสดงภาพถ่ายผลการดำเนินงานเมื่อไม่มีรูปถ่าย', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => mockCaseDone,
+    }));
+
+    render(<TrackForm initialId="HG999999999" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('ถนนชำรุดเป็นหลุมบ่อ')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText('ภาพถ่ายผลการดำเนินงานของเจ้าหน้าที่ (Before & After)')).not.toBeInTheDocument();
   });
 });

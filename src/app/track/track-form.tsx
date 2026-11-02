@@ -2,10 +2,12 @@
 
 import {
   AlertCircle,
+  Camera,
   Check,
   CheckCircle2,
   Clock,
   Copy,
+  FileImage,
   FolderTree,
   Loader2,
   Phone,
@@ -14,14 +16,17 @@ import {
   UserCheck,
   Wrench,
   XCircle,
+  ZoomIn,
 } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { CaseStatusBadge } from '../../components/ui/case-status-badge';
 import { Button } from '../../components/ui/button';
+import { Dialog, DialogContent, DialogTitle } from '../../components/ui/dialog';
 import { FieldHint, Input, Label } from '../../components/ui/field';
 import { clearTrackDraft, readTrackDraft, saveTrackDraft } from '../../components/forms/non-pii-draft';
 import { cn } from '../../lib/cn';
 import { COPY } from '../../lib/copy';
+import type { PublicResolutionPhoto } from '../../lib/cases/resolution-photos';
 import { statusProgress, type CaseStatus } from '../../lib/cases/state-machine';
 import { formatThaiDateTimeShort } from '../../lib/thai-date';
 
@@ -40,6 +45,7 @@ interface CaseDetail {
     updateType: string;
     newValue: string | null;
   }>;
+  resolutionPhotos?: PublicResolutionPhoto[];
 }
 
 interface TimelineEntry {
@@ -110,6 +116,7 @@ export function TrackForm({ initialId }: { initialId?: string }) {
   const [result, setResult] = useState<CaseDetail | null>(null);
   const [draftReady, setDraftReady] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [previewPhoto, setPreviewPhoto] = useState<PublicResolutionPhoto | null>(null);
 
   async function handleCopyCode(code: string) {
     if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
@@ -320,6 +327,80 @@ export function TrackForm({ initialId }: { initialId?: string }) {
               </div>
             </div>
 
+            {/* § ภาพถ่ายผลการดำเนินงานของเจ้าหน้าที่ (Before & After) — แสดงเฉพาะเมื่อมีรูปถ่าย */}
+            {result.resolutionPhotos && result.resolutionPhotos.length > 0 && (
+              <div className="mt-6 rounded-xl border border-border bg-surface-raised p-4 sm:p-5">
+                <div className="mb-4 flex items-center gap-2">
+                  <Camera className="h-5 w-5 text-accent-strong" aria-hidden="true" />
+                  <h4 className="text-base font-bold text-ink">
+                    ภาพถ่ายผลการดำเนินงานของเจ้าหน้าที่ (Before & After)
+                  </h4>
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {result.resolutionPhotos.map((photo) => {
+                    const isBefore = photo.tag === 'before';
+                    return (
+                      <div
+                        key={photo.id}
+                        className="group relative flex flex-col overflow-hidden rounded-xl border border-border bg-surface-sunken shadow-xs transition hover:border-accent-strong/40"
+                      >
+                        <div className="relative aspect-video w-full overflow-hidden bg-surface-sunken">
+                          {photo.url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={photo.url}
+                              alt={photo.caption || (isBefore ? 'ภาพก่อนดำเนินการ' : 'ภาพหลังดำเนินการ')}
+                              loading="lazy"
+                              className="h-full w-full object-cover transition duration-150 group-hover:scale-105"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full flex-col items-center justify-center p-2 text-center text-xs text-muted">
+                              <FileImage className="mb-1 h-5 w-5 text-muted" aria-hidden="true" />
+                              <span>ไม่สามารถแสดงภาพได้</span>
+                            </div>
+                          )}
+
+                          {/* Badge ก่อน / หลัง */}
+                          <div className="absolute left-2.5 top-2.5 z-10">
+                            <span
+                              className={cn(
+                                'inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold shadow-xs',
+                                isBefore
+                                  ? 'border border-border bg-surface text-ink'
+                                  : 'border border-success-soft bg-success-soft text-success-ink',
+                              )}
+                            >
+                              {isBefore ? 'ก่อนดำเนินการ (Before)' : 'หลังดำเนินการ (After)'}
+                            </span>
+                          </div>
+
+                          {/* Zoom Button Overlay */}
+                          {photo.url && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                              <button
+                                type="button"
+                                onClick={() => setPreviewPhoto(photo)}
+                                aria-label={`ดูภาพขยาย ${photo.caption || (isBefore ? 'ก่อนดำเนินการ' : 'หลังดำเนินการ')}`}
+                                className="flex min-h-touch min-w-touch items-center justify-center rounded-lg bg-surface/90 text-ink shadow-sm hover:bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
+                              >
+                                <ZoomIn className="h-5 w-5" aria-hidden="true" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {photo.caption && (
+                          <div className="border-t border-border bg-surface-raised p-2.5">
+                            <p className="text-xs text-ink">{photo.caption}</p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <ol className="relative mt-6">
               <span
                 aria-hidden="true"
@@ -394,6 +475,30 @@ export function TrackForm({ initialId }: { initialId?: string }) {
           </div>
         </div>
       </div>
+
+      {/* Lightbox Modal แสดงภาพถ่ายผลงาน */}
+      <Dialog open={!!previewPhoto} onOpenChange={(open) => !open && setPreviewPhoto(null)}>
+        <DialogContent className="max-w-3xl p-4 sm:p-6">
+          <DialogTitle className="text-base font-bold text-ink">
+            {previewPhoto?.tag === 'after'
+              ? 'ภาพหลังดำเนินการ (After)'
+              : 'ภาพก่อนดำเนินการ (Before)'}
+          </DialogTitle>
+          {previewPhoto?.caption && (
+            <p className="mt-1 text-sm text-muted">{previewPhoto.caption}</p>
+          )}
+          <div className="mt-4 flex max-h-[70vh] items-center justify-center overflow-hidden rounded-lg bg-black/5">
+            {previewPhoto?.url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={previewPhoto.url}
+                alt={previewPhoto.caption || 'ภาพถ่ายผลการดำเนินงาน'}
+                className="max-h-[70vh] w-auto max-w-full object-contain"
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

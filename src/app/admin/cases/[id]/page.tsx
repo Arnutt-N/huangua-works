@@ -28,6 +28,7 @@ import { CaseDetailClient } from './case-detail-client';
 import { safeInternalPath } from '@/lib/navigation';
 import { CaseAttachments } from '@/components/admin/case-attachments';
 import { isStorageConfigured, keyFromUrl, readUrlForKey } from '@/lib/storage';
+import { parseResolutionPhotos } from '@/lib/cases/resolution-photos';
 
 export const metadata: Metadata = { title: 'รายละเอียดเรื่อง' };
 
@@ -126,6 +127,7 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
           subDistrictName: subDistricts.nameTh,
           villageName: villages.nameTh,
           attachments: cases.attachments,
+          metadata: cases.metadata,
         })
         .from(cases)
         .leftJoin(categories, eq(cases.categoryId, categories.id))
@@ -183,6 +185,22 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
         })
       )
     : rawAttachments.map((att) => ({ ...att, url: null }));
+
+  // § ดึงและเซ็น URL ภาพถ่ายผลการดำเนินงานของเจ้าหน้าที่ (ก่อนทำ / หลังทำ)
+  const rawResolutionPhotos = parseResolutionPhotos(caseRow.metadata);
+  const signedResolutionPhotos = storageConfigured
+    ? await Promise.all(
+        rawResolutionPhotos.map(async (photo) => {
+          try {
+            const url = await readUrlForKey(photo.key, { disposition: 'inline', expiresIn: 900 });
+            return { ...photo, url };
+          } catch (err) {
+            console.error(`[case-detail] เซ็น URL ล้มเหลวสำหรับ resolution photo key=${photo.key}:`, err);
+            return { ...photo, url: null };
+          }
+        }),
+      )
+    : rawResolutionPhotos.map((photo) => ({ ...photo, url: null }));
 
   // § รวม assignedTo และผู้ทำรายการใน timeline เข้าด้วยกันแล้วดึงชื่อจาก users ในครั้งเดียวด้วย inArray (แก้ N+1)
   const userIdsToFetch = [
@@ -343,6 +361,8 @@ export default async function CaseDetailPage({ params, searchParams }: PageProps
             canChangeBudget={canChangeBudget}
             canChangeBudgetAmount={canChangeBudgetAmount}
             canChangeActionDetails={canChangeActionDetails}
+            resolutionPhotos={signedResolutionPhotos}
+            storageConfigured={storageConfigured}
           />
         </section>
 
