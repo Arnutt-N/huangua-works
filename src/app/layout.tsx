@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import { Noto_Sans_Thai } from 'next/font/google';
 import { Analytics } from '@vercel/analytics/react';
+import { PwaRegister } from '@/components/pwa/pwa-register';
+import { OfflineIndicator } from '@/components/pwa/offline-indicator';
 import { COPY } from '@/lib/copy';
 import '../styles/tokens.css';
 
@@ -47,6 +49,11 @@ export const metadata: Metadata = {
     shortcut: '/icon.svg',
     apple: '/icon.svg',
   },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'อบต.หัวงัว',
+  },
   openGraph: {
     type: 'website',
     locale: 'th_TH',
@@ -89,6 +96,8 @@ export default function RootLayout({
   return (
     <html lang="th" data-theme="light" className={noto.variable} suppressHydrationWarning>
       <body>
+        <PwaRegister />
+        <OfflineIndicator />
         <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-md focus:bg-accent-strong focus:px-4 focus:py-2 focus:text-on-accent">ข้ามไปเนื้อหาหลัก</a>
         {children}
         <Analytics />
