@@ -15,6 +15,7 @@ import {
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { Button } from '../../components/ui/button';
+import { ErrorSummary, type ErrorSummaryItem } from '../../components/ui/error-summary';
 import { FieldError, FieldHint, Input, Label, Textarea } from '../../components/ui/field';
 import {
   Select,
@@ -85,6 +86,38 @@ const initialForm: FormState = {
 
 type FieldErrors = Partial<Record<keyof FormState, string>>;
 
+const INTAKE_FIELD_LABELS: Partial<Record<keyof FormState, string>> = {
+  fullName: 'ชื่อ - นามสกุล',
+  cid: 'เลขบัตรประชาชน 13 หลัก',
+  phone: 'เบอร์โทรติดต่อ',
+  categoryId: 'หมวดเรื่อง',
+  title: 'หัวเรื่อง',
+  detail: 'รายละเอียด',
+  provinceId: 'จังหวัด',
+  districtId: 'อำเภอ',
+  subDistrictId: 'ตำบล',
+  villageId: 'หมู่บ้าน',
+  village: 'ชื่อหมู่บ้าน',
+  addr: 'รายละเอียดเพิ่มเติม / จุดสังเกต',
+  consent: 'ความยินยอมเก็บรวบรวมข้อมูล',
+};
+
+const INTAKE_FIELD_DOM_IDS: Partial<Record<keyof FormState, string>> = {
+  fullName: 'name',
+  cid: 'cid',
+  phone: 'phone',
+  categoryId: 'cat',
+  title: 'title',
+  detail: 'detail',
+  provinceId: 'province',
+  districtId: 'district',
+  subDistrictId: 'subdistrict',
+  villageId: 'villageId',
+  village: 'village',
+  addr: 'addr',
+  consent: 'consent',
+};
+
 interface SubmitResult {
   caseId: string;
   trackingCode: string;
@@ -99,6 +132,9 @@ function validate(form: FormState, skipIdentity: boolean): FieldErrors {
   if (!skipIdentity) {
     if (!form.fullName.trim()) errors.fullName = 'กรุณากรอกชื่อ-นามสกุล';
     if (!isValidCid(form.cid)) errors.cid = 'เลขบัตรประชาชนไม่ถูกต้อง (13 หลัก)';
+  }
+  if (form.phone.trim() && !/^[0-9]{9,10}$/.test(form.phone.trim().replace(/[-\s]/g, ''))) {
+    errors.phone = 'เบอร์โทรต้องเป็นตัวเลข 9-10 หลัก';
   }
   if (!form.categoryId) errors.categoryId = 'กรุณาเลือกหมวดเรื่อง';
   if (!form.title.trim()) errors.title = 'กรุณากรอกหัวเรื่อง';
@@ -121,11 +157,11 @@ function SectionCard({ children }: { children: React.ReactNode }) {
 
 function SectionHeading({ icon: Icon, children }: { icon: typeof User; children: React.ReactNode }) {
   return (
-    <h2 className="flex items-center gap-3 text-xl font-semibold">
-      <span className="bg-accent-100 flex h-10 w-10 items-center justify-center rounded-xl">
+    <h2 className="flex items-start gap-3 text-xl font-semibold">
+      <span className="bg-accent-100 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
         <Icon className="text-accent-strong h-5 w-5" aria-hidden="true" />
       </span>
-      {children}
+      <span className="pt-1">{children}</span>
     </h2>
   );
 }
@@ -170,6 +206,7 @@ export function IntakeForm({
     categoryId: resolveInitialCategoryId(categories, initialCategorySlug),
   }));
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [submitCount, setSubmitCount] = useState(0);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<SubmitResult | null>(null);
@@ -495,7 +532,10 @@ export function IntakeForm({
 
     const errors = validate(form, liffMode);
     setFieldErrors(errors);
-    if (Object.keys(errors).length > 0) return;
+    if (Object.keys(errors).length > 0) {
+      setSubmitCount((c) => c + 1);
+      return;
+    }
 
     if (attachments.some((a) => a.status === 'uploading')) {
       setSubmitError('กรุณารอให้อัปโหลดรูปภาพเสร็จสิ้นก่อนส่งเรื่อง');
@@ -606,8 +646,15 @@ export function IntakeForm({
     );
   }
 
+  const errorSummaryItems: ErrorSummaryItem[] = Object.entries(fieldErrors).map(([key, msg]) => ({
+    fieldId: INTAKE_FIELD_DOM_IDS[key as keyof FormState] ?? key,
+    fieldLabel: INTAKE_FIELD_LABELS[key as keyof FormState],
+    message: msg!,
+  }));
+
   return (
     <form className="mt-8 flex flex-col gap-6" noValidate onSubmit={handleSubmit}>
+      <ErrorSummary errors={errorSummaryItems} submitCount={submitCount} />
       <p className="text-sm text-muted">
         บันทึกเฉพาะหมวดเรื่องเป็นดราฟต์บนเครื่องนี้อัตโนมัติ ไม่บันทึกชื่อ เลขบัตรประชาชน
         เบอร์โทร ที่อยู่ หรือข้อความที่กรอก เมื่อกลับมาหน้านี้จะคืนหมวดเรื่องให้
@@ -721,9 +768,12 @@ export function IntakeForm({
             type="tel"
             inputMode="tel"
             placeholder="0812345678"
+            invalid={!!fieldErrors.phone}
+            aria-describedby={fieldErrors.phone ? 'phone-error' : undefined}
             value={form.phone}
             onChange={(e) => updateField('phone', e.target.value)}
           />
+          {fieldErrors.phone && <FieldError id="phone-error">{fieldErrors.phone}</FieldError>}
         </div>
       </SectionCard>
 
@@ -803,7 +853,7 @@ export function IntakeForm({
                 type="button"
                 onClick={handleGeoRetry}
                 disabled={loadingGeo !== null}
-                className="inline-flex items-center rounded-lg border border-danger-ink/40 bg-surface px-3 py-1 text-xs font-medium text-danger-ink shadow-xs transition hover:bg-surface-raised active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-ink disabled:opacity-50"
+                className="inline-flex min-h-touch min-w-touch items-center justify-center rounded-lg border border-danger-ink/40 bg-surface px-4 py-2 text-sm font-medium text-danger-ink shadow-xs transition hover:bg-surface-raised active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-ink disabled:opacity-50"
               >
                 {loadingGeo !== null ? 'กำลังโหลด...' : 'ลองใหม่'}
               </button>

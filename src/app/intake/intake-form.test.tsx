@@ -433,4 +433,67 @@ describe('IntakeForm — แนบรูปภาพและ Network Resilience
       );
     });
   });
+
+  it('เมื่อกดส่งฟอร์มว่าง จะแสดง ErrorSummary พร้อมย้ายโฟกัส และคลิกลิงก์เพื่อนำทางไปยัง input ได้', async () => {
+    const scrollIntoViewSpy = vi.spyOn(HTMLElement.prototype, 'scrollIntoView');
+
+    render(<IntakeForm categories={categories} />);
+
+    const submitBtn = screen.getByRole('button', { name: 'ส่งเรื่อง' });
+    fireEvent.click(submitBtn);
+
+    const alert = screen.getByRole('alert', { name: /กรุณาตรวจสอบข้อมูล/i });
+    expect(alert).toBeInTheDocument();
+    expect(document.activeElement).toBe(alert);
+
+    // เลือกลิงก์ชื่อ-นามสกุล
+    const nameLink = screen.getByRole('link', { name: /ชื่อ - นามสกุล/i });
+    expect(nameLink).toHaveAttribute('href', '#name');
+
+    fireEvent.click(nameLink);
+    expect(document.activeElement).toBe(document.getElementById('name'));
+    expect(scrollIntoViewSpy).toHaveBeenCalled();
+
+    // เลือกลิงก์หมวดเรื่อง
+    const catLink = screen.getByRole('link', { name: /หมวดเรื่อง/i });
+    expect(catLink).toHaveAttribute('href', '#cat');
+
+    fireEvent.click(catLink);
+    expect(document.activeElement).toBe(document.getElementById('cat'));
+  });
+
+  it('เมื่อกรอกเบอร์โทรศัพท์ผิดรูปแบบ จะแสดง error พร้อมลิงก์ใน ErrorSummary', async () => {
+    render(<IntakeForm categories={categories} />);
+
+    fireEvent.change(document.getElementById('phone')!, { target: { value: '12345' } });
+
+    const submitBtn = screen.getByRole('button', { name: 'ส่งเรื่อง' });
+    fireEvent.click(submitBtn);
+
+    const phoneLink = screen.getByRole('link', { name: /เบอร์โทรติดต่อ: เบอร์โทรต้องเป็นตัวเลข 9-10 หลัก/i });
+    expect(phoneLink).toBeInTheDocument();
+
+    fireEvent.click(phoneLink);
+    expect(document.activeElement).toBe(document.getElementById('phone'));
+
+    const phoneInput = document.getElementById('phone')!;
+    expect(phoneInput).toHaveAttribute('aria-invalid', 'true');
+    expect(phoneInput).toHaveAttribute('aria-describedby', 'phone-error');
+    expect(document.getElementById('phone-error')).toHaveTextContent('เบอร์โทรต้องเป็นตัวเลข 9-10 หลัก');
+  });
+
+  it('ปุ่มลองใหม่ของ Geo retry มีขนาด touch target ตามเกณฑ์ min-h-touch', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url === '/api/provinces') {
+        return { ok: false, status: 500 };
+      }
+      return { ok: true, json: async () => ({}) };
+    }));
+
+    render(<IntakeForm categories={categories} />);
+
+    const retryBtn = await screen.findByRole('button', { name: 'ลองใหม่' }, { timeout: INTAKE_QUERY_TIMEOUT_MS });
+    expect(retryBtn).toHaveClass('min-h-touch');
+    expect(retryBtn).toHaveClass('min-w-touch');
+  });
 });

@@ -223,4 +223,49 @@ describe('QueueBookingForm · race ตอนเปลี่ยนวันที
       expect(screen.getByRole('radio', { name: 'เช้า 09:00–10:30' })).toBeEnabled(),
     );
   });
+
+  it('เมื่อกดส่งฟอร์มว่าง จะแสดง ErrorSummary พร้อม role=alert และย้ายโฟกัสไปยัง ErrorSummary', async () => {
+    const scrollIntoViewMock = vi.fn();
+    window.HTMLElement.prototype.scrollIntoView = scrollIntoViewMock;
+
+    render(<QueueBookingForm />);
+
+    const submitBtn = screen.getByRole('button', { name: 'ยืนยันการจองคิว' });
+    fireEvent.click(submitBtn);
+
+    const alert = screen.getByRole('alert', { name: /กรุณาตรวจสอบข้อมูล/i });
+    expect(alert).toBeInTheDocument();
+    expect(document.activeElement).toBe(alert);
+
+    // ตรวจสอบว่ามีลิงก์ไปยังฟิลด์ต่าง ๆ
+    const nameLink = screen.getByRole('link', { name: /ชื่อ-นามสกุล/i });
+    expect(nameLink).toHaveAttribute('href', '#queue-name');
+
+    // กดลิงก์แล้วโฟกัสต้องย้ายไปยัง input ชื่อ-นามสกุล
+    fireEvent.click(nameLink);
+    expect(document.activeElement).toBe(screen.getByLabelText(/ชื่อ-นามสกุล/i));
+    expect(scrollIntoViewMock).toHaveBeenCalled();
+
+    // ตรวจสอบ aria-describedby และ aria-invalid
+    const nameInput = screen.getByLabelText(/ชื่อ-นามสกุล/i);
+    expect(nameInput).toHaveAttribute('aria-describedby', 'queue-name-error');
+    expect(screen.getByText('กรุณากรอกชื่อ-นามสกุล')).toHaveAttribute('id', 'queue-name-error');
+  });
+
+  it('กดส่งซ้ำเมื่อยังมีข้อผิดพลาด จะย้ายโฟกัสกลับมาที่ ErrorSummary อีกครั้ง', async () => {
+    render(<QueueBookingForm />);
+
+    const submitBtn = screen.getByRole('button', { name: 'ยืนยันการจองคิว' });
+    fireEvent.click(submitBtn);
+
+    const alert = screen.getByRole('alert', { name: /กรุณาตรวจสอบข้อมูล/i });
+    expect(document.activeElement).toBe(alert);
+
+    // ย้ายโฟกัสไปที่ปุ่มส่งอีกรอบแล้วกดส่ง
+    submitBtn.focus();
+    expect(document.activeElement).toBe(submitBtn);
+
+    fireEvent.click(submitBtn);
+    expect(document.activeElement).toBe(alert);
+  });
 });
