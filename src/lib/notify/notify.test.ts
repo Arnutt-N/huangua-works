@@ -1,7 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sendTelegram } from './telegram';
 import { sendDiscord } from './discord';
-import { buildNewCaseNoticeText, notifyNewCase, sendNotification } from './index';
+import {
+  buildNewCaseNoticeText,
+  buildNewQueueNoticeText,
+  buildUrgentCaseNoticeText,
+  notifyNewCase,
+  notifyNewQueueBooking,
+  notifyUrgentCase,
+  sendNotification,
+} from './index';
 
 /**
  * notify (Telegram/Discord) — unit test ด้วย fetch mock เท่านั้น
@@ -225,3 +233,81 @@ describe('notifyNewCase', () => {
     ]);
   });
 });
+
+describe('notifyNewQueueBooking', () => {
+  const queueNotice = {
+    bookingId: 'Q-2569-001',
+    categoryLabel: 'งานช่างและบริการสาธารณูปโภค (ลงพื้นที่)',
+    serviceType: 'ไฟฟ้าสาธารณะดับ/ชำรุด',
+    dateTh: '4 พ.ย. 2569',
+    slotLabel: '09:00 - 10:30 น.',
+    villageName: 'หมู่ 1 บ้านหัวงัว',
+    note: 'เสาหน้าวัด',
+  };
+
+  it('buildNewQueueNoticeText สร้างข้อความภาษาไทยครบถ้วน', () => {
+    const text = buildNewQueueNoticeText(queueNotice);
+    expect(text).toContain('หมวดหมู่: งานช่างและบริการสาธารณูปโภค (ลงพื้นที่)');
+    expect(text).toContain('เรื่องที่นัดหมาย: ไฟฟ้าสาธารณะดับ/ชำรุด');
+    expect(text).toContain('วันนัดหมาย: 4 พ.ย. 2569');
+    expect(text).toContain('ช่วงเวลา: 09:00 - 10:30 น.');
+    expect(text).toContain('พื้นที่: หมู่ 1 บ้านหัวงัว');
+    expect(text).toContain('หมายเหตุ: เสาหน้าวัด');
+
+    const defaultVillageText = buildNewQueueNoticeText({
+      ...queueNotice,
+      villageName: null,
+      note: null,
+    });
+    expect(defaultVillageText).toContain('พื้นที่: ที่ทำการ อบต.หัวงัว');
+    expect(defaultVillageText).not.toContain('หมายเหตุ');
+  });
+
+  it('ส่งแจ้งเตือนการจองคิวใหม่เมื่อ env ครบ', async () => {
+    vi.stubEnv('TELEGRAM_BOT_TOKEN', 'TEST_TOKEN');
+    vi.stubEnv('TELEGRAM_CHAT_ID', 'CHAT1');
+    const fetchMock = vi.fn().mockResolvedValue(okResponse());
+    vi.stubGlobal('fetch', fetchMock);
+
+    const results = await notifyNewQueueBooking(queueNotice);
+    expect(results.find((r) => r.channel === 'telegram')?.status).toBe('sent');
+  });
+});
+
+describe('notifyUrgentCase', () => {
+  const urgentNotice = {
+    trackingCode: 'HG-691103001',
+    title: 'ท่อเมนประปาแตก น้ำท่วมทางสัญจร',
+    categoryName: 'ประปา',
+    assignedToName: 'นายช่างสมชาย',
+    reason: 'กระทบการสัญจรของหมู่บ้าน',
+  };
+
+  it('buildUrgentCaseNoticeText สร้างข้อความเตือนเคสด่วนถูกต้อง', () => {
+    const text = buildUrgentCaseNoticeText(urgentNotice);
+    expect(text).toContain('เลขอ้างอิง: HG-691103001');
+    expect(text).toContain('หัวข้อ: ท่อเมนประปาแตก น้ำท่วมทางสัญจร');
+    expect(text).toContain('หมวดหมู่: ประปา');
+    expect(text).toContain('ผู้รับผิดชอบ: นายช่างสมชาย');
+    expect(text).toContain('เหตุผล: กระทบการสัญจรของหมู่บ้าน');
+
+    const unassignedText = buildUrgentCaseNoticeText({
+      ...urgentNotice,
+      assignedToName: null,
+      reason: null,
+    });
+    expect(unassignedText).toContain('ผู้รับผิดชอบ: ยังไม่ได้มอบหมาย');
+    expect(unassignedText).not.toContain('เหตุผล');
+  });
+
+  it('ส่งแจ้งเตือนเคสด่วนสำเร็จโดยไม่ throw', async () => {
+    vi.stubEnv('TELEGRAM_BOT_TOKEN', 'TEST_TOKEN');
+    vi.stubEnv('TELEGRAM_CHAT_ID', 'CHAT1');
+    const fetchMock = vi.fn().mockResolvedValue(okResponse());
+    vi.stubGlobal('fetch', fetchMock);
+
+    const results = await notifyUrgentCase(urgentNotice);
+    expect(results.find((r) => r.channel === 'telegram')?.status).toBe('sent');
+  });
+});
+

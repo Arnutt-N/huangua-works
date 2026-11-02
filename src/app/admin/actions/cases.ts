@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm';
 import { requireStaff } from '@/lib/auth/require-staff';
 import { CASE_SUPERVISOR_ROLES } from '@/lib/auth/roles';
 import { notifyCitizenStatusChange } from '@/lib/cases/line-notify';
+import { notifyUrgentCase } from '@/lib/notify';
 import { applyCaseUpdate, type CaseActor } from '@/lib/cases/operations';
 import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
@@ -136,6 +137,29 @@ export async function setPriority(
   }, toActor(auth));
 
   if (!result.ok) return { error: result.error };
+
+  if (priority === 'urgent') {
+    const db = await getDb();
+    firstOrUndefined(
+      db
+        .select({
+          trackingCode: cases.trackingCode,
+          title: cases.title,
+        })
+        .from(cases)
+        .where(eq(cases.id, caseId))
+        .limit(1),
+    )
+      .then((c) => {
+        if (c) {
+          notifyUrgentCase({
+            trackingCode: c.trackingCode ?? caseId,
+            title: c.title,
+          }).catch((err) => console.warn('[cases-action] urgent notice dispatch failed', err));
+        }
+      })
+      .catch((err) => console.warn('[cases-action] case lookup for urgent notice failed', err));
+  }
 
   revalidatePath(`/admin/cases/${caseId}`);
   revalidatePath('/admin');

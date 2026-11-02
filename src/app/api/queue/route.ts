@@ -33,6 +33,7 @@ import { buildSlotAvailability } from '@/app/queue/slots';
 import { LIFF_SESSION_COOKIE, readLiffSessionValue } from '@/lib/liff/session';
 import { pseudonymizeLineId } from '@/lib/line/identity';
 import { sendQueueBookingConfirmation } from '@/lib/line/notify/queue-booking-notify';
+import { notifyNewQueueBooking } from '@/lib/notify';
 
 function thaiDate(isoDate: string): string {
   return formatThaiDateLong(new Date(`${isoDate}T00:00:00`));
@@ -212,6 +213,17 @@ export async function POST(req: NextRequest) {
       })
       .catch((err) => console.warn('[queue-api] confirmation dispatch failed', err));
   }
+
+  // § Non-blocking Staff notification dispatch (แจ้งเตือนเจ้าหน้าที่ผ่าน Telegram/Discord)
+  notifyNewQueueBooking({
+    bookingId: id,
+    categoryLabel: QUEUE_CATEGORY_LABELS[category],
+    serviceType,
+    dateTh: thaiDate(bookingDate),
+    slotLabel: QUEUE_SLOT_LABELS[slot],
+    villageName,
+    note: note || null,
+  }).catch((err) => console.warn('[queue-api] staff notification dispatch failed', err));
 
   await logAudit(
     {
