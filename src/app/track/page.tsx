@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { Navbar } from '@/components/landing/Navbar';
-import { SiteFooter } from '../../components/site/site-footer';
+import { SiteFooter } from '@/components/site/site-footer';
 import { LiffProvider } from '@/components/liff/liff-provider';
 import { CaseStatusBadge } from '@/components/ui/case-status-badge';
 import { listMyCases } from '@/lib/cases/citizen-access';

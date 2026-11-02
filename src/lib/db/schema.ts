@@ -16,6 +16,7 @@ import { sql } from 'drizzle-orm';
 import { ALL_STATUSES } from '../cases/state-machine';
 import { ALL_BUDGET_STATUSES } from '../cases/budget';
 import { ALL_ROLES } from '../auth/roles';
+import { ALL_QUEUE_CATEGORIES, ALL_QUEUE_BOOKING_STATUSES } from '../queue/state-machine';
 import { CONVERSATION_MODES } from '../line/chat-modes';
 import { REPLY_OBJECT_TYPES } from '../line/reply-object-validation';
 import type { BroadcastTarget } from '../line/broadcast-target';
@@ -1135,17 +1136,9 @@ export const tierRoles = pgTable('tier_roles', {
 // ช่องทางประชาชนจองวัน/ช่วงเวลาให้ช่าง อบต. เข้าดูหน้างาน หรือติดต่อราชการ อบต. (P2-03)
 // ────────────────────────────────────────────────────────────────────────────
 
-export const queueCategoryEnum = pgEnum('queue_category', [
-  'technician',
-  'government',
-]);
+export const queueCategoryEnum = pgEnum('queue_category', ALL_QUEUE_CATEGORIES);
 
-export const queueBookingStatusEnum = pgEnum('queue_booking_status', [
-  'booked',
-  'confirmed',
-  'done',
-  'cancelled',
-]);
+export const queueBookingStatusEnum = pgEnum('queue_booking_status', ALL_QUEUE_BOOKING_STATUSES);
 
 export const queueBookings = pgTable(
   'queue_bookings',

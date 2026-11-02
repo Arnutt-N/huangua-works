@@ -9,6 +9,7 @@ import { formatThaiDateLong } from '@/lib/thai-date';
 import {
   QUEUE_BOOKING_STATUS_LABELS,
   QUEUE_CATEGORY_LABELS,
+  QUEUE_CATEGORY_SHORT_LABELS,
   QUEUE_SLOT_LABELS,
   toLocalISODate,
   type QueueBookingStatus,
@@ -293,7 +294,7 @@ export default async function AdminQueuePage({ searchParams }: AdminQueuePagePro
                             CATEGORY_BADGE[b.category as QueueCategory] ?? 'bg-surface-sunken text-ink'
                           }`}
                         >
-                          {b.category === 'technician' ? 'งานช่าง' : 'ติดต่อราชการ'}
+                          {QUEUE_CATEGORY_SHORT_LABELS[b.category as QueueCategory] ?? b.category}
                         </span>
                       </td>
                       <td className="px-4 py-3">

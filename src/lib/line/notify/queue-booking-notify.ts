@@ -58,7 +58,7 @@ export function buildQueueConfirmationMessage(
       ? 'ลงพื้นที่ตรวจหน้างาน (เจ้าหน้าที่จะโทรประสานงานก่อนเข้าพื้นที่)'
       : 'ณ ที่ทำการ อบต.หัวงัว (กรุณาเตรียมบัตรประชาชนและเอกสารที่เกี่ยวข้อง)';
 
-  const bodyContents: unknown[] = [
+  const bodyContents: Record<string, unknown>[] = [
     { type: 'text', text: booking.serviceType, wrap: true, size: 'md', weight: 'bold' },
     { type: 'separator', margin: 'md' },
     {
@@ -142,7 +142,7 @@ export function buildQueueConfirmationMessage(
       body: {
         type: 'box',
         layout: 'vertical',
-        contents: bodyContents as any,
+        contents: bodyContents,
       },
     },
   };
@@ -158,7 +158,7 @@ export function buildQueueStatusUpdateMessage(
   const statusLabel = QUEUE_BOOKING_STATUS_LABELS[newStatus] ?? newStatus;
   const headerColor = STATUS_HEADER_COLORS[newStatus] ?? '#1E40AF';
 
-  const bodyContents: unknown[] = [
+  const bodyContents: Record<string, unknown>[] = [
     { type: 'text', text: booking.serviceType, wrap: true, size: 'md', weight: 'bold' },
     { type: 'separator', margin: 'md' },
     {
@@ -273,7 +273,7 @@ export function buildQueueStatusUpdateMessage(
       body: {
         type: 'box',
         layout: 'vertical',
-        contents: bodyContents as any,
+        contents: bodyContents,
       },
     },
   };

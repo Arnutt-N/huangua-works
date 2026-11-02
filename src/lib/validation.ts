@@ -4,6 +4,18 @@ import { ALL_BUDGET_STATUSES } from './cases/budget';
 import { STAFF_ROLES } from './auth/roles';
 import { CONVERSATION_MODES } from './line/chat-modes';
 import {
+  ALL_QUEUE_CATEGORIES,
+  type QueueCategory,
+  QUEUE_CATEGORY_LABELS,
+  QUEUE_CATEGORY_SHORT_LABELS,
+  ALL_QUEUE_BOOKING_STATUSES,
+  type QueueBookingStatus,
+  QUEUE_BOOKING_STATUS_LABELS,
+  QUEUE_TRANSITIONS,
+  assertQueueTransition,
+  canTransitionQueueStatus,
+} from './queue/state-machine';
+import {
   CANNED_RESPONSE_CATEGORIES,
   CANNED_SHORTCUT_MAX,
   CANNED_TITLE_MAX,
@@ -557,14 +569,15 @@ export const responsibleFormSchema = z.object({
 // § จองคิวนัดช่างและนัดหมาย อบต. (P2-03) — POST/GET /api/queue + server action ฝั่งเจ้าหน้าที่
 // ────────────────────────────────────────────────────────────────────────────
 
-/** หมวดหมู่งานจองคิว */
-export const QUEUE_CATEGORIES = ['technician', 'government'] as const;
-export type QueueCategory = (typeof QUEUE_CATEGORIES)[number];
-export const queueCategorySchema = z.enum(QUEUE_CATEGORIES);
+/** หมวดหมู่งานจองคิว — derived จาก src/lib/queue/state-machine.ts */
+export const QUEUE_CATEGORIES = ALL_QUEUE_CATEGORIES;
+export type { QueueCategory };
+export const queueCategorySchema = z.enum(ALL_QUEUE_CATEGORIES);
 
-export const QUEUE_CATEGORY_LABELS: Record<QueueCategory, string> = {
-  technician: 'งานช่างและบริการสาธารณูปโภค (ลงพื้นที่)',
-  government: 'งานติดต่อราชการทั่วไป (ณ ที่ทำการ อบต.)',
+export {
+  QUEUE_CATEGORY_LABELS,
+  QUEUE_CATEGORY_SHORT_LABELS,
+  ALL_QUEUE_CATEGORIES,
 };
 
 /** ช่วงเวลานัด — วันละ 4 ช่วง, id เสถียรเก็บลงคอลัมน์ slot ตรง ๆ */
@@ -581,15 +594,16 @@ export const QUEUE_SLOT_LABELS: Record<QueueSlotId, string> = {
 
 export const queueSlotSchema = z.enum(QUEUE_SLOT_IDS);
 
-/** mirror pgEnum queue_booking_status (ดู schema.ts — ค่าเพิ่ม/ลดต้องแก้ทั้งคู่) */
-export const queueBookingStatusSchema = z.enum(['booked', 'confirmed', 'done', 'cancelled']);
-export type QueueBookingStatus = z.infer<typeof queueBookingStatusSchema>;
+/** สถานะคิว — derived จาก src/lib/queue/state-machine.ts */
+export const queueBookingStatusSchema = z.enum(ALL_QUEUE_BOOKING_STATUSES);
+export type { QueueBookingStatus };
 
-export const QUEUE_BOOKING_STATUS_LABELS: Record<QueueBookingStatus, string> = {
-  booked: 'จองแล้ว',
-  confirmed: 'ยืนยันแล้ว',
-  done: 'เสร็จแล้ว',
-  cancelled: 'ยกเลิกแล้ว',
+export {
+  ALL_QUEUE_BOOKING_STATUSES,
+  QUEUE_BOOKING_STATUS_LABELS,
+  QUEUE_TRANSITIONS,
+  assertQueueTransition,
+  canTransitionQueueStatus,
 };
 
 /** จองล่วงหน้าได้ไม่เกิน 30 วัน — UI (min/max ของ date input) อ่านค่านี้ด้วย */
