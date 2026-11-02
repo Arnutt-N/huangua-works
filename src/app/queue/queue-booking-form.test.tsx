@@ -21,6 +21,14 @@ function nextBusinessDays(count: number): string[] {
   return out;
 }
 
+function nextSaturday(): string {
+  const d = new Date();
+  while (d.getDay() !== 6) {
+    d.setDate(d.getDate() + 1);
+  }
+  return toLocalISODate(d);
+}
+
 function deferred<T>() {
   let resolve!: (v: T) => void;
   let reject!: (e: unknown) => void;
@@ -47,13 +55,49 @@ afterEach(() => {
   fetchMock.mockReset();
 });
 
-/** กรอกฟอร์มจนพร้อมกดจอง (สมมติตารางช่วงว่างโหลดแล้ว) */
-function fillBookingForm() {
-  fireEvent.change(screen.getByLabelText('ชื่อ-นามสกุล'), { target: { value: 'สมชาย ใจดี' } });
-  fireEvent.change(screen.getByLabelText('เบอร์โทรติดต่อกลับ'), { target: { value: '0812345678' } });
-  fireEvent.change(screen.getByLabelText('ประเภทงานช่าง'), { target: { value: 'ไฟฟ้าดับ' } });
-  fireEvent.click(screen.getByRole('checkbox', { name: /ยินยอม/ }));
+/** กรอกฟอร์มหมวดราชการ (ไม่ต้องกรอกหมู่บ้าน) จนพร้อมกดจอง */
+function fillGovernmentBookingForm() {
+  fireEvent.change(screen.getByLabelText(/ชื่อ-นามสกุล/i), { target: { value: 'สมชาย ใจดี' } });
+  fireEvent.change(screen.getByLabelText(/เบอร์โทรศัพท์ติดต่อกลับ/i), { target: { value: '0812345678' } });
+  fireEvent.change(screen.getByLabelText(/เรื่องหรือหัวข้อ/i), { target: { value: 'ขออนุญาตก่อสร้าง' } });
+  fireEvent.click(screen.getByRole('checkbox', { name: /ยินยอม/i }));
 }
+
+describe('QueueBookingForm · หมวดหมู่และฟังก์ชันการใช้งาน', () => {
+  it('สลับหมวดหมู่แล้วโหลดช่วงเวลาและรีเซ็ตค่า', async () => {
+    const [dayA] = nextBusinessDays(1);
+    if (!dayA) throw new Error('test setup: หาวันราชการไม่เจอ');
+
+    fetchMock.mockResolvedValue(
+      jsonResponse({ date: dayA, dateTh: dayA, slots: buildSlotAvailability([]) }),
+    );
+
+    render(<QueueBookingForm />);
+
+    // เลือกหมวดงานติดต่อราชการ
+    const govRadio = screen.getByRole('radio', { name: /งานติดต่อราชการทั่วไป/i });
+    fireEvent.click(govRadio);
+    expect(govRadio).toHaveAttribute('aria-checked', 'true');
+
+    // กด preset เรื่องที่ติดต่อ
+    const presetBtn = screen.getByRole('button', { name: /ขออนุญาตก่อสร้างอาคาร/i });
+    fireEvent.click(presetBtn);
+
+    const serviceInput = screen.getByLabelText(/เรื่องหรือหัวข้อ/i) as HTMLInputElement;
+    expect(serviceInput.value).toContain('ขออนุญาตก่อสร้างอาคาร');
+  });
+
+  it('แสดงข้อความเตือนเมื่อเลือกวันหยุดเสาร์-อาทิตย์', async () => {
+    const sat = nextSaturday();
+    render(<QueueBookingForm />);
+    const dateInput = screen.getByLabelText('วันที่นัด');
+    fireEvent.change(dateInput, { target: { value: sat } });
+
+    expect(
+      screen.getByText(/อบต.หัวงัว ปิดทำการในวันหยุดราชการ/i),
+    ).toBeInTheDocument();
+  });
+});
 
 describe('QueueBookingForm · race ตอนเปลี่ยนวันที่', () => {
   it('response เก่าของวันก่อนหน้าไม่ทับตารางของวันล่าสุด', async () => {
@@ -79,7 +123,7 @@ describe('QueueBookingForm · race ตอนเปลี่ยนวันที
 
     // B มาก่อน — slot_1 เต็มแล้ว
     await waitFor(() =>
-      expect(screen.getByRole('radio', { name: /09:00.*เต็มแล้ว/ })).toBeDisabled(),
+      expect(screen.getByRole('radio', { name: /09:00.*คิวเต็ม/ })).toBeDisabled(),
     );
 
     // A มาช้า (ข้อมูลว่างหมด) — ต้องถูกทิ้ง ตารางยังเป็นของ B
@@ -89,7 +133,7 @@ describe('QueueBookingForm · race ตอนเปลี่ยนวันที
     await act(async () => {
       await new Promise((r) => setTimeout(r, 50));
     });
-    expect(screen.getByRole('radio', { name: /09:00.*เต็มแล้ว/ })).toBeDisabled();
+    expect(screen.getByRole('radio', { name: /09:00.*คิวเต็ม/ })).toBeDisabled();
   });
 
   it('POST ชน 409 แล้วรีเฟรชตารางของวันเดิมให้เห็นช่วงที่เต็ม', async () => {
@@ -109,20 +153,21 @@ describe('QueueBookingForm · race ตอนเปลี่ยนวันที
     });
 
     render(<QueueBookingForm />);
+    // สลับเป็นหมวดราชการ เพื่อความสะดวกในการกรอก
+    fireEvent.click(screen.getByRole('radio', { name: /งานติดต่อราชการทั่วไป/i }));
+
     fireEvent.change(screen.getByLabelText('วันที่นัด'), { target: { value: dayA } });
-    // § รอปุ่มช่วงมาจริง ไม่ใช่แค่ fetch ถูกเรียก — ตอน slotsLoading ฟอร์มถอด
-    // radiogroup ออก คลิกทันทีจะแข่งกับ response (flake)
     await waitFor(() =>
       expect(screen.getByRole('radio', { name: 'เช้า 09:00–10:30' })).toBeEnabled(),
     );
     fireEvent.click(screen.getByRole('radio', { name: 'เช้า 09:00–10:30' }));
-    fillBookingForm();
+    fillGovernmentBookingForm();
     fireEvent.click(screen.getByRole('button', { name: 'ยืนยันการจองคิว' }));
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('ช่วงนี้ถูกจองแล้ว'));
     // รีเฟรชแล้ว: slot_1 เต็ม + เลิกเลือกช่วงเดิม
     await waitFor(() =>
-      expect(screen.getByRole('radio', { name: /09:00.*เต็มแล้ว/ })).toBeDisabled(),
+      expect(screen.getByRole('radio', { name: /09:00.*คิวเต็ม/ })).toBeDisabled(),
     );
     const getCalls = fetchMock.mock.calls.filter(([, init]) => init?.method !== 'POST');
     expect(getCalls).toHaveLength(2);
@@ -138,7 +183,6 @@ describe('QueueBookingForm · race ตอนเปลี่ยนวันที
         jsonResponse({
           date: dayB,
           dateTh: dayB,
-          // ถ้าโค้ดดึงวัน A ซ้ำหลัง 409 จะได้ข้อมูลนี้ (slot_1 เต็ม) มาทับตารางวัน B
           slots: buildSlotAvailability(
             String(input).includes(dayA) &&
               fetchMock.mock.calls.filter(([u]) => String(u).includes(dayA)).length > 1
@@ -150,14 +194,15 @@ describe('QueueBookingForm · race ตอนเปลี่ยนวันที
     });
 
     render(<QueueBookingForm />);
+    fireEvent.click(screen.getByRole('radio', { name: /งานติดต่อราชการทั่วไป/i }));
+
     const dateInput = screen.getByLabelText('วันที่นัด');
     fireEvent.change(dateInput, { target: { value: dayA } });
-    // § เหตุผลเดียวกับเทสก่อนหน้า — รอปุ่มช่วงมาจริงก่อนคลิก กัน flake
     await waitFor(() =>
       expect(screen.getByRole('radio', { name: 'เช้า 09:00–10:30' })).toBeEnabled(),
     );
     fireEvent.click(screen.getByRole('radio', { name: 'เช้า 09:00–10:30' }));
-    fillBookingForm();
+    fillGovernmentBookingForm();
     fireEvent.click(screen.getByRole('button', { name: 'ยืนยันการจองคิว' }));
 
     // เปลี่ยนวันระหว่างรอ POST ตอบ

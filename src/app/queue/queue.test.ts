@@ -3,7 +3,9 @@ import {
   createQueueBookingSchema,
   queueAvailabilityQuerySchema,
   queueBookingDateSchema,
+  queueCategorySchema,
   queuePhoneSchema,
+  queueServiceTypeSchema,
   queueSlotSchema,
   toLocalISODate,
   QUEUE_BOOKING_WINDOW_DAYS,
@@ -33,6 +35,15 @@ function shifted(days: number): string {
   d.setDate(d.getDate() + days);
   return toLocalISODate(d);
 }
+
+describe('queueCategorySchema', () => {
+  it('รับเฉพาะ technician และ government', () => {
+    expect(queueCategorySchema.safeParse('technician').success).toBe(true);
+    expect(queueCategorySchema.safeParse('government').success).toBe(true);
+    expect(queueCategorySchema.safeParse('other').success).toBe(false);
+    expect(queueCategorySchema.safeParse('').success).toBe(false);
+  });
+});
 
 describe('queueBookingDateSchema', () => {
   it('รับวันราชการในกรอบ 30 วัน', () => {
@@ -83,6 +94,18 @@ describe('queuePhoneSchema', () => {
   });
 });
 
+describe('queueServiceTypeSchema', () => {
+  it('รับข้อความเรื่องติดต่อที่ถูกต้อง', () => {
+    expect(queueServiceTypeSchema.safeParse('ขออนุญาตก่อสร้าง').success).toBe(true);
+    expect(queueServiceTypeSchema.safeParse('ไฟฟ้าสาธารณะดับ').success).toBe(true);
+  });
+
+  it('ปฏิเสธข้อความสั้นหรือยาวเกินไป', () => {
+    expect(queueServiceTypeSchema.safeParse('ก').success).toBe(false);
+    expect(queueServiceTypeSchema.safeParse('a'.repeat(101)).success).toBe(false);
+  });
+});
+
 describe('queueSlotSchema', () => {
   it('รับเฉพาะ slot_1–slot_4', () => {
     expect(queueSlotSchema.safeParse('slot_1').success).toBe(true);
@@ -96,8 +119,10 @@ describe('createQueueBookingSchema', () => {
   const valid = {
     fullName: 'สมชาย ใจดี',
     phoneNumber: '0812345678',
+    category: 'technician',
     serviceType: 'ไฟฟ้าดับ',
     note: 'เสาหน้าบ้าน',
+    villageId: 'v-01',
     bookingDate: nextBusinessDay(),
     slot: 'slot_1',
     consent: true,
@@ -107,11 +132,31 @@ describe('createQueueBookingSchema', () => {
     expect(createQueueBookingSchema.safeParse(valid).success).toBe(true);
   });
 
-  it('note ว่างได้ (optional)', () => {
+  it('default category เป็น technician เมื่อไม่ระบุ', () => {
+    const withoutCat: Record<string, unknown> = { ...valid };
+    delete withoutCat.category;
+    const parsed = createQueueBookingSchema.safeParse(withoutCat);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.category).toBe('technician');
+    }
+  });
+
+  it('รับ category government', () => {
+    const gov = { ...valid, category: 'government', serviceType: 'ยื่นภาษีที่ดิน' };
+    const parsed = createQueueBookingSchema.safeParse(gov);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.category).toBe('government');
+    }
+  });
+
+  it('note และ villageId ว่างได้ (optional)', () => {
     const rest: Record<string, unknown> = { ...valid };
     delete rest.note;
+    delete rest.villageId;
     expect(createQueueBookingSchema.safeParse(rest).success).toBe(true);
-    expect(createQueueBookingSchema.safeParse({ ...valid, note: '' }).success).toBe(true);
+    expect(createQueueBookingSchema.safeParse({ ...valid, note: '', villageId: '' }).success).toBe(true);
   });
 
   it('บังคับ consent=true', () => {
@@ -121,8 +166,23 @@ describe('createQueueBookingSchema', () => {
 });
 
 describe('queueAvailabilityQuerySchema', () => {
-  it('รับ date ที่ถูกต้อง', () => {
-    expect(queueAvailabilityQuerySchema.safeParse({ date: nextBusinessDay() }).success).toBe(true);
+  it('รับ date ที่ถูกต้องพร้อม default category technician', () => {
+    const parsed = queueAvailabilityQuerySchema.safeParse({ date: nextBusinessDay() });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.category).toBe('technician');
+    }
+  });
+
+  it('รับ category government ได้', () => {
+    const parsed = queueAvailabilityQuerySchema.safeParse({
+      date: nextBusinessDay(),
+      category: 'government',
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.category).toBe('government');
+    }
   });
 
   it('ปฏิเสธ date หาย/ผิดรูปแบบ', () => {

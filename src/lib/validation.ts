@@ -554,10 +554,20 @@ export const responsibleFormSchema = z.object({
   departmentId: uuidSchema,
   assignedTo: z.string().optional().or(z.literal('')),
 });
-// § จองคิวนัดช่าง (P2-03) — POST/GET /api/queue + server action ฝั่งเจ้าหน้าที่
+// § จองคิวนัดช่างและนัดหมาย อบต. (P2-03) — POST/GET /api/queue + server action ฝั่งเจ้าหน้าที่
 // ────────────────────────────────────────────────────────────────────────────
 
-/** ช่วงเวลานัดช่าง — วันละ 4 ช่วง, id เสถียรเก็บลงคอลัมน์ slot ตรง ๆ */
+/** หมวดหมู่งานจองคิว */
+export const QUEUE_CATEGORIES = ['technician', 'government'] as const;
+export type QueueCategory = (typeof QUEUE_CATEGORIES)[number];
+export const queueCategorySchema = z.enum(QUEUE_CATEGORIES);
+
+export const QUEUE_CATEGORY_LABELS: Record<QueueCategory, string> = {
+  technician: 'งานช่างและบริการสาธารณูปโภค (ลงพื้นที่)',
+  government: 'งานติดต่อราชการทั่วไป (ณ ที่ทำการ อบต.)',
+};
+
+/** ช่วงเวลานัด — วันละ 4 ช่วง, id เสถียรเก็บลงคอลัมน์ slot ตรง ๆ */
 export const QUEUE_SLOT_IDS = ['slot_1', 'slot_2', 'slot_3', 'slot_4'] as const;
 export type QueueSlotId = (typeof QUEUE_SLOT_IDS)[number];
 
@@ -632,8 +642,8 @@ export const queuePhoneSchema = z
 export const queueServiceTypeSchema = z
   .string()
   .trim()
-  .min(2, 'กรุณาระบุประเภทงานช่าง (เช่น ไฟฟ้าดับ ท่อประปาแตก)')
-  .max(100, 'ประเภทงานช่างยาวเกิน 100 ตัวอักษร');
+  .min(2, 'กรุณาระบุเรื่องที่ต้องการติดต่อหรือประเภทงานบริการ')
+  .max(100, 'เรื่องที่ต้องการติดต่อยาวเกิน 100 ตัวอักษร');
 
 export const queueNoteSchema = z
   .string()
@@ -643,27 +653,31 @@ export const queueNoteSchema = z
   .or(z.literal(''));
 
 /**
- * POST /api/queue — ประชาชนจองคิวนัดช่าง
+ * POST /api/queue — ประชาชนจองคิวนัดช่างหรือติดต่อราชการ
  *
- * § consent เป็นหลักฐาน PDPA ว่าผู้จองยินยอมให้เก็บชื่อ–เบอร์เพื่อติดต่อเรื่องนัดช่าง
+ * § consent เป็นหลักฐาน PDPA ว่าผู้จองยินยอมให้เก็บชื่อ–เบอร์เพื่อติดต่อเรื่องการนัดหมาย
  * ช่องทางนี้ไม่มี user row (ไม่ต้อง login) จึงไม่มีแถวใน consent_records —
  * หลักฐานการยินยอมคือตัวแถวการจองเอง (created_at = เวลากดยินยอม)
  */
 export const createQueueBookingSchema = z.object({
   fullName: fullNameSchema,
   phoneNumber: queuePhoneSchema,
+  category: queueCategorySchema.default('technician'),
   serviceType: queueServiceTypeSchema,
   note: queueNoteSchema,
+  villageId: z.string().trim().optional().or(z.literal('')),
   bookingDate: queueBookingDateSchema,
   slot: queueSlotSchema,
   consent: z.literal(true, {
-    message: 'กรุณายินยอมให้เก็บชื่อ–เบอร์โทรเพื่อติดต่อเรื่องนัดช่าง',
+    message: 'กรุณายินยอมให้เก็บชื่อ–เบอร์โทรเพื่อติดต่อเรื่องการนัดหมาย',
   }),
 });
+export type CreateQueueBookingInput = z.infer<typeof createQueueBookingSchema>;
 
-/** GET /api/queue?date= — ดูช่วงที่ว่างของวัน (คืนเฉพาะสถานะว่าง/ไม่ว่าง ไม่มี PII) */
+/** GET /api/queue?date=&category= — ดูช่วงที่ว่างของวันแยกตามหมวดหมู่ (คืนเฉพาะสถานะว่าง/ไม่ว่าง ไม่มี PII) */
 export const queueAvailabilityQuerySchema = z.object({
   date: queueBookingDateSchema,
+  category: queueCategorySchema.default('technician'),
 });
 
 /** server action ฝั่งเจ้าหน้าที่ — เปลี่ยนสถานะคิว + โน้ตภายใน */

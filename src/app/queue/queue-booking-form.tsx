@@ -1,30 +1,76 @@
 'use client';
 
-import { AlertCircle, CalendarCheck, CheckCircle2, Loader2, User, Wrench } from 'lucide-react';
+import {
+  AlertCircle,
+  Building2,
+  CalendarCheck,
+  CheckCircle2,
+  Loader2,
+  MessageCircle,
+  User,
+  Wrench,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useRef, useState, type FormEvent } from 'react';
 import { Button } from '../../components/ui/button';
 import { FieldError, FieldHint, Input, Label, Textarea } from '../../components/ui/field';
-import { QUEUE_BOOKING_WINDOW_DAYS, queuePhoneSchema } from '../../lib/validation';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../components/ui/select';
+import {
+  QUEUE_BOOKING_WINDOW_DAYS,
+  QUEUE_CATEGORY_LABELS,
+  queuePhoneSchema,
+  type QueueCategory,
+} from '../../lib/validation';
 import { formatThaiDateLong } from '../../lib/thai-date';
+import { useLiff } from '../../components/liff/liff-provider';
 import {
   buildSlotAvailability,
   isBusinessDay,
   queueDateRange,
   type QueueSlotAvailability,
 } from './slots';
+import { HUA_NGUA_VILLAGES } from './villages';
 
 interface BookingResult {
   dateTh: string;
   slotLabel: string;
+  categoryLabel?: string;
   serviceType: string;
+  hasLineNotification?: boolean;
 }
+
+const CATEGORY_PRESETS: Record<QueueCategory, readonly string[]> = {
+  technician: [
+    'ไฟฟ้าสาธารณะดับ/ชำรุด',
+    'ท่อประปาแตก/น้ำไม่ไหล',
+    'ถนนชำรุด/ผิวทางเสียหาย',
+    'ตัดกิ่งไม้ใกล้สายไฟ/สิ่งแวดล้อม',
+  ],
+  government: [
+    'ขออนุญาตก่อสร้างอาคาร (ข.1)',
+    'ภาษีที่ดินและสิ่งปลูกสร้าง / ภาษีป้าย',
+    'ลงทะเบียนเบี้ยยังชีพผู้สูงอายุ/ผู้พิการ',
+    'จดทะเบียนพาณิชย์/ขอใบอนุญาต',
+  ],
+};
 
 function SectionCard({ children }: { children: React.ReactNode }) {
   return <section className="glass mt-6 rounded-xl p-6 shadow-sm sm:p-8">{children}</section>;
 }
 
-function SectionHeading({ icon: Icon, children }: { icon: typeof User; children: React.ReactNode }) {
+function SectionHeading({
+  icon: Icon,
+  children,
+}: {
+  icon: typeof User;
+  children: React.ReactNode;
+}) {
   return (
     <h2 className="flex items-center gap-3 text-xl font-semibold">
       <span className="bg-accent-100 flex h-10 w-10 items-center justify-center rounded-xl">
@@ -36,12 +82,16 @@ function SectionHeading({ icon: Icon, children }: { icon: typeof User; children:
 }
 
 export function QueueBookingForm() {
+  const { authenticated, displayName } = useLiff();
+
+  const [category, setCategory] = useState<QueueCategory>('technician');
   const [date, setDate] = useState('');
   const [slots, setSlots] = useState<QueueSlotAvailability[]>(() => buildSlotAvailability([]));
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slot, setSlot] = useState('');
   const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [villageId, setVillageId] = useState('');
   const [serviceType, setServiceType] = useState('');
   const [note, setNote] = useState('');
   const [consent, setConsent] = useState(false);
@@ -51,18 +101,14 @@ export function QueueBookingForm() {
   const [result, setResult] = useState<BookingResult | null>(null);
 
   const range = queueDateRange();
-  // § กัน response เก่าทับ response ใหม่เมื่อเปลี่ยนวันรัว ๆ (ยิงใน handler ไม่มี effect cleanup)
   const dateRequestId = useRef(0);
-  // § วันที่ล่าสุดในช่อง — คู่กับ state `date` ไว้ให้ async continuation (409 refresh)
-  // เทียบว่าผู้ใช้เปลี่ยนวันระหว่างรอ response หรือไม่ (closure ใน handler จับค่าเก่า)
   const dateRef = useRef('');
+  const categoryRef = useRef<QueueCategory>('technician');
 
-  // § ทางโหลดตารางช่วงว่างทางเดียว — ทั้งเปลี่ยนวันและรีเฟรชหลัง 409 ผ่านนี่เท่านั้น
-  // ทุกครั้งที่ยิงจะขึ้นเลข request ใหม่ response ที่เลขไม่ตรงจะถูกทิ้งเสมอ
-  function loadAvailability(value: string) {
+  function loadAvailability(targetDate: string, targetCategory: QueueCategory) {
     const requestId = ++dateRequestId.current;
     setSlotsLoading(true);
-    fetch(`/api/queue?date=${value}`)
+    fetch(`/api/queue?date=${encodeURIComponent(targetDate)}&category=${encodeURIComponent(targetCategory)}`)
       .then(async (res) => {
         const data = (await res.json()) as {
           slots?: QueueSlotAvailability[];
@@ -89,8 +135,19 @@ export function QueueBookingForm() {
       });
   }
 
-  // § โหลดช่วงว่างใน onChange ตรง ๆ ไม่ผ่าน useEffect — วันหยุดราชการ (ส–อา)
-  // ไม่ต้องยิง API เพราะ server ปฏิเสธอยู่แล้ว แค่แสดงทุกช่วงว่าไม่ว่าง
+  function handleCategoryChange(newCategory: QueueCategory) {
+    setCategory(newCategory);
+    categoryRef.current = newCategory;
+    setSlot('');
+    setServiceType('');
+    if (newCategory === 'government') {
+      setVillageId('');
+    }
+    if (date && isBusinessDay(date)) {
+      loadAvailability(date, newCategory);
+    }
+  }
+
   function handleDateChange(value: string) {
     setDate(value);
     dateRef.current = value;
@@ -100,10 +157,19 @@ export function QueueBookingForm() {
       return;
     }
     if (!isBusinessDay(value)) {
-      setSlots(buildSlotAvailability(['slot_1', 'slot_2', 'slot_3', 'slot_4']));
+      setSlots(buildSlotAvailability([]));
       return;
     }
-    loadAvailability(value);
+    loadAvailability(value, categoryRef.current);
+  }
+
+  function applyPreset(preset: string) {
+    setServiceType(preset);
+    setFieldErrors((e) => {
+      const next = { ...e };
+      delete next.serviceType;
+      return next;
+    });
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -115,9 +181,13 @@ export function QueueBookingForm() {
     if (fullName.trim().length < 2) errors.fullName = 'กรุณากรอกชื่อ-นามสกุล';
     if (!queuePhoneSchema.safeParse(phoneNumber.trim()).success)
       errors.phoneNumber = 'เบอร์โทรต้องเป็นตัวเลข 9-10 หลัก ขึ้นต้นด้วย 0';
-    if (serviceType.trim().length < 2) errors.serviceType = 'กรุณาระบุประเภทงานช่าง';
+    if (category === 'technician' && !villageId) {
+      errors.villageId = 'กรุณาเลือกหมู่บ้านที่ต้องการให้ช่างลงพื้นที่';
+    }
+    if (serviceType.trim().length < 2)
+      errors.serviceType = 'กรุณาระบุเรื่องที่ต้องการติดต่อหรือประเภทงานบริการ';
     if (note.trim().length > 500) errors.note = 'รายละเอียดยาวเกิน 500 ตัวอักษร';
-    if (!consent) errors.consent = 'กรุณายินยอมให้เก็บชื่อ–เบอร์โทรเพื่อติดต่อเรื่องนัดช่าง';
+    if (!consent) errors.consent = 'กรุณายินยอมให้เก็บชื่อ–เบอร์โทรเพื่อติดต่อเรื่องการนัดหมาย';
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
@@ -130,8 +200,10 @@ export function QueueBookingForm() {
         body: JSON.stringify({
           fullName: fullName.trim(),
           phoneNumber: phoneNumber.trim(),
+          category,
           serviceType: serviceType.trim(),
           note: note.trim(),
+          villageId: villageId || undefined,
           bookingDate: date,
           slot,
           consent: true,
@@ -143,11 +215,8 @@ export function QueueBookingForm() {
         booking?: BookingResult;
       };
       if (!res.ok || !data.success || !data.booking) {
-        // § 409 = ช่วงนี้มีคนจองตัดหน้าไปแล้ว — รีเฟรชตารางช่วงว่างให้เห็นสถานะใหม่ทันที
-        // แต่เฉพาะเมื่อผู้ใช้ยังอยู่ที่วันเดิม: ถ้าเปลี่ยนวันระหว่างรอ POST แล้วดึงวันเก่า
-        // มาทับ จะเอาตารางผิดวันมาแสดง (fetch ของวันใหม่ออกไปก่อนแล้ว)
         if (res.status === 409) {
-          if (dateRef.current === date) loadAvailability(date);
+          if (dateRef.current === date) loadAvailability(date, categoryRef.current);
           setSlot('');
         }
         setSubmitError(data.error ?? 'จองคิวไม่สำเร็จ กรุณาลองใหม่');
@@ -167,8 +236,20 @@ export function QueueBookingForm() {
         <div className="text-center">
           <CheckCircle2 className="mx-auto h-14 w-14 text-success-ink" aria-hidden="true" />
           <h2 className="mt-4 text-2xl font-bold">จองคิวสำเร็จ</h2>
-          <p className="mt-2 text-muted">เจ้าหน้าที่จะโทรยืนยันนัดหมายกับท่านอีกครั้ง</p>
+          <p className="mt-2 text-muted">เจ้าหน้าที่จะตรวจสอบข้อมูลและโทรประสานงานยืนยันนัดหมายกับท่านอีกครั้ง</p>
+
+          {result.hasLineNotification && (
+            <div className="mx-auto mt-4 inline-flex items-center gap-2 rounded-full border border-success-ink/30 bg-success-soft px-4 py-1.5 text-sm font-semibold text-success-ink">
+              <MessageCircle className="h-4 w-4" aria-hidden="true" />
+              ส่งข้อมูลยืนยันการจองคิวไปยัง LINE ของท่านแล้ว
+            </div>
+          )}
+
           <dl className="bg-surface-raised mx-auto mt-6 max-w-md space-y-2 rounded-xl border border-border p-5 text-left">
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted">หมวดงาน</dt>
+              <dd className="font-semibold">{result.categoryLabel ?? QUEUE_CATEGORY_LABELS[category]}</dd>
+            </div>
             <div className="flex justify-between gap-4">
               <dt className="text-muted">วันที่นัด</dt>
               <dd className="font-semibold">{result.dateTh}</dd>
@@ -178,7 +259,7 @@ export function QueueBookingForm() {
               <dd className="font-semibold">{result.slotLabel}</dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="text-muted">งานช่าง</dt>
+              <dt className="text-muted">เรื่องที่นัดหมาย</dt>
               <dd className="font-semibold">{result.serviceType}</dd>
             </div>
           </dl>
@@ -190,8 +271,10 @@ export function QueueBookingForm() {
                 setResult(null);
                 setDate('');
                 dateRef.current = '';
+                setSlot('');
                 setFullName('');
                 setPhoneNumber('');
+                setVillageId('');
                 setServiceType('');
                 setNote('');
                 setConsent(false);
@@ -208,8 +291,80 @@ export function QueueBookingForm() {
     );
   }
 
+  const isWeekendSelected = !!date && !isBusinessDay(date);
+
   return (
     <form onSubmit={handleSubmit} noValidate>
+      {authenticated && displayName && (
+        <div className="glass mt-6 flex items-center justify-between rounded-xl border border-accent-strong/30 bg-accent-sunken p-4">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-strong text-on-accent">
+              <MessageCircle className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-ink">
+                เข้าสู่ระบบผ่าน LINE: <span className="text-accent-strong">{displayName}</span>
+              </p>
+              <p className="text-xs text-muted">ท่านจะได้รับการแจ้งเตือนยืนยันและสถานะนัดหมายทาง LINE</p>
+            </div>
+          </div>
+          {!fullName && (
+            <button
+              type="button"
+              onClick={() => setFullName(displayName)}
+              className="inline-flex min-h-touch items-center text-xs font-semibold text-accent-strong hover:underline"
+            >
+              ใช้ชื่อจาก LINE
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* เลือกหมวดหมู่งาน */}
+      <SectionCard>
+        <SectionHeading icon={Wrench}>เลือกประเภทบริการ</SectionHeading>
+        <div className="mt-5 space-y-3">
+          <div className="flex flex-col gap-2.5 sm:flex-row" role="radiogroup" aria-label="ประเภทบริการ">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={category === 'technician'}
+              onClick={() => handleCategoryChange('technician')}
+              className={`flex min-h-touch flex-1 items-center gap-3 rounded-xl border p-4 text-left font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong ${
+                category === 'technician'
+                  ? 'border-accent-strong bg-accent-sunken text-accent-strong shadow-xs'
+                  : 'border-border bg-surface-raised text-ink hover:border-accent-strong'
+              }`}
+            >
+              <Wrench className="h-5 w-5 shrink-0" aria-hidden="true" />
+              <div>
+                <span className="block text-base">งานช่างและบริการสาธารณูปโภค</span>
+                <span className="block text-xs font-normal text-muted">ลงพื้นที่ตรวจหน้างาน (ไฟฟ้า ประปา ถนน)</span>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              role="radio"
+              aria-checked={category === 'government'}
+              onClick={() => handleCategoryChange('government')}
+              className={`flex min-h-touch flex-1 items-center gap-3 rounded-xl border p-4 text-left font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong ${
+                category === 'government'
+                  ? 'border-accent-strong bg-accent-sunken text-accent-strong shadow-xs'
+                  : 'border-border bg-surface-raised text-ink hover:border-accent-strong'
+              }`}
+            >
+              <Building2 className="h-5 w-5 shrink-0" aria-hidden="true" />
+              <div>
+                <span className="block text-base">งานติดต่อราชการทั่วไป</span>
+                <span className="block text-xs font-normal text-muted">ณ ที่ทำการ อบต.หัวงัว (ภาษี เบี้ยยังชีพ ช่าง)</span>
+              </div>
+            </button>
+          </div>
+        </div>
+      </SectionCard>
+
+      {/* เลือกวันและช่วงเวลา */}
       <SectionCard>
         <SectionHeading icon={CalendarCheck}>เลือกวันและช่วงเวลา</SectionHeading>
         <div className="mt-5 space-y-5">
@@ -227,52 +382,61 @@ export function QueueBookingForm() {
             />
             <FieldHint id="queue-date-hint">
               รับนัดวันจันทร์–ศุกร์ ล่วงหน้าไม่เกิน {QUEUE_BOOKING_WINDOW_DAYS} วัน
-              {date && !isBusinessDay(date) ? '' : date ? ` · ${formatThaiDateLong(new Date(`${date}T00:00:00`))}` : ''}
+              {date && isBusinessDay(date) ? ` · ${formatThaiDateLong(new Date(`${date}T00:00:00`))}` : ''}
             </FieldHint>
             <FieldError id="queue-date-error">{fieldErrors.date}</FieldError>
           </div>
 
-          <fieldset>
-            <legend className="mb-1.5 block text-sm font-semibold text-ink">ช่วงเวลา</legend>
-            {slotsLoading ? (
-              <p className="text-muted flex min-h-touch items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                กำลังโหลดช่วงว่าง…
-              </p>
-            ) : (
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2" role="radiogroup" aria-label="ช่วงเวลา">
-                {slots.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={slot === s.id}
-                    disabled={!s.available}
-                    onClick={() => setSlot(s.id)}
-                    className={`min-h-touch rounded-md border px-4 py-3 text-left font-semibold transition-colors ${
-                      slot === s.id
-                        ? 'border-accent-strong bg-accent-sunken text-accent-strong'
-                        : s.available
-                          ? 'border-border bg-surface-raised text-ink hover:border-accent-strong'
-                          : 'cursor-not-allowed border-border bg-surface-raised text-muted opacity-50'
-                    }`}
-                  >
-                    {s.label}
-                    {!s.available && <span className="ml-2 text-sm font-normal">(เต็มแล้ว)</span>}
-                  </button>
-                ))}
-              </div>
-            )}
-            <FieldError>{fieldErrors.slot}</FieldError>
-          </fieldset>
+          {isWeekendSelected && (
+            <div className="rounded-xl border border-warning-border bg-warning-soft p-4 text-sm font-semibold text-warning-ink">
+              อบต.หัวงัว ปิดทำการในวันหยุดราชการ (เปิดให้บริการวันจันทร์–ศุกร์ เวลา 08:30–16:30 น.)
+            </div>
+          )}
+
+          {!isWeekendSelected && (
+            <fieldset>
+              <legend className="mb-2 block text-sm font-semibold text-ink">ช่วงเวลาที่สะดวก</legend>
+              {slotsLoading ? (
+                <p className="text-muted flex min-h-touch items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  กำลังตรวจสอบช่วงว่าง…
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2" role="radiogroup" aria-label="ช่วงเวลา">
+                  {slots.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={slot === s.id}
+                      disabled={!s.available}
+                      onClick={() => setSlot(s.id)}
+                      className={`min-h-touch rounded-lg border px-4 py-3 text-left font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong ${
+                        slot === s.id
+                          ? 'border-accent-strong bg-accent-sunken text-accent-strong shadow-xs'
+                          : s.available
+                            ? 'border-border bg-surface-raised text-ink hover:border-accent-strong'
+                            : 'cursor-not-allowed border-border bg-surface-sunken text-muted'
+                      }`}
+                    >
+                      <span>{s.label}</span>
+                      {!s.available && <span className="ml-2 text-xs font-normal text-muted">(คิวเต็ม)</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <FieldError>{fieldErrors.slot}</FieldError>
+            </fieldset>
+          )}
         </div>
       </SectionCard>
 
+      {/* ข้อมูลผู้จอง */}
       <SectionCard>
-        <SectionHeading icon={User}>ข้อมูลผู้จอง</SectionHeading>
+        <SectionHeading icon={User}>ข้อมูลผู้จองและสถานที่</SectionHeading>
         <div className="mt-5 space-y-5">
           <div>
-            <Label htmlFor="queue-name">ชื่อ-นามสกุล</Label>
+            <Label htmlFor="queue-name">ชื่อ-นามสกุล ผู้ติดต่อ</Label>
             <Input
               id="queue-name"
               type="text"
@@ -280,12 +444,13 @@ export function QueueBookingForm() {
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               invalid={!!fieldErrors.fullName}
-              placeholder="เช่น สมชาย ใจดี"
+              placeholder="เช่น นายสมชาย ใจดี"
             />
             <FieldError>{fieldErrors.fullName}</FieldError>
           </div>
+
           <div>
-            <Label htmlFor="queue-phone">เบอร์โทรติดต่อกลับ</Label>
+            <Label htmlFor="queue-phone">เบอร์โทรศัพท์ติดต่อกลับ (จำเป็น)</Label>
             <Input
               id="queue-phone"
               type="tel"
@@ -296,26 +461,70 @@ export function QueueBookingForm() {
               invalid={!!fieldErrors.phoneNumber}
               placeholder="เช่น 0812345678"
             />
+            <FieldHint>เจ้าหน้าที่จะโทรประสานงานตามหมายเลขนี้ก่อนถึงวันนัด</FieldHint>
             <FieldError>{fieldErrors.phoneNumber}</FieldError>
           </div>
+
+          {category === 'technician' && (
+            <div>
+              <Label htmlFor="queue-village">หมู่บ้านที่ต้องการให้เข้าตรวจหน้างาน (ตำบลหัวงัว)</Label>
+              <Select value={villageId} onValueChange={(val) => setVillageId(val)}>
+                <SelectTrigger id="queue-village" aria-label="เลือกหมู่บ้าน">
+                  <SelectValue placeholder="เลือกหมู่บ้าน (หมู่ 1 - หมู่ 13)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {HUA_NGUA_VILLAGES.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {v.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FieldError>{fieldErrors.villageId}</FieldError>
+            </div>
+          )}
         </div>
       </SectionCard>
 
+      {/* เรื่องที่ต้องการติดต่อ */}
       <SectionCard>
-        <SectionHeading icon={Wrench}>งานช่างที่ต้องการ</SectionHeading>
+        <SectionHeading icon={category === 'technician' ? Wrench : Building2}>
+          {category === 'technician' ? 'งานช่างที่ต้องการให้ลงพื้นที่' : 'เรื่องที่ต้องการติดต่อราชการ'}
+        </SectionHeading>
         <div className="mt-5 space-y-5">
           <div>
-            <Label htmlFor="queue-service">ประเภทงานช่าง</Label>
+            <Label htmlFor="queue-service">เรื่องหรือหัวข้อที่ต้องการนัดหมาย</Label>
             <Input
               id="queue-service"
               type="text"
               value={serviceType}
               onChange={(e) => setServiceType(e.target.value)}
               invalid={!!fieldErrors.serviceType}
-              placeholder="เช่น ไฟฟ้าดับ ท่อประปาแตก ถนนชำรุด"
+              placeholder={
+                category === 'technician'
+                  ? 'เช่น ซ่อมไฟฟ้าสาธารณะ, ท่อประปาแตก'
+                  : 'เช่น ยื่นแบบขออนุญาตก่อสร้าง, ติดต่อภาษีที่ดิน'
+              }
             />
             <FieldError>{fieldErrors.serviceType}</FieldError>
+
+            <div className="mt-3">
+              <span className="block text-xs font-semibold text-muted">หัวข้อที่พบบ่อย (กดเพื่อเลือก):</span>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {CATEGORY_PRESETS[category].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => applyPreset(preset)}
+                    className="inline-flex min-h-touch items-center rounded-lg border border-border bg-surface-raised px-3 py-1.5 text-xs font-medium text-ink transition-colors hover:border-accent-strong hover:bg-accent-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
+
           <div>
             <Label htmlFor="queue-note">รายละเอียดเพิ่มเติม (ถ้ามี)</Label>
             <Textarea
@@ -324,23 +533,28 @@ export function QueueBookingForm() {
               value={note}
               onChange={(e) => setNote(e.target.value)}
               invalid={!!fieldErrors.note}
-              placeholder="เช่น จุดที่เสีย ที่ตั้งบ้าน จุดสังเกต"
+              placeholder={
+                category === 'technician'
+                  ? 'เช่น จุดสังเกต เสาไฟฟ้าต้นที่เท่าไร หรือจุดที่มีปัญหาน้ำรั่ว'
+                  : 'เช่น ต้องการปรึกษาเอกสารประกอบ หรือสอบถามขั้นตอนเบื้องต้น'
+              }
             />
             <FieldError>{fieldErrors.note}</FieldError>
           </div>
+
           <div>
             <label className="flex min-h-touch cursor-pointer items-start gap-3" htmlFor="queue-consent">
               <input
                 id="queue-consent"
                 type="checkbox"
-                aria-label="ยินยอมให้ อบต.หัวงัว เก็บชื่อ–เบอร์โทรเพื่อติดต่อเรื่องนัดช่าง"
+                aria-label="ยินยอมให้ อบต.หัวงัว เก็บชื่อ–เบอร์โทรเพื่อติดต่อเรื่องการนัดหมาย"
                 checked={consent}
                 onChange={(e) => setConsent(e.target.checked)}
                 className="mt-1 h-5 w-5 flex-none rounded border-border-strong text-accent-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
               />
               <span className="text-sm">
-                ข้าพเจ้ายินยอมให้ อบต.หัวงัว เก็บชื่อ–นามสกุลและเบอร์โทรศัพท์
-                เพื่อใช้ติดต่อเรื่องนัดช่างเท่านั้น
+                ข้าพเจ้ายินยอมให้ อบต.หัวงัว เก็บรวบรวมและใช้ชื่อ–นามสกุล และเบอร์โทรศัพท์
+                เพื่อใช้สำหรับการประสานงานและแจ้งเตือนสถานะการนัดหมายตาม พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล (PDPA)
               </span>
             </label>
             <FieldError>{fieldErrors.consent}</FieldError>
@@ -349,7 +563,10 @@ export function QueueBookingForm() {
       </SectionCard>
 
       {submitError && (
-        <p role="alert" className="mt-6 flex items-start gap-2 rounded-xl border border-danger-ink/30 bg-danger-soft p-4 font-semibold text-danger-ink">
+        <p
+          role="alert"
+          className="mt-6 flex items-start gap-2 rounded-xl border border-danger-ink/30 bg-danger-soft p-4 font-semibold text-danger-ink"
+        >
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
           {submitError}
         </p>
@@ -357,7 +574,7 @@ export function QueueBookingForm() {
 
       <Button type="submit" size="lg" disabled={submitting} className="mt-6 w-full">
         {submitting && <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />}
-        {submitting ? 'กำลังจองคิว…' : 'ยืนยันการจองคิว'}
+        {submitting ? 'กำลังบันทึกการจองคิว…' : 'ยืนยันการจองคิว'}
       </Button>
     </form>
   );
