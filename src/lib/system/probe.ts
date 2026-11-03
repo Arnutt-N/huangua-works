@@ -78,7 +78,8 @@ async function probeSmtp(): Promise<{ status: ConnectionProbeStatus; endpoint: s
 async function probeTelegram(): Promise<{ status: ConnectionProbeStatus; endpoint: string }> {
   const endpoint = 'https://api.telegram.org';
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token) return { status: 'unknown', endpoint };
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+  if (!token || !chatId) return { status: 'unknown', endpoint };
   try {
     const res = await fetchWithTimeout(`${endpoint}/bot${token}/getMe`);
     return { status: res.ok ? 'connected' : 'degraded', endpoint };

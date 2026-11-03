@@ -68,6 +68,11 @@ describe('field-offline-store', () => {
     expect(updated?.syncedAt).toBeTruthy();
   });
 
+  it('คืน false เมื่อทำเครื่องหมายซิงค์กับ id ที่ไม่มีอยู่', async () => {
+    const marked = await markFieldDraftSynced('non-existent-id');
+    expect(marked).toBe(false);
+  });
+
   it('ลบแบบร่างภาคสนามได้สำเร็จ', async () => {
     const draft = await saveFieldDraft({
       kind: 'field_note',

@@ -3,8 +3,6 @@ import { decryptLineId } from '@/lib/line/identity';
 import { getChatSetting } from '@/lib/line/settings';
 import type { LineOutgoingMessage } from '@/lib/line/types';
 import { formatThaiDateLong } from '@/lib/thai-date';
-
-export type LineFlexMessage = Extract<LineOutgoingMessage, { type: 'flex' }>;
 import {
   QUEUE_BOOKING_STATUS_LABELS,
   QUEUE_CATEGORY_LABELS,
@@ -13,6 +11,8 @@ import {
   type QueueCategory,
   type QueueSlotId,
 } from '@/lib/validation';
+
+export type LineFlexMessage = Extract<LineOutgoingMessage, { type: 'flex' }>;
 
 export interface QueueBookingNotifyTarget {
   id: string;

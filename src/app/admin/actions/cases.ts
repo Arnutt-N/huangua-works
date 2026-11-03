@@ -9,7 +9,7 @@ import { notifyUrgentCase } from '@/lib/notify';
 import { applyCaseUpdate, type CaseActor } from '@/lib/cases/operations';
 import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
-import { cases, caseUpdates } from '@/lib/db/schema';
+import { cases, caseUpdates, categories, users } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import { AUDIT_ACTIONS, logAudit } from '@/lib/audit';
 import { deleteFile, isStorageConfigured, uploadFile } from '@/lib/storage';
@@ -145,8 +145,12 @@ export async function setPriority(
         .select({
           trackingCode: cases.trackingCode,
           title: cases.title,
+          categoryName: categories.name,
+          assignedToName: users.fullName,
         })
         .from(cases)
+        .leftJoin(categories, eq(cases.categoryId, categories.id))
+        .leftJoin(users, eq(cases.assignedTo, users.id))
         .where(eq(cases.id, caseId))
         .limit(1),
     )
@@ -155,6 +159,8 @@ export async function setPriority(
           notifyUrgentCase({
             trackingCode: c.trackingCode ?? caseId,
             title: c.title,
+            categoryName: c.categoryName,
+            assignedToName: c.assignedToName,
           }).catch((err) => console.warn('[cases-action] urgent notice dispatch failed', err));
         }
       })

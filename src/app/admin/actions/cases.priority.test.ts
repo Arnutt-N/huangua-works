@@ -49,14 +49,21 @@ describe('setPriority server action', () => {
   it('ปรับเป็น urgent สำเร็จ พร้อมเรียก notifyUrgentCase', async () => {
     vi.mocked(applyCaseUpdate).mockResolvedValue({ ok: true } as any);
 
+    const queryBuilder: any = {};
+    queryBuilder.leftJoin = vi.fn().mockReturnValue(queryBuilder);
+    queryBuilder.where = vi.fn().mockReturnValue({
+      limit: vi.fn().mockResolvedValue([
+        {
+          trackingCode: 'HG-691103001',
+          title: 'เสาไฟฟ้าล้มขวางทาง',
+          categoryName: 'ไฟฟ้าสาธารณะ',
+          assignedToName: 'สมชาย ช่างไฟ',
+        },
+      ]),
+    });
+
     const mockSelect = vi.fn().mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([
-            { trackingCode: 'HG-691103001', title: 'เสาไฟฟ้าล้มขวางทาง' },
-          ]),
-        }),
-      }),
+      from: vi.fn().mockReturnValue(queryBuilder),
     });
     vi.mocked(getDb).mockResolvedValue({ select: mockSelect } as any);
 
@@ -72,6 +79,14 @@ describe('setPriority server action', () => {
       { kind: 'priority', priority: 'urgent' },
       expect.objectContaining({ userId: 'staff-1' }),
     );
+    await vi.waitFor(() => {
+      expect(notifyUrgentCase).toHaveBeenCalledWith({
+        trackingCode: 'HG-691103001',
+        title: 'เสาไฟฟ้าล้มขวางทาง',
+        categoryName: 'ไฟฟ้าสาธารณะ',
+        assignedToName: 'สมชาย ช่างไฟ',
+      });
+    });
   });
 
   it('ปรับเป็น normal สำเร็จ และไม่เรียก notifyUrgentCase', async () => {

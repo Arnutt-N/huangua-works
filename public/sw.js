@@ -41,8 +41,8 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
 
-  // ไม่แคช API routes หรือ Auth endpoints
-  if (url.pathname.startsWith('/api/')) {
+  // ไม่แคช API routes, Auth endpoints หรือหน้าแอดมิน (/admin) ที่มีข้อมูลส่วนบุคคล (PII)
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/admin')) {
     return;
   }
 
@@ -51,8 +51,8 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          // เก็บสำเนาหน้าเว็บล่าสุดลงแคช
-          if (response && response.status === 200) {
+          // เก็บสำเนาหน้าเว็บล่าสุดลงแคช (เฉพาะหน้าที่ไม่ใช่ /admin)
+          if (response && response.status === 200 && !url.pathname.startsWith('/admin')) {
             const clone = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
           }
@@ -93,7 +93,7 @@ self.addEventListener('fetch', (event) => {
             }
             return networkResponse;
           })
-          .catch(() => cached);
+          .catch(() => cached || new Response('', { status: 503, statusText: 'Service Unavailable' }));
 
         return cached || fetchPromise;
       }),
