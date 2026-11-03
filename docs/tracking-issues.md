@@ -112,7 +112,7 @@
 | P2-03 | จองคิวนัดช่างและนัดหมาย อบต. | P2 | P1 | feat | ระบบบริการจองคิวออนไลน์สำหรับงานช่างและติดต่อราชการ พร้อมปฏิทินเลือกช่วงเวลาและการแจ้งเตือน LINE (เสร็จสมบูรณ์ใน PR #192, ปรับปรุง State Machine ใน PR #193) | จองคิวทำงาน; calendar slot 4 ช่วง/วัน; แจ้งเตือน LINE; admin queue page | P1-13 | M |
 | P2-04 | a11y ผู้สูงอายุเพิ่มเติม (M-A1, M-A2, M-A3) | P2 | P1 | a11y | `prefers-reduced-motion` ตรวจก่อน (SC 2.3.3); draft เก็บเฉพาะ non-PII ใน `localStorage`; `ErrorSummary` ตามเกณฑ์ G199 พร้อม smart focus jump; `aria-describedby` + `role="alert"` ทุก input; touch target ≥44px; error pattern ใน Storybook (เสร็จสมบูรณ์ใน PR #198) | reduced-motion ตรวจ; ไม่เก็บ PII ใน client; ErrorSummary + error pattern ทำงาน; ผ่าน axe | P1-13 | M |
 | P2-05 | PMQA reporting | P2 | P2 | feat | PMQA reporting integration (เสร็จสมบูรณ์ใน PR #185) | PMQA report ออก; ฟอร์แมตตามมาตรฐานเกณฑ์ PMQA หมวด 3/7 พร้อม layout พิมพ์ A4 ใน /admin/reports/pmqa | P1-13 | M |
-| P2-06 | Honeypot anti-spam (L-S1) | P2 | P2 | sec | invisible honeypot field `website_url` (hidden + `tabindex=-1` + `aria-hidden`) + reject if filled OR submit < 2 วินาที; ไม่ใช้ reCAPTCHA หนัก | honeypot ทำงาน; บล็อก bot; ไม่กระทบ a11y | P1-01 | S |
+| P2-06 | Honeypot anti-spam (L-S1) | P2 | P2 | sec | invisible honeypot field `website_url` (hidden + `tabindex=-1` + `aria-hidden`) + reject if filled OR submit < 2 วินาที; ไม่ใช้ reCAPTCHA หนัก (เสร็จสมบูรณ์ใน `/intake` และ `/queue` ใน PR #201) | honeypot ทำงาน; บล็อก bot; ไม่กระทบ a11y | P1-01 | S |
 
 ---
 
