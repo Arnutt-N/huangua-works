@@ -103,7 +103,9 @@ describe('updateQueueBooking server action', () => {
   it('อัปเดตสถานะสำเร็จ พร้อมเรียก LINE notification เมื่อมี lineUserIdEnc', async () => {
     const mockUpdate = vi.fn().mockReturnValue({
       set: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue(undefined),
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([{ id: '11111111-1111-4111-8111-111111111111' }]),
+        }),
       }),
     });
 
@@ -133,5 +135,32 @@ describe('updateQueueBooking server action', () => {
       'confirmed',
       'ยืนยันรับเรื่องเรียบร้อย',
     );
+  });
+
+  it('คืน error เมื่อสถานะคิวถูกเปลี่ยนแปลงไปแล้วโดยผู้อื่น (optimistic concurrency conflict)', async () => {
+    const mockUpdate = vi.fn().mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([]),
+        }),
+      }),
+    });
+
+    const mockDb = {
+      select: vi.fn().mockReturnThis(),
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnValue({
+        limit: vi.fn().mockResolvedValue([sampleBooking]),
+      }),
+      update: mockUpdate,
+    };
+    vi.mocked(getDb).mockResolvedValue(mockDb as any);
+
+    const formData = new FormData();
+    formData.append('id', '11111111-1111-4111-8111-111111111111');
+    formData.append('status', 'confirmed');
+
+    const result = await updateQueueBooking({ error: null }, formData);
+    expect(result.error).toContain('ถูกเปลี่ยนแปลงไปแล้วโดยผู้อื่น');
   });
 });

@@ -131,6 +131,15 @@ export async function listFieldDrafts(): Promise<FieldDraft[]> {
       const req = store.getAll();
       req.onsuccess = () => {
         const list = (req.result as FieldDraft[]) || [];
+        // รวม draft ที่ค้างใน memoryStore (กรณีเขียน IDB ไม่สำเร็จ)
+        if (memoryStore.size > 0) {
+          const idbIds = new Set(list.map((d) => d.id));
+          for (const [memId, memDraft] of memoryStore.entries()) {
+            if (!idbIds.has(memId)) {
+              list.push(memDraft);
+            }
+          }
+        }
         resolve(sortDrafts(list));
       };
       req.onerror = () => reject(req.error);
@@ -155,7 +164,10 @@ export async function deleteFieldDraft(id: string): Promise<boolean> {
       const tx = db.transaction(STORE_NAME, 'readwrite');
       const store = tx.objectStore(STORE_NAME);
       const req = store.delete(id);
-      req.onsuccess = () => resolve(true);
+      req.onsuccess = () => {
+        memoryStore.delete(id);
+        resolve(true);
+      };
       req.onerror = () => reject(req.error);
     });
   } catch {
@@ -167,19 +179,11 @@ export async function deleteFieldDraft(id: string): Promise<boolean> {
  * ทำเครื่องหมายว่าแบบร่างนี้ได้ซิงค์ขึ้นเซิร์ฟเวอร์สำเร็จแล้ว
  */
 export async function markFieldDraftSynced(id: string): Promise<boolean> {
-  const list = await listFieldDrafts();
-  const target = list.find((d) => d.id === id);
-  if (!target) return false;
-
-  const updated: FieldDraft = {
-    ...target,
-    synced: true,
-    syncedAt: new Date().toISOString(),
-  };
-
   const idb = getIndexedDB();
   if (!idb) {
-    memoryStore.set(id, updated);
+    const target = memoryStore.get(id);
+    if (!target) return false;
+    memoryStore.set(id, { ...target, synced: true, syncedAt: new Date().toISOString() });
     return true;
   }
 
@@ -188,12 +192,38 @@ export async function markFieldDraftSynced(id: string): Promise<boolean> {
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readwrite');
       const store = tx.objectStore(STORE_NAME);
-      const req = store.put(updated);
-      req.onsuccess = () => resolve(true);
-      req.onerror = () => reject(req.error);
+      const getReq = store.get(id);
+      getReq.onsuccess = () => {
+        const target = getReq.result as FieldDraft | undefined;
+        if (!target) {
+          const memTarget = memoryStore.get(id);
+          if (memTarget) {
+            memoryStore.set(id, { ...memTarget, synced: true, syncedAt: new Date().toISOString() });
+            resolve(true);
+            return;
+          }
+          resolve(false);
+          return;
+        }
+
+        const updated: FieldDraft = {
+          ...target,
+          synced: true,
+          syncedAt: new Date().toISOString(),
+        };
+        const putReq = store.put(updated);
+        putReq.onsuccess = () => {
+          memoryStore.delete(id);
+          resolve(true);
+        };
+        putReq.onerror = () => reject(putReq.error);
+      };
+      getReq.onerror = () => reject(getReq.error);
     });
   } catch {
-    memoryStore.set(id, updated);
+    const target = memoryStore.get(id);
+    if (!target) return false;
+    memoryStore.set(id, { ...target, synced: true, syncedAt: new Date().toISOString() });
     return true;
   }
 }

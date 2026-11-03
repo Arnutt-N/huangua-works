@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { requireStaff } from '@/lib/auth/require-staff';
 import { getDb } from '@/lib/db';
 import { queueBookings } from '@/lib/db/schema';
@@ -44,10 +44,15 @@ export async function updateQueueBooking(
   }
 
   try {
-    await db
+    const updated = await db
       .update(queueBookings)
       .set({ status, adminNote: adminNote || null, updatedAt: new Date() })
-      .where(eq(queueBookings.id, id));
+      .where(and(eq(queueBookings.id, id), eq(queueBookings.status, from)))
+      .returning({ id: queueBookings.id });
+
+    if (!updated || updated.length === 0) {
+      return { error: 'สถานะคิวถูกเปลี่ยนแปลงไปแล้วโดยผู้อื่น กรุณารีเฟรชหน้าจอ' };
+    }
 
     await logAudit(
       {

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { WifiOff, RefreshCw, ArrowLeft, CalendarCheck } from 'lucide-react';
+import { WifiOff, ArrowLeft, CalendarCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export const metadata: Metadata = {
@@ -37,19 +37,19 @@ export default function OfflinePage() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-            <Link href="/admin/queue" className="w-full sm:w-auto">
-              <Button variant="secondary" className="w-full min-h-touch gap-2">
+            <Button variant="secondary" className="w-full sm:w-auto min-h-touch gap-2" asChild>
+              <Link href="/admin/queue">
                 <CalendarCheck className="h-4 w-4" aria-hidden="true" />
                 คิวนัดหมายงานช่าง
-              </Button>
-            </Link>
+              </Link>
+            </Button>
 
-            <Link href="/" className="w-full sm:w-auto">
-              <Button variant="secondary" className="w-full min-h-touch gap-2">
+            <Button variant="secondary" className="w-full sm:w-auto min-h-touch gap-2" asChild>
+              <Link href="/">
                 <ArrowLeft className="h-4 w-4" aria-hidden="true" />
                 กลับหน้าแรก
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           </div>
         </div>
       </main>

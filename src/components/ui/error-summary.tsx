@@ -86,7 +86,7 @@ export function ErrorSummary({
       aria-labelledby="error-summary-title"
       tabIndex={-1}
       className={cn(
-        'rounded-2xl border border-danger-ink/30 bg-danger-soft/40 p-4 text-ink sm:p-5',
+        'rounded-xl border border-danger-ink/30 bg-danger-soft/40 p-4 text-ink sm:p-5',
         'focus:outline-none focus-visible:ring-2 focus-visible:ring-danger-ink',
         'motion-reduce:transition-none',
         className
