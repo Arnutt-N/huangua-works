@@ -3,11 +3,14 @@ import '@testing-library/jest-dom/vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { toLocalISODate } from '@/lib/validation';
+import { HONEYPOT_FIELD } from '@/lib/anti-spam';
 import { buildSlotAvailability } from './slots';
 import { QueueBookingForm } from './queue-booking-form';
 
 // § เทส race 3 เคสนี้ flaky ภายใต้โหลดทั้งชุด (timeout 5s) — 30s ตาม intake pattern
 vi.setConfig({ testTimeout: 30_000 });
+
+const QUEUE_QUERY_TIMEOUT_MS = 4000;
 
 /** วันราชการล่วงหน้า n วัน (จ–ศ) — ใช้เป็นวันที่จองที่ server mock ยอมรับแน่ ๆ */
 function nextBusinessDays(count: number): string[] {
@@ -164,10 +167,14 @@ describe('QueueBookingForm · race ตอนเปลี่ยนวันที
     fillGovernmentBookingForm();
     fireEvent.click(screen.getByRole('button', { name: 'ยืนยันการจองคิว' }));
 
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('ช่วงนี้ถูกจองแล้ว'));
+    await waitFor(
+      () => expect(screen.getByRole('alert')).toHaveTextContent('ช่วงนี้ถูกจองแล้ว'),
+      { timeout: QUEUE_QUERY_TIMEOUT_MS },
+    );
     // รีเฟรชแล้ว: slot_1 เต็ม + เลิกเลือกช่วงเดิม
-    await waitFor(() =>
-      expect(screen.getByRole('radio', { name: /09:00.*คิวเต็ม/ })).toBeDisabled(),
+    await waitFor(
+      () => expect(screen.getByRole('radio', { name: /09:00.*คิวเต็ม/ })).toBeDisabled(),
+      { timeout: QUEUE_QUERY_TIMEOUT_MS },
     );
     const getCalls = fetchMock.mock.calls.filter(([, init]) => init?.method !== 'POST');
     expect(getCalls).toHaveLength(2);
@@ -207,7 +214,9 @@ describe('QueueBookingForm · race ตอนเปลี่ยนวันที
 
     // เปลี่ยนวันระหว่างรอ POST ตอบ
     fireEvent.change(dateInput, { target: { value: dayB } });
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3)); // GET A, POST, GET B
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3), {
+      timeout: QUEUE_QUERY_TIMEOUT_MS,
+    }); // GET A, POST, GET B
 
     // POST ตอบ 409 ช้า — วันเก่าแล้ว ต้องไม่รีเฟรชทับ
     postGate.resolve(jsonResponse({ error: 'ช่วงนี้ถูกจองแล้ว' }, 409));
@@ -219,8 +228,10 @@ describe('QueueBookingForm · race ตอนเปลี่ยนวันที
       ([u, init]) => init?.method !== 'POST' && String(u).includes(dayA),
     );
     expect(getACalls).toHaveLength(1);
-    await waitFor(() =>
-      expect(screen.getByRole('radio', { name: 'เช้า 09:00–10:30' })).toBeEnabled(),
+    await waitFor(
+      () =>
+        expect(screen.getByRole('radio', { name: 'เช้า 09:00–10:30' })).toBeEnabled(),
+      { timeout: QUEUE_QUERY_TIMEOUT_MS },
     );
   });
 
@@ -267,5 +278,75 @@ describe('QueueBookingForm · race ตอนเปลี่ยนวันที
 
     fireEvent.click(submitBtn);
     expect(document.activeElement).toBe(alert);
+  });
+});
+
+describe('QueueBookingForm · Honeypot และ Anti-Spam', () => {
+  it('มีฟิลด์ honeypot ที่อยู่นอกจอ ซ่อนจาก screen reader และไม่อยู่ใน tab order', () => {
+    render(<QueueBookingForm />);
+    const honeypot = document.getElementById(HONEYPOT_FIELD) as HTMLInputElement;
+    expect(honeypot).toBeInTheDocument();
+    expect(honeypot).toHaveAttribute('type', 'text');
+    expect(honeypot).toHaveAttribute('tabIndex', '-1');
+    expect(honeypot).toHaveAttribute('aria-hidden', 'true');
+    expect(honeypot).toHaveAttribute('aria-label', 'เว็บไซต์');
+    expect(honeypot).toHaveAttribute('autocomplete', 'off');
+
+    const wrapper = honeypot.parentElement!;
+    expect(wrapper).toHaveAttribute('aria-hidden', 'true');
+    expect(wrapper).toHaveStyle({
+      position: 'absolute',
+      left: '-9999px',
+      overflow: 'hidden',
+    });
+  });
+
+  it('ส่งข้อมูลการจองพร้อม websiteUrl และ formStartedAt', async () => {
+    const [dayA] = nextBusinessDays(1);
+    if (!dayA) throw new Error('test setup: หาวันราชการไม่เจอ');
+
+    fetchMock.mockImplementation((_input, init) => {
+      if (init?.method === 'POST') {
+        return Promise.resolve(
+          jsonResponse({
+            success: true,
+            booking: {
+              dateTh: dayA,
+              slotLabel: '09:00–10:30',
+              serviceType: 'ขออนุญาตก่อสร้าง',
+            },
+          }),
+        );
+      }
+      return Promise.resolve(
+        jsonResponse({ date: dayA, dateTh: dayA, slots: buildSlotAvailability([]) }),
+      );
+    });
+
+    render(<QueueBookingForm />);
+    fireEvent.click(screen.getByRole('radio', { name: /งานติดต่อราชการทั่วไป/i }));
+    fireEvent.change(screen.getByLabelText('วันที่นัด'), { target: { value: dayA } });
+    await waitFor(() =>
+      expect(screen.getByRole('radio', { name: 'เช้า 09:00–10:30' })).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByRole('radio', { name: 'เช้า 09:00–10:30' }));
+    fillGovernmentBookingForm();
+
+    fireEvent.click(screen.getByRole('button', { name: 'ยืนยันการจองคิว' }));
+
+    await waitFor(
+      () => {
+        const postCall = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST');
+        expect(postCall).toBeDefined();
+      },
+      { timeout: QUEUE_QUERY_TIMEOUT_MS },
+    );
+
+    const postCall = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST')!;
+    const payload = JSON.parse(String(postCall[1]?.body));
+    expect(payload.websiteUrl).toBeUndefined();
+    expect(payload.formStartedAt).toBeTypeOf('number');
+    expect(payload.bookingDate).toBe(dayA);
+    expect(payload.slot).toBe('slot_1');
   });
 });

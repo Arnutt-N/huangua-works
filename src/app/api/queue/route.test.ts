@@ -4,6 +4,7 @@ import { GET, POST } from './route';
 import { getDb } from '@/lib/db';
 import { checkRateLimit } from '@/lib/upstash';
 import { logAudit } from '@/lib/audit';
+import { MIN_SUBMIT_MS } from '@/lib/anti-spam';
 import { toLocalISODate } from '@/lib/validation';
 import { LIFF_SESSION_COOKIE, createLiffSessionValue } from '@/lib/liff/session';
 import { sendQueueBookingConfirmation } from '@/lib/line/notify/queue-booking-notify';
@@ -219,5 +220,90 @@ describe('POST /api/queue', () => {
       }),
     );
     expect(logAudit).toHaveBeenCalled();
+  });
+
+  it('ปฏิเสธเมื่อ body เป็น malformed JSON คืน HTTP 400 และข้อความกลาง', async () => {
+    const req = new NextRequest('http://localhost:3000/api/queue', {
+      method: 'POST',
+      body: '{',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toBe('ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบแล้วลองใหม่');
+  });
+
+  it('ปฏิเสธเมื่อ body เป็น non-object หรือ array คืน HTTP 400', async () => {
+    const req = new NextRequest('http://localhost:3000/api/queue', {
+      method: 'POST',
+      body: JSON.stringify(['item1', 'item2']),
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toBe('ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบแล้วลองใหม่');
+  });
+
+  it('ปฏิเสธเมื่อ honeypot field (websiteUrl) มีค่า คืน HTTP 400 และข้อความกลาง', async () => {
+    const req = new NextRequest('http://localhost:3000/api/queue', {
+      method: 'POST',
+      body: JSON.stringify({ ...validPayload, websiteUrl: 'https://spambot.example' }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toBe('ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบแล้วลองใหม่');
+  });
+
+  it('ปฏิเสธเมื่อ formStartedAt ส่งเร็วกว่า MIN_SUBMIT_MS คืน HTTP 400', async () => {
+    const now = 1_700_000_000_000;
+    vi.spyOn(Date, 'now').mockReturnValue(now);
+    const req = new NextRequest('http://localhost:3000/api/queue', {
+      method: 'POST',
+      body: JSON.stringify({ ...validPayload, formStartedAt: now - (MIN_SUBMIT_MS - 500) }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toBe('ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบแล้วลองใหม่');
+  });
+
+  it('ยอมรับ submission ปกติเมื่อส่งช้ากว่า MIN_SUBMIT_MS และไม่มี honeypot', async () => {
+    const now = 1_700_000_000_000;
+    vi.spyOn(Date, 'now').mockReturnValue(now);
+    let callCount = 0;
+    const mockInsert = vi.fn().mockResolvedValue(undefined);
+    const mockDb = {
+      select: vi.fn().mockReturnThis(),
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) return Promise.resolve([{ count: 0 }]);
+        if (callCount === 2) return { limit: vi.fn().mockResolvedValue([]) };
+        return { limit: vi.fn().mockResolvedValue([{ name: 'บ้านหัวงัว หมู่ 1' }]) };
+      }),
+      insert: vi.fn().mockReturnValue({ values: mockInsert }),
+      update: vi.fn(),
+    };
+    vi.mocked(getDb).mockResolvedValue(mockDb as any);
+
+    const req = new NextRequest('http://localhost:3000/api/queue', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...validPayload,
+        websiteUrl: '',
+        formStartedAt: now - (MIN_SUBMIT_MS + 5000),
+      }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+    const data = await res.json();
+    expect(data.success).toBe(true);
+    expect(mockInsert).toHaveBeenCalled();
   });
 });
