@@ -1,13 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Wifi, WifiOff } from 'lucide-react';
-
 /**
  * OfflineIndicator — แสดงแถบแจ้งเตือนสถานะเมื่ออุปกรณ์หลุดจากการเชื่อมต่ออินเทอร์เน็ต
  */
-'use client';
-
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Wifi, WifiOff } from 'lucide-react';
 

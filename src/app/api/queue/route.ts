@@ -19,7 +19,7 @@ import { generateId } from '@/lib/id';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit';
 import { checkRateLimit } from '@/lib/upstash';
 import { clientIpFromHeaders } from '@/lib/rate-limit/client-ip';
-import { parseBody } from '@/lib/api-helpers';
+import { isSpamSubmission } from '@/lib/anti-spam';
 import {
   createQueueBookingSchema,
   queueAvailabilityQuerySchema,
@@ -37,6 +37,14 @@ import { notifyNewQueueBooking } from '@/lib/notify';
 
 function thaiDate(isoDate: string): string {
   return formatThaiDateLong(new Date(`${isoDate}T00:00:00`));
+}
+
+// § ใช้ได้เฉพาะตอนปฏิเสธเพราะสัญญาณกันสแปมเท่านั้น — คืนข้อความกลางเพื่อไม่ให้บอทเรียนรู้เกณฑ์ (ดู src/lib/anti-spam.ts)
+function spamRejectionResponse() {
+  return NextResponse.json(
+    { error: 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบแล้วลองใหม่' },
+    { status: 400 },
+  );
 }
 
 export async function GET(req: NextRequest) {
@@ -82,9 +90,39 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const body = await parseBody(createQueueBookingSchema, req);
-  if (!body.ok) return body.response;
-  const { fullName, phoneNumber, category, serviceType, note, villageId, bookingDate, slot } = body.data;
+  // § Parse body แบบ stream-safe ก่อนตรวจสแปมและ schema
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return spamRejectionResponse();
+  }
+
+  // § กันสแปม (honeypot + จับเวลากรอก) — ตรวจก่อน validate เพื่อตัดบอททิ้งเร็ว
+  // error ต้อง generic เช่นเดียวกับ /api/cases/submit เพื่อไม่ให้บอทเอาไปปรับตัว
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+    return spamRejectionResponse();
+  }
+
+  const raw = body as { websiteUrl?: unknown; formStartedAt?: unknown };
+  if (
+    isSpamSubmission(
+      {
+        websiteUrl: typeof raw.websiteUrl === 'string' ? raw.websiteUrl : undefined,
+        formStartedAt: typeof raw.formStartedAt === 'number' ? raw.formStartedAt : undefined,
+      },
+      Date.now(),
+    )
+  ) {
+    return spamRejectionResponse();
+  }
+
+  const validation = validateOrError(createQueueBookingSchema, body);
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
+  }
+  const { fullName, phoneNumber, category, serviceType, note, villageId, bookingDate, slot } =
+    validation.data;
 
   const db = await getDb();
 

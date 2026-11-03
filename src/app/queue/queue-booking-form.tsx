@@ -11,7 +11,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { ErrorSummary, type ErrorSummaryItem } from '@/components/ui/error-summary';
 import { FieldError, FieldHint, Input, Label, Textarea } from '@/components/ui/field';
@@ -29,6 +29,7 @@ import {
   type QueueCategory,
 } from '@/lib/validation';
 import { formatThaiDateLong } from '@/lib/thai-date';
+import { HONEYPOT_FIELD, MIN_SUBMIT_MS } from '@/lib/anti-spam';
 import { useLiff } from '@/components/liff/liff-provider';
 import {
   buildSlotAvailability,
@@ -124,6 +125,14 @@ export function QueueBookingForm() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<BookingResult | null>(null);
 
+  // § กันสแปม: honeypot + จับเวลากรอกฟอร์ม (ดู src/lib/anti-spam.ts)
+  const honeypotRef = useRef<HTMLInputElement>(null);
+  const formStartedAtRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    formStartedAtRef.current = Date.now();
+  }, []);
+
   const range = queueDateRange();
   const dateRequestId = useRef(0);
   const dateRef = useRef('');
@@ -218,9 +227,21 @@ export function QueueBookingForm() {
       return;
     }
 
+    const websiteUrl = honeypotRef.current?.value || undefined;
+    const formStartedAt = formStartedAtRef.current || undefined;
+
     setSubmitting(true);
     setSubmitError(null);
     try {
+      // § ผู้ใช้กรอกไวหรือเติมอัตโนมัติรอครบเกณฑ์ก่อนส่ง ไม่ได้รับ error เพราะเร็วเกินไป
+      const remaining =
+        formStartedAt === undefined
+          ? 0
+          : Math.min(MIN_SUBMIT_MS, MIN_SUBMIT_MS - (Date.now() - formStartedAt));
+      if (remaining > 0) {
+        await new Promise<void>((resolve) => window.setTimeout(resolve, remaining));
+      }
+
       const res = await fetch('/api/queue', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -234,6 +255,8 @@ export function QueueBookingForm() {
           bookingDate: date,
           slot,
           consent: true,
+          websiteUrl,
+          formStartedAt,
         }),
       });
       const data = (await res.json()) as {
@@ -622,6 +645,30 @@ export function QueueBookingForm() {
           {submitError}
         </p>
       )}
+
+      {/* § Honeypot กันบอท — ผู้ใช้จริงมองไม่เห็น (อยู่นอกจอ ไม่รับโฟกัส ไม่อ่านออกเสียง) */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          left: '-9999px',
+          top: 'auto',
+          width: '1px',
+          height: '1px',
+          overflow: 'hidden',
+        }}
+      >
+        <input
+          ref={honeypotRef}
+          id={HONEYPOT_FIELD}
+          name={HONEYPOT_FIELD}
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+          aria-hidden="true"
+          aria-label="เว็บไซต์"
+        />
+      </div>
 
       <Button type="submit" size="lg" disabled={submitting} className="mt-6 w-full">
         {submitting && <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />}
