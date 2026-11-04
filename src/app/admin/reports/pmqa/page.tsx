@@ -41,7 +41,7 @@ export default async function PmqaReportPage({ searchParams }: PageProps) {
   });
 
   return (
-    <AdminShell user={staffUser} active="reports" title="รายงานเกณฑ์ PMQA">
+    <AdminShell user={staffUser} active="pmqa" title="รายงานเกณฑ์ PMQA">
       <div className="space-y-6">
         {/* หัวหนังสือราชการสำหรับพิมพ์ (แสดงเฉพาะโหมดพิมพ์เท่านั้น) */}
         <div className="hidden text-center print:mb-6 print:block">

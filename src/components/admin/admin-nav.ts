@@ -19,6 +19,7 @@ import {
   PanelTop,
   MessageSquareText,
   MessageSquareReply,
+  Award,
   type LucideIcon,
 } from 'lucide-react';
 import { ADMIN_ROLES, type UserRole } from '@/lib/auth/roles';
@@ -28,6 +29,7 @@ export type { UserRole } from '@/lib/auth/roles';
 export type AdminTab =
   | 'dashboard'
   | 'reports'
+  | 'pmqa'
   | 'chat'
   | 'chat-histories'
   | 'friends'
@@ -85,6 +87,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     items: [
       { key: 'dashboard', label: 'แดชบอร์ด', href: '/admin', icon: BarChart3 },
       { key: 'reports', label: 'จัดการเรื่อง', href: '/admin/reports', icon: ClipboardList },
+      { key: 'pmqa', label: 'รายงาน PMQA', href: '/admin/reports/pmqa', icon: Award },
     ],
   },
   {
@@ -184,7 +187,7 @@ interface ChromeRule {
 const CHROME_RULES: ChromeRule[] = [
   { prefix: '/admin/chat', exact: true, active: 'chat', title: 'สนทนาสด', bleed: true },
   { prefix: '/admin/cases', active: 'reports', title: 'รายละเอียดเรื่อง' },
-  { prefix: '/admin/reports/pmqa', active: 'reports', title: 'รายงานเกณฑ์ PMQA' },
+  { prefix: '/admin/reports/pmqa', active: 'pmqa', title: 'รายงานเกณฑ์ PMQA' },
   { prefix: '/admin/reports', active: 'reports', title: 'จัดการเรื่อง' },
   { prefix: '/admin/queue', active: 'dashboard', title: 'คิวนัดหมายและนัดช่าง' },
   { prefix: '/admin/profile', active: 'profile', title: 'โปรไฟล์ของฉัน' },

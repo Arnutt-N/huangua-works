@@ -4,17 +4,17 @@ import { ChevronRight, type LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 /**
- * KpiCard — Key Performance Indicator card
+ * KpiCard: Key Performance Indicator card
  *
  * Unity กับ landing Stats: ใช้ glass + icon สีน้ำเงิน/amber + value เด่น
  * แตกต่างจาก Stats ตรงนี้คือเป็น data point เดียว (ไม่ใช่ชุด 4) และทำงานใน admin context
  *
  * Variants:
  *  - default: accent น้ำเงิน (tech/smart)
- *  - gold: amber accent (Thai royal — ใช้สำหรับ highlight KPI)
+ *  - gold: amber accent (Thai royal: ใช้สำหรับ highlight KPI)
  *  - danger: red accent (SLA breach / warning)
  *
- * § สีไอคอนใช้ token *-ink ทั้งหมด — ของเดิม variant gold ใช้ text-accent-gold (L82%)
+ * § สีไอคอนใช้ token *-ink ทั้งหมด: ของเดิม variant gold ใช้ text-accent-gold (L82%)
  * บนพื้น gold-soft (L95%) = 1.52:1 ไอคอนแทบหายไปกับพื้น (ต่ำกว่า 3:1 ของ WCAG 1.4.11)
  *
  * โครงการ์ด = กรอบไอคอนสี + ตัวเลข + label เหมือนการ์ดบริการบน landing (Services.tsx)
@@ -55,6 +55,7 @@ export interface KpiCardProps {
   hint?: ReactNode;
   className?: string;
   href?: string;
+  ariaLabel?: string;
 }
 
 export function KpiCard({
@@ -65,6 +66,7 @@ export function KpiCard({
   hint,
   className,
   href,
+  ariaLabel,
 }: KpiCardProps) {
   const styles = variantStyles[variant];
   const displayValue = typeof value === 'number' ? value.toLocaleString('th-TH') : value;
@@ -103,7 +105,7 @@ export function KpiCard({
     return (
       <Link
         href={href}
-        aria-label={`${label} ${displayValue} คลิกเพื่อดูรายการ`}
+        aria-label={ariaLabel ?? `${label} ${displayValue} คลิกเพื่อดูรายการ`}
         className={cn(
           'glass-panel group flex flex-col gap-3 rounded-xl p-5 shadow-sm',
           'transition duration-normal ease-out-expo hover:border-accent-strong hover:shadow-md',

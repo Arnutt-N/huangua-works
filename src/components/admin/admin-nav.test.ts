@@ -89,6 +89,7 @@ describe('visibleNavGroups', () => {
 const PAGE_OF: Record<string, string> = {
   dashboard: 'src/app/admin/page.tsx',
   reports: 'src/app/admin/reports/page.tsx',
+  pmqa: 'src/app/admin/reports/pmqa/page.tsx',
   chat: 'src/app/admin/chat/page.tsx',
   'chat-histories': 'src/app/admin/chat-histories/page.tsx',
   friends: 'src/app/admin/friends/page.tsx',
@@ -164,6 +165,13 @@ describe('resolveAdminChrome', () => {
   it('แดชบอร์ดไม่กลืนเส้นทางที่ยาวกว่า', () => {
     expect(resolveAdminChrome('/admin')).toMatchObject({ active: 'dashboard', title: 'แดชบอร์ดเจ้าหน้าที่' });
     expect(resolveAdminChrome('/admin/reports').active).toBe('reports');
+  });
+
+  it('หน้ารายงานเกณฑ์ PMQA ใช้แท็บ pmqa', () => {
+    expect(resolveAdminChrome('/admin/reports/pmqa')).toMatchObject({
+      active: 'pmqa',
+      title: 'รายงานเกณฑ์ PMQA',
+    });
   });
 });
 
