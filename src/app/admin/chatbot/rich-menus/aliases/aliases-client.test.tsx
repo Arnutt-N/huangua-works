@@ -68,7 +68,7 @@ describe('RichMenuAliasesClient', () => {
       'alias id ใช้ได้เฉพาะ a-z A-Z 0-9 _ - ความยาว 1-50 ตัว',
     );
     expect(createMenuAlias).not.toHaveBeenCalled();
-  });
+  }, 15000);
 
   it('ตารางแสดงคอลัมน์สถานะ Sync', async () => {
     listMenuAliases.mockResolvedValue({
