@@ -1,4 +1,5 @@
 import type { CaseStatus } from '@/lib/cases/state-machine';
+import type { KpiTrend } from '@/components/admin/kpi-card';
 
 export interface DailyTrendPoint {
   date: string; // YYYY-MM-DD
@@ -36,4 +37,5 @@ export interface DashboardMetrics {
   resolutionRate: number; // 0-100
   recentIntakeVelocity: number; // จำนวนเรื่องรับใน 7 วันล่าสุด
   lastUpdatedDateText: string;
+  monthOverMonthTrend?: KpiTrend;
 }
