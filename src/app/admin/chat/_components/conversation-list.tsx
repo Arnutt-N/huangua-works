@@ -146,7 +146,7 @@ export function ConversationList({
                   onClick={() => setFilter(chip.key)}
                   aria-pressed={active}
                   className={cn(
-                    'inline-flex flex-1 items-center justify-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-semibold',
+                    'inline-flex flex-1 items-center justify-center gap-1 rounded-md px-2 py-1.5 text-xs font-semibold',
                     'transition-colors duration-normal ease-out-expo',
                     active
                       ? 'bg-accent-gradient text-on-accent shadow-lg'
@@ -156,7 +156,7 @@ export function ConversationList({
                   {chip.label}
                   <span
                     className={cn(
-                      'inline-flex h-4 min-w-4 items-center justify-center rounded-pill px-1 text-[10px] tabular-nums',
+                      'inline-flex h-4 min-w-4 items-center justify-center rounded-pill px-1 text-xs tabular-nums',
                       active ? 'bg-white/20 text-on-accent' : 'bg-surface-raised text-muted',
                     )}
                   >
@@ -172,8 +172,8 @@ export function ConversationList({
               aria-pressed={sort === 'oldest'}
               title={
                 sort === 'newest'
-                  ? 'ล่าสุดก่อน — กดเพื่อสลับเป็นรอนานสุด'
-                  : 'รอนานสุดก่อน — กดเพื่อสลับเป็นล่าสุด'
+                  ? 'ล่าสุดก่อน - กดเพื่อสลับเป็นรอนานสุด'
+                  : 'รอนานสุดก่อน - กดเพื่อสลับเป็นล่าสุด'
               }
               className={cn(
                 'inline-flex flex-none items-center justify-center rounded-md px-2 py-1.5',
@@ -207,7 +207,7 @@ export function ConversationList({
         </div>
 
         <div className="flex-none border-t border-border bg-surface-sunken px-3 py-2.5">
-          <div className="flex items-center justify-between gap-2 text-[11px]">
+          <div className="flex items-center justify-between gap-2 text-xs">
             <span className="inline-flex items-center gap-1.5 text-success">
               <span className="h-1.5 w-1.5 rounded-pill bg-success" aria-hidden="true" />
               กำลังคุย {counts.active}

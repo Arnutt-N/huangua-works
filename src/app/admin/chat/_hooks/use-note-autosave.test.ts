@@ -19,7 +19,7 @@ afterEach(() => {
 });
 
 describe('useNoteAutosave', () => {
-  it('debounces 800ms before saving', async () => {
+  it('debounces 800 milliseconds before saving', async () => {
     const { result } = renderHook(() => useNoteAutosave('conv-1', null));
 
     act(() => result.current.onChange('โทรกลับพรุ่งนี้'));
@@ -104,7 +104,7 @@ describe('useNoteAutosave', () => {
     );
 
     act(() => result.current.onChange('กำลังพิมพ์อยู่'));
-    // refetch (เช่นหลัง transfer/reconnect) คืนค่าเก่าจาก server — ห้ามทับ draft
+    // refetch (เช่นหลัง transfer/reconnect) คืนค่าเก่าจาก server - ห้ามทับ draft
     rerender({ id: 'conv-1', note: 'เดิม-จาก-server' });
 
     expect(result.current.note).toBe('กำลังพิมพ์อยู่');

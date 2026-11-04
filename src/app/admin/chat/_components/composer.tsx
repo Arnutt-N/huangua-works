@@ -22,7 +22,7 @@ export function Composer({
 }: {
   canReply: boolean;
   mode: string;
-  /** ห้อง human_active แต่คนดูแลเป็นแอดมินคนอื่น — โชว์ banner + ปุ่มรับช่วงต่อ */
+  /** ห้อง human_active แต่คนดูแลเป็นแอดมินคนอื่น: โชว์ banner + ปุ่มรับช่วงต่อ */
   ownershipBanner: { ownerName: string | null } | null;
   actionError: string | null;
   cannedResponses: CannedResponse[];
@@ -36,7 +36,7 @@ export function Composer({
   const [expanded, setExpanded] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // auto-grow ในกรอบ 44–120px (กางแล้วสูงได้ถึง 240px)
+  // auto-grow ในกรอบ 44-120px (กางแล้วสูงได้ถึง 240px)
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
@@ -44,7 +44,7 @@ export function Composer({
     el.style.height = `${Math.min(el.scrollHeight, expanded ? EXPANDED_MAX_HEIGHT : MAX_HEIGHT)}px`;
   }, [input, expanded]);
 
-  // picker เปิดเมื่อ input ขึ้นต้นด้วย "/" — filter คือข้อความหลัง "/"
+  // picker เปิดเมื่อ input ขึ้นต้นด้วย "/" - filter คือข้อความหลัง "/"
   const pickerFilter = input.startsWith('/') ? input.slice(1) : '';
   const showPicker = input.startsWith('/')
     ? canReply && !slashDismissed
@@ -198,9 +198,9 @@ export function Composer({
                     : 'รับเรื่องก่อนเพื่อตอบผู้ใช้'
                 }
                 disabled={!canReply}
-                style={{ minHeight: '44px', maxHeight: `${expanded ? EXPANDED_MAX_HEIGHT : MAX_HEIGHT}px` }}
+                style={{ maxHeight: `${expanded ? EXPANDED_MAX_HEIGHT : MAX_HEIGHT}px` }} /* ds-allow-hardcode: dynamic auto-resizing */
                 className={cn(
-                  'w-full resize-none rounded-md border border-border bg-surface px-4 py-3 pr-10 text-sm text-ink shadow-sm placeholder:text-muted',
+                  'min-h-11 w-full resize-none rounded-md border border-border bg-surface px-4 py-3 pr-10 text-sm text-ink shadow-sm placeholder:text-muted',
                   'transition-colors duration-normal ease-out-expo',
                   'focus:border-accent focus:bg-surface-raised focus:outline-none focus-visible:ring focus-visible:ring-accent/40',
                   'disabled:bg-surface-sunken disabled:opacity-50',

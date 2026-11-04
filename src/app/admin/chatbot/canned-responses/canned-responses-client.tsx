@@ -37,7 +37,7 @@ const CATEGORY_OPTIONS = CANNED_RESPONSE_CATEGORIES.map((value) => ({
 }));
 
 function categoryLabel(value: string | undefined): string {
-  if (!value) return '—';
+  if (!value) return '-';
   return (CANNED_CATEGORY_LABELS as Record<string, string>)[value] ?? value;
 }
 
@@ -161,7 +161,7 @@ export function CannedResponsesClient() {
       </PageHeader>
 
       {loading ? (
-        // § skeleton เป็น div นอก <table> — rule a11y control-has-associated-label ตีความ td ที่ไม่มี text เป็น control
+        // § skeleton เป็น div นอก <table> - rule a11y control-has-associated-label ตีความ td ที่ไม่มี text เป็น control
         <div className="space-y-2 rounded-xl border border-border/50 p-4">
           {[...Array(5)].map((_, i) => (
             <div key={i} className="flex animate-pulse gap-3 py-2">
@@ -185,7 +185,7 @@ export function CannedResponsesClient() {
         />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border/50">
-          <table className="w-full min-w-[720px] text-left">
+          <table className="w-full min-w-180 text-left">
             <thead>
               <tr className="border-b border-border/50 text-xs font-semibold uppercase tracking-wide text-muted">
                 <th scope="col" className="px-4 py-2.5">ชอร์ตคัต</th>
@@ -207,7 +207,7 @@ export function CannedResponsesClient() {
                           /{item.shortcut}
                         </code>
                       ) : (
-                        <span className="text-xs text-muted">—</span>
+                        <span className="text-xs text-muted">-</span>
                       )}
                     </td>
                     <td className="max-w-md px-4 py-3">
@@ -375,7 +375,7 @@ export function CannedResponsesClient() {
                   label: 'ชอร์ตคัต',
                   value: (
                     <span className="font-mono font-semibold text-accent-strong">
-                      /{viewRow.shortcut ?? '—'}
+                      /{viewRow.shortcut ?? '-'}
                     </span>
                   ),
                 },

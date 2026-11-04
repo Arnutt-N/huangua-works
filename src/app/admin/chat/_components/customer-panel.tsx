@@ -14,7 +14,7 @@ import { TagPicker } from './tag-picker';
 const SAVE_LABEL: Record<string, string> = {
   dirty: 'กำลังพิมพ์...',
   saving: 'กำลังบันทึก...',
-  saved: 'บันทึกแล้ว ✓',
+  saved: 'บันทึกแล้ว',
   error: 'บันทึกไม่สำเร็จ',
 };
 
@@ -31,7 +31,7 @@ export function CustomerPanel({
   staff: StaffMember[];
   messages: Message[];
   onTagsSaved: () => void;
-  /** ปุ่มปิด — desktop = พับ panel, mobile = ปิด dialog */
+  /** ปุ่มปิด - desktop = พับ panel, mobile = ปิด dialog */
   onClose?: () => void;
 }) {
   const { note, onChange, saveState } = useNoteAutosave(
@@ -75,13 +75,13 @@ export function CustomerPanel({
         />
         <div>
           <p className="text-sm font-bold text-ink">{name}</p>
-          <p className="text-[11px] text-muted" title="LINE user id (ปิดบังบางส่วน)">
-            {conversation.lineUserId ?? '—'}
+          <p className="text-xs text-muted" title="LINE user id (ปิดบังบางส่วน)">
+            {conversation.lineUserId ?? '-'}
           </p>
         </div>
         <span
           className={cn(
-            'rounded-pill px-2.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset',
+            'rounded-pill px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset',
             MODE_BADGE[detail.mode] ?? FALLBACK_BADGE,
           )}
         >
@@ -121,7 +121,7 @@ export function CustomerPanel({
               <dd className="font-medium text-ink">
                 {conversation.lastMessageAt
                   ? formatRelativeTime(conversation.lastMessageAt)
-                  : '—'}
+                  : '-'}
               </dd>
             </div>
             <div className="flex justify-between gap-2">
@@ -155,7 +155,7 @@ export function CustomerPanel({
               <FileText className="h-3.5 w-3.5" aria-hidden="true" /> PDF
             </button>
           </div>
-          <p className="text-[10px] text-muted">
+          <p className="text-xs text-muted">
             PDF = สั่งพิมพ์แล้วเลือก &quot;บันทึกเป็น PDF&quot; · ครอบคลุม {messages.length} ข้อความที่โหลดแล้ว
           </p>
         </div>
@@ -174,7 +174,7 @@ export function CustomerPanel({
             </h3>
             <span
               className={cn(
-                'text-[11px] font-medium',
+                'text-xs font-medium',
                 saveState === 'error' ? 'text-danger' : 'text-muted',
               )}
               aria-live="polite"
@@ -195,7 +195,7 @@ export function CustomerPanel({
             )}
           />
           {detail.adminNoteUpdatedAt && (
-            <p className="text-[10px] text-muted">
+            <p className="text-xs text-muted">
               แก้ไขล่าสุด {formatRelativeTime(detail.adminNoteUpdatedAt)}
               {noteUpdatedByName ? ` โดย ${noteUpdatedByName}` : ''}
             </p>

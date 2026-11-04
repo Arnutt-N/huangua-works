@@ -23,8 +23,8 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        # ไม่ระบุ version — ใช้ packageManager จาก package.json (pnpm@11.0.8)
-        # ถ้าระบุ version ที่นี่จะซ้อนกับ packageManager → action-setup v4 ปฏิเสธ
+        # ไม่ระบุ version: ใช้ packageManager จาก package.json (pnpm@11.0.8)
+        # ถ้าระบุ version ที่นี่จะซ้อนกับ packageManager -> action-setup v4 ปฏิเสธ
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -41,7 +41,17 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      # Unit tests เท่านั้น — integration tests ต้องการ Postgres+Redis จริง (run แยกใน dedicated job ถ้าต้องการ)
+      # Fast design token and a11y gates
+      - name: Hardcode tokens gate
+        run: pnpm lint:hardcodes
+
+      - name: Zero emoji gate
+        run: pnpm lint:emoji
+
+      - name: Native select gate
+        run: pnpm lint:select
+
+      # Unit tests เท่านั้น: integration tests ต้องการ Postgres+Redis จริง (run แยกใน dedicated job ถ้าต้องการ)
       # หมายเหตุ: contrast gate อยู่ใน src/styles/tokens.contrast.test.ts จึงรันไปกับ
       # step นี้อยู่แล้ว ไม่ต้องพึ่ง pretest hook ซึ่งไม่ทำงานเพราะเราเรียก vitest ตรง
       - name: Unit tests
@@ -50,7 +60,7 @@ jobs:
       # รันซ้ำเป็น step แยกเพื่อให้เห็นผลชัดใน log ตอน gate ไม่ผ่าน
       # (ตัว gate จริงอยู่ใน unit tests ด้านบนแล้ว)
       #
-      # § if: always() จำเป็นจริง — ไม่ใช่ของประดับ
+      # § if: always() จำเป็นจริง: ไม่ใช่ของประดับ
       # ถ้าไม่มี เมื่อ unit tests พังเพราะ contrast ตก job จะหยุดที่ step ก่อนหน้าทันที
       # แล้ว step นี้ซึ่งเป็นตัวเดียวที่พิมพ์ว่าคู่ไหนพัง ค่าเท่าไร ใช้ที่ไหน จะไม่เคย
       # ได้รันในสถานการณ์ที่มันถูกออกแบบมาให้ช่วยพอดี

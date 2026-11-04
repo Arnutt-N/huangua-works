@@ -67,7 +67,7 @@ export function RichMenusClient() {
           : new File([fitted.file], fitted.filename, { type: 'image/jpeg' });
       const ok = await mutate(
         () => adminApi.uploadRichMenuImage(item.id, uploadFile),
-        'อัปรูปเมนูสำเร็จ — กด Set Active เพื่อเปิดใช้งานได้เลย',
+        'อัปรูปเมนูสำเร็จ - กด Set Active เพื่อเปิดใช้งานได้เลย',
       );
       if (ok) {
         setFailedImages((prev) => {
@@ -152,7 +152,7 @@ export function RichMenusClient() {
       ) : (
         <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left">
+            <table className="w-full min-w-180 text-left">
               <thead>
                 <tr className="border-b border-border/50 text-xs font-semibold uppercase tracking-wide text-muted">
                   <th scope="col" className="w-40 px-4 py-3 text-center">Preview</th>
@@ -181,7 +181,7 @@ export function RichMenusClient() {
                               }
                             />
                           ) : (
-                            <div className="flex h-full items-center justify-center bg-surface-sunken px-2 text-center text-[10px] text-muted">
+                            <div className="flex h-full items-center justify-center bg-surface-sunken px-2 text-center text-xs text-muted">
                               No Image
                             </div>
                           )}
@@ -193,11 +193,11 @@ export function RichMenusClient() {
                           <span className="font-medium">Bar Text:</span>{' '}
                           <span className="italic">&quot;{item.chatBarText}&quot;</span>
                         </p>
-                        <p className="mt-1 truncate font-mono text-[10px] text-muted">
+                        <p className="mt-1 truncate font-mono text-xs text-muted">
                           {item.lineRichMenuId ?? 'LOCAL_ONLY'}
                         </p>
                         {(item.userLinkCount ?? 0) > 0 && (
-                          <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-accent-sunken px-1.5 py-0.5 text-[10px] font-bold text-accent-strong">
+                          <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-accent-sunken px-1.5 py-0.5 text-xs font-bold text-accent-strong">
                             <Users className="h-3 w-3" /> {item.userLinkCount} ผู้ใช้
                           </span>
                         )}
@@ -206,7 +206,7 @@ export function RichMenusClient() {
                         <span
                           title={pill.title}
                           className={cn(
-                            'rounded-full border px-2.5 py-1 text-[10px] font-bold',
+                            'rounded-full border px-2.5 py-1 text-xs font-bold',
                             pillTone[pill.tone],
                           )}
                         >
@@ -263,7 +263,7 @@ export function RichMenusClient() {
                             </Button>
                           )}
                           {action === null && (
-                            <span className="rounded-full border border-success/30 bg-success-soft px-3 py-1 text-[10px] font-black tracking-widest text-success-ink">
+                            <span className="rounded-full border border-success/30 bg-success-soft px-3 py-1 text-xs font-black tracking-widest text-success-ink">
                               Live Now
                             </span>
                           )}
@@ -329,7 +329,7 @@ export function RichMenusClient() {
                     [viewMenu.displayStartAt, viewMenu.displayEndAt]
                       .map((v) => (v ? toLocalDatetimeInputValue(v).replace('T', ' ') : null))
                       .filter(Boolean)
-                      .join(' – ') || 'ตลอดเวลา',
+                      .join(' - ') || 'ตลอดเวลา',
                 },
                 { label: 'ผู้ใช้ที่ผูกเมนูนี้', value: `${viewMenu.userLinkCount ?? 0} คน` },
               ]

@@ -8,9 +8,9 @@ const SENDER_LABEL: Record<string, string> = {
 };
 
 function csvCell(value: string): string {
-  // § กัน CSV injection — ข้อความจากผู้ใช้ที่ขึ้นต้นด้วยสูตร Excel ต้องถูกทำให้เป็น text
+  // § กัน CSV injection - ข้อความจากผู้ใช้ที่ขึ้นต้นด้วยสูตร Excel ต้องถูกทำให้เป็น text
   const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
-  // § RFC 4180 — ครอบด้วย " และซ้ำ " ที่อยู่ข้างใน
+  // § RFC 4180 - ครอบด้วย " และซ้ำ " ที่อยู่ข้างใน
   if (/[",\n\r]/.test(safe)) return `"${safe.replace(/"/g, '""')}"`;
   return safe;
 }
@@ -55,6 +55,8 @@ export function printConversation(
         `<td>${escapeHtml(m.textContent ?? `[${m.messageType}]`)}</td></tr>`,
     )
     .join('');
+  // Standalone print window HTML generator: uses offline static print styles
+  /* ds-allow-hardcode:start */
   win.document.write(
     `<!doctype html><html lang="th"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>` +
       '<style>body{font-family:"Sarabun",sans-serif;padding:24px;color:#111}' +
@@ -64,6 +66,7 @@ export function printConversation(
       `<h1>${escapeHtml(title)}</h1><table><thead><tr><th>เวลา</th><th>ผู้ส่ง</th><th>ข้อความ</th></tr></thead>` +
       `<tbody>${rows}</tbody></table></body></html>`,
   );
+  /* ds-allow-hardcode:end */
   win.document.close();
   win.focus();
   win.print();

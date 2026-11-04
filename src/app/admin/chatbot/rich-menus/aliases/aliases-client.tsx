@@ -106,7 +106,7 @@ export function RichMenuAliasesClient() {
         <h2 className="text-sm font-bold text-ink">สร้าง Alias ใหม่</h2>
         {syncedMenus.length === 0 && !loading ? (
           <p className="text-xs text-warning-ink">
-            ยังไม่มีเมนูที่ sync ไป LINE —{' '}
+            ยังไม่มีเมนูที่ sync ไป LINE -{' '}
             <Link href="/admin/chatbot/rich-menus" className="font-bold underline">
               sync เมนูอย่างน้อย 1 อัน
             </Link>{' '}
@@ -115,7 +115,7 @@ export function RichMenuAliasesClient() {
         ) : (
           <div className="flex flex-col gap-3 md:flex-row md:items-end">
             <div className="flex-1">
-              <label htmlFor="alias-id" className="text-[10px] font-bold uppercase tracking-wider text-muted">
+              <label htmlFor="alias-id" className="text-xs font-bold uppercase tracking-wider text-muted">
                 Alias ID
               </label>
               <Input
@@ -127,7 +127,7 @@ export function RichMenuAliasesClient() {
               />
             </div>
             <div className="flex-1">
-              <label htmlFor="alias-target" className="text-[10px] font-bold uppercase tracking-wider text-muted">
+              <label htmlFor="alias-target" className="text-xs font-bold uppercase tracking-wider text-muted">
                 ชี้ไปที่เมนู
               </label>
               <select
@@ -161,7 +161,7 @@ export function RichMenuAliasesClient() {
       ) : (
         <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[600px] text-left">
+            <table className="w-full min-w-150 text-left">
               <thead>
                 <tr className="border-b border-border/50 text-xs font-semibold uppercase tracking-wide text-muted">
                   <th scope="col" className="px-4 py-3">Alias ID</th>
@@ -193,7 +193,7 @@ export function RichMenuAliasesClient() {
                     <td className="px-4 py-4 text-center">
                       <span
                         className={cn(
-                          'rounded-full border px-2.5 py-1 text-[10px] font-bold',
+                          'rounded-full border px-2.5 py-1 text-xs font-bold',
                           alias.syncStatus === 'synced'
                             ? 'border-success/30 bg-success-soft text-success-ink'
                             : 'border-warning/40 bg-warning-soft text-warning-ink',

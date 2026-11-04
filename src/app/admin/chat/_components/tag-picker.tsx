@@ -27,7 +27,7 @@ export function TagPicker({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // ปิดโหมดแก้ไขเฉพาะตอนเปลี่ยนห้อง — refetch ระหว่างแก้ต้องไม่ปิด panel กลางคัน
+  // ปิดโหมดแก้ไขเฉพาะตอนเปลี่ยนห้อง: refetch ระหว่างแก้ต้องไม่ปิด panel กลางคัน
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect -- reset UI state เมื่อเปลี่ยนห้อง */
     setEditing(false);
@@ -35,7 +35,7 @@ export function TagPicker({
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [conversationId]);
 
-  // sync selection จาก server — เทียบเนื้อหา (ids) ไม่ใช่ array identity
+  // sync selection จาก server: เทียบเนื้อหา (ids) ไม่ใช่ array identity
   // กัน loadConversations (SSE ห้องอื่น) มา reset selection ทั้งที่ค่าเท่าเดิม
   const selectedKey = selectedTags.map((t) => t.id).join(',');
   useEffect(() => {
@@ -90,7 +90,7 @@ export function TagPicker({
           type="button"
           onClick={() => setEditing((v) => !v)}
           aria-expanded={editing}
-          className="inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-[11px] font-semibold text-muted hover:bg-accent-sunken hover:text-accent-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
+          className="inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-xs font-semibold text-muted hover:bg-accent-sunken hover:text-accent-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
         >
           <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
           {editing ? 'เสร็จสิ้น' : 'จัดการแท็ก'}
@@ -106,7 +106,7 @@ export function TagPicker({
               <span
                 key={tag.id}
                 className={cn(
-                  'rounded-pill px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset',
+                  'rounded-pill px-2 py-0.5 text-xs font-semibold ring-1 ring-inset',
                   TAG_BADGE[tag.color] ?? TAG_BADGE.muted,
                 )}
               >
@@ -127,7 +127,7 @@ export function TagPicker({
                   onClick={() => toggle(tag.id)}
                   aria-pressed={active}
                   className={cn(
-                    'inline-flex items-center gap-1 rounded-pill px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset',
+                    'inline-flex items-center gap-1 rounded-pill px-2 py-0.5 text-xs font-semibold ring-1 ring-inset',
                     'transition-colors duration-fast',
                     TAG_BADGE[tag.color] ?? TAG_BADGE.muted,
                     active ? 'ring-2' : 'opacity-60 hover:opacity-100',
@@ -169,7 +169,7 @@ export function TagPicker({
                     aria-label={`สี ${color}`}
                     onClick={() => setNewColor(color)}
                     className={cn(
-                      'inline-flex h-6 w-6 items-center justify-center rounded-pill text-[10px] font-bold ring-1 ring-inset',
+                      'inline-flex h-6 w-6 items-center justify-center rounded-pill text-xs font-bold ring-1 ring-inset',
                       TAG_BADGE[color],
                       newColor === color && 'ring-2',
                     )}
@@ -183,7 +183,7 @@ export function TagPicker({
                 onClick={() => void handleCreate()}
                 disabled={!newName.trim() || busy}
                 className={cn(
-                  'ml-auto inline-flex h-7 items-center gap-1 rounded-md bg-accent-strong px-2 text-[11px] font-semibold text-on-accent',
+                  'ml-auto inline-flex h-7 items-center gap-1 rounded-md bg-accent-strong px-2 text-xs font-semibold text-on-accent',
                   'hover:opacity-90 disabled:pointer-events-none disabled:opacity-50',
                   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong',
                 )}
@@ -197,7 +197,7 @@ export function TagPicker({
       )}
 
       {error && (
-        <p className="text-[11px] font-medium text-danger" role="alert">
+        <p className="text-xs font-medium text-danger" role="alert">
           {error}
         </p>
       )}

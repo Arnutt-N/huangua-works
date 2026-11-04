@@ -83,7 +83,7 @@ export function ChatArea({
         </div>
         <span
           className={cn(
-            'inline-flex flex-none items-center gap-1 rounded-pill px-2 py-0.5 text-[10px] font-bold ring-1 ring-inset',
+            'inline-flex flex-none items-center gap-1 rounded-pill px-2 py-0.5 text-xs font-bold ring-1 ring-inset',
             connected
               ? 'bg-success-soft text-success-ink ring-success/30'
               : 'bg-surface-sunken text-muted ring-border',

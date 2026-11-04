@@ -27,7 +27,7 @@ export const ConversationItem = memo(function ConversationItem({
 }: {
   conversation: Conversation;
   isSelected: boolean;
-  /** ห้องนี้เกิน SLA ฝั่งแชท — โชว์ป้ายเตือน (danger-ink/danger-soft คู่ contrast ที่ลงทะเบียนแล้ว) */
+  /** ห้องนี้เกิน SLA ฝั่งแชท: โชว์ป้ายเตือน (danger-ink/danger-soft คู่ contrast ที่ลงทะเบียนแล้ว) */
   slaBreached?: boolean;
   onSelect: (id: string) => void;
   onTogglePin: (id: string, pinned: boolean) => void;
@@ -100,7 +100,7 @@ export const ConversationItem = memo(function ConversationItem({
             </span>
             <span
               className={cn(
-                'ml-auto flex-none text-[10px] tabular-nums',
+                'ml-auto flex-none text-xs tabular-nums',
                 'text-muted',
               )}
             >
@@ -115,12 +115,12 @@ export const ConversationItem = memo(function ConversationItem({
                 'text-muted',
               )}
             >
-              {conv.lastMessageText ?? '—'}
+              {conv.lastMessageText ?? '-'}
             </span>
             <span className="ml-auto flex flex-none items-center gap-1">
               <span
                 className={cn(
-                  'inline-flex items-center gap-0.5 rounded-pill px-1.5 py-0.5 text-[10px] font-medium',
+                  'inline-flex items-center gap-0.5 rounded-pill px-1.5 py-0.5 text-xs font-medium',
                   isBot
                     ? 'bg-accent-sunken text-accent-strong'
                     : 'bg-success-soft text-success-ink',
@@ -138,13 +138,13 @@ export const ConversationItem = memo(function ConversationItem({
                   role="img"
                   aria-label="เกิน SLA"
                   title="เกิน SLA ฝั่งแชท"
-                  className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-pill bg-danger-soft px-1 text-[10px] font-bold tabular-nums text-danger-ink"
+                  className="inline-flex h-4.5 min-w-4.5 items-center justify-center rounded-pill bg-danger-soft px-1 text-xs font-bold tabular-nums text-danger-ink"
                 >
                   !
                 </span>
               )}
               {conv.unreadAdmin > 0 && (
-                <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-pill bg-danger px-1 text-[10px] font-bold tabular-nums text-white">
+                <span className="inline-flex h-4.5 min-w-4.5 items-center justify-center rounded-pill bg-danger px-1 text-xs font-bold tabular-nums text-white">
                   {conv.unreadAdmin > 9 ? '9+' : conv.unreadAdmin}
                 </span>
               )}
@@ -157,7 +157,7 @@ export const ConversationItem = memo(function ConversationItem({
                 <span
                   key={tag.id}
                   className={cn(
-                    'inline-block rounded-pill px-1.5 py-0.5 text-[10px] font-medium',
+                    'inline-block rounded-pill px-1.5 py-0.5 text-xs font-medium',
                     'bg-surface-sunken text-muted',
                   )}
                 >
@@ -167,7 +167,7 @@ export const ConversationItem = memo(function ConversationItem({
               {extraTags > 0 && (
                 <span
                   className={cn(
-                    'text-[10px] font-medium',
+                    'text-xs font-medium',
                     'text-muted',
                   )}
                 >
