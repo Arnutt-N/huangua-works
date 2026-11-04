@@ -72,11 +72,13 @@ export function AdminDashboardView({
           icon={TrendingUp}
           variant="default"
           href="/admin/reports"
-          trend={{
-            value: `+${metrics.recentIntakeVelocity.toLocaleString('th-TH')}`,
-            direction: metrics.recentIntakeVelocity > 0 ? 'up' : 'flat',
-            label: 'รับเข้า 7 วันล่าสุด',
-          }}
+          trend={
+            metrics.monthOverMonthTrend ?? {
+              value: `+${metrics.recentIntakeVelocity.toLocaleString('th-TH')}`,
+              direction: metrics.recentIntakeVelocity > 0 ? 'up' : 'flat',
+              label: 'รับเข้า 7 วันล่าสุด',
+            }
+          }
         />
         <KpiCard
           label="กำลังดำเนินการ"

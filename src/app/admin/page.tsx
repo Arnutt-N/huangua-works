@@ -144,6 +144,28 @@ export default async function AdminDashboardPage() {
   const recent7Days = trendPoints.slice(-7);
   const recentIntakeVelocity = recent7Days.reduce((sum, p) => sum + p.received, 0);
 
+  // คำนวณแนวโน้มเปรียบเทียบกับเดือนที่ผ่านมา (30 วันล่าสุด เทียบกับ 30 วันก่อนหน้า)
+  const current30Days = trendPoints.slice(-30);
+  const previous30Days = trendPoints.slice(-60, -30);
+  const currentMonthIntake = current30Days.reduce((sum, p) => sum + p.received, 0);
+  const previousMonthIntake = previous30Days.reduce((sum, p) => sum + p.received, 0);
+
+  let momDirection: 'up' | 'down' | 'flat' = 'flat';
+  let momPct = 0;
+  if (previousMonthIntake > 0) {
+    momPct = Math.round(((currentMonthIntake - previousMonthIntake) / previousMonthIntake) * 100);
+    momDirection = momPct > 0 ? 'up' : momPct < 0 ? 'down' : 'flat';
+  } else if (currentMonthIntake > 0) {
+    momDirection = 'up';
+    momPct = 100;
+  }
+
+  const monthOverMonthTrend = {
+    value: `${momPct >= 0 ? '+' : ''}${momPct}%`,
+    direction: momDirection,
+    label: 'เทียบกับเดือนที่ผ่านมา',
+  };
+
   // § สถานะ breakdown สำหรับ donut และ bar chart
   const statusBreakdown: StatusBreakdownItem[] = ALL_STATUSES
     .map((s) => ({
@@ -188,6 +210,7 @@ export default async function AdminDashboardPage() {
     resolutionRate,
     recentIntakeVelocity,
     lastUpdatedDateText,
+    monthOverMonthTrend,
   };
 
   return (
