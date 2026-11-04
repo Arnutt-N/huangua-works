@@ -49,6 +49,9 @@ describe('KpiCard Component', () => {
 
     // ต้องมีคลาส focus-visible ring ตาม tokens
     expect(link).toHaveClass('focus-visible:outline-accent-strong');
+
+    // ต้องไม่มีไอคอนลูกศร ChevronRight บนการ์ด
+    expect(link.querySelector('.lucide-chevron-right')).not.toBeInTheDocument();
   });
 
   it('จัดรูปแบบตัวเลขจำนวนเต็มด้วย toLocaleString (th-TH)', () => {
@@ -125,5 +128,24 @@ describe('KpiCard Component', () => {
 
     expect(screen.getByText(/8%/)).toBeInTheDocument();
     expect(screen.getByText('เทียบกับเดือนก่อน')).toBeInTheDocument();
+  });
+
+  it('จัดวางไอคอนเป็นสี่เหลี่ยมลบมุม (rounded-md) และชิดขอบบน (items-start)', () => {
+    const { container } = render(
+      <KpiCard
+        label="เรื่องทั้งหมด"
+        value={100}
+        icon={Activity}
+        subtext="ข้อความย่อย"
+      />,
+    );
+
+    const card = container.querySelector('.glass-panel');
+    expect(card).toHaveClass('items-start');
+
+    const iconContainer = container.querySelector('.rounded-md');
+    expect(iconContainer).toBeInTheDocument();
+    expect(iconContainer).toHaveClass('h-12', 'w-12', 'rounded-md');
+    expect(iconContainer).not.toHaveClass('rounded-xl');
   });
 });
