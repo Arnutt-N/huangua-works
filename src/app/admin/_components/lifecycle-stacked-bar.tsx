@@ -8,7 +8,6 @@ import { cn } from '@/lib/cn';
 
 export interface LifecycleStackedBarProps {
   statusItems: StatusBreakdownItem[];
-  totalCases: number;
 }
 
 interface StageInfo {
@@ -23,8 +22,16 @@ interface StageInfo {
   filterHref: string;
 }
 
-export function LifecycleStackedBar({ statusItems, totalCases }: LifecycleStackedBarProps) {
+export function LifecycleStackedBar({ statusItems }: LifecycleStackedBarProps) {
   const [activeStage, setActiveStage] = useState<string | null>(null);
+
+  // § ตัวหารคือผลรวมทุกสถานะที่ส่งเข้ามา (รวมสถานะที่ไม่อยู่ใน 4 ขั้น เช่น รออนุมัติงบ/ปฏิเสธ)
+  // ห้ามรับยอดรวมจากภายนอก — เดิมใช้ metrics.totalReceived (snapshot รายวัน) ที่เล็กกว่า
+  // ผลรวมจริง ทำให้เปอร์เซ็นต์เกิน 100% และแถบสะสมล้นกรอบ
+  const totalCases = useMemo(
+    () => statusItems.reduce((sum, s) => sum + s.count, 0),
+    [statusItems],
+  );
 
   const stages = useMemo<StageInfo[]>(() => {
     const map = new Map(statusItems.map((s) => [s.status, s.count]));

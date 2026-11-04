@@ -128,10 +128,7 @@ export function AdminDashboardView({
       {/* BAND 3: Multi-Chart Visual Analytics (Donut + Ranked Horizontal Bars) */}
       <div className="grid gap-6 lg:grid-cols-12">
         <div className="lg:col-span-6 flex flex-col">
-          <StatusDonutChart
-            items={statusBreakdown}
-            totalCases={metrics.totalReceived}
-          />
+          <StatusDonutChart items={statusBreakdown} />
         </div>
         <div className="lg:col-span-6 flex flex-col">
           <CategoryRankedChart categories={categoryBreakdown} />
@@ -140,10 +137,7 @@ export function AdminDashboardView({
 
       {/* BAND 4: Lifecycle Stacked Progression & Department Table */}
       <div className="space-y-6">
-        <LifecycleStackedBar
-          statusItems={statusBreakdown}
-          totalCases={metrics.totalReceived}
-        />
+        <LifecycleStackedBar statusItems={statusBreakdown} />
 
         <DepartmentAttributionTable departments={departmentBreakdown} />
       </div>
