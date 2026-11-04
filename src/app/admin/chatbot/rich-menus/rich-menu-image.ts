@@ -1,4 +1,4 @@
-// § LINE รับ content ของ rich menu ไม่เกิน 1 MB (413) — ย่อฝั่ง client ก่อนอัปโหลด
+// § LINE รับ content ของ rich menu ไม่เกิน 1 MB (413) - ย่อฝั่ง client ก่อนอัปโหลด
 // รูปที่พอดีอยู่แล้วผ่านไปเฉย ๆ (ไม่ re-encode เพื่อรักษา alpha ของ PNG)
 
 import { RICH_MENU_IMAGE_LIMIT_BYTES } from '@/lib/contracts';
@@ -7,7 +7,7 @@ export const RICH_MENU_IMAGE_MAX_W = 2500;
 export const RICH_MENU_IMAGE_MAX_H = 1686;
 
 export const RICH_MENU_FIT_GUIDANCE =
-  'ย่อรูปอัตโนมัติไม่ได้ — โปรดใช้รูปไม่เกิน 1 MB หรือย่อที่หน้า /admin/image-resize ก่อนอัปโหลด';
+  'ย่อรูปอัตโนมัติไม่ได้ - โปรดใช้รูปไม่เกิน 1 MB หรือย่อที่หน้า /admin/image-resize ก่อนอัปโหลด';
 
 export function scaledToFit(
   width: number,
@@ -22,7 +22,7 @@ export function scaledToFit(
   };
 }
 
-/** § fits:false คือผลที่ถูกต้องได้ — ย่อจนสุดแล้วยังเกิน 1 MB ให้ server 413 เป็นผู้ตัดสิน */
+/** § fits:false คือผลที่ถูกต้องได้ - ย่อจนสุดแล้วยังเกิน 1 MB ให้ server 413 เป็นผู้ตัดสิน */
 export type FitRichMenuImageResult =
   | { fits: true; converted: false; file: File; filename: string }
   | { fits: true; converted: true; file: Blob; filename: string }
@@ -90,7 +90,7 @@ async function encodeJpeg(
   if (!ctx) throw new Error(RICH_MENU_FIT_GUIDANCE);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = '#ffffff'; /* ds-allow-hardcode: canvas JPEG background fill */
   ctx.fillRect(0, 0, width, height);
   ctx.drawImage(source, 0, 0, width, height);
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));

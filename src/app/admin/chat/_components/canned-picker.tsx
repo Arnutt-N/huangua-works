@@ -5,7 +5,7 @@ import { cn } from '@/lib/cn';
 import type { CannedResponse } from '../_lib/types';
 
 /**
- * รายการข้อความสำเร็จรูป — popup เหนือ composer
+ * รายการข้อความสำเร็จรูป - popup เหนือ composer
  * เปิดด้วย "/" หรือปุ่ม toolbar; keyboard nav ↑↓ + Enter + Escape
  */
 export function CannedPicker({
@@ -93,7 +93,7 @@ export function CannedPicker({
             <span className="flex items-center gap-2">
               <span className="text-sm font-semibold text-ink">{item.title}</span>
               {item.shortcut && (
-                <span className="rounded-pill bg-surface-sunken px-1.5 py-0.5 text-[10px] font-mono text-muted">
+                <span className="rounded-pill bg-surface-sunken px-1.5 py-0.5 text-xs font-mono text-muted">
                   /{item.shortcut}
                 </span>
               )}

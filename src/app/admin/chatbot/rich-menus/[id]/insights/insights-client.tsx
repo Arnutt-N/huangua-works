@@ -35,7 +35,7 @@ function ImpressionsChart({
 }) {
   if (points.length === 0) {
     return (
-      <div className="flex h-[240px] items-center justify-center gap-2 text-sm text-muted">
+      <div className="flex h-60 items-center justify-center gap-2 text-sm text-muted">
         <Info className="h-4 w-4" /> ไม่มีข้อมูลในช่วงเวลาที่เลือก
       </div>
     );
@@ -198,12 +198,12 @@ export function RichMenuInsightsClient({ menuId }: { menuId: string }) {
           <div className="grid gap-4 sm:grid-cols-3">
             <KpiCard
               label="Impressions"
-              value={summary?.impression?.count.toLocaleString('th-TH') ?? '—'}
+              value={summary?.impression?.count.toLocaleString('th-TH') ?? '-'}
               icon={<Eye className="h-4 w-4" />}
             />
             <KpiCard
               label="Unique Viewers"
-              value={summary?.impression?.unique_users.toLocaleString('th-TH') ?? '—'}
+              value={summary?.impression?.unique_users.toLocaleString('th-TH') ?? '-'}
               icon={<BarChart3 className="h-4 w-4" />}
             />
             <KpiCard
@@ -246,8 +246,8 @@ export function RichMenuInsightsClient({ menuId }: { menuId: string }) {
           {(summary?.metrics_from || daily?.metrics_from) && (
             <p className="flex items-center gap-1.5 text-xs text-muted">
               <Info className="h-3.5 w-3.5" />
-              ช่วงข้อมูลจริง: {summary?.metrics_from ?? daily?.metrics_from ?? '—'} –{' '}
-              {summary?.metrics_to ?? daily?.metrics_to ?? '—'}
+              ช่วงข้อมูลจริง: {summary?.metrics_from ?? daily?.metrics_from ?? '-'} -{' '}
+              {summary?.metrics_to ?? daily?.metrics_to ?? '-'}
             </p>
           )}
         </>

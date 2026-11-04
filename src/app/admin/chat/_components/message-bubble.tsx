@@ -12,7 +12,7 @@ const SENDER_LABELS: Record<string, string> = {
   bot: 'บอท',
 };
 
-/** เหตุผล ingest ล้มเป็นภาษาแอดมิน — ให้รู้ว่าต้องขอส่งใหม่หรือระบบล้ม */
+/** เหตุผล ingest ล้มเป็นภาษาแอดมิน: ให้รู้ว่าต้องขอส่งใหม่หรือระบบล้ม */
 function mediaSkippedLabel(reason: string): string {
   switch (reason) {
     case 'too_large':
@@ -39,15 +39,15 @@ export function MessageBubble({
   message: Message;
   customerName: string | null;
   customerPicture: string | null;
-  /** ข้อความแรกของชุด — โชว์ชื่อผู้ส่ง */
+  /** ข้อความแรกของชุด: โชว์ชื่อผู้ส่ง */
   showSender?: boolean;
-  /** ข้อความสุดท้ายของชุด — โชว์ avatar (ตาม jsk avatar อยู่ล่างสุดของชุด) */
+  /** ข้อความสุดท้ายของชุด: โชว์ avatar (ตาม jsk avatar อยู่ล่างสุดของชุด) */
   showAvatar?: boolean;
   onRetry: (msg: Message) => void;
 }) {
   const isAdmin = msg.sender === 'admin';
   const isBot = msg.sender === 'bot';
-  // § ขอ presigned URL เมื่อ bubble มีไฟล์เท่านั้น — endpoint รับ messageId + conversationId
+  // § ขอ presigned URL เมื่อ bubble มีไฟล์เท่านั้น: endpoint รับ messageId + conversationId
   // ไม่รับ key (route ฝั่ง server resolve key จากแถวเอง)
   const hasAttachment =
     msg.hasMedia === true &&
@@ -108,7 +108,7 @@ export function MessageBubble({
         {showSender && (
           <span
             className={cn(
-              'px-1 text-[10px] font-medium',
+              'px-1 text-xs font-medium',
               isAdmin ? 'text-success-ink' : isBot ? 'text-accent-strong' : 'text-muted',
             )}
           >
@@ -133,19 +133,19 @@ export function MessageBubble({
           ) : hasAttachment && readUrl.status === 'loading' ? (
             <span className="text-muted">กำลังโหลดไฟล์...</span>
           ) : hasAttachment && readUrl.status === 'failed' ? (
-            <span className="text-muted">เปิดไฟล์ไม่ได้ — ลองรีเฟรชหน้าอีกครั้ง</span>
+            <span className="text-muted">เปิดไฟล์ไม่ได้: ลองรีเฟรชหน้าอีกครั้ง</span>
           ) : (msg.messageType === 'file' || msg.messageType === 'video' || msg.messageType === 'audio') &&
             readUrl.status === 'ready' ? (
             <a href={readUrl.url} target="_blank" rel="noreferrer" className="underline underline-offset-2">
               {msg.metadata?.fileName ?? (msg.messageType === 'file' ? 'ไฟล์แนบ' : msg.messageType === 'video' ? 'วิดีโอแนบ' : 'เสียงแนบ')} (เปิดดู)
             </a>
           ) : (msg.messageType === 'image' || msg.messageType === 'file' || msg.messageType === 'video' || msg.messageType === 'audio') && msg.metadata?.skipped ? (
-            <span className="text-muted">รับไฟล์ไม่สำเร็จ ({mediaSkippedLabel(msg.metadata.skipped)}) — ขอให้ผู้ใช้ส่งใหม่อีกครั้ง</span>
+            <span className="text-muted">รับไฟล์ไม่สำเร็จ ({mediaSkippedLabel(msg.metadata.skipped)}): ขอให้ผู้ใช้ส่งใหม่อีกครั้ง</span>
           ) : (
             (msg.textContent ?? `[${msg.messageType}]`)
           )}
         </div>
-        <span className="flex items-center gap-1 px-1 text-[10px] text-muted">
+        <span className="flex items-center gap-1 px-1 text-xs text-muted">
           {msg.status === 'pending' ? (
             <>
               <RefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />
@@ -158,7 +158,7 @@ export function MessageBubble({
               className="inline-flex items-center gap-1 font-semibold text-danger underline underline-offset-2"
             >
               <AlertCircle className="h-3 w-3" aria-hidden="true" />
-              ส่งไม่สำเร็จ — ลองอีกครั้ง
+              ส่งไม่สำเร็จ - ลองอีกครั้ง
             </button>
           ) : (
             <>

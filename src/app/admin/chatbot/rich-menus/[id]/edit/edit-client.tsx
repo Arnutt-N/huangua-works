@@ -180,7 +180,7 @@ export function RichMenuEditClient({ menuId }: { menuId: string }) {
       return;
     }
     if (imageFile && !menu?.lineRichMenuId && !andSync) {
-      setError('เมนูนี้ยังไม่ซิงค์ — ต้อง "บันทึกและซิงค์" ก่อนจึงอัปโหลดรูปได้');
+      setError('เมนูนี้ยังไม่ซิงค์ - ต้อง "บันทึกและซิงค์" ก่อนจึงอัปโหลดรูปได้');
       return;
     }
 
@@ -211,7 +211,7 @@ export function RichMenuEditClient({ menuId }: { menuId: string }) {
       }
     }
 
-    // § อัปรูปเฉพาะตอน "บันทึกและซิงค์" — LINE อัปเดตเมนูเดิมไม่ได้ sync ครั้งถัดไปจะ recreate
+    // § อัปรูปเฉพาะตอน "บันทึกและซิงค์" - LINE อัปเดตเมนูเดิมไม่ได้ sync ครั้งถัดไปจะ recreate
     // รูปที่อัปไปก่อนหน้าจะหายไปกับเมนูเดิม
     if (andSync) {
       const uploadError = await uploadImage();
@@ -328,7 +328,7 @@ export function RichMenuEditClient({ menuId }: { menuId: string }) {
               <span className="block text-sm font-medium text-muted">สถานะ</span>
               <span
                 title={pill.title}
-                className={cn('mt-1 inline-block rounded-full border px-2.5 py-1 text-[10px] font-bold', pillTone[pill.tone])}
+                className={cn('mt-1 inline-block rounded-full border px-2.5 py-1 text-xs font-bold', pillTone[pill.tone])}
               >
                 {pill.label}
               </span>
@@ -356,7 +356,7 @@ export function RichMenuEditClient({ menuId }: { menuId: string }) {
                     />
                     <span className="flex-1">
                       <span className="block text-sm font-bold text-ink">{DISPLAY_MODE_LABEL[mode]}</span>
-                      <span className="block text-[11px] text-muted">
+                      <span className="block text-xs text-muted">
                         {mode === 'ALWAYS'
                           ? 'เมื่อบันทึกและซิงค์ เมนูจะกลับมาเป็นเมนูหลักทันที'
                           : mode === 'SCHEDULED'
@@ -415,7 +415,7 @@ export function RichMenuEditClient({ menuId }: { menuId: string }) {
               className="hidden"
               onChange={handleImageChange}
             />
-            <p className="mt-2 text-xs text-muted">รองรับ JPEG, PNG — สูงสุด 1 MB (ระบบย่อให้อัตโนมัติ)</p>
+            <p className="mt-2 text-xs text-muted">รองรับ JPEG, PNG - สูงสุด 1 MB (ระบบย่อให้อัตโนมัติ)</p>
             {imageFile && (
               <p className="mt-1 text-xs font-medium text-warning-ink">รูปจะถูกอัปโหลดเมื่อกด &quot;บันทึกและซิงค์&quot; เท่านั้น</p>
             )}
@@ -470,8 +470,8 @@ export function RichMenuEditClient({ menuId }: { menuId: string }) {
                     <div>
                       <Label htmlFor={`rm-alias-${i}`}>สลับไปที่เมนู (ALIAS)</Label>
                       {aliases.length === 0 ? (
-                        <p className="text-[11px] text-warning-ink">
-                          ยังไม่มี alias —{' '}
+                        <p className="text-xs text-warning-ink">
+                          ยังไม่มี alias: {' '}
                           <Link href="/admin/chatbot/rich-menus/aliases" className="font-bold underline">
                             สร้าง alias ก่อน
                           </Link>
@@ -518,7 +518,7 @@ export function RichMenuEditClient({ menuId }: { menuId: string }) {
               </Button>
             )}
             {action === null && (
-              <span className="rounded-full border border-success/30 bg-success-soft px-3 py-1 text-[10px] font-black tracking-widest text-success-ink">
+              <span className="rounded-full border border-success/30 bg-success-soft px-3 py-1 text-xs font-black tracking-widest text-success-ink">
                 Live Now
               </span>
             )}

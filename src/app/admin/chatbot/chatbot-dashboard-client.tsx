@@ -74,7 +74,7 @@ export function ChatbotDashboardClient() {
           </div>
           {replyObjectsError ? null : replyObjects.length === 0 ? (
             <p className="px-5 py-8 text-center text-sm text-muted">
-              ยังไม่มี Reply Object —{' '}
+              ยังไม่มี Reply Object -{' '}
               <Link href="/admin/chatbot/reply-objects/new" className="font-semibold text-accent-strong hover:underline">
                 สร้างเทมเพลตแรก
               </Link>
@@ -95,7 +95,7 @@ export function ChatbotDashboardClient() {
                         <p className="truncate font-mono text-xs text-muted">${obj.objectId}</p>
                       </div>
                     </div>
-                    <span className="flex-none rounded-sm bg-surface-sunken px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">
+                    <span className="flex-none rounded-sm bg-surface-sunken px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-muted">
                       {obj.objectType}
                     </span>
                   </div>
@@ -120,7 +120,7 @@ export function ChatbotDashboardClient() {
           </div>
           {intentsError ? null : intents.length === 0 ? (
             <p className="px-5 py-8 text-center text-sm text-muted">
-              ยังไม่มีหมวดเจตนา —{' '}
+              ยังไม่มีหมวดเจตนา -{' '}
               <Link href="/admin/chatbot/auto-replies" className="font-semibold text-accent-strong hover:underline">
                 ไปสร้างหมวด
               </Link>

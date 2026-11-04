@@ -134,7 +134,7 @@ export function RichMenuBuilderClient() {
     const id = created.data.id;
     if (!id) {
       setBusy(null);
-      setError('สร้างเมนูสำเร็จแต่ไม่ได้รับ id — ตรวจสอบที่หน้ารายการ');
+      setError('สร้างเมนูสำเร็จแต่ไม่ได้รับ id - ตรวจสอบที่หน้ารายการ');
       return;
     }
     if (!andSync) {
@@ -276,7 +276,7 @@ export function RichMenuBuilderClient() {
                   <div key={i} className="space-y-3 rounded-2xl border border-border bg-surface-sunken/40 p-4">
                     <div className="flex items-center justify-between gap-2">
                       <span className="flex items-center gap-2 text-xs font-bold uppercase text-muted">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-surface text-[10px] font-bold text-ink">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-surface text-xs font-bold text-ink">
                           {i + 1}
                         </span>
                         {area.label}
@@ -348,8 +348,8 @@ export function RichMenuBuilderClient() {
                       <div>
                         <Label htmlFor={`rb-alias-${i}`}>สลับไปที่เมนู (ALIAS)</Label>
                         {aliases.length === 0 ? (
-                          <p className="text-[11px] text-warning-ink">
-                            ยังไม่มี alias —{' '}
+                          <p className="text-xs text-warning-ink">
+                            ยังไม่มี alias: {' '}
                             <Link href="/admin/chatbot/rich-menus/aliases" className="font-bold underline">
                               สร้าง alias ก่อน
                             </Link>
@@ -410,7 +410,7 @@ export function RichMenuBuilderClient() {
                 <span className="flex h-full flex-col items-center justify-center gap-2 py-10 text-muted">
                   <Upload className="h-8 w-8 text-accent-strong" />
                   <span className="text-sm font-bold">อัปโหลดรูปเมนู</span>
-                  <span className="text-[10px]">
+                  <span className="text-xs">
                     {template.size.width}x{template.size.height} pixels
                   </span>
                 </span>
@@ -425,8 +425,8 @@ export function RichMenuBuilderClient() {
             </label>
 
             <div className="flex gap-3 rounded-xl border border-warning/40 bg-warning-soft p-3">
-              <p className="text-[11px] leading-normal text-warning-ink">
-                รูปต้องตรงขนาดเทมเพลตที่เลือก ขนาดไม่เกิน 1 MB — ระบบจะย่อให้อัตโนมัติหากเกิน
+              <p className="text-xs leading-normal text-warning-ink">
+                รูปต้องตรงขนาดเทมเพลตที่เลือก ขนาดไม่เกิน 1 MB (ระบบจะย่อให้อัตโนมัติหากเกิน)
               </p>
             </div>
 
@@ -452,12 +452,12 @@ export function RichMenuBuilderClient() {
                   />
                   <span className="flex-1">
                     <span className="block text-sm font-bold text-ink">{DISPLAY_MODE_LABEL[mode]}</span>
-                    <span className="block text-[11px] text-muted">
+                    <span className="block text-xs text-muted">
                       {mode === 'ALWAYS'
                         ? 'เมื่อบันทึกและซิงค์ เมนูจะถูกตั้งเป็นเมนูหลักทันที'
                         : mode === 'SCHEDULED'
                           ? 'ระบบแสดง/ซ่อนเมนูอัตโนมัติตามช่วงเวลาที่กำหนด'
-                          : 'ซิงค์ไป LINE แต่ไม่ตั้งเป็นเมนูหลัก — ใช้กับ alias หรือผูก รายคน'}
+                          : 'ซิงค์ไป LINE แต่ไม่ตั้งเป็นเมนูหลัก: ใช้กับ alias หรือผูก รายคน'}
                     </span>
                     {mode === 'SCHEDULED' && displayMode === 'SCHEDULED' && (
                       <span className="mt-3 block space-y-2">
@@ -554,7 +554,7 @@ export function RichMenuBuilderClient() {
                         </div>
                         <span
                           className={cn(
-                            'block text-[11px] font-bold uppercase tracking-tight',
+                            'block text-xs font-bold uppercase tracking-tight',
                             pendingKey === t.key ? 'text-accent-strong' : 'text-muted',
                           )}
                         >

@@ -76,7 +76,7 @@ export function CannedManageDialog({
 
   const handleDelete = async (id: string, title: string) => {
     if (busy) return;
-    // § FORM-06: ใช้ useConfirm แทน window.confirm — ลบถาวรไม่มี undo
+    // § FORM-06: ใช้ useConfirm แทน window.confirm - ลบถาวรไม่มี undo
     const ok = await confirm({
       title: 'ลบข้อความสำเร็จรูป',
       description: `ลบ "${title}" ใช่หรือไม่? ลบแล้วกู้คืนไม่ได้`,
@@ -103,7 +103,7 @@ export function CannedManageDialog({
         <DialogHeader>
           <DialogTitle>ข้อความสำเร็จรูป</DialogTitle>
           <DialogDescription>
-            ข้อความที่ใช้บ่อย — เรียกใช้ในช่องพิมพ์ด้วย &quot;/&quot; ตามด้วยคีย์ลัดหรือชื่อ
+            ข้อความที่ใช้บ่อย - เรียกใช้ในช่องพิมพ์ด้วย &quot;/&quot; ตามด้วยคีย์ลัดหรือชื่อ
           </DialogDescription>
         </DialogHeader>
 
@@ -121,7 +121,7 @@ export function CannedManageDialog({
                   <p className="flex items-center gap-2 text-sm font-semibold text-ink">
                     <span className="truncate">{item.title}</span>
                     {item.shortcut && (
-                      <code className="rounded-sm bg-accent-sunken px-1.5 py-0.5 text-[10px] font-bold text-accent-strong">
+                      <code className="rounded-sm bg-accent-sunken px-1.5 py-0.5 text-xs font-bold text-accent-strong">
                         /{item.shortcut}
                       </code>
                     )}

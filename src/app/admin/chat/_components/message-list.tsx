@@ -48,7 +48,7 @@ export function MessageList({
   const prevCountRef = useRef(0);
   const prevFirstIdRef = useRef<string | null>(null);
 
-  // autoscroll เฉพาะเมื่อผู้ใช้อยู่ใกล้ล่าง — ไม่ลากคนที่กำลังอ่านย้อนหลังลงมา
+  // autoscroll เฉพาะเมื่อผู้ใช้อยู่ใกล้ล่าง: ไม่ลากคนที่กำลังอ่านย้อนหลังลงมา
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -59,7 +59,7 @@ export function MessageList({
       messages.length > prevCountRef.current;
 
     if (prepended) {
-      // โหลดหน้าเก่า — คง scroll position เดิม (ชดเชยความสูงที่เพิ่ม)
+      // โหลดหน้าเก่า: คง scroll position เดิม (ชดเชยความสูงที่เพิ่ม)
       el.scrollTop += el.scrollHeight - prevHeightRef.current;
     } else if (stickToBottomRef.current) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -85,7 +85,7 @@ export function MessageList({
       (entries) => {
         if (entries[0]?.isIntersecting) onLoadOlder();
       },
-      { root, rootMargin: '80px 0px 0px 0px' },
+      { root, rootMargin: '80px 0px 0px 0px' }, /* ds-allow-hardcode: IntersectionObserver rootMargin CSS string */
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
@@ -100,7 +100,7 @@ export function MessageList({
       aria-label="ข้อความในการสนทนา"
     >
       {hasMore && (
-        <div ref={sentinelRef} className="py-1 text-center text-[11px] text-muted">
+        <div ref={sentinelRef} className="py-1 text-center text-xs text-muted">
           กำลังโหลดข้อความก่อนหน้า...
         </div>
       )}

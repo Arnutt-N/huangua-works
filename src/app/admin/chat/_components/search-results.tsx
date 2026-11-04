@@ -21,7 +21,7 @@ export function SearchResults({
   }
   return (
     <div className="space-y-1 pb-2">
-      <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted">
+      <p className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-muted">
         ผลค้นหาข้อความ ({results.length})
       </p>
       {results.map((r) => (
@@ -35,14 +35,14 @@ export function SearchResults({
           )}
         >
           <span className="flex items-center justify-between gap-2">
-            <span className="truncate text-[11px] font-medium text-ink">
+            <span className="truncate text-xs font-medium text-ink">
               {r.displayName ?? r.lineUserId ?? 'ผู้ใช้ LINE'}
             </span>
-            <span className="flex-none text-[11px] text-muted tabular-nums">
+            <span className="flex-none text-xs text-muted tabular-nums">
               {formatTime(r.createdAt)}
             </span>
           </span>
-          <span className="line-clamp-2 text-[11px] text-muted">{r.snippet}</span>
+          <span className="line-clamp-2 text-xs text-muted">{r.snippet}</span>
         </button>
       ))}
     </div>

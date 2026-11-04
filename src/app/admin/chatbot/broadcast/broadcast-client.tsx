@@ -32,7 +32,7 @@ import { Button } from '@/components/ui/button';
 import { FieldHint, Label, Textarea } from '@/components/ui/field';
 
 /**
- * รอบการตรวจคิวส่งประกาศ (นาที) — ต้องตรงกับ schedule ที่ตั้งไว้ใน cron-job.org
+ * รอบการตรวจคิวส่งประกาศ (นาที) - ต้องตรงกับ schedule ที่ตั้งไว้ใน cron-job.org
  * ที่ยิง /api/cron/broadcast-send ใช้บอกผู้ใช้ว่าประกาศอาจออกช้ากว่าเวลาที่ตั้งได้แค่ไหน
  */
 const SEND_WINDOW_MINUTES = 30;
@@ -57,14 +57,14 @@ const TYPE_LABELS: Record<string, string> = {
 function broadcastName(item: BroadcastItem): string {
   if (item.title) return item.title;
   const first = item.content[0];
-  if (!first) return '—';
+  if (!first) return '-';
   if (first.type === 'text' && first.text) return first.text;
   return `[${first.type}]`;
 }
 
 function broadcastType(item: BroadcastItem): string {
   const first = item.content[0];
-  if (!first) return '—';
+  if (!first) return '-';
   return TYPE_LABELS[first.type] ?? `[${first.type}]`;
 }
 
@@ -85,7 +85,7 @@ function formatSendAt(item: BroadcastItem): { text: string; isScheduled: boolean
       isScheduled: true,
     };
   }
-  return { text: '—', isScheduled: false };
+  return { text: '-', isScheduled: false };
 }
 
 export function BroadcastClient() {
@@ -176,7 +176,7 @@ export function BroadcastClient() {
       confirmText: 'ส่งทันที',
     });
     if (!ok) return;
-    // server คืน 409 { error: 'ส่งแล้วหรือกำลังส่ง' } / 404 / 502 เมื่อส่งไม่สำเร็จ — mutate โชว์ข้อความนั้น
+    // server คืน 409 { error: 'ส่งแล้วหรือกำลังส่ง' } / 404 / 502 เมื่อส่งไม่สำเร็จ - mutate โชว์ข้อความนั้น
     await mutate(() => adminApi.sendBroadcast(item.id), 'ส่งประกาศสำเร็จ');
   }
 
@@ -239,7 +239,7 @@ export function BroadcastClient() {
       </AdminCard>
 
       <AdminCard>
-        {/* § skeleton/empty เป็น div นอก table — rule a11y control-has-associated-label ตีความ tr ที่ไม่มี text เป็น control */}
+        {/* § skeleton/empty เป็น div นอก table - rule a11y control-has-associated-label ตีความ tr ที่ไม่มี text เป็น control */}
         {loading ? (
           <div aria-hidden="true">
             {Array.from({ length: 5 }, (_, i) => (
@@ -264,7 +264,7 @@ export function BroadcastClient() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left">
+            <table className="w-full min-w-180 text-left">
               <thead>
                 <tr className="border-b border-border/50 text-xs font-semibold uppercase tracking-wide text-muted">
                   <th scope="col" className="px-4 py-3">ชื่อแคมเปญ</th>
@@ -478,7 +478,7 @@ export function BroadcastClient() {
               />
               <FieldHint id="bc-schedule-hint">
                 ระบบตรวจคิวทุก {SEND_WINDOW_MINUTES} นาที ประกาศจึงอาจออกช้ากว่าเวลาที่ตั้งได้ถึง{' '}
-                {SEND_WINDOW_MINUTES} นาที — ถ้าต้องการให้ออกทันที ให้สร้างเป็นร่างแล้วกดปุ่มส่ง
+                {SEND_WINDOW_MINUTES} นาที - ถ้าต้องการให้ออกทันที ให้สร้างเป็นร่างแล้วกดปุ่มส่ง
               </FieldHint>
             </div>
           </div>

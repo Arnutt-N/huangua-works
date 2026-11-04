@@ -68,14 +68,14 @@ export function ChatHeader({
             <p className="truncate text-sm font-bold text-ink">
               {customerName ?? 'ผู้ใช้ LINE'}
             </p>
-            <span className="flex-none rounded-pill bg-surface-sunken px-1.5 py-0.5 text-[10px] font-medium text-muted">
+            <span className="flex-none rounded-pill bg-surface-sunken px-1.5 py-0.5 text-xs font-medium text-muted">
               {MODE_LABELS[mode] ?? mode}
             </span>
           </div>
         </div>
 
         <div className="flex flex-none items-center gap-2">
-          {/* สลับผู้ตอบ — บอท / เจ้าหน้าที่ (แทนปุ่ม "รับเรื่อง" เดิม เรียก handler เดียวกัน) */}
+          {/* สลับผู้ตอบ - บอท / เจ้าหน้าที่ (แทนปุ่ม "รับเรื่อง" เดิม เรียก handler เดียวกัน) */}
           {mode !== 'resolved' && (
             <div className="hidden items-center gap-0.5 rounded-pill bg-surface-sunken p-1 md:flex">
               <button
@@ -154,7 +154,7 @@ export function ChatHeader({
             </button>
           )}
 
-          {/* toggle panel — desktop พับ/กาง aside, mobile เปิดเป็น dialog */}
+          {/* toggle panel - desktop พับ/กาง aside, mobile เปิดเป็น dialog */}
           <button
             type="button"
             onClick={onTogglePanel}
