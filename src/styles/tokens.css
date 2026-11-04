@@ -91,7 +91,7 @@
   --font-sans: var(--font-noto), 'Noto Sans Thai', system-ui, -apple-system, sans-serif;
 
   /* radius (glassmorphism style)
-   * ⚠️ สเกลนี้มีแค่ sm/md/lg/xl/pill — rounded-2xl / rounded-3xl ของ Tailwind
+   * คำเตือน: สเกลนี้มีแค่ sm/md/lg/xl/pill - rounded-2xl / rounded-3xl ของ Tailwind
    * ไม่ได้ถูก override จึงใช้ค่า default (1rem / 1.5rem) ผลคือสเกลไม่เรียงกัน:
    *   rounded-lg = 16px, rounded-xl = 24px, rounded-2xl = 16px, rounded-3xl = 24px
    * → rounded-2xl "เล็กกว่า" rounded-xl ทั้งที่ชื่อใหญ่กว่า
@@ -221,6 +221,8 @@
 
   html {
     scroll-behavior: smooth;
+    /* WCAG 2.2 SC 2.4.11 Focus Not Obscured: ป้องกันไม่ให้ sticky header บังองค์ประกอบที่กำลังโฟกัส */
+    scroll-padding-top: 5rem;
   }
 
   @media (prefers-reduced-motion: reduce) {
