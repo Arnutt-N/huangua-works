@@ -19,7 +19,7 @@ import { getPmqaReportData } from '@/lib/pmqa';
 import { formatThaiDateTime } from '@/lib/thai-date';
 
 export const metadata: Metadata = {
-  title: 'รายงาน PMQA — อบต.หัวงัว',
+  title: 'รายงาน PMQA: อบต.หัวงัว',
   description: 'รายงานสรุปเรื่องร้องเรียนตามเกณฑ์ PMQA จำแนกตามหมวดหมู่ สถานะ และปีงบประมาณ',
 };
 
@@ -75,7 +75,7 @@ export default async function PmqaReportPage({ searchParams }: PageProps) {
             </h1>
             <p className="mt-0.5 text-sm text-muted">
               สรุปเรื่องร้องเรียนตามหมวดหมู่/สถานะ/ปีงบประมาณไทย (1 ต.ค.{' '}
-              {report.fiscalYear - 1} – 30 ก.ย. {report.fiscalYear})
+              {report.fiscalYear - 1} ถึง 30 ก.ย. {report.fiscalYear})
             </p>
           </div>
 
@@ -357,7 +357,7 @@ export default async function PmqaReportPage({ searchParams }: PageProps) {
               สถิติรายเดือนในรอบปีงบประมาณ พ.ศ. {report.fiscalYear}
             </h2>
             <p className="text-xs text-muted print:text-muted">
-              การกระจายตัวของเรื่องร้องเรียนตลอดทั้งปีงบประมาณ (ไตรมาส 1 – ไตรมาส 4)
+              การกระจายตัวของเรื่องร้องเรียนตลอดทั้งปีงบประมาณ (ไตรมาส 1 ถึง ไตรมาส 4)
             </p>
           </div>
 
