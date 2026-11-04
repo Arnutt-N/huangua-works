@@ -5,11 +5,10 @@ import {
   TrendingUp,
   Activity,
   CheckCircle2,
-  Clock,
   AlertTriangle,
-  ChevronRight,
   FileSpreadsheet,
   Award,
+  ShieldCheck,
 } from 'lucide-react';
 import { KpiCard } from '@/components/admin/kpi-card';
 import { IntakeTrendChart } from './intake-trend-chart';
@@ -24,7 +23,6 @@ import type {
   DepartmentBreakdownItem,
   DashboardMetrics,
 } from './admin-dashboard-types';
-import { cn } from '@/lib/cn';
 
 export interface AdminDashboardViewProps {
   metrics: DashboardMetrics;
@@ -41,8 +39,6 @@ export function AdminDashboardView({
   categoryBreakdown,
   departmentBreakdown,
 }: AdminDashboardViewProps) {
-  const totalReceivedFormatted = metrics.totalReceived.toLocaleString('th-TH');
-
   return (
     <div className="space-y-6">
       {/* Freshness Timestamp line */}
@@ -68,99 +64,16 @@ export function AdminDashboardView({
         </div>
       </div>
 
-      {/* SLA Alert Banner (Prominent Callout) */}
-      {metrics.slaBreach > 0 && (
-        <Link
-          href="/admin/reports?overdue=1"
-          aria-label={`เลยกำหนด SLA ${metrics.slaBreach.toLocaleString('th-TH')} เรื่อง คลิกเพื่อดูคิวเรื่อง`}
-          className={cn(
-            'group flex items-center justify-between gap-3 rounded-xl border border-danger-ink/30 bg-danger-soft px-5 py-4 shadow-sm transition',
-            'hover:border-danger-ink hover:bg-danger-soft/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-ink',
-          )}
-        >
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 flex-none items-center justify-center rounded-lg bg-danger-soft ring-1 ring-danger-ink/30 ring-inset">
-              <AlertTriangle className="h-5 w-5 text-danger-ink" aria-hidden="true" />
-            </span>
-            <div>
-              <p className="font-bold text-danger-ink">
-                เลยกำหนด SLA {metrics.slaBreach.toLocaleString('th-TH')} เรื่อง
-              </p>
-              <p className="text-xs text-ink/80">
-                เรื่องร้องเรียนที่ยังเปิดอยู่และเลยกำหนดระยะเวลาแก้ไขตามมาตรฐาน (คลิกเพื่อเปิดดูคิวเรื่องที่ต้องเร่งดำเนินการ)
-              </p>
-            </div>
-          </div>
-          <ChevronRight
-            className="h-5 w-5 text-danger-ink transition-transform group-hover:translate-x-1"
-            aria-hidden="true"
-          />
-        </Link>
-      )}
-
-      {/* BAND 1: Leading Hero Section (Hero Metric + Trend Chart) */}
-      <div className="grid gap-6 lg:grid-cols-12 items-stretch">
-        {/* Leading Metric Card (Col 4) */}
-        <div className="lg:col-span-4 flex flex-col justify-between rounded-xl border border-border bg-surface-raised p-6 shadow-sm">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent-sunken text-accent-strong">
-                <TrendingUp className="h-5 w-5" aria-hidden="true" />
-              </span>
-              <span className="inline-flex items-center rounded-full bg-accent-100 px-2.5 py-0.5 text-xs font-semibold text-accent-strong">
-                ภาพรวมทั้งระบบ
-              </span>
-            </div>
-
-            <div className="mt-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted">
-                เรื่องรับทั้งหมด
-              </p>
-              {/* Display Type at 3x body size */}
-              <p className="mt-1 text-4xl sm:text-5xl font-black tabular-nums tracking-tight text-ink">
-                {totalReceivedFormatted}
-              </p>
-            </div>
-
-            <div className="mt-4 space-y-2 border-t border-border/60 pt-4 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-muted">อัตราการแก้ไขเสร็จสิ้น:</span>
-                <span className="font-bold text-success-ink tabular-nums">
-                  {metrics.resolutionRate}%
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted">รับเข้า 7 วันล่าสุด:</span>
-                <span className="font-bold text-accent-strong tabular-nums">
-                  +{metrics.recentIntakeVelocity.toLocaleString('th-TH')} เรื่อง
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-6">
-            <Link
-              href="/admin/reports"
-              aria-label={`เรื่องรับทั้งหมด ${totalReceivedFormatted} คลิกเพื่อดูรายการ`}
-              className={cn(
-                'group flex w-full items-center justify-center gap-2 rounded-lg bg-accent-strong px-4 py-2.5 text-xs font-semibold text-on-accent shadow-sm transition',
-                'hover:bg-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong',
-              )}
-            >
-              <span>ดูรายการเรื่องทั้งหมด</span>
-              <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-            </Link>
-          </div>
-        </div>
-
-        {/* 30-Day Intake & Resolution Trend Area Chart (Col 8) */}
-        <div className="lg:col-span-8 flex flex-col">
-          <IntakeTrendChart points={trendPoints} />
-        </div>
-      </div>
-
-      {/* BAND 2: Secondary Operational Figures */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      {/* BAND 1: Key Performance Indicators (4 การ์ดสถิติเรียงหน้ากระดาน) */}
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard
+          label="เรื่องรับทั้งหมด"
+          value={metrics.totalReceived}
+          icon={TrendingUp}
+          variant="default"
+          href="/admin/reports"
+          hint={`7 วัน: +${metrics.recentIntakeVelocity.toLocaleString('th-TH')}`}
+        />
         <KpiCard
           label="กำลังดำเนินการ"
           value={metrics.totalInProgress}
@@ -168,6 +81,7 @@ export function AdminDashboardView({
           variant="gold"
           className="shadow-accent-drop"
           href="/admin/reports?status=open"
+          hint={`${metrics.totalReceived > 0 ? Math.round((metrics.totalInProgress / metrics.totalReceived) * 100) : 0}% ของทั้งหมด`}
         />
         <KpiCard
           label="ปิดสำเร็จ"
@@ -175,13 +89,30 @@ export function AdminDashboardView({
           icon={CheckCircle2}
           variant="default"
           href="/admin/reports?status=closed"
+          hint={
+            metrics.avgResolutionDays != null
+              ? `สำเร็จ ${metrics.resolutionRate}% (เฉลี่ย ${metrics.avgResolutionDays} วัน)`
+              : `สำเร็จ ${metrics.resolutionRate}%`
+          }
         />
         <KpiCard
-          label="เวลาดำเนินการเฉลี่ย"
-          value={metrics.avgResolutionDays != null ? `${metrics.avgResolutionDays} วัน` : '-'}
-          icon={Clock}
-          variant="default"
+          label="เลยกำหนด SLA"
+          value={metrics.slaBreach}
+          icon={metrics.slaBreach > 0 ? AlertTriangle : ShieldCheck}
+          variant={metrics.slaBreach > 0 ? 'danger' : 'default'}
+          href={metrics.slaBreach > 0 ? '/admin/reports?overdue=1' : undefined}
+          ariaLabel={
+            metrics.slaBreach > 0
+              ? `เลยกำหนด SLA ${metrics.slaBreach.toLocaleString('th-TH')} เรื่อง คลิกเพื่อดูคิวเรื่อง`
+              : undefined
+          }
+          hint={metrics.slaBreach > 0 ? 'ต้องเร่งดำเนินการ' : 'ตรงตามเกณฑ์ 100%'}
         />
+      </div>
+
+      {/* BAND 2: 30-Day Intake & Resolution Trend Area Chart */}
+      <div className="flex flex-col">
+        <IntakeTrendChart points={trendPoints} />
       </div>
 
       {/* BAND 3: Multi-Chart Visual Analytics (Donut + Ranked Horizontal Bars) */}
