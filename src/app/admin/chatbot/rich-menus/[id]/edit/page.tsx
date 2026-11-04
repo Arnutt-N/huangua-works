@@ -4,7 +4,7 @@ import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { RichMenuEditClient } from './edit-client';
 
-export const metadata: Metadata = { title: 'แก้ไข Rich Menu' };
+export const metadata: Metadata = { title: 'แก้ไขริชเมนู' };
 export const dynamic = 'force-dynamic';
 
 export default async function RichMenuEditPage({
@@ -16,7 +16,7 @@ export default async function RichMenuEditPage({
   const { id } = await params;
 
   return (
-    <AdminShell user={staffUser} active="rich-menus" title="แก้ไข Rich Menu">
+    <AdminShell user={staffUser} active="rich-menus" title="แก้ไขริชเมนู">
       <RichMenuEditClient menuId={id} />
     </AdminShell>
   );

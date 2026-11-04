@@ -4,7 +4,7 @@ import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { RichMenuInsightsClient } from './insights-client';
 
-export const metadata: Metadata = { title: 'สถิติ Rich Menu' };
+export const metadata: Metadata = { title: 'สถิติริชเมนู' };
 export const dynamic = 'force-dynamic';
 
 export default async function RichMenuInsightsPage({
@@ -16,7 +16,7 @@ export default async function RichMenuInsightsPage({
   const { id } = await params;
 
   return (
-    <AdminShell user={staffUser} active="rich-menus" title="สถิติ Rich Menu">
+    <AdminShell user={staffUser} active="rich-menus" title="สถิติริชเมนู">
       <RichMenuInsightsClient menuId={id} />
     </AdminShell>
   );

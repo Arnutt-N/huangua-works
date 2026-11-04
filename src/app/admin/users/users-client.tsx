@@ -9,6 +9,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Loader2,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input, Label, Textarea } from '@/components/ui/field';
@@ -30,6 +31,13 @@ import {
 } from '@/components/ui/dialog';
 import { RoleBadge, ROLE_LABELS_TH } from '@/components/admin/role-badge';
 import { ConfirmDialog } from '@/components/admin/confirm-dialog';
+import {
+  ToastProvider,
+  ToastViewport,
+  Toast,
+  ToastTitle,
+  ToastClose,
+} from '@/components/ui/toast';
 import {
   createUser,
   toggleUserActive,
@@ -534,9 +542,11 @@ function FormError({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** success toast สำหรับ users page */
+/** success toast สำหรับ users page (Radix Toast Viewport) */
 export function UserSuccessToast({ ok }: { ok: string | null }) {
-  if (!ok) return null;
+  const [closedKey, setClosedKey] = useState<string | null>(null);
+
+  if (!ok || closedKey === ok) return null;
   const messages: Record<string, string> = {
     created: 'สร้างบัญชีเรียบร้อย',
     toggled: 'อัปเดตสถานะเรียบร้อย',
@@ -545,13 +555,26 @@ export function UserSuccessToast({ ok }: { ok: string | null }) {
   };
   const msg = messages[ok] ?? 'บันทึกเรียบร้อย';
   return (
-    <div
-      role="status"
-      className="mb-4 flex items-center gap-2 rounded-xl border border-success-ink/30 bg-success-soft px-4 py-3 text-sm font-semibold text-success-ink shadow-sm"
-    >
-      <CheckCircle2 className="h-4 w-4 flex-none" aria-hidden="true" />
-      {msg}
-    </div>
+    <ToastProvider swipeDirection="right">
+      <Toast
+        open={true}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setClosedKey(ok);
+        }}
+        variant="success"
+        className="flex items-center gap-2"
+      >
+        <CheckCircle2 className="h-4 w-4 flex-none text-success-ink" aria-hidden="true" />
+        <ToastTitle className="text-sm font-semibold text-success-ink">{msg}</ToastTitle>
+        <ToastClose
+          aria-label="ปิดการแจ้งเตือน"
+          className="ml-auto rounded-md p-1 text-success-ink/70 hover:text-success-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
+        >
+          <X className="h-4 w-4" aria-hidden="true" />
+        </ToastClose>
+      </Toast>
+      <ToastViewport />
+    </ToastProvider>
   );
 }
 

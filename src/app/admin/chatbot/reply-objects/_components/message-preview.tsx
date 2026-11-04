@@ -46,7 +46,7 @@ export function MessagePreview({
 
 function Placeholder({ label }: { label: string }) {
   return (
-    <div className="rounded-xl bg-[#a9c6e8] px-3 py-2 text-sm font-medium text-[#2b3a4a]">
+    <div className="rounded-xl bg-accent-sunken px-3 py-2 text-sm font-medium text-ink">
       {label}
     </div>
   );

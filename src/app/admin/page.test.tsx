@@ -110,4 +110,42 @@ describe('AdminDashboardPage (admin/page)', () => {
     expect(inProgressStatusLink).toBeInTheDocument();
     expect(inProgressStatusLink).toHaveAttribute('href', '/admin/reports?status=in_progress');
   });
+
+  it('เรนเดอร์ชาร์ตและอินเตอร์เฟซ data storytelling ครบถ้วน (Donut, Trend Area, Stacked Bar, Table)', async () => {
+    const page = await AdminDashboardPage();
+    render(page);
+
+    // 1. Donut Chart สำหรับสัดส่วนสถานะ
+    const donutImg = screen.getByRole('img', {
+      name: /โดนัทชาร์ตสัดส่วนสถานะเรื่องทั้งหมด 10 เรื่อง/,
+    });
+    expect(donutImg).toBeInTheDocument();
+
+    // 2. Trend Area Chart พร้อมช่วงเวลา 7 วัน / 30 วัน / 90 วัน
+    const trendImg = screen.getByRole('img', {
+      name: /กราฟแนวโน้ม/,
+    });
+    expect(trendImg).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '7 วัน' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '30 วัน' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '90 วัน' })).toBeInTheDocument();
+
+    // 3. Lifecycle Funnel Stacked Bar
+    const stackedBarImg = screen.getByRole('img', {
+      name: /สัดส่วนวงจรเรื่อง/,
+    });
+    expect(stackedBarImg).toBeInTheDocument();
+
+    // 4. ตารางภาระงานหน่วยงาน พร้อมหัวตารางเรียงลำดับ
+    const deptTable = screen.getByRole('table', {
+      name: /ตารางสถิติเรื่องร้องเรียนแยกตามหน่วยงานรับผิดชอบ/,
+    });
+    expect(deptTable).toBeInTheDocument();
+    expect(screen.getByText('ภาระงานตามหน่วยงานรับผิดชอบ')).toBeInTheDocument();
+
+    // ตารางเสริมสำหรับผู้ใช้ screen reader ในส่วนแนวโน้ม
+    expect(
+      screen.getByRole('table', { name: /สถิติแนวโน้มการรับเรื่องและปิดงานรายวัน/ }),
+    ).toBeInTheDocument();
+  });
 });

@@ -213,12 +213,12 @@ export function ReplyObjectForm({
             onChange={(e) => setForm({ ...form, payload: e.target.value })}
             rows={12}
             spellCheck={false}
-            className="w-full rounded-xl border border-border bg-[#0f172a] px-4 py-3 font-mono text-xs text-[#86efac] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
+            className="w-full rounded-xl border border-border bg-surface-sunken px-4 py-3 font-mono text-xs text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
             placeholder="{ ... }"
             required
           />
 
-          <p className="text-[11px] leading-relaxed text-muted">
+          <p className="text-xs leading-relaxed text-muted">
             อ้างถึงในคำตอบด้วยรหัส เช่น <code className="font-mono">${form.objectId || 'object_id'}</code>{' '}
             (วางท้ายข้อความ คั่นด้วยเว้นวรรค) — หลีกเลี่ยงตัวเลขหลัง $ เช่น{' '}
             <code className="font-mono">$100</code> (จะหายไป)
@@ -232,7 +232,7 @@ export function ReplyObjectForm({
 
         <div className="h-fit space-y-2 lg:sticky lg:top-0">
           <span className="text-xs font-semibold uppercase tracking-wide text-muted">Live Preview</span>
-          <div className="overflow-x-auto rounded-xl border border-border/60 bg-[#8aa6c8] p-4 dark:bg-[#39414d]">
+          <div className="overflow-x-auto rounded-xl border border-border bg-accent-sunken/60 p-4">
             <MessagePreview
               objectType={form.objectType}
               payload={parsedPayload}

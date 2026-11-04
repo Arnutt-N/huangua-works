@@ -175,14 +175,14 @@ export function ReplyObjectsClient() {
                   </h3>
                 </div>
                 <span
-                  className={`flex-none rounded-md px-2 py-0.5 text-[10px] font-bold uppercase ${typeBadgeClass(item.objectType)}`}
+                  className={`flex-none rounded-md px-2 py-0.5 text-xs font-bold uppercase ${typeBadgeClass(item.objectType)}`}
                 >
                   {item.objectType}
                 </span>
               </div>
 
               {item.category && (
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted">
                   {item.category}
                 </p>
               )}
@@ -282,7 +282,7 @@ export function ReplyObjectsClient() {
           viewObj ? (
             <div>
               <p className="mb-1 text-xs text-muted">JSON</p>
-              <pre className="max-h-64 overflow-auto overscroll-contain rounded-xl bg-[#0f172a] p-4 font-mono text-xs text-[#86efac]">
+              <pre className="max-h-64 overflow-auto overscroll-contain rounded-xl border border-border bg-surface-sunken p-4 font-mono text-xs text-ink">
                 {JSON.stringify(viewObj.payload, null, 2)}
               </pre>
             </div>

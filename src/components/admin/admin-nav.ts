@@ -88,17 +88,17 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     ],
   },
   {
-    label: 'CHATBOT MANAGEMENT',
+    label: 'จัดการแชทบอท',
     items: [
-      { key: 'chatbot', label: 'Chatbot Overview', href: '/admin/chatbot', icon: Bot, supervisorOnly: true },
-      { key: 'chat', label: 'Live Chat', href: '/admin/chat', icon: MessageSquare },
-      { key: 'chat-histories', label: 'Chat Histories', href: '/admin/chat-histories', icon: History, supervisorOnly: true },
-      { key: 'broadcast', label: 'Broadcast', href: '/admin/chatbot/broadcast', icon: Megaphone, supervisorOnly: true },
-      { key: 'auto-replies', label: 'Auto-Replies', href: '/admin/chatbot/auto-replies', icon: Reply, supervisorOnly: true },
-      { key: 'reply-objects', label: 'Reply Objects', href: '/admin/chatbot/reply-objects', icon: MessageSquareReply, supervisorOnly: true },
-      { key: 'canned-responses', label: 'Canned Responses', href: '/admin/chatbot/canned-responses', icon: MessageSquareText, supervisorOnly: true },
-      { key: 'rich-menus', label: 'Rich Menus', href: '/admin/chatbot/rich-menus', icon: PanelTop, supervisorOnly: true },
-      { key: 'friends', label: 'Friend Histories', href: '/admin/friends', icon: UsersRound, supervisorOnly: true },
+      { key: 'chatbot', label: 'ภาพรวมแชทบอท', href: '/admin/chatbot', icon: Bot, supervisorOnly: true },
+      { key: 'chat', label: 'สนทนาสด', href: '/admin/chat', icon: MessageSquare },
+      { key: 'chat-histories', label: 'ประวัติการสนทนา', href: '/admin/chat-histories', icon: History, supervisorOnly: true },
+      { key: 'broadcast', label: 'บรอดแคสต์', href: '/admin/chatbot/broadcast', icon: Megaphone, supervisorOnly: true },
+      { key: 'auto-replies', label: 'ตอบอัตโนมัติ', href: '/admin/chatbot/auto-replies', icon: Reply, supervisorOnly: true },
+      { key: 'reply-objects', label: 'รูปแบบคำตอบ', href: '/admin/chatbot/reply-objects', icon: MessageSquareReply, supervisorOnly: true },
+      { key: 'canned-responses', label: 'ข้อความสำเร็จรูป', href: '/admin/chatbot/canned-responses', icon: MessageSquareText, supervisorOnly: true },
+      { key: 'rich-menus', label: 'ริชเมนู', href: '/admin/chatbot/rich-menus', icon: PanelTop, supervisorOnly: true },
+      { key: 'friends', label: 'ประวัติเพื่อน', href: '/admin/friends', icon: UsersRound, supervisorOnly: true },
     ],
   },
   {
@@ -167,6 +167,69 @@ export function visibleNavGroups(role: UserRole): AdminNavGroup[] {
     ...group,
     items: visibleNavItems(role, group.items),
   })).filter((group) => group.items.length > 0);
+}
+
+interface ChromeRule {
+  prefix: string;
+  active: AdminTab;
+  title: string;
+  exact?: boolean;
+  bleed?: boolean;
+}
+
+/**
+ * ชื่อหน้าและแท็บที่ไฮไลต์ — ใช้โดย layout ที่ถือ sidebar ไว้ข้ามหน้า
+ * กฎที่ prefix ยาวกว่าชนะ เพื่อให้หน้ารายละเอียดไม่ไปใช้ชื่อหน้ารายการ
+ */
+const CHROME_RULES: ChromeRule[] = [
+  { prefix: '/admin/chat', exact: true, active: 'chat', title: 'สนทนาสด', bleed: true },
+  { prefix: '/admin/cases', active: 'reports', title: 'รายละเอียดเรื่อง' },
+  { prefix: '/admin/reports/pmqa', active: 'reports', title: 'รายงานเกณฑ์ PMQA' },
+  { prefix: '/admin/reports', active: 'reports', title: 'จัดการเรื่อง' },
+  { prefix: '/admin/queue', active: 'dashboard', title: 'คิวนัดหมายและนัดช่าง' },
+  { prefix: '/admin/profile', active: 'profile', title: 'โปรไฟล์ของฉัน' },
+  { prefix: '/admin/chatbot/broadcast/new', active: 'broadcast', title: 'สร้างประกาศ' },
+  { prefix: '/admin/chatbot/broadcast', exact: true, active: 'broadcast', title: 'ส่งประกาศ' },
+  { prefix: '/admin/chatbot/broadcast', active: 'broadcast', title: 'รายละเอียดบรอดแคสต์' },
+  { prefix: '/admin/chatbot/auto-replies', exact: true, active: 'auto-replies', title: 'ตอบอัตโนมัติ' },
+  { prefix: '/admin/chatbot/auto-replies', active: 'auto-replies', title: 'รายละเอียดหมวด' },
+  { prefix: '/admin/chatbot/reply-objects/new', active: 'reply-objects', title: 'สร้างรูปแบบคำตอบ' },
+  { prefix: '/admin/chatbot/reply-objects', active: 'reply-objects', title: 'รูปแบบคำตอบ' },
+  { prefix: '/admin/chatbot/canned-responses', active: 'canned-responses', title: 'ข้อความสำเร็จรูป' },
+  { prefix: '/admin/chatbot/rich-menus/aliases', active: 'rich-menus', title: 'นามแฝงริชเมนู' },
+  { prefix: '/admin/chatbot/rich-menus/new', active: 'rich-menus', title: 'สร้างริชเมนู' },
+  { prefix: '/admin/chatbot/rich-menus', exact: true, active: 'rich-menus', title: 'ริชเมนู' },
+  { prefix: '/admin/friends/history', active: 'friends', title: 'ประวัติเหตุการณ์เพื่อน' },
+  { prefix: '/admin/friends', exact: true, active: 'friends', title: 'เพื่อน LINE' },
+  { prefix: '/admin/friends', active: 'friends', title: 'รายละเอียดเพื่อน' },
+  { prefix: '/admin/chat-histories', active: 'chat-histories', title: 'ประวัติการสนทนา' },
+  { prefix: '/admin/chatbot', active: 'chatbot', title: 'ภาพรวมแชทบอท' },
+  { prefix: '/admin/citizens', active: 'citizens', title: 'จัดการบัญชีประชาชน' },
+  { prefix: '/admin/users', active: 'users', title: 'จัดการผู้ใช้' },
+  { prefix: '/admin/responsible', active: 'responsible', title: 'ผู้รับผิดชอบย้อนหลัง' },
+  { prefix: '/admin/health', active: 'health', title: 'สุขภาพระบบ' },
+  { prefix: '/admin/master-data', active: 'master-data', title: 'หน่วยงาน / หมวดหมู่' },
+  { prefix: '/admin/design', active: 'design', title: 'ระบบดีไซน์' },
+  { prefix: '/admin/settings', active: 'settings', title: 'ตั้งค่า' },
+  { prefix: '/admin/image-resize', active: 'image-resize', title: 'ย่อรูป' },
+  { prefix: '/admin/files', active: 'files', title: 'ไฟล์สื่อ' },
+  { prefix: '/admin/audit', active: 'audit', title: 'ประวัติการกระทำ' },
+  { prefix: '/admin', exact: true, active: 'dashboard', title: 'แดชบอร์ดเจ้าหน้าที่' },
+];
+
+export function resolveAdminChrome(pathname: string): { active: AdminTab; title: string; bleed: boolean } {
+  const path = (pathname.split('?')[0] || '/admin').replace(/\/$/, '') || '/admin';
+  if (path.includes('/rich-menus/') && path.endsWith('/edit')) {
+    return { active: 'rich-menus', title: 'แก้ไขริชเมนู', bleed: false };
+  }
+  if (path.includes('/rich-menus/') && path.endsWith('/insights')) {
+    return { active: 'rich-menus', title: 'สถิติริชเมนู', bleed: false };
+  }
+  const hit = CHROME_RULES.filter((rule) =>
+    rule.exact ? path === rule.prefix : path === rule.prefix || path.startsWith(`${rule.prefix}/`),
+  ).sort((a, b) => b.prefix.length - a.prefix.length || Number(Boolean(b.exact)) - Number(Boolean(a.exact)))[0];
+  if (hit) return { active: hit.active, title: hit.title, bleed: Boolean(hit.bleed) };
+  return { active: 'dashboard', title: 'แดชบอร์ดเจ้าหน้าที่', bleed: false };
 }
 
 /** คำนำหน้าชื่อไทยที่ไม่ควรกลายเป็นอักษรย่อบน avatar */
