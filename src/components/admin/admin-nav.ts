@@ -87,7 +87,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     items: [
       { key: 'dashboard', label: 'แดชบอร์ด', href: '/admin', icon: BarChart3 },
       { key: 'reports', label: 'จัดการเรื่อง', href: '/admin/reports', icon: ClipboardList },
-      { key: 'pmqa', label: 'รายงาน PMQA', href: '/admin/reports/pmqa', icon: Award },
+      { key: 'pmqa', label: 'PMQA 4.0', href: '/admin/reports/pmqa', icon: Award },
     ],
   },
   {
