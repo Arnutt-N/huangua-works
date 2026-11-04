@@ -94,4 +94,36 @@ describe('KpiCard Component', () => {
     expect(screen.getByText('98')).toBeInTheDocument();
     expect(screen.getByText('ปิดเรื่องสำเร็จ')).toBeInTheDocument();
   });
+
+  it('เรนเดอร์ variant "success" พร้อม styling โทนสีเขียว', () => {
+    render(
+      <KpiCard
+        label="งานสำเร็จตามกำหนด"
+        value={42}
+        icon={Activity}
+        variant="success"
+      />,
+    );
+
+    expect(screen.getByText('42')).toBeInTheDocument();
+    expect(screen.getByText('งานสำเร็จตามกำหนด')).toBeInTheDocument();
+  });
+
+  it('เรนเดอร์ข้อมูลแนวโน้มเปรียบเทียบ (trend) ได้ถูกต้อง', () => {
+    render(
+      <KpiCard
+        label="คำร้องทั้งหมด"
+        value={12}
+        icon={Activity}
+        trend={{
+          value: '8%',
+          direction: 'up',
+          label: 'เทียบกับเดือนก่อน',
+        }}
+      />,
+    );
+
+    expect(screen.getByText(/8%/)).toBeInTheDocument();
+    expect(screen.getByText('เทียบกับเดือนก่อน')).toBeInTheDocument();
+  });
 });

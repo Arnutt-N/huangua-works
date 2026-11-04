@@ -64,7 +64,7 @@ export function AdminDashboardView({
         </div>
       </div>
 
-      {/* BAND 1: Key Performance Indicators (4 การ์ดสถิติเรียงหน้ากระดาน) */}
+      {/* BAND 1: Key Performance Indicators (4 การ์ดสถิติเรียงหน้ากระดานสไตล์ Horizontal Split) */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           label="เรื่องรับทั้งหมด"
@@ -72,7 +72,11 @@ export function AdminDashboardView({
           icon={TrendingUp}
           variant="default"
           href="/admin/reports"
-          hint={`7 วัน: +${metrics.recentIntakeVelocity.toLocaleString('th-TH')}`}
+          trend={{
+            value: `+${metrics.recentIntakeVelocity.toLocaleString('th-TH')}`,
+            direction: metrics.recentIntakeVelocity > 0 ? 'up' : 'flat',
+            label: 'รับเข้า 7 วันล่าสุด',
+          }}
         />
         <KpiCard
           label="กำลังดำเนินการ"
@@ -81,15 +85,19 @@ export function AdminDashboardView({
           variant="gold"
           className="shadow-accent-drop"
           href="/admin/reports?status=open"
-          hint={`${metrics.totalReceived > 0 ? Math.round((metrics.totalInProgress / metrics.totalReceived) * 100) : 0}% ของทั้งหมด`}
+          subtext={
+            metrics.totalReceived > 0
+              ? `สัดส่วน ${Math.round((metrics.totalInProgress / metrics.totalReceived) * 100)}% ของทั้งหมด`
+              : 'ไม่มีเรื่องค้างดำเนินการ'
+          }
         />
         <KpiCard
           label="ปิดสำเร็จ"
           value={metrics.totalClosed}
           icon={CheckCircle2}
-          variant="default"
+          variant="success"
           href="/admin/reports?status=closed"
-          hint={
+          subtext={
             metrics.avgResolutionDays != null
               ? `สำเร็จ ${metrics.resolutionRate}% (เฉลี่ย ${metrics.avgResolutionDays} วัน)`
               : `สำเร็จ ${metrics.resolutionRate}%`
@@ -99,14 +107,14 @@ export function AdminDashboardView({
           label="เลยกำหนด SLA"
           value={metrics.slaBreach}
           icon={metrics.slaBreach > 0 ? AlertTriangle : ShieldCheck}
-          variant={metrics.slaBreach > 0 ? 'danger' : 'default'}
+          variant={metrics.slaBreach > 0 ? 'danger' : 'success'}
           href={metrics.slaBreach > 0 ? '/admin/reports?overdue=1' : undefined}
           ariaLabel={
             metrics.slaBreach > 0
               ? `เลยกำหนด SLA ${metrics.slaBreach.toLocaleString('th-TH')} เรื่อง คลิกเพื่อดูคิวเรื่อง`
               : undefined
           }
-          hint={metrics.slaBreach > 0 ? 'ต้องเร่งดำเนินการ' : 'ตรงตามเกณฑ์ 100%'}
+          subtext={metrics.slaBreach > 0 ? 'เกินกำหนดมาตรฐาน ต้องเร่งรัด' : 'ตรงตามเกณฑ์ 100%'}
         />
       </div>
 
