@@ -65,11 +65,9 @@ export function AdminLayout({
     setCollapsed(window.localStorage.getItem(COLLAPSE_KEY) === '1');
   }, []);
 
-  // § repo นี้ไม่มี admin/layout.tsx — ทุกหน้า render <AdminShell> เองใน page
-  // sidebar จึง remount ทุกครั้งที่เปลี่ยนหน้า และ nav เริ่ม scrollTop = 0 เสมอ
-  // คลิกเมนูล่างๆ แล้วแถบเมนูเด้งกลับขึ้นบน มองไม่เห็นว่าอยู่ที่เมนูไหน
-  // → เลื่อนเฉพาะ nav ให้ active item โผล่ (ไม่ใช้ scrollIntoView เพราะมันลาก
-  //   window/page scroll ตามไปด้วย ทำให้เนื้อหาหน้ากระตุก)
+  // § sidebar อยู่ที่ src/app/admin/layout.tsx (ผ่าน AdminChrome) จึงไม่ remount ตอนเปลี่ยนหน้า
+  // effect นี้เลื่อนเฉพาะเมื่อรายการที่ active หลุดจากกรอบ nav
+  // (ไม่ใช้ scrollIntoView เพราะมันลาก window/page scroll ตามไปด้วย)
   useEffect(() => {
     const nav = navRef.current;
     if (!nav) return;

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { ADMIN_NAV_GROUPS, visibleNavGroups, visibleNavItems, initialsOf } from './admin-nav';
+import { ADMIN_NAV_GROUPS, resolveAdminChrome, visibleNavGroups, visibleNavItems, initialsOf } from './admin-nav';
 
 /**
  * § เทสต์นี้ปักหมุดกฎเรื่องสิทธิ์ที่ comment ในโค้ดเขียนเตือนไว้แต่ไม่มีอะไรบังคับ
@@ -12,15 +12,15 @@ describe('visibleNavGroups', () => {
   it('officer ไม่เห็นกลุ่ม "ระบบและเครื่องมือ" เลย เพราะทุกเมนูในกลุ่มเป็น supervisorOnly แล้ว', () => {
     const labels = visibleNavGroups('officer').map((g) => g.label);
     expect(labels).not.toContain('ระบบและเครื่องมือ');
-    expect(labels).toEqual(['งานหลัก', 'CHATBOT MANAGEMENT']);
+    expect(labels).toEqual(['งานหลัก', 'จัดการแชทบอท']);
   });
 
-  it('officer เห็นแค่ Live Chat ในกลุ่ม CHATBOT MANAGEMENT (เมนูอื่น supervisorOnly)', () => {
-    const bot = visibleNavGroups('officer').find((g) => g.label === 'CHATBOT MANAGEMENT');
+  it('officer เห็นแค่ สนทนาสด ในกลุ่ม จัดการแชทบอท (เมนูอื่น supervisorOnly)', () => {
+    const bot = visibleNavGroups('officer').find((g) => g.label === 'จัดการแชทบอท');
     expect(bot?.items.map((i) => i.key)).toEqual(['chat']);
   });
 
-  it('officer ไม่เห็นสามเมนูใหม่ แต่ยังเห็น Live Chat', () => {
+  it('officer ไม่เห็นสามเมนูใหม่ แต่ยังเห็น สนทนาสด', () => {
     const keys = visibleNavGroups('officer').flatMap((g) => g.items).map((i) => i.key);
     expect(keys).toContain('chat');
     expect(keys).not.toContain('chat-histories');
@@ -28,8 +28,8 @@ describe('visibleNavGroups', () => {
     expect(keys).not.toContain('canned-responses');
   });
 
-  it('head เห็นสามเมนูใหม่ในกลุ่ม CHATBOT MANAGEMENT', () => {
-    const bot = visibleNavGroups('head').find((g) => g.label === 'CHATBOT MANAGEMENT');
+  it('head เห็นสามเมนูใหม่ในกลุ่ม จัดการแชทบอท', () => {
+    const bot = visibleNavGroups('head').find((g) => g.label === 'จัดการแชทบอท');
     expect(bot?.items.map((i) => i.key)).toEqual(
       expect.arrayContaining(['chat-histories', 'friends', 'canned-responses']),
     );
@@ -150,3 +150,22 @@ describe('initialsOf', () => {
     expect(initialsOf('   ')).toBe('?');
   });
 });
+
+describe('resolveAdminChrome', () => {
+  it('หน้าสนทนาสดเต็มพื้นที่ และประวัติแชทไม่โดน bleed ตาม', () => {
+    expect(resolveAdminChrome('/admin/chat')).toMatchObject({ active: 'chat', title: 'สนทนาสด', bleed: true });
+    expect(resolveAdminChrome('/admin/chat-histories').bleed).toBe(false);
+  });
+
+  it('หน้ารายละเอียดเรื่องใช้แท็บจัดการเรื่อง', () => {
+    expect(resolveAdminChrome('/admin/cases/abc')).toMatchObject({ active: 'reports', title: 'รายละเอียดเรื่อง' });
+  });
+
+  it('แดชบอร์ดไม่กลืนเส้นทางที่ยาวกว่า', () => {
+    expect(resolveAdminChrome('/admin')).toMatchObject({ active: 'dashboard', title: 'แดชบอร์ดเจ้าหน้าที่' });
+    expect(resolveAdminChrome('/admin/reports').active).toBe('reports');
+  });
+});
+
+
+

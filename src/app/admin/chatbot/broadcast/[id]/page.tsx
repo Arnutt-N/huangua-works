@@ -4,7 +4,7 @@ import { ADMIN_ROLES } from '@/lib/auth/roles';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { BroadcastDetailClient } from './broadcast-detail-client';
 
-export const metadata: Metadata = { title: 'รายละเอียด Broadcast' };
+export const metadata: Metadata = { title: 'รายละเอียดบรอดแคสต์' };
 export const dynamic = 'force-dynamic';
 
 export default async function BroadcastDetailPage({
@@ -16,7 +16,7 @@ export default async function BroadcastDetailPage({
   const { id } = await params;
 
   return (
-    <AdminShell user={staffUser} active="broadcast" title="รายละเอียด Broadcast">
+    <AdminShell user={staffUser} active="broadcast" title="รายละเอียดบรอดแคสต์">
       <BroadcastDetailClient broadcastId={id} />
     </AdminShell>
   );

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { AlertTriangle, Clock, ChevronRight, MapPin, Inbox, X, Activity, Download } from 'lucide-react';
+import { AlertTriangle, Clock, ChevronRight, MapPin, Inbox, X, Activity, Download, Star } from 'lucide-react';
 import type { Metadata } from 'next';
 import { and, desc, eq, gte, ilike, lte, or, count, sql, isNotNull, lt, inArray } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
@@ -206,8 +206,12 @@ export default async function CaseManagementPage({
             </span>
           )}
           {summary.feedbackAvg !== null && (
-            <span>
-              คะแนนเฉลี่ย <strong className="text-ink">★ {summary.feedbackAvg}</strong>{' '}
+            <span className="inline-flex items-center gap-1">
+              คะแนนเฉลี่ย{' '}
+              <strong className="inline-flex items-center gap-1 text-ink">
+                <Star className="h-4 w-4 fill-warning-ink text-warning-ink" aria-hidden="true" />
+                {summary.feedbackAvg}
+              </strong>{' '}
               ({summary.feedbackCount} ครั้ง)
             </span>
           )}
@@ -295,10 +299,8 @@ export default async function CaseManagementPage({
                   <Link
                     href={`/admin/cases/${item.id}?return=${encodeURIComponent(currentUrl)}`}
                     className={cn(
-                      'block border-l-4 px-4 py-4 transition-colors duration-normal ease-out-expo',
+                      'block px-4 py-4 transition-colors duration-normal ease-out-expo',
                       'hover:bg-accent-sunken/60',
-                      // แถบซ้ายแดงสำหรับเรื่องที่เลย SLA — สแกนหาได้ทันทีโดยไม่ต้องอ่าน
-                      item.overSla ? 'border-l-danger' : 'border-l-transparent',
                       'sm:grid sm:grid-cols-[2.5fr_1fr_1fr_1.2fr_auto_auto] sm:items-center sm:gap-4',
                     )}
                   >

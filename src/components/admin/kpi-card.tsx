@@ -84,7 +84,7 @@ export function KpiCard({
           {hint && <span className="text-xs text-muted">{hint}</span>}
           {href && (
             <ChevronRight
-              className="h-4 w-4 text-muted opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100"
+              className="h-4 w-4 text-muted/70 transition-transform group-hover:translate-x-0.5 group-hover:text-ink"
               aria-hidden="true"
             />
           )}

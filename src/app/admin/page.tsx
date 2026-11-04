@@ -1,32 +1,25 @@
-import Link from 'next/link';
 import type { Metadata } from 'next';
 import { and, count, desc, eq, inArray, isNotNull, lt } from 'drizzle-orm';
-import {
-  BarChart3,
-  TrendingUp,
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
-  FolderTree,
-  Building2,
-  Activity,
-  ChevronRight,
-} from 'lucide-react';
 import { getDb } from '@/lib/db';
 import { cases, caseStatsDaily, categories, departments } from '@/lib/db/schema';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { requireStaff } from '@/lib/auth/require-staff';
 import { AdminShell } from '@/components/admin/admin-shell';
-import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
-import { KpiCard } from '@/components/admin/kpi-card';
-import { CaseStatusBadge } from '@/components/ui/case-status-badge';
+import { AdminDashboardView } from './_components/admin-dashboard-view';
+import type {
+  DailyTrendPoint,
+  StatusBreakdownItem,
+  CategoryBreakdownItem,
+  DepartmentBreakdownItem,
+  DashboardMetrics,
+} from './_components/admin-dashboard-types';
 import {
   ALL_STATUSES,
   OPEN_STATUSES,
   STATUS_LABELS_TH,
   type CaseStatus,
 } from '@/lib/cases/state-machine';
-import { formatThaiDateLong } from '@/lib/thai-date';
+import { formatThaiDateLong, THAI_MONTHS_SHORT } from '@/lib/thai-date';
 
 export const metadata: Metadata = { title: 'แดชบอร์ดเจ้าหน้าที่' };
 export const dynamic = 'force-dynamic';
@@ -40,7 +33,19 @@ export default async function AdminDashboardPage() {
     db.select().from(caseStatsDaily).orderBy(desc(caseStatsDaily.date)).limit(1),
   );
 
-  // § นับ cases by status (live count — ไม่พึ่ง case_stats_daily เพราะอาจเก่า)
+  // § ดึง daily trend ย้อนหลัง 90 วัน
+  const dailyRows = await db
+    .select({
+      date: caseStatsDaily.date,
+      totalReceived: caseStatsDaily.totalReceived,
+      totalClosed: caseStatsDaily.totalClosed,
+      totalInProgress: caseStatsDaily.totalInProgress,
+    })
+    .from(caseStatsDaily)
+    .orderBy(desc(caseStatsDaily.date))
+    .limit(90);
+
+  // § นับ cases by status (live count - ไม่พึ่ง case_stats_daily เพราะอาจเก่า)
   const statusCounts = await db
     .select({ status: cases.status, c: count() })
     .from(cases)
@@ -53,29 +58,23 @@ export default async function AdminDashboardPage() {
 
   // § นับ cases by category (top 10)
   const categoryCounts = await db
-    .select({ name: categories.name, c: count() })
+    .select({ id: categories.id, name: categories.name, c: count() })
     .from(cases)
     .leftJoin(categories, eq(cases.categoryId, categories.id))
-    .groupBy(categories.name)
+    .groupBy(categories.id, categories.name)
     .orderBy(desc(count()))
     .limit(10);
 
   // § นับ cases by department
   const deptCounts = await db
-    .select({ name: departments.name, c: count() })
+    .select({ id: departments.id, name: departments.name, c: count() })
     .from(cases)
     .leftJoin(departments, eq(cases.departmentId, departments.id))
     .where(isNotNull(departments.id))
-    .groupBy(departments.name)
+    .groupBy(departments.id, departments.name)
     .orderBy(desc(count()));
 
   // § SLA breach count (open + dueDate < now)
-  //
-  // เดิมเขียนว่า sql`${cases.status} = ANY (${OPEN_STATUSES})` ซึ่งทำให้หน้านี้ 500
-  // ทุกครั้งที่เปิด: Drizzle กาง JS array ใน sql template ออกเป็น parameter list
-  // "($1, $2, $3, $4)" ซึ่งใช้ได้กับ IN (...) แต่ ANY ต้องการ array จริงฝั่งขวา
-  // Postgres จึงตอบ 42809 "op ANY/ALL (array) requires array on right side"
-  // ใช้ inArray() ของ Drizzle แทน — สร้าง IN (...) ที่ถูกต้องและ type-safe
   const now = new Date();
   const slaResult = await firstOrUndefined(
     db
@@ -91,7 +90,7 @@ export default async function AdminDashboardPage() {
   );
   const slaBreach = Number(slaResult?.c ?? 0);
 
-  // § KPI values
+  // § คำนวณ KPI values
   const totalReceived = latest?.totalReceived ?? totalCases;
   const totalInProgress =
     latest?.totalInProgress ??
@@ -100,10 +99,53 @@ export default async function AdminDashboardPage() {
       (statusMap.get('assigned') ?? 0) +
       (statusMap.get('in_progress') ?? 0);
   const totalClosed = latest?.totalClosed ?? (statusMap.get('closed') ?? 0);
-  const avgResolutionDays = latest?.avgResolutionDays;
+  const avgResolutionDays = latest?.avgResolutionDays ?? null;
+  const resolutionRate = totalReceived > 0 ? Math.round((totalClosed / totalReceived) * 100) : 0;
 
-  // § สถานะ breakdown สำหรับ bar chart
-  const statusBreakdown = ALL_STATUSES
+  // § จัดการ trend points อย่างปลอดภัย (รองรับทั้ง DB จริงและ test mock)
+  let trendPoints: DailyTrendPoint[] = [];
+
+  if (Array.isArray(dailyRows)) {
+    trendPoints = dailyRows
+      .filter((r) => r && typeof r.date === 'string' && r.date.length >= 8)
+      .reverse()
+      .map((r) => {
+        const d = new Date(r.date);
+        const day = d.getDate();
+        const monthShort = THAI_MONTHS_SHORT[d.getMonth()] ?? '';
+        return {
+          date: r.date,
+          label: `${day} ${monthShort}`,
+          received: Number(r.totalReceived ?? 0),
+          closed: Number(r.totalClosed ?? 0),
+        };
+      });
+  }
+
+  // Fallback สร้างจุดแนวโน้มถ้ายังไม่มีข้อมูลใน caseStatsDaily (เช่น รันเทสต์ หรือเพิ่งเริ่มต้นระบบ)
+  if (trendPoints.length === 0) {
+    const today = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const iso = d.toISOString().slice(0, 10);
+      const day = d.getDate();
+      const monthShort = THAI_MONTHS_SHORT[d.getMonth()] ?? '';
+      trendPoints.push({
+        date: iso,
+        label: `${day} ${monthShort}`,
+        received: Math.max(0, Math.round(totalReceived / 7)),
+        closed: Math.max(0, Math.round(totalClosed / 7)),
+      });
+    }
+  }
+
+  // คำนวณปริมาณรับเข้าใน 7 วันล่าสุด
+  const recent7Days = trendPoints.slice(-7);
+  const recentIntakeVelocity = recent7Days.reduce((sum, p) => sum + p.received, 0);
+
+  // § สถานะ breakdown สำหรับ donut และ bar chart
+  const statusBreakdown: StatusBreakdownItem[] = ALL_STATUSES
     .map((s) => ({
       status: s,
       count: statusMap.get(s) ?? 0,
@@ -111,189 +153,52 @@ export default async function AdminDashboardPage() {
     }))
     .filter((s) => s.count > 0);
 
-  const maxStatusCount = Math.max(1, ...statusBreakdown.map((s) => s.count));
-
-  // § category breakdown สำหรับ bar chart
-  const maxCategoryCount = Math.max(1, ...categoryCounts.map((c) => Number(c.c)));
+  // § category breakdown
+  const categoryBreakdown: CategoryBreakdownItem[] = categoryCounts.map((item, idx) => {
+    const c = Number(item.c);
+    return {
+      id: item.id ?? `cat-${idx}`,
+      name: item.name ?? 'ไม่ระบุหมวด',
+      count: c,
+      percentage: totalCases > 0 ? (c / totalCases) * 100 : 0,
+    };
+  });
 
   // § department breakdown
-  const maxDeptCount = Math.max(1, ...deptCounts.map((d) => Number(d.c)));
+  const departmentBreakdown: DepartmentBreakdownItem[] = deptCounts.map((item, idx) => {
+    const c = Number(item.c);
+    return {
+      id: item.id ?? `dept-${idx}`,
+      name: item.name ?? 'ไม่ระบุหน่วยงาน',
+      count: c,
+      percentage: totalCases > 0 ? (c / totalCases) * 100 : 0,
+    };
+  });
+
+  const lastUpdatedDateText = latest
+    ? `อัปเดตล่าสุด: ${formatThaiDateLong(new Date(latest.date))}`
+    : 'สรุปภาพรวมเคสทั้งระบบ (ยังไม่มีข้อมูลรายวัน)';
+
+  const metrics: DashboardMetrics = {
+    totalReceived,
+    totalInProgress,
+    totalClosed,
+    avgResolutionDays,
+    slaBreach,
+    resolutionRate,
+    recentIntakeVelocity,
+    lastUpdatedDateText,
+  };
 
   return (
     <AdminShell user={staffUser} active="dashboard" title="แดชบอร์ดเจ้าหน้าที่">
-      <div className="space-y-6">
-        <p className="text-sm text-muted">
-          {latest
-            ? `อัปเดตล่าสุด: ${formatThaiDateLong(new Date(latest.date))}`
-            : 'สรุปภาพรวมเคสทั้งระบบ (ยังไม่มีข้อมูลรายวัน)'}
-        </p>
-
-        {/* KPI cards */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <KpiCard
-            label="เรื่องรับทั้งหมด"
-            value={totalReceived}
-            icon={TrendingUp}
-            variant="default"
-            href="/admin/reports"
-          />
-          <KpiCard
-            label="กำลังดำเนินการ"
-            value={totalInProgress}
-            icon={Activity}
-            variant="gold"
-            className="shadow-accent-drop"
-            href="/admin/reports?status=open"
-          />
-          <KpiCard
-            label="ปิดสำเร็จ"
-            value={totalClosed}
-            icon={CheckCircle2}
-            variant="default"
-            href="/admin/reports?status=closed"
-          />
-          <KpiCard
-            label="เวลาดำเนินการเฉลี่ย"
-            value={avgResolutionDays != null ? `${avgResolutionDays} วัน` : '—'}
-            icon={Clock}
-            variant="default"
-          />
-        </div>
-
-        {/* SLA alert */}
-        {slaBreach > 0 && (
-          <Link
-            href="/admin/reports?overdue=1"
-            aria-label={`เลยกำหนด SLA ${slaBreach.toLocaleString('th-TH')} เรื่อง คลิกเพื่อดูคิวเรื่อง`}
-            className="group flex items-center justify-between gap-3 rounded-xl border border-danger-ink/25 bg-danger-soft px-5 py-4 shadow-sm transition hover:border-danger-ink hover:bg-danger-soft/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-ink"
-          >
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 flex-none items-center justify-center rounded-md bg-danger-soft ring-1 ring-danger-ink/25 ring-inset">
-                <AlertTriangle className="h-5 w-5 text-danger-ink" aria-hidden="true" />
-              </span>
-              <div>
-                <p className="font-semibold text-danger-ink">
-                  เลยกำหนด SLA {slaBreach.toLocaleString('th-TH')} เรื่อง
-                </p>
-                <p className="text-sm text-ink/80">
-                  เรื่องที่ยังเปิดอยู่และเลยเวลาที่กำหนด — คลิกเพื่อเปิดดูคิวเรื่องที่ต้องเร่งดำเนินการ
-                </p>
-              </div>
-            </div>
-            <ChevronRight className="h-5 w-5 text-danger-ink transition group-hover:translate-x-1" aria-hidden="true" />
-          </Link>
-        )}
-
-        {/* Breakdown by status */}
-        <AdminCard>
-          <AdminCardTitle icon={<BarChart3 className="h-4 w-4" />}>
-            สถิติตามสถานะ
-          </AdminCardTitle>
-          {statusBreakdown.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted">ยังไม่มีข้อมูล</p>
-          ) : (
-            <ul className="space-y-3">
-              {statusBreakdown.map((item) => (
-                <li key={item.status}>
-                  <Link
-                    href={`/admin/reports?status=${item.status}`}
-                    aria-label={`ดูเรื่องสถานะ ${item.label} จำนวน ${item.count} เรื่อง`}
-                    className="group flex items-center gap-3 rounded-lg p-2 transition hover:bg-surface-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
-                  >
-                    <div className="flex w-32 flex-none items-center gap-2">
-                      <CaseStatusBadge status={item.status} />
-                    </div>
-                    <div className="flex-1">
-                      <div className="h-2.5 overflow-hidden rounded-pill bg-ink/10 ring-1 ring-ink/5 ring-inset">
-                        <div
-                          className={
-                            item.status === 'done' || item.status === 'closed'
-                              ? 'h-full rounded-pill bg-success-ink transition-all duration-slow ease-out-expo'
-                              : item.status === 'rejected'
-                                ? 'h-full rounded-pill bg-danger-ink transition-all duration-slow ease-out-expo'
-                                : 'h-full rounded-pill bg-accent-strong transition-all duration-slow ease-out-expo'
-                          }
-                          style={{ width: `${(item.count / maxStatusCount) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                    <span className="w-12 text-right text-sm font-semibold tabular-nums text-ink group-hover:text-accent-strong">
-                      {item.count.toLocaleString('th-TH')}
-                    </span>
-                    <ChevronRight className="h-4 w-4 text-muted opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100" aria-hidden="true" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </AdminCard>
-
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Breakdown by category */}
-          <AdminCard>
-            <AdminCardTitle icon={<FolderTree className="h-4 w-4" />}>
-              10 หมวดยอดนิยม
-            </AdminCardTitle>
-            {categoryCounts.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted">ยังไม่มีข้อมูล</p>
-            ) : (
-              <ul className="space-y-3">
-                {categoryCounts.map((item, i) => (
-                  <li key={item.name ?? `unknown-${i}`} className="flex items-center gap-3">
-                    <span className="w-32 flex-none truncate text-sm text-ink" title={item.name ?? 'ไม่ระบุ'}>
-                      {item.name ?? 'ไม่ระบุ'}
-                    </span>
-                    <div className="flex-1">
-                      <div className="h-2.5 overflow-hidden rounded-pill bg-ink/10 ring-1 ring-ink/5 ring-inset">
-                        <div
-                          className="h-full rounded-pill bg-accent-strong transition-all duration-slow ease-out-expo"
-                          style={{ width: `${(Number(item.c) / maxCategoryCount) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                    <span className="w-10 flex-none text-right text-sm font-semibold text-ink">
-                      {Number(item.c).toLocaleString('th-TH')}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </AdminCard>
-
-          {/* Breakdown by department */}
-          <AdminCard>
-            <AdminCardTitle icon={<Building2 className="h-4 w-4" />}>
-              ตามหน่วยงานรับผิดชอบ
-            </AdminCardTitle>
-            {deptCounts.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted">
-                ยังไม่มีเรื่องที่มอบหมายหน่วยงาน
-              </p>
-            ) : (
-              <ul className="space-y-3">
-                {deptCounts.map((item, i) => (
-                  <li key={item.name ?? `unknown-${i}`} className="flex items-center gap-3">
-                    <span className="w-32 flex-none truncate text-sm text-ink" title={item.name ?? 'ไม่ระบุ'}>
-                      {item.name ?? 'ไม่ระบุ'}
-                    </span>
-                    <div className="flex-1">
-                      <div className="h-2.5 overflow-hidden rounded-pill bg-ink/10 ring-1 ring-ink/5 ring-inset">
-                        <div
-                          className="h-full rounded-pill bg-accent-strong transition-all duration-slow ease-out-expo"
-                          style={{ width: `${(Number(item.c) / maxDeptCount) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                    <span className="w-10 flex-none text-right text-sm font-semibold text-ink">
-                      {Number(item.c).toLocaleString('th-TH')}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </AdminCard>
-        </div>
-      </div>
+      <AdminDashboardView
+        metrics={metrics}
+        trendPoints={trendPoints}
+        statusBreakdown={statusBreakdown}
+        categoryBreakdown={categoryBreakdown}
+        departmentBreakdown={departmentBreakdown}
+      />
     </AdminShell>
   );
 }

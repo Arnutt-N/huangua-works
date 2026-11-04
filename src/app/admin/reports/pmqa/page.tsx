@@ -51,11 +51,11 @@ export default async function PmqaReportPage({ searchParams }: PageProps) {
           <p className="mt-1 text-base font-semibold text-black">
             รายงานสรุปสถิติการดำเนินการจัดการเรื่องร้องเรียน/ร้องทุกข์ ตามเกณฑ์ PMQA (หมวด 3 และ หมวด 7)
           </p>
-          <p className="mt-0.5 text-sm text-neutral-800">
+          <p className="mt-0.5 text-sm text-ink">
             ประจำปีงบประมาณ พ.ศ. {report.fiscalYear} (ตั้งแต่วันที่ 1 ตุลาคม พ.ศ.{' '}
             {report.fiscalYear - 1} ถึงวันที่ 30 กันยายน พ.ศ. {report.fiscalYear})
           </p>
-          <p className="mt-1 text-xs text-neutral-600">
+          <p className="mt-1 text-xs text-muted">
             ข้อมูล ณ วันที่ {formatThaiDateTime(report.generatedAt)}
           </p>
         </div>
@@ -110,9 +110,9 @@ export default async function PmqaReportPage({ searchParams }: PageProps) {
 
         {/* แผง KPI การ์ดสรุปภาพรวม */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 print:grid-cols-4 print:gap-3">
-          <div className="glass-panel rounded-xl p-5 shadow-sm print:break-inside-avoid print:rounded-lg print:border print:border-neutral-300 print:bg-white print:p-4 print:text-black print:shadow-none">
+          <div className="glass-panel rounded-xl p-5 shadow-sm print:break-inside-avoid print:rounded-lg print:border print:border-border print:bg-white print:p-4 print:text-black print:shadow-none">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-muted print:text-neutral-700">
+              <span className="text-xs font-semibold text-muted print:text-muted">
                 เรื่องร้องเรียนทั้งหมด
               </span>
               <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent-sunken text-accent-strong print:hidden">
@@ -123,16 +123,16 @@ export default async function PmqaReportPage({ searchParams }: PageProps) {
               <span className="text-3xl font-extrabold text-ink print:text-black">
                 {report.totalCases.toLocaleString('th-TH')}
               </span>
-              <span className="text-xs text-muted print:text-neutral-600">เรื่อง</span>
+              <span className="text-xs text-muted print:text-muted">เรื่อง</span>
             </div>
-            <p className="mt-1 text-xs text-muted print:text-neutral-600">
+            <p className="mt-1 text-xs text-muted print:text-muted">
               รับแจ้งในปีงบประมาณ {report.fiscalYear}
             </p>
           </div>
 
-          <div className="glass-panel rounded-xl p-5 shadow-sm print:break-inside-avoid print:rounded-lg print:border print:border-neutral-300 print:bg-white print:p-4 print:text-black print:shadow-none">
+          <div className="glass-panel rounded-xl p-5 shadow-sm print:break-inside-avoid print:rounded-lg print:border print:border-border print:bg-white print:p-4 print:text-black print:shadow-none">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-muted print:text-neutral-700">
+              <span className="text-xs font-semibold text-muted print:text-muted">
                 ดำเนินการแล้วเสร็จ
               </span>
               <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-success-soft text-success-ink print:hidden">
@@ -143,19 +143,19 @@ export default async function PmqaReportPage({ searchParams }: PageProps) {
               <span className="text-3xl font-extrabold text-ink print:text-black">
                 {report.resolvedCount.toLocaleString('th-TH')}
               </span>
-              <span className="text-xs text-muted print:text-neutral-600">เรื่อง</span>
+              <span className="text-xs text-muted print:text-muted">เรื่อง</span>
             </div>
             <div className="mt-1 flex items-center justify-between text-xs">
               <span className="font-semibold text-success-ink print:font-bold print:text-black">
                 อัตราความสำเร็จ {report.resolutionRate}%
               </span>
-              <span className="text-muted print:text-neutral-600">(เสร็จสิ้น/ปิดเรื่อง)</span>
+              <span className="text-muted print:text-muted">(เสร็จสิ้น/ปิดเรื่อง)</span>
             </div>
           </div>
 
-          <div className="glass-panel rounded-xl p-5 shadow-sm print:break-inside-avoid print:rounded-lg print:border print:border-neutral-300 print:bg-white print:p-4 print:text-black print:shadow-none">
+          <div className="glass-panel rounded-xl p-5 shadow-sm print:break-inside-avoid print:rounded-lg print:border print:border-border print:bg-white print:p-4 print:text-black print:shadow-none">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-muted print:text-neutral-700">
+              <span className="text-xs font-semibold text-muted print:text-muted">
                 อยู่ระหว่างดำเนินการ
               </span>
               <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-warning-soft text-warning-ink print:hidden">
@@ -166,9 +166,9 @@ export default async function PmqaReportPage({ searchParams }: PageProps) {
               <span className="text-3xl font-extrabold text-ink print:text-black">
                 {report.openCount.toLocaleString('th-TH')}
               </span>
-              <span className="text-xs text-muted print:text-neutral-600">เรื่อง</span>
+              <span className="text-xs text-muted print:text-muted">เรื่อง</span>
             </div>
-            <p className="mt-1 text-xs text-muted print:text-neutral-600">
+            <p className="mt-1 text-xs text-muted print:text-muted">
               สัดส่วน{' '}
               {report.totalCases > 0
                 ? Math.round((report.openCount / report.totalCases) * 1000) / 10
@@ -177,9 +177,9 @@ export default async function PmqaReportPage({ searchParams }: PageProps) {
             </p>
           </div>
 
-          <div className="glass-panel rounded-xl p-5 shadow-sm print:break-inside-avoid print:rounded-lg print:border print:border-neutral-300 print:bg-white print:p-4 print:text-black print:shadow-none">
+          <div className="glass-panel rounded-xl p-5 shadow-sm print:break-inside-avoid print:rounded-lg print:border print:border-border print:bg-white print:p-4 print:text-black print:shadow-none">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-muted print:text-neutral-700">
+              <span className="text-xs font-semibold text-muted print:text-muted">
                 ยุติเรื่อง / ไม่รับดำเนินการ
               </span>
               <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-danger-soft text-danger-ink print:hidden">
@@ -190,20 +190,20 @@ export default async function PmqaReportPage({ searchParams }: PageProps) {
               <span className="text-3xl font-extrabold text-ink print:text-black">
                 {report.rejectedCount.toLocaleString('th-TH')}
               </span>
-              <span className="text-xs text-muted print:text-neutral-600">เรื่อง</span>
+              <span className="text-xs text-muted print:text-muted">เรื่อง</span>
             </div>
-            <p className="mt-1 text-xs text-muted print:text-neutral-600">ไม่อยู่ในอำนาจหน้าที่/ไม่เข้าเกณฑ์</p>
+            <p className="mt-1 text-xs text-muted print:text-muted">ไม่อยู่ในอำนาจหน้าที่/ไม่เข้าเกณฑ์</p>
           </div>
         </div>
 
         {/* แผงแจกแจงแยกตามสถานะย่อยทั้ง 8 สถานะ (จัดแบบ 4 คอลัมน์ x 2 แถว ในโหมดพิมพ์) */}
-        <div className="glass-panel rounded-xl p-5 shadow-sm print:break-inside-avoid print:rounded-lg print:border print:border-neutral-300 print:bg-white print:p-4 print:text-black print:shadow-none">
+        <div className="glass-panel rounded-xl p-5 shadow-sm print:break-inside-avoid print:rounded-lg print:border print:border-border print:bg-white print:p-4 print:text-black print:shadow-none">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="flex items-center gap-2 text-base font-bold text-ink print:text-black">
               <BarChart3 className="h-4 w-4 text-accent-strong print:hidden" aria-hidden="true" />
               จำแนกตามขั้นตอนวงจรชีวิต (8 สถานะ)
             </h2>
-            <span className="text-xs text-muted print:text-neutral-600">สถานะตาม State Machine</span>
+            <span className="text-xs text-muted print:text-muted">สถานะตาม State Machine</span>
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8 print:grid-cols-4 print:gap-2">
@@ -216,13 +216,13 @@ export default async function PmqaReportPage({ searchParams }: PageProps) {
               return (
                 <div
                   key={status}
-                  className="flex flex-col items-center rounded-lg border border-border bg-surface-sunken/40 p-3 text-center print:break-inside-avoid print:border-neutral-300 print:bg-white print:p-2.5 print:text-black"
+                  className="flex flex-col items-center rounded-lg border border-border bg-surface-sunken/40 p-3 text-center print:break-inside-avoid print:border-border print:bg-white print:p-2.5 print:text-black"
                 >
                   <CaseStatusBadge status={status} className="text-xs" />
                   <span className="mt-2 text-xl font-bold text-ink print:text-black">
                     {count.toLocaleString('th-TH')}
                   </span>
-                  <span className="text-[11px] text-muted print:text-neutral-600">{pct}%</span>
+                  <span className="text-[11px] text-muted print:text-muted">{pct}%</span>
                 </div>
               );
             })}
@@ -230,18 +230,18 @@ export default async function PmqaReportPage({ searchParams }: PageProps) {
         </div>
 
         {/* ตารางสรุปจำแนกตามหมวดหมู่เรื่องร้องเรียน */}
-        <div className="glass-panel overflow-hidden rounded-xl shadow-sm print:rounded-lg print:border print:border-neutral-400 print:bg-white print:text-black print:shadow-none">
-          <div className="border-b border-border bg-surface-sunken/60 px-5 py-4 print:border-neutral-300 print:bg-neutral-100">
+        <div className="glass-panel overflow-hidden rounded-xl shadow-sm print:rounded-lg print:border print:border-border print:bg-white print:text-black print:shadow-none">
+          <div className="border-b border-border bg-surface-sunken/60 px-5 py-4 print:border-border print:bg-surface-sunken">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-base font-bold text-ink print:text-black">
                   สรุปจำแนกตามหมวดหมู่เรื่องร้องเรียน
                 </h2>
-                <p className="text-xs text-muted print:text-neutral-600">
+                <p className="text-xs text-muted print:text-muted">
                   ร้อยละและอัตราความสำเร็จในการแก้ไขปัญหาแยกตามประเภทงาน
                 </p>
               </div>
-              <span className="text-xs font-semibold text-muted print:text-neutral-700">
+              <span className="text-xs font-semibold text-muted print:text-muted">
                 {report.categories.length} หมวดหมู่
               </span>
             </div>
@@ -255,7 +255,7 @@ export default async function PmqaReportPage({ searchParams }: PageProps) {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm print:text-xs">
                 <thead className="print:table-header-group">
-                  <tr className="border-b border-border bg-surface-sunken/30 text-xs font-semibold text-muted print:border-neutral-300 print:bg-neutral-100 print:text-black">
+                  <tr className="border-b border-border bg-surface-sunken/30 text-xs font-semibold text-muted print:border-border print:bg-surface-sunken print:text-black">
                     <th scope="col" className="px-5 py-3 print:px-3 print:py-2">
                       หมวดหมู่เรื่อง
                     </th>
@@ -279,7 +279,7 @@ export default async function PmqaReportPage({ searchParams }: PageProps) {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border print:divide-neutral-200">
+                <tbody className="divide-y divide-border print:divide-border">
                   {report.categories.map((cat) => (
                     <tr
                       key={cat.categoryId}
@@ -291,7 +291,7 @@ export default async function PmqaReportPage({ searchParams }: PageProps) {
                       <td className="px-3 py-3 text-right font-medium text-ink print:py-2 print:text-black">
                         {cat.total.toLocaleString('th-TH')}
                       </td>
-                      <td className="px-3 py-3 text-right text-muted print:py-2 print:text-neutral-700">
+                      <td className="px-3 py-3 text-right text-muted print:py-2 print:text-muted">
                         {cat.percentageOfTotal}%
                       </td>
                       <td className="px-3 py-3 text-right font-medium text-success-ink print:py-2 print:text-black">
@@ -323,7 +323,7 @@ export default async function PmqaReportPage({ searchParams }: PageProps) {
                   ))}
                 </tbody>
                 <tfoot className="print:table-footer-group">
-                  <tr className="border-t-2 border-border bg-surface-sunken/50 font-semibold text-ink print:border-neutral-400 print:bg-neutral-100 print:text-black">
+                  <tr className="border-t-2 border-border bg-surface-sunken/50 font-semibold text-ink print:border-border print:bg-surface-sunken print:text-black">
                     <td className="px-5 py-3 print:px-3 print:py-2">รวมทั้งสิ้น</td>
                     <td className="px-3 py-3 text-right print:py-2">
                       {report.totalCases.toLocaleString('th-TH')}
@@ -351,12 +351,12 @@ export default async function PmqaReportPage({ searchParams }: PageProps) {
         </div>
 
         {/* ตารางสถิติรายเดือนในรอบปีงบประมาณ (12 เดือน) */}
-        <div className="glass-panel overflow-hidden rounded-xl shadow-sm print:rounded-lg print:border print:border-neutral-400 print:bg-white print:text-black print:shadow-none">
-          <div className="border-b border-border bg-surface-sunken/60 px-5 py-4 print:border-neutral-300 print:bg-neutral-100">
+        <div className="glass-panel overflow-hidden rounded-xl shadow-sm print:rounded-lg print:border print:border-border print:bg-white print:text-black print:shadow-none">
+          <div className="border-b border-border bg-surface-sunken/60 px-5 py-4 print:border-border print:bg-surface-sunken">
             <h2 className="text-base font-bold text-ink print:text-black">
               สถิติรายเดือนในรอบปีงบประมาณ พ.ศ. {report.fiscalYear}
             </h2>
-            <p className="text-xs text-muted print:text-neutral-600">
+            <p className="text-xs text-muted print:text-muted">
               การกระจายตัวของเรื่องร้องเรียนตลอดทั้งปีงบประมาณ (ไตรมาส 1 – ไตรมาส 4)
             </p>
           </div>
@@ -364,7 +364,7 @@ export default async function PmqaReportPage({ searchParams }: PageProps) {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm print:text-xs">
               <thead className="print:table-header-group">
-                <tr className="border-b border-border bg-surface-sunken/30 text-xs font-semibold text-muted print:border-neutral-300 print:bg-neutral-100 print:text-black">
+                <tr className="border-b border-border bg-surface-sunken/30 text-xs font-semibold text-muted print:border-border print:bg-surface-sunken print:text-black">
                   <th scope="col" className="px-5 py-3 print:px-3 print:py-2">
                     เดือน (ปีงบ)
                   </th>
@@ -385,7 +385,7 @@ export default async function PmqaReportPage({ searchParams }: PageProps) {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border print:divide-neutral-200">
+              <tbody className="divide-y divide-border print:divide-border">
                 {report.monthlyBreakdown.map((m) => {
                   const quarter = Math.ceil(m.fiscalMonthIndex / 3);
                   return (
@@ -396,7 +396,7 @@ export default async function PmqaReportPage({ searchParams }: PageProps) {
                       <td className="px-5 py-2.5 font-medium text-ink print:px-3 print:py-2 print:text-black">
                         {m.monthName} {m.buddhistYear}
                       </td>
-                      <td className="px-3 py-2.5 text-xs text-muted print:py-2 print:text-neutral-700">
+                      <td className="px-3 py-2.5 text-xs text-muted print:py-2 print:text-muted">
                         ไตรมาส {quarter}
                       </td>
                       <td className="px-3 py-2.5 text-right font-semibold text-ink print:py-2 print:text-black">
@@ -433,15 +433,15 @@ export default async function PmqaReportPage({ searchParams }: PageProps) {
           <div className="grid grid-cols-2 gap-8 text-center text-sm text-black">
             <div className="space-y-1">
               <p className="font-medium">ลงชื่อ........................................................</p>
-              <p className="text-xs text-neutral-800">(........................................................)</p>
-              <p className="text-xs text-neutral-800">เจ้าหน้าที่ผู้รับผิดชอบงานรับเรื่องร้องเรียน/ร้องทุกข์</p>
-              <p className="text-xs text-neutral-800">วันที่ ........ เดือน .................... พ.ศ. ........</p>
+              <p className="text-xs text-ink">(........................................................)</p>
+              <p className="text-xs text-ink">เจ้าหน้าที่ผู้รับผิดชอบงานรับเรื่องร้องเรียน/ร้องทุกข์</p>
+              <p className="text-xs text-ink">วันที่ ........ เดือน .................... พ.ศ. ........</p>
             </div>
             <div className="space-y-1">
               <p className="font-medium">ลงชื่อ........................................................</p>
-              <p className="text-xs text-neutral-800">(........................................................)</p>
-              <p className="text-xs text-neutral-800">นายกองค์การบริหารส่วนตำบลหัวงัว</p>
-              <p className="text-xs text-neutral-800">วันที่ ........ เดือน .................... พ.ศ. ........</p>
+              <p className="text-xs text-ink">(........................................................)</p>
+              <p className="text-xs text-ink">นายกองค์การบริหารส่วนตำบลหัวงัว</p>
+              <p className="text-xs text-ink">วันที่ ........ เดือน .................... พ.ศ. ........</p>
             </div>
           </div>
         </div>

@@ -78,6 +78,7 @@ tmp/
 project-log-md/
 
 # ---- 🤖 Agent / tool artifacts (local-only, ไม่ commit) ----
+.ds-receipts/
 .zcode/
 .kilo/
 .claude/skill-collections-comparison.md
