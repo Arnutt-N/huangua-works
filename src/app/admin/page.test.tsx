@@ -143,6 +143,20 @@ describe('AdminDashboardPage (admin/page)', () => {
     expect(deptTable).toBeInTheDocument();
     expect(screen.getByText('ภาระงานตามหน่วยงานรับผิดชอบ')).toBeInTheDocument();
 
+    const chartOrder = [
+      'แนวโน้มการรับเรื่องและการแก้ไข',
+      'วงจรขั้นตอนการดำเนินงาน (Lifecycle Funnel)',
+      'สัดส่วนตามสถานะเรื่อง',
+      '10 หมวดยอดนิยม',
+      'ภาระงานตามหน่วยงานรับผิดชอบ',
+    ].map((name) => screen.getByRole('heading', { name }));
+    for (let i = 0; i < chartOrder.length - 1; i++) {
+      expect(
+        chartOrder[i].compareDocumentPosition(chartOrder[i + 1]) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+
     // ตารางเสริมสำหรับผู้ใช้ screen reader ในส่วนแนวโน้ม
     expect(
       screen.getByRole('table', { name: /สถิติแนวโน้มการรับเรื่องและปิดงานรายวัน/ }),

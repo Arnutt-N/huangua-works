@@ -113,8 +113,8 @@ export function StatusDonutChart({ items }: StatusDonutChartProps) {
         </div>
       ) : (
         <div className="mt-4 grid items-center gap-6 @3xl:grid-cols-12">
-          {/* § วางคู่กันเมื่อการ์ดกว้างพอ (@3xl) เท่านั้น — การ์ดนี้กินครึ่งแดชบอร์ด
-              breakpoint sm ของวิวพอร์ตทำให้คอลัมน์รายการแคบเกิน และป้ายชื่อยาวทับแถบ */}
+          {/* § วางคู่กันเมื่อการ์ดกว้างถึง @3xl (768px) — การ์ดนี้เต็มแถวแดชบอร์ด
+              จอแคบยังเรียงวงไว้เหนือรายการ เพื่อไม่ให้ป้ายยาวทับแถบ */}
           {/* Donut Visual (Col 5) */}
           <div className="relative flex flex-col items-center justify-center @3xl:col-span-5">
             <div className="relative h-44 w-44">
