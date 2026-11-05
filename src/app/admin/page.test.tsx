@@ -151,9 +151,13 @@ describe('AdminDashboardPage (admin/page)', () => {
       'ภาระงานตามหน่วยงานรับผิดชอบ',
     ].map((name) => screen.getByRole('heading', { name }));
     for (let i = 0; i < chartOrder.length - 1; i++) {
+      const current = chartOrder[i];
+      const next = chartOrder[i + 1];
+      expect(current).toBeInstanceOf(HTMLElement);
+      expect(next).toBeInstanceOf(HTMLElement);
+      if (!(current instanceof HTMLElement) || !(next instanceof HTMLElement)) continue;
       expect(
-        chartOrder[i].compareDocumentPosition(chartOrder[i + 1]) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
+        current.compareDocumentPosition(next) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     }
 
