@@ -45,7 +45,7 @@ export function DepartmentAttributionTable({
 
   return (
     <div className="glass-panel flex flex-col justify-between rounded-xl p-5 shadow-sm">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="flex h-7 w-7 items-center justify-center rounded-md bg-accent-sunken text-accent-strong">
             <Building2 className="h-4 w-4" aria-hidden="true" />
@@ -116,13 +116,13 @@ export function DepartmentAttributionTable({
                     </td>
                     <td className="py-2.5 text-right tabular-nums text-muted">
                       <div className="flex items-center justify-end gap-2">
-                        <div className="hidden sm:block h-1.5 w-16 overflow-hidden rounded-pill bg-ink/10">
-                          <div
-                            className="h-full rounded-pill bg-accent-strong"
+                        <span className="hidden h-1.5 w-16 overflow-hidden rounded-pill bg-ink/10 sm:block" aria-hidden="true">
+                          <span
+                            className="block h-full rounded-pill bg-accent-strong"
                             style={{ width: `${(item.count / maxCount) * 100}%` }}
                           />
-                        </div>
-                        <span>{item.percentage.toFixed(1)}%</span>
+                        </span>
+                        {item.percentage.toFixed(1)}%
                       </div>
                     </td>
                     <td className="py-2.5 text-right">

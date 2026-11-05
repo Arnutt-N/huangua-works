@@ -120,29 +120,24 @@ export function AdminDashboardView({
         />
       </div>
 
-      {/* BAND 2: 30-Day Intake & Resolution Trend Area Chart */}
+      {/* BAND 2: แนวโน้มรายวัน เต็มความกว้าง */}
       <div className="flex flex-col">
         <IntakeTrendChart points={trendPoints} />
       </div>
 
-      {/* BAND 3: Multi-Chart Visual Analytics (Donut + Ranked Horizontal Bars) */}
-      <div className="grid gap-6 lg:grid-cols-12">
-        <div className="lg:col-span-6 flex flex-col">
-          <StatusDonutChart items={statusBreakdown} />
-        </div>
-        <div className="lg:col-span-6 flex flex-col">
-          <CategoryRankedChart categories={categoryBreakdown} />
-        </div>
-      </div>
+      {/* BAND 3: วงจร 4 ขั้น เป็นสรุปสถานะ เต็มความกว้าง อยู่ก่อนโดนัทรายสถานะ */}
+      <LifecycleStackedBar statusItems={statusBreakdown} />
 
-      {/* BAND 4: Lifecycle Stacked Progression & Department Table */}
-      <div className="space-y-6">
-        <LifecycleStackedBar statusItems={statusBreakdown} />
+      {/* BAND 4: โดนัทเต็มแถว เพื่อให้วงกับรายการอยู่ข้างกันเมื่อการ์ดถึง @3xl */}
+      <StatusDonutChart items={statusBreakdown} />
 
+      {/* BAND 5: หมวดเรื่องคู่กับหน่วยงาน — คนละมิติกับสถานะ */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <CategoryRankedChart categories={categoryBreakdown} />
         <DepartmentAttributionTable departments={departmentBreakdown} />
       </div>
 
-      {/* BAND 5: Ending on Purpose (Operational Footer) */}
+      {/* BAND 6: Ending on Purpose (Operational Footer) */}
       <div className="rounded-xl border border-border/80 bg-surface-sunken/60 px-5 py-4 text-xs text-muted">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
