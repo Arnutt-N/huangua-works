@@ -62,14 +62,19 @@ describe('CannedResponsesClient ตาราง JSK', () => {
     expect(within(table).getByText('ทักทาย')).toBeInTheDocument();
     expect(within(table).getByText('สวัสดีครับ ยินดีให้บริการ')).toBeInTheDocument();
     expect(within(table).getByText('ข้อมูลทั่วไป')).toBeInTheDocument();
-    expect(within(table).getByText('ใช้งานอยู่')).toBeInTheDocument();
+    expect(within(table).queryByText('ใช้งานอยู่')).not.toBeInTheDocument();
+    expect(within(table).getByRole('switch', { name: 'ปิดใช้งาน ทักทาย' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
     expect(within(table).getByText('3')).toBeInTheDocument();
   });
 
   it('โหลดแบบ include_inactive=true เสมอ (เห็นของที่ปิดใช้งาน)', async () => {
     fetchCannedResponses.mockResolvedValue([item({ isActive: false })]);
     render(<CannedResponsesClient />);
-    expect(await screen.findByText('ปิดใช้งาน')).toBeInTheDocument();
+    const inactive = await screen.findByRole('switch', { name: 'เปิดใช้งาน ทักทาย' });
+    expect(inactive).toHaveAttribute('aria-checked', 'false');
     expect(fetchCannedResponses).toHaveBeenCalledWith(true, expect.any(AbortSignal));
   });
 

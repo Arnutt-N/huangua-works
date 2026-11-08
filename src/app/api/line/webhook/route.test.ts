@@ -76,6 +76,52 @@ describe('POST /api/line/webhook · rate limit', () => {
     expect(mockHandle).toHaveBeenCalledTimes(1);
   });
 
+  it('body เกิน 1 MiB → 413 ก่อนตรวจลายเซ็น', async () => {
+    const big = new Uint8Array(1024 * 1024 + 1);
+    const res = await POST(
+      new Request('http://localhost/api/line/webhook', { method: 'POST', body: big }),
+    );
+
+    expect(res.status).toBe(413);
+    expect(mockVerify).not.toHaveBeenCalled();
+    expect(mockHandle).not.toHaveBeenCalled();
+  });
+
+  it('ไบต์ที่ไม่ใช่ UTF-8 → 400 ก่อนตรวจลายเซ็น', async () => {
+    const res = await POST(
+      new Request('http://localhost/api/line/webhook', {
+        method: 'POST',
+        body: new Uint8Array([0xff]),
+      }),
+    );
+
+    expect(res.status).toBe(400);
+    expect(mockVerify).not.toHaveBeenCalled();
+  });
+
+  it('body เกิน 1 MiB → 413 ก่อนตรวจลายเซ็น', async () => {
+    const big = new Uint8Array(1024 * 1024 + 1);
+    const res = await POST(
+      new Request('http://localhost/api/line/webhook', { method: 'POST', body: big }),
+    );
+
+    expect(res.status).toBe(413);
+    expect(mockVerify).not.toHaveBeenCalled();
+    expect(mockHandle).not.toHaveBeenCalled();
+  });
+
+  it('ไบต์ที่ไม่ใช่ UTF-8 → 400 ก่อนตรวจลายเซ็น', async () => {
+    const res = await POST(
+      new Request('http://localhost/api/line/webhook', {
+        method: 'POST',
+        body: new Uint8Array([0xff]),
+      }),
+    );
+
+    expect(res.status).toBe(400);
+    expect(mockVerify).not.toHaveBeenCalled();
+  });
+
   it('ลายเซ็นไม่ผ่าน → 401 ก่อนเช็ก rate limit', async () => {
     mockVerify.mockReturnValue(false);
 

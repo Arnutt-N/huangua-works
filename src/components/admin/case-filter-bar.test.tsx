@@ -93,12 +93,12 @@ describe('CaseFilterBar — FLOW-03: การรักษาสถานะค�
     expect(pushMock).toHaveBeenCalledWith(expect.stringContaining('to='));
   });
 
-  it('เมื่อเลือก preset กำหนดเอง แสดงช่องเลือกวันที่ตั้งแต่วันที่ และถึงวันที่', async () => {
-    mockSearchParams = new URLSearchParams('preset=custom&from=2026-10-01&to=2026-10-15');
+  it('แสดงช่องจากวันที่และถึงวันที่ตลอด ไม่มีปุ่มกำหนดเอง', () => {
     render(<CaseFilterBar categories={mockCategories} />);
 
-    expect(screen.getByRole('button', { name: 'ตั้งแต่วันที่' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'ถึงวันที่' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'จากวันที่' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'ถึงวันที่' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'กำหนดเอง' })).not.toBeInTheDocument();
   });
 
   it('เมื่อ searchParams มี status=open ตัวเลือกใน Select แสดงคำว่า "กำลังดำเนินการทั้งหมด (เปิด)"', () => {

@@ -220,33 +220,24 @@ export function CannedResponsesClient() {
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-center">
-                      <div className="flex flex-col items-center gap-2">
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={isActive}
+                        aria-label={`${isActive ? 'ปิด' : 'เปิด'}ใช้งาน ${item.title}`}
+                        disabled={togglingId === item.id}
+                        onClick={() => void handleToggleActive(item)}
+                        className={`relative inline-flex h-5 w-9 flex-none items-center rounded-pill transition-colors duration-normal ${
+                          isActive ? 'bg-accent-strong' : 'bg-surface-sunken'
+                        } ${togglingId === item.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
                         <span
-                          className={`inline-block rounded-pill px-2 py-0.5 text-xs font-medium ${
-                            isActive ? 'bg-success/10 text-success' : 'bg-surface-sunken text-muted'
+                          aria-hidden="true"
+                          className={`inline-block h-4 w-4 rounded-pill bg-white shadow transition-transform duration-normal ${
+                            isActive ? 'translate-x-4' : 'translate-x-0.5'
                           }`}
-                        >
-                          {isActive ? 'ใช้งานอยู่' : 'ปิดใช้งาน'}
-                        </span>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={isActive}
-                          aria-label={`${isActive ? 'ปิด' : 'เปิด'}ใช้งาน ${item.title}`}
-                          disabled={togglingId === item.id}
-                          onClick={() => void handleToggleActive(item)}
-                          className={`relative inline-flex h-5 w-9 flex-none items-center rounded-pill transition-colors duration-normal ${
-                            isActive ? 'bg-accent-strong' : 'bg-surface-sunken'
-                          } ${togglingId === item.id ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        >
-                          <span
-                            aria-hidden="true"
-                            className={`inline-block h-4 w-4 rounded-pill bg-white shadow transition-transform duration-normal ${
-                              isActive ? 'translate-x-4' : 'translate-x-0.5'
-                            }`}
-                          />
-                        </button>
-                      </div>
+                        />
+                      </button>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-center text-sm text-muted">
                       {item.usageCount ?? 0}

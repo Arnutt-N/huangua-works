@@ -13,6 +13,7 @@ import { CaseFilterBar } from '@/components/admin/case-filter-bar';
 import { CaseStatusBadge } from '@/components/ui/case-status-badge';
 import { OPEN_STATUSES, isCaseStatus, type CaseStatus } from '@/lib/cases/state-machine';
 import { parseThaiDateEnd, parseThaiDateStart } from '@/lib/thai-date';
+import { isReversedDateRange } from '@/lib/date-range';
 import { cn } from '@/lib/cn';
 
 export const metadata: Metadata = { title: 'จัดการเรื่อง' };
@@ -88,10 +89,13 @@ export default async function CaseManagementPage({
   if (categoryFilter) {
     filters.push(eq(cases.categoryId, categoryFilter));
   }
-  if (fromStart) {
+  // § ช่วงที่วันเริ่มอยู่หลังวันสิ้นสุดไม่มีความหมาย — ไม่ใส่เงื่อนไข
+  // ผู้ใช้เห็นคำเตือนที่ตัวกรอง แทนรายการว่างที่ไม่มีคำอธิบาย
+  const dateRangeOk = !isReversedDateRange(params.from, params.to);
+  if (dateRangeOk && fromStart) {
     filters.push(gte(cases.createdAt, fromStart));
   }
-  if (toEnd) {
+  if (dateRangeOk && toEnd) {
     filters.push(lte(cases.createdAt, toEnd));
   }
   if (q) {

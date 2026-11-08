@@ -101,6 +101,21 @@ describe('BroadcastClient ตาราง JSK', () => {
     await waitFor(() => expect(listBroadcasts).toHaveBeenCalledTimes(2));
   });
 
+  it('ช่วงวันที่ถูกส่งไปกับคำขอรายการ และนับหน้าใหม่', async () => {
+    const user = userEvent.setup();
+    render(<BroadcastClient />);
+    await screen.findByText('ประกาศน้ำประปา');
+
+    await user.type(screen.getByRole('textbox', { name: 'จากวันที่' }), '01');
+    await user.type(screen.getByRole('textbox', { name: 'เดือน จากวันที่' }), '10');
+    await user.type(screen.getByRole('textbox', { name: 'ปี พ.ศ. จากวันที่' }), '2569');
+
+    await waitFor(() => {
+      const queries = listBroadcasts.mock.calls.map((call) => String(call[0]));
+      expect(queries.some((query) => query.includes('from=2026-10-01') && query.includes('page=1'))).toBe(true);
+    });
+  });
+
   it('draft กดส่งเลยยิง send + reload', async () => {
     const user = userEvent.setup();
     const nativeConfirm = vi.spyOn(window, 'confirm');

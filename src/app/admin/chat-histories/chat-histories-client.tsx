@@ -6,6 +6,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Download, History, RefreshCw, Search, ArrowUp } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { AdminCard } from '@/components/admin/admin-card';
+import { DatePresetFilter } from '@/components/admin/date-preset-filter';
+import { STANDARD_DATE_PRESETS, isReversedDateRange, presetOptionToDates } from '@/lib/date-range';
 import { PageHeader } from '@/components/admin/page-header';
 import { EmptyState } from '@/components/admin/empty-state';
 import { LineAvatar } from '@/app/admin/chat/_components/line-avatar';
@@ -25,6 +27,25 @@ const FILTERS: { key: HistoryFilter; label: string }[] = [
 
 function modeLabel(mode: string): string {
   return MODE_LABELS[mode] ?? 'ไม่ระบุสถานะ';
+}
+
+function localYmd(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${month}-${day}`;
+}
+
+/** ช่วงที่สลับกันไม่ตัดรายการ — ตัวกรองแสดงคำเตือนเอง */
+function matchesMessageDate(iso: string | null, from: string, to: string): boolean {
+  if (isReversedDateRange(from, to) || (!from && !to)) return true;
+  const day = localYmd(iso);
+  if (!day) return false;
+  if (from && day < from) return false;
+  if (to && day > to) return false;
+  return true;
 }
 
 function displayNameOf(conv: Conversation): string {
@@ -79,6 +100,9 @@ export function ChatHistoriesClient() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [filter, setFilter] = useState<HistoryFilter>('closed');
   const [query, setQuery] = useState('');
+  const [datePreset, setDatePreset] = useState<string | null>(null);
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
   const [page, setPage] = useState(0);
   const { results: searchResults, searching } = useMessageSearch(query);
 
@@ -131,9 +155,10 @@ export function ChatHistoriesClient() {
           (c.lastMessageText ?? '').toLowerCase().includes(q),
       );
     }
+    list = list.filter((c) => matchesMessageDate(c.lastMessageAt, customStart, customEnd));
     const time = (c: Conversation) => (c.lastMessageAt ? new Date(c.lastMessageAt).getTime() : 0);
     return [...list].sort((a, b) => time(b) - time(a));
-  }, [conversations, filter, query]);
+  }, [conversations, filter, query, customStart, customEnd]);
 
   const hasQuery = query.trim().length > 0;
 
@@ -152,6 +177,24 @@ export function ChatHistoriesClient() {
 
   function handleQueryChange(next: string) {
     setQuery(next);
+    setPage(0);
+  }
+
+  function handlePresetChange(key: string) {
+    setDatePreset(key);
+    const opt = STANDARD_DATE_PRESETS.find((p) => p.key === key);
+    if (opt && key !== 'custom') {
+      const dates = presetOptionToDates(opt);
+      setCustomStart(dates.from);
+      setCustomEnd(dates.to);
+    }
+    setPage(0);
+  }
+
+  function clearDates() {
+    setDatePreset(null);
+    setCustomStart('');
+    setCustomEnd('');
     setPage(0);
   }
 
@@ -186,6 +229,27 @@ export function ChatHistoriesClient() {
               'w-full rounded-md border border-border bg-surface py-2 pl-10 pr-3 text-sm text-ink placeholder:text-muted',
               'focus:border-accent/40 focus:outline-none focus-visible:ring focus-visible:ring-accent/40',
             )}
+          />
+        </div>
+
+        <div className="mt-3 border-t border-border pt-3">
+          <DatePresetFilter
+            preset={datePreset}
+            customStart={customStart}
+            customEnd={customEnd}
+            onPresetChange={handlePresetChange}
+            onCustomStartChange={(value) => {
+              setDatePreset('custom');
+              setCustomStart(value);
+              setPage(0);
+            }}
+            onCustomEndChange={(value) => {
+              setDatePreset('custom');
+              setCustomEnd(value);
+              setPage(0);
+            }}
+            showClear={datePreset !== null || customStart !== '' || customEnd !== ''}
+            onClear={clearDates}
           />
         </div>
 
