@@ -1,9 +1,9 @@
 {
   "jskRepoPath": "D:\\genAI\\jsk-app",
   "jskSessionLogDir": "D:\\genAI\\jsk-app\\project-log-md\\pi",
-  "lastSyncedSessionFile": "session-summary-20261025-0102.md",
-  "lastSyncedJskHead": "2c56454",
-  "lastSyncedAt": "2026-10-25T01:13:15+07:00",
+  "lastSyncedSessionFile": "session-summary-20261027-1225.md",
+  "lastSyncedJskHead": "0d2ca78",
+  "lastSyncedAt": "2026-11-07T20:50:00+07:00",
   "portedItems": [
     {
       "jskPr": "#280, #281",
@@ -24,6 +24,21 @@
       "jskPr": "#289",
       "summary": "ย้ายสวิตช์เปิด/ปิดจากคอลัมน์จัดการไปคอลัมน์สถานะ (Canned Responses)",
       "huanguaBranch": "feat/jsk-line-menu-parity"
+    },
+    {
+      "jskPr": "#313–#319",
+      "summary": "แถวตัวกรองวันแบบ JSK: ปุ่ม 7/30/90/ปีนี้, ช่องวันที่โชว์ตลอด, เตือนช่วงไม่ครบหรือสลับ, ปุ่มล้างของช่องวันที่เป็นวงกลม. ยังไม่พอร์ตช่องพิมพ์ วว/ดด/ปปปป ของ CalendarPickerTH",
+      "huanguaBranch": "feat/jsk-sync-20261107"
+    },
+    {
+      "jskPr": "#301 F-005",
+      "summary": "webhook LINE ตัด body ที่เกิน 1 MiB (413) และ UTF-8 ที่ถอดไม่ได้ (400) ก่อนตรวจลายเซ็น",
+      "huanguaBranch": "feat/jsk-sync-20261107"
+    },
+    {
+      "jskPr": "#320",
+      "summary": "เอาข้อความ ใช้งานอยู่/ปิดใช้งาน ออกจากเซลล์สวิตช์คำตอบสำเร็จรูป — ส่วนปิดสวิตช์ให้ VIEWER ไม่พอร์ตเพราะไม่มีบทบาทนั้น",
+      "huanguaBranch": "feat/jsk-sync-20261107"
     }
   ],
   "reviewedItems": [
@@ -50,6 +65,18 @@
     {
       "jskPr": "#296",
       "summary": "ยังไม่พอร์ต (รอคำตัดสิน): Viewer read-only role (ALL_ROLES ของหัวงัวยังไม่มี viewer) และ reply-objects edit ย้ายจาก modal เป็น full page ตาม jsk"
+    },
+    {
+      "jskPr": "#297, #298",
+      "summary": "DatePresetFilter + แบน import DateRangePicker — หัวงัวมี DatePresetFilter แล้ว (รายงานเรื่องผ่าน CaseFilterBar, บันทึกตรวจสอบผ่าน AuditFilterBar) และไม่มี DateRangePicker ให้แบน"
+    },
+    {
+      "jskPr": "#300",
+      "summary": "P1 admin UX 8 ข้อ: นัดหมาย/command palette/หน้า requests ไม่มีในหัวงัว; ยืนยันออกจากระบบ, ล็อก dialog ตอน busy, drawer (inert/Escape/โฟกัส), และกันผลค้นหาเก่าทับใหม่มีอยู่แล้ว"
+    },
+    {
+      "jskPr": "#301 (session 20261027-1225 only)",
+      "summary": "ruff gate และงาน CI ของ backend Python — ไม่พอร์ต เพราะหัวงัวไม่มีสแตกนั้น คอมมิตความปลอดภัยที่ตามมาอยู่ใน session ของ claude_code ซึ่งสคริปต์ตรวจไม่เห็น"
     }
   ]
 }

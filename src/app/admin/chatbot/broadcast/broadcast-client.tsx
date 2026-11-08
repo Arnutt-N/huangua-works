@@ -18,6 +18,8 @@ import {
   Calendar,
 } from 'lucide-react';
 import { AdminCard } from '@/components/admin/admin-card';
+import { DatePresetFilter } from '@/components/admin/date-preset-filter';
+import { STANDARD_DATE_PRESETS, isReversedDateRange, presetOptionToDates } from '@/lib/date-range';
 import { useConfirm } from '@/components/admin/use-confirm';
 import { AdminErrorState } from '@/components/admin/admin-error-state';
 import { PageHeader } from '@/components/admin/page-header';
@@ -99,6 +101,9 @@ export function BroadcastClient() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [estimate, setEstimate] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState('');
+  const [datePreset, setDatePreset] = useState<string | null>(null);
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
   const [page, setPage] = useState(0);
   const [cancelTarget, setCancelTarget] = useState<BroadcastItem | null>(null);
   const [actionSaving, setActionSaving] = useState(false);
@@ -107,8 +112,13 @@ export function BroadcastClient() {
   const query = useMemo(() => {
     const params = new URLSearchParams({ page: String(page + 1), pageSize: String(PAGE_SIZE) });
     if (statusFilter) params.set('status', statusFilter);
+    // § ช่วงที่สลับกันไม่ส่งขึ้นเซิร์ฟเวอร์ — ตัวกรองแสดงคำเตือน และรายการไม่ถูกตัดเงียบ ๆ
+    if (!isReversedDateRange(customStart, customEnd)) {
+      if (customStart) params.set('from', customStart);
+      if (customEnd) params.set('to', customEnd);
+    }
     return params.toString();
-  }, [statusFilter, page]);
+  }, [statusFilter, page, customStart, customEnd]);
 
   const { data, loading, feedback, error, errorCode, notify, mutate, reload } = useResource({
     load: adminApi.listBroadcasts,
@@ -235,6 +245,40 @@ export function BroadcastClient() {
           <Button onClick={openDialog} variant="outline" className="min-h-touch gap-1.5">
             <Plus className="h-4 w-4" /> สร้างด่วน
           </Button>
+        </div>
+        <div className="mt-3 border-t border-border pt-3">
+          <DatePresetFilter
+            preset={datePreset}
+            customStart={customStart}
+            customEnd={customEnd}
+            onPresetChange={(key) => {
+              setDatePreset(key);
+              const opt = STANDARD_DATE_PRESETS.find((p) => p.key === key);
+              if (opt && key !== 'custom') {
+                const dates = presetOptionToDates(opt);
+                setCustomStart(dates.from);
+                setCustomEnd(dates.to);
+              }
+              setPage(0);
+            }}
+            onCustomStartChange={(value) => {
+              setDatePreset('custom');
+              setCustomStart(value);
+              setPage(0);
+            }}
+            onCustomEndChange={(value) => {
+              setDatePreset('custom');
+              setCustomEnd(value);
+              setPage(0);
+            }}
+            showClear={datePreset !== null || customStart !== '' || customEnd !== ''}
+            onClear={() => {
+              setDatePreset(null);
+              setCustomStart('');
+              setCustomEnd('');
+              setPage(0);
+            }}
+          />
         </div>
       </AdminCard>
 

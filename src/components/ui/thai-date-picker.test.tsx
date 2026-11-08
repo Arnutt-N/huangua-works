@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ThaiDatePicker } from './thai-date-picker';
 
@@ -8,48 +10,63 @@ afterEach(() => {
   cleanup();
 });
 
+function Controlled({ initial = '' }: { initial?: string }) {
+  const [value, setValue] = useState(initial);
+  return <ThaiDatePicker label="วันที่" value={value} onChange={setValue} />;
+}
+
 describe('ThaiDatePicker', () => {
-  it('แสดงค่าเริ่มต้นและเปิดปฏิทิน พ.ศ. ใน document.body (Portal) ได้', () => {
-    const onChange = vi.fn();
-    render(
-      <div className="overflow-hidden">
-        <ThaiDatePicker label="ตั้งแต่วันที่" value="2026-10-15" onChange={onChange} />
-      </div>,
-    );
+  it('แสดงวัน เดือน ปี พ.ศ. ที่พิมพ์ได้ และมีค่าแล้วเป็นกากบาทแทนปฏิทิน', () => {
+    render(<ThaiDatePicker label="ตั้งแต่วันที่" value="2026-10-15" onChange={vi.fn()} />);
 
-    const trigger = screen.getByRole('button', { name: 'ตั้งแต่วันที่' });
-    expect(trigger).toHaveTextContent('15 ต.ค. 2569');
-
-    fireEvent.click(trigger);
-
-    const dialog = screen.getByRole('dialog', { name: 'ปฏิทิน ตั้งแต่วันที่' });
-    expect(dialog.parentElement).toBe(document.body);
-    expect(dialog).toHaveTextContent('ตุลาคม 2569');
-
-    fireEvent.click(screen.getByRole('button', { name: '20' }));
-    expect(onChange).toHaveBeenCalledWith('2026-10-20');
+    expect(screen.getByRole('textbox', { name: 'ตั้งแต่วันที่' })).toHaveValue('15');
+    expect(screen.getByRole('textbox', { name: 'เดือน ตั้งแต่วันที่' })).toHaveValue('10');
+    expect(screen.getByRole('textbox', { name: 'ปี พ.ศ. ตั้งแต่วันที่' })).toHaveValue('2569');
+    expect(screen.getByRole('button', { name: 'ล้างตั้งแต่วันที่' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'เปิดปฏิทิน ตั้งแต่วันที่' })).not.toBeInTheDocument();
   });
 
-  it('แสดงปุ่มล้างค่า (X) แบบแยกชัดเจน (32px hit box) และกดล้างค่าได้', () => {
-    const onChange = vi.fn();
-    render(<ThaiDatePicker label="ถึงวันที่" value="2026-10-23" onChange={onChange} />);
+  it('กดปฏิทินแล้วเลือกวัน ส่ง ISO และเปลี่ยนเป็นกากบาทวงกลมแดง', async () => {
+    const user = userEvent.setup();
+    render(<Controlled />);
 
-    const clearBtn = screen.getByRole('button', { name: 'ล้างถึงวันที่' });
-    expect(clearBtn).toHaveClass('h-8', 'w-8');
+    await user.click(screen.getByRole('button', { name: 'เปิดปฏิทิน วันที่' }));
+    const dialog = screen.getByRole('dialog', { name: 'ปฏิทิน วันที่' });
+    expect(dialog.parentElement).toBe(document.body);
 
-    fireEvent.click(clearBtn);
-    expect(onChange).toHaveBeenCalledWith('');
+    await user.click(screen.getByRole('button', { name: '20' }));
+
+    expect(screen.getByRole('textbox', { name: 'วันที่' })).toHaveValue('20');
+    const clearBtn = screen.getByRole('button', { name: 'ล้างวันที่' });
+    expect(clearBtn).toHaveClass('rounded-full', 'bg-danger/10');
+    expect(clearBtn.parentElement).toHaveClass('h-9');
+    expect(screen.queryByRole('button', { name: 'เปิดปฏิทิน วันที่' })).not.toBeInTheDocument();
+  });
+
+  it('พิมพ์ วว/ดด/ปปปป แล้วได้กากบาท กดล้างแล้วพิมพ์หรือเลือกใหม่ได้', async () => {
+    const user = userEvent.setup();
+    render(<Controlled />);
+
+    await user.type(screen.getByRole('textbox', { name: 'วันที่' }), '15');
+    await user.type(screen.getByRole('textbox', { name: 'เดือน วันที่' }), '10');
+    await user.type(screen.getByRole('textbox', { name: 'ปี พ.ศ. วันที่' }), '2569');
+
+    expect(await screen.findByRole('button', { name: 'ล้างวันที่' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'ล้างวันที่' }));
+
+    expect(screen.getByRole('textbox', { name: 'วันที่' })).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'เปิดปฏิทิน วันที่' })).toBeInTheDocument();
   });
 
   it('เลื่อนเปลี่ยนเดือนและกดปุ่ม Escape เพื่อปิดปฏิทินได้', () => {
-    const onChange = vi.fn();
-    render(<ThaiDatePicker label="ตั้งแต่วันที่" value="2026-01-10" onChange={onChange} />);
+    render(<ThaiDatePicker label="ตั้งแต่วันที่" value="" onChange={vi.fn()} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'ตั้งแต่วันที่' }));
-    expect(screen.getByRole('dialog')).toHaveTextContent('มกราคม 2569');
+    fireEvent.click(screen.getByRole('button', { name: 'เปิดปฏิทิน ตั้งแต่วันที่' }));
+    const before = screen.getByRole('dialog').textContent;
 
     fireEvent.click(screen.getByRole('button', { name: 'เดือนก่อนหน้า' }));
-    expect(screen.getByRole('dialog')).toHaveTextContent('ธันวาคม 2568');
+    expect(screen.getByRole('dialog').textContent).not.toBe(before);
 
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).toBeNull();

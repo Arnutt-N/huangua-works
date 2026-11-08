@@ -186,7 +186,7 @@ describe('BroadcastWizardClient ตัวช่วยสร้าง 4 ขั้
     await user.type(screen.getByLabelText('ข้อความประกาศ'), 'สวัสดี');
     await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
 
-    await user.click(screen.getByLabelText('วันที่ส่ง (เว้นว่าง = สร้างเป็นร่าง)'));
+    await user.click(screen.getByRole('button', { name: 'เปิดปฏิทิน วันที่ส่ง (เว้นว่าง = สร้างเป็นร่าง)' }));
     await user.click(screen.getByRole('button', { name: 'เดือนถัดไป' }));
     await user.click(screen.getByRole('button', { name: '5' }));
     await user.type(screen.getByLabelText('เวลาส่ง'), '10:00');
@@ -207,7 +207,7 @@ describe('BroadcastWizardClient ตัวช่วยสร้าง 4 ขั้
     await user.type(screen.getByLabelText('ข้อความประกาศ'), 'ร่าง');
     await user.click(screen.getByRole('button', { name: /ถัดไป/ }));
 
-    await user.click(screen.getByLabelText('วันที่ส่ง (เว้นว่าง = สร้างเป็นร่าง)'));
+    await user.click(screen.getByRole('button', { name: 'เปิดปฏิทิน วันที่ส่ง (เว้นว่าง = สร้างเป็นร่าง)' }));
     await user.click(screen.getByRole('button', { name: 'เดือนถัดไป' }));
     await user.click(screen.getByRole('button', { name: '5' }));
     await user.type(screen.getByLabelText('เวลาส่ง'), '10:00');

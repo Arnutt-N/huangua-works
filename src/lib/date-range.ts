@@ -1,25 +1,25 @@
 import { formatIsoToThaiShort } from './thai-date';
 
 /**
- * § date-range.ts — Date Preset Engine สำหรับระบบจัดการแอดมิน (Tranche F / JSK Port)
- * รองรับการคำนวณช่วงวันที่แบบ ISO (YYYY-MM-DD) ตามปฏิทินไทยและรอบปีงบประมาณราชการ
- * ทำงานบน native Date API โดยไม่เพิ่ม external dependencies (คงขนาด bundle เล็ก)
+ * § date-range.ts — ช่วงวันของตัวกรองแอดมิน (ชุดเดียวกับ JSK หลัง PR #313–#319)
+ * `custom` ไม่ใช่ปุ่ม — เป็นเครื่องหมายว่าผู้ใช้แก้ช่องวันที่เอง
+ * ทำงานบน native Date API โดยไม่เพิ่ม external dependencies
  */
 
 export interface DatePresetOption {
   key: string;
   label: string;
   days?: number;
-  fiscalYear?: boolean;
-  todayOnly?: boolean;
+  /** 1 ม.ค. ของปีปฏิทินปัจจุบัน ถึงวันนี้ */
+  yearToDate?: boolean;
 }
 
-/** ชุดปุ่ม Preset มาตรฐานสำหรับแอดมิน */
+/** ชุดปุ่ม Preset มาตรฐานสำหรับแอดมิน — ตรงกับ JSK */
 export const STANDARD_DATE_PRESETS: DatePresetOption[] = [
-  { key: 'today', label: 'วันนี้', todayOnly: true },
   { key: '7d', label: '7 วัน', days: 7 },
   { key: '30d', label: '30 วัน', days: 30 },
-  { key: 'fiscal', label: 'ปีงบประมาณนี้', fiscalYear: true },
+  { key: '90d', label: '90 วัน', days: 90 },
+  { key: 'year', label: 'ปีนี้', yearToDate: true },
   { key: 'custom', label: 'กำหนดเอง' },
 ];
 
@@ -47,19 +47,8 @@ export function presetOptionToDates(
 ): { from: string; to: string } {
   const to = toYmd(now);
 
-  if (opt.todayOnly) {
-    return { from: to, to };
-  }
-
-  if (opt.fiscalYear) {
-    // § ปีงบประมาณไทย: เริ่ม 1 ต.ค. (October 1)
-    // ถ้าเดือนปัจจุบันคือ ต.ค.-ธ.ค. (index 9-11) -> ปีเริ่มคือปีปัจจุบัน
-    // ถ้าเดือนปัจจุบันคือ ม.ค.-ก.ย. (index 0-8) -> ปีเริ่มคือปีก่อนหน้า
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
-    const startYear = currentMonth >= 9 ? currentYear : currentYear - 1;
-    const from = `${startYear}-10-01`;
-    return { from, to };
+  if (opt.yearToDate) {
+    return { from: `${now.getFullYear()}-01-01`, to };
   }
 
   const lookback = opt.days ?? 30;
@@ -80,7 +69,7 @@ export function resolveDateRange(
   if (!preset) return null;
 
   if (preset === 'custom') {
-    if (customStart && customEnd) {
+    if (customStart && customEnd && customStart <= customEnd) {
       return { from: customStart, to: customEnd };
     }
     return null;
@@ -89,6 +78,31 @@ export function resolveDateRange(
   const opt = presets.find((p) => p.key === preset);
   if (!opt) return null;
   return presetOptionToDates(opt, now);
+}
+
+export type CustomRangeProblem = 'incomplete' | 'reversed';
+
+/** ช่วงที่กรอกยังใช้ไม่ได้ — ค่าว่างทั้งคู่ไม่ใช่ความผิดพลาด */
+export function customRangeProblem(
+  customStart: string,
+  customEnd: string,
+): CustomRangeProblem | null {
+  if (customStart && customEnd && customStart <= customEnd) return null;
+  if (!customStart && !customEnd) return null;
+  return customStart && customEnd ? 'reversed' : 'incomplete';
+}
+
+export const CUSTOM_RANGE_MESSAGES: Record<CustomRangeProblem, string> = {
+  incomplete: 'กรุณาเลือกวันที่เริ่มต้นและวันที่สิ้นสุด',
+  reversed: 'วันที่เริ่มต้นต้องไม่มากกว่าวันที่สิ้นสุด',
+};
+
+/** คู่ YYYY-MM-DD ที่วันเริ่มอยู่หลังวันสิ้นสุด — ห้ามเอาไปเป็นเงื่อนไขคิวรี */
+export function isReversedDateRange(
+  from: string | null | undefined,
+  to: string | null | undefined,
+): boolean {
+  return Boolean(from && to && from > to);
 }
 
 /**

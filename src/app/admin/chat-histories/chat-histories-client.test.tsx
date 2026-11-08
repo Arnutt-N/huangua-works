@@ -117,6 +117,22 @@ describe('ChatHistoriesClient อ่านอย่างเดียว', () =>
     expect(screen.getByText('สมหญิง')).toBeInTheDocument();
   });
 
+  it('ช่วงวันที่ตัดบทสนทนาที่ข้อความล่าสุดอยู่นอกช่วง', async () => {
+    const user = userEvent.setup();
+    fetchConversations.mockResolvedValue([conversation({ lastMessageAt: '2026-10-19T10:00:00.000Z' })]);
+    render(<ChatHistoriesClient />);
+    expect(await screen.findByText('สมชาย')).toBeInTheDocument();
+
+    await user.type(screen.getByRole('textbox', { name: 'จากวันที่' }), '01');
+    await user.type(screen.getByRole('textbox', { name: 'เดือน จากวันที่' }), '10');
+    await user.type(screen.getByRole('textbox', { name: 'ปี พ.ศ. จากวันที่' }), '2569');
+    await user.type(screen.getByRole('textbox', { name: 'ถึงวันที่' }), '02');
+    await user.type(screen.getByRole('textbox', { name: 'เดือน ถึงวันที่' }), '10');
+    await user.type(screen.getByRole('textbox', { name: 'ปี พ.ศ. ถึงวันที่' }), '2569');
+
+    await waitFor(() => expect(screen.queryByText('สมชาย')).not.toBeInTheDocument());
+  });
+
   it('ไม่มีช่องพิมพ์ ไม่มีปุ่มส่ง ไม่มีปุ่มเปลี่ยนโหมด', async () => {
     fetchConversations.mockResolvedValue([conversation()]);
     render(<ChatHistoriesClient />);

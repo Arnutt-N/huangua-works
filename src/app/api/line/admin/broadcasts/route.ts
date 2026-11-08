@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { count, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { chatBroadcasts, chatBroadcastFailedRecipients } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
@@ -11,6 +11,7 @@ import { broadcastTargetSchema } from '@/lib/line/broadcast-target';
 import { BROADCAST_TITLE_MAX } from '@/lib/contracts';
 import { broadcastContentSchema as contentSchema } from '@/lib/line/broadcast-content-schema';
 import { z } from 'zod';
+import { parseThaiDateEnd, parseThaiDateStart } from '@/lib/thai-date';
 
 export const runtime = 'nodejs';
 
@@ -42,12 +43,16 @@ const createSchema = z
     }
   });
 
+const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
 const querySchema = z.object({
   page: z.coerce.number().int().min(1).optional().default(1),
   pageSize: z.coerce.number().int().min(1).max(100).optional().default(50),
   status: z
     .enum(['draft', 'scheduled', 'sending', 'sent', 'failed', 'cancelled'])
     .optional(),
+  from: ymd.optional(),
+  to: ymd.optional(),
 });
 
 export async function GET(request: Request) {
@@ -59,6 +64,8 @@ export async function GET(request: Request) {
     page: url.searchParams.get('page') ?? undefined,
     pageSize: url.searchParams.get('pageSize') ?? undefined,
     status: url.searchParams.get('status') ?? undefined,
+    from: url.searchParams.get('from') ?? undefined,
+    to: url.searchParams.get('to') ?? undefined,
   });
   if (!parsed.success) {
     return NextResponse.json(
@@ -66,11 +73,24 @@ export async function GET(request: Request) {
       { status: 400 },
     );
   }
-  const { page, pageSize, status } = parsed.data;
+  const { page, pageSize, status, from, to } = parsed.data;
+  if (from && to && from > to) {
+    return NextResponse.json(
+      { error: 'วันที่เริ่มต้นต้องไม่มากกว่าวันที่สิ้นสุด' },
+      { status: 400 },
+    );
+  }
 
   const db = await getDb();
 
-  const where = status ? eq(chatBroadcasts.status, status) : undefined;
+  const fromStart = parseThaiDateStart(from);
+  const toEnd = parseThaiDateEnd(to);
+  const filters = [
+    status ? eq(chatBroadcasts.status, status) : undefined,
+    fromStart ? gte(chatBroadcasts.createdAt, fromStart) : undefined,
+    toEnd ? lte(chatBroadcasts.createdAt, toEnd) : undefined,
+  ].filter((clause) => clause !== undefined);
+  const where = filters.length > 0 ? and(...filters) : undefined;
   const [countRow] = await db.select({ value: count() }).from(chatBroadcasts).where(where);
   const total = countRow?.value ?? 0;
 

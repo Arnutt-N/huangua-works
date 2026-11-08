@@ -50,7 +50,7 @@ export function ThaiDateTimeField({
             const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
             emit(datePart || today, e.target.value);
           }}
-          className="min-h-touch w-full rounded-md border border-border bg-surface-raised px-3 text-sm text-ink sm:w-32"
+          className="h-9 w-full rounded-xl border border-border bg-surface-raised px-3 text-sm text-ink sm:w-32"
         />
       </div>
     </div>

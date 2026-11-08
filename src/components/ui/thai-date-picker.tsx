@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { formatIsoToThaiShort, THAI_MONTHS_FULL } from '@/lib/thai-date';
+import { THAI_MONTHS_FULL } from '@/lib/thai-date';
 
 const WEEKDAYS_TH = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'] as const;
 const POPOVER_WIDTH = 280;
@@ -28,12 +28,8 @@ function parseIsoOrToday(value: string): { year: number; month: number; day: num
     const month = Number(m[2]) - 1;
     const day = Number(m[3]);
     if (month >= 0 && month <= 11 && day >= 1 && day <= 31) {
-      const probe = new Date(Date.UTC(year, month, day));
-      if (
-        probe.getUTCFullYear() === year &&
-        probe.getUTCMonth() === month &&
-        probe.getUTCDate() === day
-      ) {
+      const probe = new Date(year, month, day);
+      if (probe.getFullYear() === year && probe.getMonth() === month && probe.getDate() === day) {
         return { year, month, day };
       }
     }
@@ -48,41 +44,161 @@ function toIsoDate(year: number, monthIndex: number, day: number): string {
   return `${year}-${mm}-${dd}`;
 }
 
+function partsFrom(value: string): { day: string; month: string; year: string } {
+  const parsed = parseIsoOrToday(value);
+  if (parsed.day === null || !value.trim()) return { day: '', month: '', year: '' };
+  return {
+    day: String(parsed.day).padStart(2, '0'),
+    month: String(parsed.month + 1).padStart(2, '0'),
+    year: String(parsed.year + 543),
+  };
+}
+
 export function ThaiDatePicker({
   id,
   label,
   value,
   onChange,
-  placeholder = 'เลือกวันที่',
   disabled = false,
   className,
 }: ThaiDatePickerProps) {
   const generatedId = useId();
-  const triggerId = id ?? generatedId;
+  const dayId = id ?? generatedId;
 
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [fieldError, setFieldError] = useState('');
   const parsed = parseIsoOrToday(value);
   const [viewYear, setViewYear] = useState(parsed.year);
   const [viewMonth, setViewMonth] = useState(parsed.month);
   const [coords, setCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const slotRef = useRef<HTMLButtonElement>(null);
+  const dayRef = useRef<HTMLInputElement>(null);
+  const monthRef = useRef<HTMLInputElement>(null);
+  const yearRef = useRef<HTMLInputElement>(null);
+
+  const hasValue = value.trim() !== '';
+
+  function writeParts(iso: string) {
+    const parts = partsFrom(iso);
+    if (dayRef.current) dayRef.current.value = parts.day;
+    if (monthRef.current) monthRef.current.value = parts.month;
+    if (yearRef.current) yearRef.current.value = parts.year;
+  }
 
   function openCalendar() {
-    if (disabled) return;
+    if (disabled || hasValue) return;
     const target = parseIsoOrToday(value);
     setViewYear(target.year);
     setViewMonth(target.month);
-    setOpen((prev) => !prev);
+    setOpen(true);
   }
 
+  function validateAndUpdate() {
+    const day = dayRef.current?.value ?? '';
+    const month = monthRef.current?.value ?? '';
+    const beYear = yearRef.current?.value ?? '';
+    setFieldError('');
+
+    if (!day && !month && !beYear) {
+      setEditing(false);
+      if (value !== '') onChange('');
+      return;
+    }
+    if (!day || !month || !beYear) return;
+
+    const dayNum = Number.parseInt(day, 10);
+    const monthNum = Number.parseInt(month, 10);
+    const beYearNum = Number.parseInt(beYear, 10);
+
+    if (dayNum < 1 || dayNum > 31) {
+      setFieldError('วันที่ไม่ถูกต้อง (1-31)');
+      return;
+    }
+    if (monthNum < 1 || monthNum > 12) {
+      setFieldError('เดือนไม่ถูกต้อง (1-12)');
+      return;
+    }
+    if (beYearNum < 2400 || beYearNum > 2700) {
+      setFieldError('ปี พ.ศ. ไม่ถูกต้อง (2400-2700)');
+      return;
+    }
+
+    const ceYear = beYearNum - 543;
+    const probe = new Date(ceYear, monthNum - 1, dayNum);
+    if (
+      probe.getFullYear() !== ceYear ||
+      probe.getMonth() !== monthNum - 1 ||
+      probe.getDate() !== dayNum
+    ) {
+      setFieldError('วันที่ไม่มีในเดือนนี้');
+      return;
+    }
+
+    const iso = toIsoDate(ceYear, monthNum - 1, dayNum);
+    setEditing(false);
+    if (iso !== value) onChange(iso);
+  }
+
+  function handleInput(e: FormEvent<HTMLInputElement>, type: 'day' | 'month' | 'year') {
+    setEditing(true);
+    setOpen(false);
+    const el = e.currentTarget;
+    const clean = el.value.replace(/\D/g, '');
+    const maxLen = type === 'year' ? 4 : 2;
+    el.value = clean.slice(0, maxLen);
+
+    if (type === 'day' && clean.length === 2) {
+      monthRef.current?.focus();
+      monthRef.current?.select();
+    } else if (type === 'month' && clean.length === 2) {
+      yearRef.current?.focus();
+      yearRef.current?.select();
+    }
+
+    if (type === 'year' && clean.length === 4) {
+      const dayLen = dayRef.current?.value.length ?? 0;
+      const monthLen = monthRef.current?.value.length ?? 0;
+      if (dayLen >= 1 && monthLen >= 1) {
+        queueMicrotask(() => validateAndUpdate());
+      }
+    }
+  }
+
+  function handleBlur() {
+    window.setTimeout(() => {
+      const active = document.activeElement;
+      if (containerRef.current?.contains(active)) return;
+      if (popoverRef.current?.contains(active)) return;
+      validateAndUpdate();
+    }, 0);
+  }
+
+  function clearValue() {
+    writeParts('');
+    setEditing(false);
+    setFieldError('');
+    setOpen(false);
+    onChange('');
+    dayRef.current?.focus();
+  }
+
+  useEffect(() => {
+    if (editing) return;
+    const parts = partsFrom(value);
+    if (dayRef.current) dayRef.current.value = parts.day;
+    if (monthRef.current) monthRef.current.value = parts.month;
+    if (yearRef.current) yearRef.current.value = parts.year;
+  }, [value, editing]);
+
   useLayoutEffect(() => {
-    if (!open || !triggerRef.current) return;
+    if (!open || !containerRef.current) return;
 
     function updatePosition() {
-      const rect = triggerRef.current?.getBoundingClientRect();
+      const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return;
       const vw = window.innerWidth;
       const vh = window.innerHeight;
@@ -124,7 +240,7 @@ export function ThaiDatePicker({
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         setOpen(false);
-        triggerRef.current?.focus();
+        slotRef.current?.focus();
       }
     }
 
@@ -142,15 +258,21 @@ export function ThaiDatePicker({
     setViewMonth(next.getMonth());
   }
 
-  function handleSelectDay(day: number) {
-    onChange(toIsoDate(viewYear, viewMonth, day));
+  function commitPicked(iso: string) {
+    writeParts(iso);
+    setEditing(false);
+    setFieldError('');
+    onChange(iso);
     setOpen(false);
+  }
+
+  function handleSelectDay(day: number) {
+    commitPicked(toIsoDate(viewYear, viewMonth, day));
   }
 
   function handleSelectToday() {
     const now = new Date();
-    onChange(toIsoDate(now.getFullYear(), now.getMonth(), now.getDate()));
-    setOpen(false);
+    commitPicked(toIsoDate(now.getFullYear(), now.getMonth(), now.getDate()));
   }
 
   const firstWeekday = new Date(viewYear, viewMonth, 1).getDay();
@@ -160,46 +282,99 @@ export function ThaiDatePicker({
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
   ];
 
-  const displayText = formatIsoToThaiShort(value);
+  const initial = partsFrom(value);
+  const fieldClass =
+    'w-8 bg-transparent text-center text-sm text-ink outline-none placeholder:text-muted disabled:cursor-not-allowed';
 
   return (
-    <div
-      ref={containerRef}
-      className={cn(
-        'flex min-h-touch w-full items-center gap-1 rounded-md border border-border bg-surface-raised px-2.5 text-sm text-ink shadow-xs transition-colors duration-fast focus-within:border-accent-strong focus-within:ring-2 focus-within:ring-accent-strong/20 sm:w-52',
-        disabled && 'cursor-not-allowed opacity-60',
-        className,
-      )}
-    >
-      <button
-        ref={triggerRef}
-        id={triggerId}
-        type="button"
-        disabled={disabled}
-        aria-label={label}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        onClick={openCalendar}
-        className="flex min-h-touch min-w-0 flex-1 items-center gap-2 text-left outline-none"
+    <div className={cn('min-w-0', className)}>
+      <div
+        ref={containerRef}
+        className={cn(
+          // § สูง h-9 (36px) ตามช่องวันที่ของ JSK
+          'flex h-9 w-full items-center gap-0.5 rounded-xl border border-border bg-surface-raised px-1.5 text-sm text-ink shadow-xs transition-colors duration-fast focus-within:border-accent-strong focus-within:ring-2 focus-within:ring-accent-strong/20',
+          disabled && 'cursor-not-allowed opacity-60',
+        )}
       >
-        <CalendarIcon className="h-4 w-4 flex-none text-muted" aria-hidden="true" />
-        <span className={cn('truncate', displayText ? 'text-ink' : 'text-muted')}>
-          {displayText || placeholder}
+        <input
+          ref={dayRef}
+          id={dayId}
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          disabled={disabled}
+          placeholder="วว"
+          defaultValue={initial.day}
+          aria-label={label}
+          onInput={(e) => handleInput(e, 'day')}
+          onBlur={handleBlur}
+          className={fieldClass}
+        />
+        <span className="text-muted" aria-hidden="true">
+          /
         </span>
-      </button>
+        <input
+          ref={monthRef}
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          disabled={disabled}
+          placeholder="ดด"
+          defaultValue={initial.month}
+          aria-label={`เดือน ${label}`}
+          onInput={(e) => handleInput(e, 'month')}
+          onBlur={handleBlur}
+          className={fieldClass}
+        />
+        <span className="text-muted" aria-hidden="true">
+          /
+        </span>
+        <input
+          ref={yearRef}
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          disabled={disabled}
+          placeholder="ปปปป"
+          defaultValue={initial.year}
+          aria-label={`ปี พ.ศ. ${label}`}
+          onInput={(e) => handleInput(e, 'year')}
+          onBlur={handleBlur}
+          className="w-14 bg-transparent text-center text-sm text-ink outline-none placeholder:text-muted disabled:cursor-not-allowed"
+        />
 
-      {displayText && !disabled && (
-        <button
-          type="button"
-          aria-label={`ล้าง${label}`}
-          onClick={() => {
-            onChange('');
-            setOpen(false);
-          }}
-          className="flex h-8 w-8 flex-none items-center justify-center rounded-md text-muted transition-colors duration-fast hover:bg-surface-sunken hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
-        >
-          <X className="h-4 w-4" aria-hidden="true" />
-        </button>
+        {/* § ช่องเดียว: ว่างเป็นปุ่มปฏิทิน, มีค่าแล้วเป็นกากบาทวงกลมแดง */}
+        {hasValue ? (
+          <button
+            ref={slotRef}
+            type="button"
+            disabled={disabled}
+            aria-label={`ล้าง${label}`}
+            onClick={clearValue}
+            className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-danger/10 text-danger transition-colors duration-fast hover:bg-danger hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
+          >
+            <X className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        ) : (
+          <button
+            ref={slotRef}
+            type="button"
+            disabled={disabled}
+            aria-label={`เปิดปฏิทิน ${label}`}
+            aria-expanded={open}
+            aria-haspopup="dialog"
+            onClick={openCalendar}
+            className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-muted transition-colors duration-fast hover:bg-surface-sunken hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
+          >
+            <CalendarIcon className="h-4 w-4" aria-hidden="true" />
+          </button>
+        )}
+      </div>
+
+      {fieldError && (
+        <p role="alert" className="mt-1 text-xs font-medium text-danger">
+          {fieldError}
+        </p>
       )}
 
       {open &&

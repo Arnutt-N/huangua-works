@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/admin/empty-state';
 import { Pagination } from '@/components/admin/pagination';
 import { RoleBadge } from '@/components/admin/role-badge';
 import { formatThaiDateTime, parseThaiDateEnd, parseThaiDateStart } from '@/lib/thai-date';
+import { isReversedDateRange } from '@/lib/date-range';
 import { AuditFilterBar } from './audit-filter-bar';
 
 export const metadata: Metadata = { title: 'ประวัติการกระทำ' };
@@ -72,10 +73,11 @@ export default async function AuditPage({
   if (resourceFilter) {
     filters.push(eq(auditLogs.resource, resourceFilter));
   }
-  if (fromStart) {
+  const dateRangeOk = !isReversedDateRange(params.from, params.to);
+  if (dateRangeOk && fromStart) {
     filters.push(gte(auditLogs.createdAt, fromStart));
   }
-  if (toEnd) {
+  if (dateRangeOk && toEnd) {
     filters.push(lte(auditLogs.createdAt, toEnd));
   }
   if (q) {

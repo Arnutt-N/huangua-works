@@ -377,7 +377,7 @@ export function BroadcastWizardClient() {
                 value={scheduleTime}
                 onChange={(e) => setScheduleTime(e.target.value)}
                 disabled={!scheduleDate}
-                className="min-h-touch w-full rounded-md border border-border bg-surface-raised px-4 text-ink disabled:opacity-50"
+                className="h-9 w-full rounded-xl border border-border bg-surface-raised px-4 text-ink disabled:opacity-50"
               />
             </div>
             <FieldHint>ระบบตรวจคิวทุก 30 นาที ประกาศอาจออกช้ากว่าเวลาที่ตั้ง</FieldHint>
