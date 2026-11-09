@@ -20,10 +20,12 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   output: 'standalone',
-  // § Next 16.3 ขึ้นไป `next dev` เขียนบล็อก `nextjs-agent-rules` ต่อท้าย AGENTS.md ทุกครั้งที่รัน
-  // (เป็น tracked file ที่เราดูแลเอง และเป็นแหล่งกติกาเดียวของทุก agent) — ปิดไว้กันไฟล์
-  // เปลี่ยนเองแล้วถูก commit ติดไปกับงานอื่น ถ้าต้องการให้ agent อ่านคู่มือที่ bundle มากับ next
-  // (node_modules/next/dist/docs/) ให้ลบบรรทัดนี้แล้ว commit บล็อกที่ถูกสร้างขึ้นมาแทน
+  // § Next 16.4 เปลี่ยน agentRules: false จาก "ไม่เขียนบล็อก" เป็น "ลบบล็อก"
+  // next dev เรียก removeAgentRulesFiles ก่อนตรวจว่ามี agent หรือไม่
+  // (node_modules/next/dist/server/lib/app-info-log.js)
+  // บล็อก nextjs-agent-rules จึงต้องไม่อยู่ใน AGENTS.md ที่ commit
+  // ไม่งั้น dev และ e2e (playwright รัน next dev) จะทำให้ไฟล์สกปรกทุกครั้ง
+  // ถ้าต้องการให้ next เขียนบล็อกกลับมา ให้ลบคีย์นี้
   agentRules: false,
   // productionBrowserSourceMaps: false (default) — ไม่รั่ว source map สู่ client
   experimental: {
