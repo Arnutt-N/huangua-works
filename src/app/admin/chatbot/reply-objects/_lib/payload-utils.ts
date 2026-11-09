@@ -1,5 +1,7 @@
-export const FIELD_CLS =
-  'w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong';
+import { fieldControlClass } from '@/components/ui/control-styles';
+
+/** ช่องกรอกในตัวแก้ไข reply object — ใช้มาตรวัดเดียวกับ Input */
+export const FIELD_CLS = fieldControlClass;
 
 export const LABEL_CLS = 'text-xs font-semibold uppercase tracking-wide text-muted';
 

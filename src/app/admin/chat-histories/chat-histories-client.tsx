@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Download, History, RefreshCw, Search, ArrowUp } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { IconButton } from '@/components/ui/icon-button';
+import { Input } from '@/components/ui/field';
 import { AdminCard } from '@/components/admin/admin-card';
 import { DatePresetFilter } from '@/components/admin/date-preset-filter';
 import { STANDARD_DATE_PRESETS, isReversedDateRange, presetOptionToDates } from '@/lib/date-range';
@@ -203,34 +205,20 @@ export function ChatHistoriesClient() {
   return (
     <div className="space-y-4">
       <PageHeader title="ประวัติแชท" subtitle="ประวัติการสนทนาทั้งหมด">
-        <button
-          type="button"
-          onClick={() => void load()}
-          aria-label="รีเฟรช"
-          className="inline-flex min-h-touch min-w-touch items-center justify-center rounded-md border border-border bg-surface text-muted hover:bg-accent-sunken hover:text-ink"
-        >
+        <IconButton onClick={() => void load()} aria-label="รีเฟรช" className="border border-border bg-surface">
           <RefreshCw className="h-4 w-4" aria-hidden="true" />
-        </button>
+        </IconButton>
       </PageHeader>
 
       <AdminCard>
-        <div className="relative">
-          <Search
-            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
-            aria-hidden="true"
-          />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => handleQueryChange(e.target.value)}
-            placeholder="ค้นหาข้อความในสนทนา..."
-            aria-label="ค้นหาประวัติการสนทนา"
-            className={cn(
-              'w-full rounded-md border border-border bg-surface py-2 pl-10 pr-3 text-sm text-ink placeholder:text-muted',
-              'focus:border-accent/40 focus:outline-none focus-visible:ring focus-visible:ring-accent/40',
-            )}
-          />
-        </div>
+        <Input
+          type="search"
+          icon={Search}
+          value={query}
+          onChange={(e) => handleQueryChange(e.target.value)}
+          placeholder="ค้นหาข้อความในสนทนา..."
+          aria-label="ค้นหาประวัติการสนทนา"
+        />
 
         <div className="mt-3 border-t border-border pt-3">
           <DatePresetFilter
@@ -412,24 +400,22 @@ export function ChatHistoriesClient() {
               {visible.length} สนทนา (หน้า {page + 1}/{totalPages})
             </span>
             <span className="flex gap-1">
-              <button
-                type="button"
+              <IconButton
                 disabled={page <= 0}
                 onClick={() => setPage((p) => Math.max(0, p - 1))}
                 aria-label="หน้าก่อนหน้า"
-                className="inline-flex min-h-touch min-w-touch items-center justify-center rounded-md border border-border px-2 text-xs disabled:opacity-50"
+                className="border border-border text-base"
               >
                 ←
-              </button>
-              <button
-                type="button"
+              </IconButton>
+              <IconButton
                 disabled={page >= totalPages - 1}
                 onClick={() => setPage((p) => p + 1)}
                 aria-label="หน้าถัดไป"
-                className="inline-flex min-h-touch min-w-touch items-center justify-center rounded-md border border-border px-2 text-xs disabled:opacity-50"
+                className="border border-border text-base"
               >
                 →
-              </button>
+              </IconButton>
             </span>
           </div>
         )}

@@ -9,6 +9,9 @@ import { readinessOf } from '../readiness';
 import { useResource } from '@/app/admin/_lib/use-resource';
 import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/field';
+import { IconButton } from '@/components/ui/icon-button';
+import { SelectField } from '@/components/ui/select';
 import { useConfirm } from '@/components/admin/use-confirm';
 import { AdminErrorState } from '@/components/admin/admin-error-state';
 
@@ -251,28 +254,27 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
                 setNameDraft(item.name);
                 setDescDraft(item.description ?? '');
               }}
-              className="gap-1 text-xs"
+              size="sm"
+              className="gap-1"
             >
               <Pencil className="h-3.5 w-3.5" /> แก้ไข
             </Button>
           </div>
         ) : (
           <div className="space-y-2 rounded-lg border border-border p-3">
-            <input
+            <Input
               aria-label="ชื่อหมวด"
               value={nameDraft}
               onChange={(e) => setNameDraft(e.target.value)}
-              className="min-h-touch w-full rounded-md border border-border bg-surface-raised px-3 text-sm text-ink"
             />
-            <input
+            <Input
               aria-label="คำอธิบาย"
               value={descDraft ?? ''}
               onChange={(e) => setDescDraft(e.target.value)}
               placeholder="คำอธิบาย (เว้นว่างได้)"
-              className="min-h-touch w-full rounded-md border border-border bg-surface-raised px-3 text-sm text-ink"
             />
-            <div className="flex gap-2">
-              <Button disabled={mutating} onClick={() => void saveMeta()} className="text-xs">บันทึก</Button>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" disabled={mutating} onClick={() => void saveMeta()}>บันทึก</Button>
               <Button disabled={mutating} variant="ghost" onClick={() => { setNameDraft(null); setDescDraft(null); }}>
                 ยกเลิก
               </Button>
@@ -287,7 +289,7 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
           role="tab"
           aria-selected={activeTab === 'keywords'}
           onClick={() => setActiveTab('keywords')}
-          className={`min-h-touch rounded-lg px-4 text-sm font-semibold ${activeTab === 'keywords' ? 'bg-accent-strong text-on-accent' : 'border border-border text-muted'}`}
+          className={`min-h-touch whitespace-nowrap rounded-md px-4 text-sm font-semibold leading-snug ${activeTab === 'keywords' ? 'bg-accent-strong text-on-accent' : 'border border-border text-muted'}`}
         >
           Keywords ({item.keywords.length})
         </button>
@@ -296,7 +298,7 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
           role="tab"
           aria-selected={activeTab === 'responses'}
           onClick={() => setActiveTab('responses')}
-          className={`min-h-touch rounded-lg px-4 text-sm font-semibold ${activeTab === 'responses' ? 'bg-accent-strong text-on-accent' : 'border border-border text-muted'}`}
+          className={`min-h-touch whitespace-nowrap rounded-md px-4 text-sm font-semibold leading-snug ${activeTab === 'responses' ? 'bg-accent-strong text-on-accent' : 'border border-border text-muted'}`}
         >
           คำตอบ ({item.responses.length})
         </button>
@@ -315,15 +317,14 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
                     <span className="text-sm font-medium text-ink">{kw.keyword}</span>
                     <span className="ml-2 rounded bg-accent-sunken px-1.5 py-0.5 text-xs text-accent-strong">{MATCH_LABELS[kw.matchType]}</span>
                   </span>
-                  <button
-                    type="button"
+                  <IconButton
+                    intent="danger"
                     disabled={mutating}
                     onClick={() => handleDeleteKeyword(kw.id)}
-                    className="flex min-h-touch min-w-touch items-center justify-center rounded-md hover:bg-danger/10 disabled:opacity-50"
                     aria-label={`ลบ keyword ${kw.keyword}`}
                   >
-                    <Trash2 className="h-4 w-4 text-danger" />
-                  </button>
+                    <Trash2 className="h-4 w-4" />
+                  </IconButton>
                 </li>
               ))}
             </ul>
@@ -331,31 +332,29 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
           <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-border/50 pt-3">
             <div className="min-w-40 flex-1">
               <label htmlFor="add-keyword" className="text-xs text-muted">keyword ใหม่</label>
-              <input
+              <Input
                 id="add-keyword"
                 aria-label="keyword ใหม่"
                 value={newKeyword}
                 onChange={(e) => setNewKeyword(e.target.value)}
                 placeholder="เช่น กี่โมง"
-                className="min-h-touch w-full rounded-md border border-border bg-surface-raised px-3 text-sm text-ink"
               />
             </div>
             <div>
               <label htmlFor="add-match" className="text-xs text-muted">วิธีจับคู่</label>
-              <select
+              <SelectField
                 id="add-match"
-                aria-label="วิธีจับคู่ keyword"
+                ariaLabel="วิธีจับคู่ keyword"
                 value={newMatchType}
-                onChange={(e) => setNewMatchType(e.target.value as IntentMatchType)}
-                className="min-h-touch rounded-md border border-border bg-surface-raised px-2 text-sm text-ink"
-              >
-                <option value="exact">ตรงทั้งหมด</option>
-                <option value="starts_with">ขึ้นต้น</option>
-                <option value="contains">มีคำนี้</option>
-                <option value="regex">regex</option>
-              </select>
+                onValueChange={(next) => setNewMatchType(next as IntentMatchType)}
+                options={(Object.keys(MATCH_LABELS) as IntentMatchType[]).map((key) => ({
+                  value: key,
+                  label: MATCH_LABELS[key],
+                }))}
+                className="w-40"
+              />
             </div>
-            <Button disabled={mutating} onClick={() => void addKeyword()} className="gap-1 text-xs">
+            <Button size="sm" disabled={mutating} onClick={() => void addKeyword()} className="gap-1">
               <Plus className="h-3.5 w-3.5" /> เพิ่ม
             </Button>
           </div>
@@ -377,15 +376,14 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
                     )}
                     <span className="text-xs text-muted">{r.replyType === 'text' ? 'ข้อความ' : 'reply object'}</span>
                   </span>
-                  <button
-                    type="button"
+                  <IconButton
+                    intent="danger"
                     disabled={mutating}
                     onClick={() => handleDeleteResponse(r.id)}
-                    className="flex min-h-touch min-w-touch items-center justify-center rounded-md hover:bg-danger/10 disabled:opacity-50"
                     aria-label="ลบคำตอบนี้"
                   >
-                    <Trash2 className="h-4 w-4 text-danger" />
-                  </button>
+                    <Trash2 className="h-4 w-4" />
+                  </IconButton>
                 </li>
               ))}
             </ul>
@@ -393,29 +391,29 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
           <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-border/50 pt-3">
             <div className="min-w-40 flex-1">
               <label htmlFor="add-response" className="text-xs text-muted">คำตอบใหม่</label>
-              <input
+              <Input
                 id="add-response"
                 aria-label="คำตอบใหม่"
                 value={newResponseText}
                 onChange={(e) => setNewResponseText(e.target.value)}
                 placeholder={newReplyType === 'text' ? 'ข้อความตอบกลับ' : 'reply object id เช่น rpl_xxx'}
-                className="min-h-touch w-full rounded-md border border-border bg-surface-raised px-3 text-sm text-ink"
               />
             </div>
             <div>
               <label htmlFor="add-reply-type" className="text-xs text-muted">ประเภท</label>
-              <select
+              <SelectField
                 id="add-reply-type"
-                aria-label="ประเภทคำตอบ"
+                ariaLabel="ประเภทคำตอบ"
                 value={newReplyType}
-                onChange={(e) => setNewReplyType(e.target.value as 'text' | 'reply_object')}
-                className="min-h-touch rounded-md border border-border bg-surface-raised px-2 text-sm text-ink"
-              >
-                <option value="text">ข้อความ</option>
-                <option value="reply_object">reply object</option>
-              </select>
+                onValueChange={(next) => setNewReplyType(next as 'text' | 'reply_object')}
+                options={[
+                  { value: 'text', label: 'ข้อความ' },
+                  { value: 'reply_object', label: 'reply object' },
+                ]}
+                className="w-44"
+              />
             </div>
-            <Button disabled={mutating} onClick={() => void addResponse()} className="gap-1 text-xs">
+            <Button size="sm" disabled={mutating} onClick={() => void addResponse()} className="gap-1">
               <Plus className="h-3.5 w-3.5" /> เพิ่ม
             </Button>
           </div>

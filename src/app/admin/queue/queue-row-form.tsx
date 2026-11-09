@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/field';
 import { updateQueueBooking, type QueueActionState } from '@/app/admin/actions/queue';
 import {
   Select,
@@ -62,7 +63,7 @@ export function QueueRowForm({
         </Select>
       </div>
 
-      <input
+      <Input
         id={`queue-note-${bookingId}`}
         name="adminNote"
         type="text"
@@ -70,9 +71,8 @@ export function QueueRowForm({
         defaultValue={currentNote ?? ''}
         placeholder={status === 'cancelled' ? 'ระบุเหตุผลการยกเลิก' : 'โน้ตภายใน (ถ้ามี)'}
         maxLength={500}
-        className={`min-h-touch w-full rounded-md border bg-surface-raised px-3 text-sm text-ink placeholder:text-muted sm:w-48 ${
-          status === 'cancelled' ? 'border-danger-ink/40' : 'border-border'
-        }`}
+        invalid={status === 'cancelled'}
+        className="sm:w-48"
       />
 
       <Button

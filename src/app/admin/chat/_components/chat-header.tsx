@@ -11,6 +11,8 @@ import {
   UserRound,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { MODE_LABELS } from '../_lib/labels';
 import { LineAvatar } from './line-avatar';
 
@@ -39,17 +41,16 @@ export function ChatHeader({
   const isHuman = mode === 'human_active';
 
   return (
-    <header className="h-14 flex-none border-b border-border bg-surface-raised/80 px-4 backdrop-blur-sm">
-      <div className="flex h-full items-center justify-between gap-3">
+    <header className="min-h-14 flex-none border-b border-border bg-surface-raised/80 px-3 py-2 backdrop-blur-sm sm:px-4">
+      <div className="flex min-h-10 flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-3">
-          <button
-            type="button"
+          <IconButton
             onClick={onBack}
             aria-label="กลับไปรายการสนทนา"
-            className="inline-flex flex-none items-center justify-center rounded-md border border-border p-2 text-muted transition-colors duration-normal ease-out-expo hover:bg-surface-sunken hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong md:hidden"
+            className="border border-border md:hidden"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          </button>
+          </IconButton>
 
           <LineAvatar
             src={customerPicture}
@@ -74,7 +75,7 @@ export function ChatHeader({
           </div>
         </div>
 
-        <div className="flex flex-none items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* สลับผู้ตอบ - บอท / เจ้าหน้าที่ (แทนปุ่ม "รับเรื่อง" เดิม เรียก handler เดียวกัน) */}
           {mode !== 'resolved' && (
             <div className="hidden items-center gap-0.5 rounded-pill bg-surface-sunken p-1 md:flex">
@@ -83,7 +84,7 @@ export function ChatHeader({
                 onClick={() => onModeChange('bot_active')}
                 aria-pressed={isBot}
                 className={cn(
-                  'inline-flex items-center gap-1 rounded-pill px-3 py-1.5 text-xs font-bold',
+                  'inline-flex min-h-touch items-center gap-1.5 whitespace-nowrap rounded-pill px-3 text-sm font-semibold leading-none',
                   'transition-colors duration-normal ease-out-expo',
                   isBot
                     ? 'bg-accent-gradient text-on-accent shadow-sm'
@@ -98,7 +99,7 @@ export function ChatHeader({
                 onClick={() => onModeChange('human_active')}
                 aria-pressed={isHuman}
                 className={cn(
-                  'inline-flex items-center gap-1 rounded-pill px-3 py-1.5 text-xs font-bold',
+                  'inline-flex min-h-touch items-center gap-1.5 whitespace-nowrap rounded-pill px-3 text-sm font-semibold leading-none',
                   'transition-colors duration-normal ease-out-expo',
                   isHuman
                     ? 'bg-accent-gradient text-on-accent shadow-sm'
@@ -114,44 +115,26 @@ export function ChatHeader({
           {isHuman && (
             <>
               <span className="hidden h-6 w-px bg-border sm:block" aria-hidden="true" />
-              <button
-                type="button"
-                onClick={onTransfer}
-                title="โอนแชทให้เจ้าหน้าที่ท่านอื่น"
-                className="inline-flex items-center gap-1 rounded-md border border-border-strong px-2.5 py-1.5 text-xs font-bold text-ink transition-colors duration-normal ease-out-expo hover:bg-accent-sunken focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
-              >
-                <ArrowRightLeft className="h-3.5 w-3.5" aria-hidden="true" />
+              <Button type="button" variant="outline" size="sm" onClick={onTransfer} title="โอนแชทให้เจ้าหน้าที่ท่านอื่น">
+                <ArrowRightLeft className="h-4 w-4" aria-hidden="true" />
                 โอนแชท
-              </button>
-              <button
-                type="button"
-                onClick={() => onModeChange('bot_active')}
-                title="คืนห้องให้ทีม/บอทดูแลต่อ (เลิกถือห้อง)"
-                className="inline-flex items-center gap-1 rounded-md border border-border-strong px-2.5 py-1.5 text-xs font-bold text-ink transition-colors duration-normal ease-out-expo hover:bg-accent-sunken focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
-              >
-                <Bot className="h-3.5 w-3.5" aria-hidden="true" />
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => onModeChange('bot_active')} title="คืนห้องให้ทีม/บอทดูแลต่อ (เลิกถือห้อง)">
+                <Bot className="h-4 w-4" aria-hidden="true" />
                 คืนให้ทีม
-              </button>
-              <button
-                type="button"
-                onClick={() => onModeChange('resolved')}
-                className="inline-flex items-center gap-1 rounded-md border border-border-strong px-2.5 py-1.5 text-xs font-bold text-accent-strong transition-colors duration-normal ease-out-expo hover:bg-accent-sunken focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
-              >
-                <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => onModeChange('resolved')}>
+                <CheckCircle className="h-4 w-4" aria-hidden="true" />
                 ปิดเรื่อง
-              </button>
+              </Button>
             </>
           )}
 
           {mode === 'resolved' && (
-            <button
-              type="button"
-              onClick={() => onModeChange('bot_active')}
-              className="inline-flex items-center gap-1 rounded-md border border-border-strong px-2.5 py-1.5 text-xs font-bold text-ink transition-colors duration-normal ease-out-expo hover:bg-accent-sunken focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
-            >
-              <Bot className="h-3.5 w-3.5" aria-hidden="true" />
+            <Button type="button" variant="outline" size="sm" onClick={() => onModeChange('bot_active')}>
+              <Bot className="h-4 w-4" aria-hidden="true" />
               คืนให้ Bot
-            </button>
+            </Button>
           )}
 
           {/* toggle panel - desktop พับ/กาง aside, mobile เปิดเป็น dialog */}
@@ -161,7 +144,7 @@ export function ChatHeader({
             aria-label={panelOpen ? 'ซ่อนข้อมูลลูกค้า' : 'แสดงข้อมูลลูกค้า'}
             aria-pressed={panelOpen}
             className={cn(
-              'hidden items-center justify-center rounded-md border p-2 md:inline-flex',
+              'hidden min-h-touch min-w-touch items-center justify-center rounded-md border md:inline-flex',
               'transition-colors duration-normal ease-out-expo',
               'focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong',
               panelOpen
@@ -179,7 +162,7 @@ export function ChatHeader({
             type="button"
             onClick={onOpenPanelMobile}
             aria-label="แสดงข้อมูลลูกค้า"
-            className="inline-flex items-center justify-center rounded-md border border-border p-2 text-muted transition-colors duration-normal ease-out-expo hover:bg-surface-sunken hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong md:hidden"
+            className="inline-flex min-h-touch min-w-touch items-center justify-center rounded-md border border-border text-muted transition-colors duration-normal ease-out-expo hover:bg-surface-sunken hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong md:hidden"
           >
             <ChevronLeft className="h-4 w-4" aria-hidden="true" />
           </button>

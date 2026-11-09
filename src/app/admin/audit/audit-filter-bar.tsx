@@ -123,22 +123,18 @@ export function AuditFilterBar({ actions }: AuditFilterBarProps) {
       aria-label="ตัวกรองประวัติ"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
-          <div className="relative">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="min-w-0 sm:col-span-2 xl:col-span-1">
             <Label htmlFor="aq" className="sr-only">
               ค้นหา
             </Label>
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
-              aria-hidden="true"
-            />
             <Input
               id="aq"
               type="search"
+              icon={Search}
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="ค้นหาชื่อ / อีเมล / IP / resource id"
-              className="pl-10"
             />
           </div>
 
@@ -151,7 +147,7 @@ export function AuditFilterBar({ actions }: AuditFilterBarProps) {
               value={currentAction}
               onValueChange={(v) => updateFilter('action', v)}
             >
-              <SelectTrigger id="af-action" className="min-w-[180px]">
+              <SelectTrigger id="af-action" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -174,7 +170,7 @@ export function AuditFilterBar({ actions }: AuditFilterBarProps) {
               value={currentResource}
               onValueChange={(v) => updateFilter('resource', v)}
             >
-              <SelectTrigger id="af-resource" className="min-w-[160px]">
+              <SelectTrigger id="af-resource" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -201,7 +197,7 @@ export function AuditFilterBar({ actions }: AuditFilterBarProps) {
           disabled={isPending}
         />
 
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="flex items-center gap-1.5 text-xs text-muted">
             <Filter className="h-3.5 w-3.5" aria-hidden="true" />
             {hasActiveFilter ? 'กำลังใช้ตัวกรอง' : 'ไม่มีตัวกรอง'}

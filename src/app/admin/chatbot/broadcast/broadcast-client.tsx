@@ -31,7 +31,8 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { FieldHint, Label, Textarea } from '@/components/ui/field';
+import { FieldHint, Input, Label, Textarea } from '@/components/ui/field';
+import { SelectField } from '@/components/ui/select';
 
 /**
  * รอบการตรวจคิวส่งประกาศ (นาที) - ต้องตรงกับ schedule ที่ตั้งไว้ใน cron-job.org
@@ -217,7 +218,7 @@ export function BroadcastClient() {
       <PageHeader title="ส่งข้อความแบบกระจาย" subtitle="สร้างและจัดการข้อความ Broadcast ถึงผู้ติดตาม LINE OA">
         <Link
           href="/admin/chatbot/broadcast/new"
-          className="inline-flex min-h-touch items-center gap-1.5 rounded-md bg-accent-strong px-4 text-sm font-semibold text-on-accent"
+          className="inline-flex min-h-touch items-center gap-1.5 whitespace-nowrap rounded-md bg-accent-strong px-4 text-sm font-semibold leading-snug text-on-accent"
         >
           <Plus className="h-4 w-4" /> สร้างข้อความ
         </Link>
@@ -225,23 +226,24 @@ export function BroadcastClient() {
 
       <AdminCard>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <select
-            aria-label="กรองสถานะ"
+          <SelectField
+            ariaLabel="กรองสถานะ"
             value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
+            onValueChange={(next) => {
+              setStatusFilter(next);
               setPage(0);
             }}
-            className="min-h-touch w-full rounded-md border border-border bg-surface-raised px-4 text-ink sm:w-64"
-          >
-            <option value="">ทุกสถานะ</option>
-            <option value="draft">ร่าง</option>
-            <option value="scheduled">รอส่ง</option>
-            <option value="sending">กำลังส่ง</option>
-            <option value="sent">ส่งแล้ว</option>
-            <option value="failed">ล้มเหลว</option>
-            <option value="cancelled">ยกเลิก</option>
-          </select>
+            options={[
+              { value: '', label: 'ทุกสถานะ' },
+              { value: 'draft', label: 'ร่าง' },
+              { value: 'scheduled', label: 'รอส่ง' },
+              { value: 'sending', label: 'กำลังส่ง' },
+              { value: 'sent', label: 'ส่งแล้ว' },
+              { value: 'failed', label: 'ล้มเหลว' },
+              { value: 'cancelled', label: 'ยกเลิก' },
+            ]}
+            className="w-full sm:w-64"
+          />
           <Button onClick={openDialog} variant="outline" className="min-h-touch gap-1.5">
             <Plus className="h-4 w-4" /> สร้างด่วน
           </Button>
@@ -443,7 +445,7 @@ export function BroadcastClient() {
           </p>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setCancelTarget(null)}>กลับ</Button>
-            <Button onClick={() => void handleCancel()} disabled={actionSaving} className="bg-danger text-on-accent hover:bg-danger/90">
+            <Button variant="destructive" onClick={() => void handleCancel()} disabled={actionSaving}>
               {actionSaving ? 'กำลังยกเลิก...' : 'ยืนยันยกเลิก'}
             </Button>
           </DialogFooter>
@@ -458,14 +460,13 @@ export function BroadcastClient() {
           <div className="space-y-4 py-2">
             <div>
               <Label htmlFor="bc-title">ชื่อแคมเปญ</Label>
-              <input
+              <Input
                 id="bc-title"
                 aria-label="ชื่อแคมเปญ"
                 maxLength={100}
                 value={quickTitle}
                 onChange={(e) => setQuickTitle(e.target.value)}
                 placeholder="เช่น ประกาศปิดทำการวันที่ 12 ส.ค."
-                className="min-h-touch w-full rounded-md border border-border bg-surface-raised px-4 text-ink"
               />
             </div>
             <div>
@@ -511,14 +512,13 @@ export function BroadcastClient() {
             </div>
             <div>
               <Label htmlFor="bc-schedule">ตั้งเวลาส่ง (เว้นว่าง = สร้างเป็นร่าง)</Label>
-              <input
+              <Input
                 aria-label="ตั้งเวลาส่ง (เว้นว่าง = สร้างเป็นร่าง)"
                 id="bc-schedule"
                 type="datetime-local"
                 value={scheduleAt}
                 onChange={(e) => setScheduleAt(e.target.value)}
                 aria-describedby="bc-schedule-hint"
-                className="min-h-touch w-full rounded-md border border-border bg-surface-raised px-4 text-ink"
               />
               <FieldHint id="bc-schedule-hint">
                 ระบบตรวจคิวทุก {SEND_WINDOW_MINUTES} นาที ประกาศจึงอาจออกช้ากว่าเวลาที่ตั้งได้ถึง{' '}

@@ -4,24 +4,22 @@ import { Label as LabelPrimitive } from '@radix-ui/react-label';
 import type { LucideIcon } from 'lucide-react';
 import { forwardRef, type InputHTMLAttributes, type LabelHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 import { cn } from '../../lib/cn';
+import { fieldChrome, fieldPad, fieldPadEndGlyph, fieldPadIcon } from './control-styles';
 
 /**
  * Field primitives (DESIGN.md §5 Inputs/Fields)
  * - label ข้างบน field (ไม่ใช่ placeholder แทน label)
- * - 1px hairline border + 10px radius + surface-raised bg
+ * - 1px hairline border + 12px radius + surface-raised bg
  * - focus = border accent-strong + ring 3px indigo 35%
  * - error = border danger + danger-soft พื้น
  * - touch ≥44px บังคับ
+ * - leading-snug กันตัวอักษร 17px ของ body (line-height 1.6) ดันกล่องจนอึดอัด
  */
 
-const fieldBase =
-  'min-h-touch w-full rounded-md border bg-surface-raised px-4 text-ink placeholder:text-muted ' +
-  'transition-colors duration-normal ease-out-expo ' +
-  'focus:outline-none focus:border-accent-strong focus-visible:ring focus-visible:ring-accent-strong/35 ' +
-  'disabled:opacity-50 motion-reduce:transition-none';
+const END_GLYPH_TYPES = new Set(['time', 'date', 'datetime-local', 'month', 'week']);
 
 const fieldState = {
-  ok: 'border-border',
+  ok: 'border-border focus:border-accent-strong',
   error: 'border-danger bg-danger-soft/40 focus:border-danger focus-visible:ring-danger/35',
 };
 
@@ -32,12 +30,19 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, invalid = false, icon: Icon, ...props }, ref) => {
+  ({ className, invalid = false, icon: Icon, type, ...props }, ref) => {
+    const endGlyph = typeof type === 'string' && END_GLYPH_TYPES.has(type);
     const input = (
       <input
         ref={ref}
+        type={type}
         aria-invalid={invalid || undefined}
-        className={cn(fieldBase, invalid ? fieldState.error : fieldState.ok, Icon && 'pl-11', className)}
+        className={cn(
+          fieldChrome,
+          Icon ? fieldPadIcon : endGlyph ? fieldPadEndGlyph : fieldPad,
+          invalid ? fieldState.error : fieldState.ok,
+          className,
+        )}
         {...props}
       />
     );
@@ -65,7 +70,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
       ref={ref}
       rows={rows}
       aria-invalid={invalid || undefined}
-      className={cn(fieldBase, 'py-3 resize-y', invalid ? fieldState.error : fieldState.ok, className)}
+      className={cn(fieldChrome, fieldPad, 'py-3 resize-y', invalid ? fieldState.error : fieldState.ok, className)}
       {...props}
     />
   ),

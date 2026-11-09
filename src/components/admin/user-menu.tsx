@@ -67,7 +67,7 @@ export function UserMenu({
       <DropdownMenu>
         <DropdownMenuTrigger
           aria-label="เมนูผู้ใช้"
-          className="flex flex-none items-center gap-2 rounded-pill p-1 pr-2 outline-none transition-colors duration-fast hover:bg-accent-sunken focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong data-[state=open]:bg-accent-sunken"
+          className="flex flex-none items-center gap-2.5 rounded-pill py-1 pl-1.5 pr-3.5 outline-none transition-colors duration-fast hover:bg-accent-sunken focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong data-[state=open]:bg-accent-sunken"
         >
           <span className="hidden text-right sm:block">
             <span className="block max-w-[12rem] truncate text-sm font-semibold text-ink">

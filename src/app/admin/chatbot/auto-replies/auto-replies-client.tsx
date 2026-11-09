@@ -123,14 +123,13 @@ export function AutoRepliesClient() {
           รายการ FAQ ({total})
         </AdminCardTitle>
 
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-          <input
+        <div className="mb-4">
+          <Input
             type="search"
+            icon={Search}
             placeholder="ค้นหาคำถามหรือคำตอบ..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="min-h-touch w-full rounded-lg border border-border bg-surface pl-10 pr-4 text-base outline-none focus:ring-2 focus:ring-accent/40"
             aria-label="ค้นหา FAQ"
           />
         </div>

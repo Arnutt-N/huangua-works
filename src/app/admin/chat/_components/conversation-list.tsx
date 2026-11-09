@@ -2,6 +2,7 @@
 
 import { ArrowDownWideNarrow, Inbox, PanelLeftClose, Search } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { Input } from '@/components/ui/field';
 import type { ConversationFilter, ConversationSort } from '../_hooks/use-conversations';
 import type { Conversation, MessageSearchResult } from '../_lib/types';
 import { ConversationItem } from './conversation-item';
@@ -111,26 +112,16 @@ export function ConversationList({
               <PanelLeftClose className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
-          <div className="relative">
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
-              aria-hidden="true"
-            />
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="ค้นหาชื่อหรือข้อความ..."
-              aria-label="ค้นหาการสนทนา"
-              className={cn(
-                'w-full rounded-md border border-border bg-surface py-2 pl-10 pr-3 text-sm text-ink placeholder:text-muted',
-                'transition-colors duration-normal ease-out-expo',
-                'focus:border-accent/40 focus:outline-none focus-visible:ring focus-visible:ring-accent/40',
-              )}
-            />
-          </div>
+          <Input
+            type="search"
+            icon={Search}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="ค้นหาชื่อหรือข้อความ..."
+            aria-label="ค้นหาการสนทนา"
+          />
 
-          <div className="flex items-center gap-1.5" role="group" aria-label="กรองการสนทนา">
+          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="กรองการสนทนา">
             {FILTER_CHIPS.map((chip) => {
               const count =
                 chip.key === 'all'
@@ -146,7 +137,7 @@ export function ConversationList({
                   onClick={() => setFilter(chip.key)}
                   aria-pressed={active}
                   className={cn(
-                    'inline-flex flex-1 items-center justify-center gap-1 rounded-md px-2 py-1.5 text-xs font-semibold',
+                    'inline-flex min-h-touch shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 text-sm font-semibold leading-none',
                     'transition-colors duration-normal ease-out-expo',
                     active
                       ? 'bg-accent-gradient text-on-accent shadow-lg'
@@ -176,7 +167,7 @@ export function ConversationList({
                   : 'รอนานสุดก่อน - กดเพื่อสลับเป็นล่าสุด'
               }
               className={cn(
-                'inline-flex flex-none items-center justify-center rounded-md px-2 py-1.5',
+                'inline-flex min-h-touch min-w-touch shrink-0 items-center justify-center rounded-md',
                 'transition-colors duration-normal ease-out-expo',
                 sort === 'oldest'
                   ? 'bg-accent-gradient text-on-accent shadow-lg'

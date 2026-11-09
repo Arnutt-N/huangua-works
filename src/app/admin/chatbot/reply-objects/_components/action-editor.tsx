@@ -3,6 +3,8 @@
 import { useId } from 'react';
 import { Trash2 } from 'lucide-react';
 import { isAllowedActionUri, URI_SCHEME_ERROR_TH } from '@/lib/contracts';
+import { IconButton } from '@/components/ui/icon-button';
+import { SelectField } from '@/components/ui/select';
 import { FIELD_CLS, type LineAction } from '../_lib/payload-utils';
 
 const ACTION_TYPES = ['message', 'uri', 'postback'] as const;
@@ -27,35 +29,27 @@ export function ActionEditor({
 
   return (
     <div className="space-y-2 rounded-lg border border-border/60 bg-surface p-3">
-      <div className="flex items-center gap-2">
-        <input
-          className={FIELD_CLS}
-          aria-label="ป้ายปุ่ม (label)"
-          placeholder="ป้ายปุ่ม (label)"
-          value={action.label ?? ''}
-          onChange={(e) => set({ label: e.target.value })}
-        />
-        <select
-          className={`${FIELD_CLS} w-28 shrink-0`}
-          aria-label="ชนิด action"
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="min-w-48 flex-1">
+          <input
+            className={FIELD_CLS}
+            aria-label="ป้ายปุ่ม (label)"
+            placeholder="ป้ายปุ่ม (label)"
+            value={action.label ?? ''}
+            onChange={(e) => set({ label: e.target.value })}
+          />
+        </span>
+        <SelectField
+          ariaLabel="ชนิด action"
           value={type}
-          onChange={(e) => set({ type: e.target.value })}
-        >
-          {ACTION_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
+          onValueChange={(next) => set({ type: next })}
+          options={ACTION_TYPES.map((t) => ({ value: t, label: t }))}
+          className="w-40 shrink-0"
+        />
         {onRemove && (
-          <button
-            type="button"
-            onClick={onRemove}
-            aria-label={removeLabel ?? 'ลบ action'}
-            className="shrink-0 rounded-lg p-2 text-danger transition-colors hover:bg-danger-soft"
-          >
+          <IconButton type="button" intent="danger" onClick={onRemove} aria-label={removeLabel ?? 'ลบ action'}>
             <Trash2 className="h-4 w-4" aria-hidden="true" />
-          </button>
+          </IconButton>
         )}
       </div>
 

@@ -18,7 +18,8 @@ import {
  */
 
 const FILTER_BUTTON_CLASSES = cn(
-  'inline-flex h-9 cursor-pointer items-center justify-center rounded-xl px-3.5 text-xs font-semibold whitespace-nowrap transition-colors duration-fast',
+  // § สูงเท่าช่องตัวกรองอื่น (44px) มุม rounded-md ตัวอักษร text-sm ไม่ตกบรรทัด
+  'inline-flex min-h-touch cursor-pointer items-center justify-center rounded-md px-3.5 text-sm font-semibold leading-snug whitespace-nowrap transition-colors duration-fast',
   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong',
   'disabled:pointer-events-none disabled:opacity-50',
 );

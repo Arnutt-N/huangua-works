@@ -6,7 +6,7 @@ import { adminApi, type BroadcastContent } from '@/app/admin/_lib/admin-api';
 import { AdminCard } from '@/components/admin/admin-card';
 import { useConfirm } from '@/components/admin/use-confirm';
 import { Button } from '@/components/ui/button';
-import { FieldHint, Label, Textarea } from '@/components/ui/field';
+import { FieldHint, Input, Label, Textarea } from '@/components/ui/field';
 import { ThaiDatePicker } from '@/components/ui/thai-date-picker';
 import { ArrowLeft, ArrowRight, Check, FileText, Image, Braces, Send } from 'lucide-react';
 import { cn } from '@/lib/cn';
@@ -229,14 +229,13 @@ export function BroadcastWizardClient() {
         <AdminCard>
           <div className="mb-4">
             <Label htmlFor="bw-title">ชื่อแคมเปญ</Label>
-            <input
+            <Input
               id="bw-title"
               aria-label="ชื่อแคมเปญ"
               maxLength={BROADCAST_TITLE_MAX}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="เช่น ประกาศปิดทำการวันที่ 12 ส.ค."
-              className="min-h-touch w-full rounded-md border border-border bg-surface-raised px-4 text-ink"
             />
             <FieldHint>ชื่อที่ใช้แสดงในตาราง — ถ้าเว้นว่างจะใช้ข้อความประกาศแทน</FieldHint>
           </div>
@@ -260,13 +259,12 @@ export function BroadcastWizardClient() {
           {contentType === 'image' && (
             <div>
               <Label htmlFor="bw-img">URL รูปภาพ (https)</Label>
-              <input
+              <Input
                 id="bw-img"
                 aria-label="URL รูปภาพ (https)"
                 value={imageUrl}
                 onChange={(e) => setImageUrl(e.target.value)}
                 placeholder="https://..."
-                className="min-h-touch w-full rounded-md border border-border bg-surface-raised px-4 text-ink"
               />
             </div>
           )}
@@ -284,13 +282,12 @@ export function BroadcastWizardClient() {
               </div>
               <div>
                 <Label htmlFor="bw-alt">ข้อความสำรอง (altText)</Label>
-                <input
+                <Input
                   id="bw-alt"
                   aria-label="ข้อความสำรอง (altText)"
                   value={flexAltText}
                   onChange={(e) => setFlexAltText(e.target.value)}
                   placeholder="เช่น ประกาศจาก อบต.หัวงัว"
-                  className="min-h-touch w-full rounded-md border border-border bg-surface-raised px-4 text-ink"
                 />
                 <FieldHint>แสดงแทน Flex บนอุปกรณ์ที่ไม่รองรับ</FieldHint>
               </div>
@@ -370,14 +367,13 @@ export function BroadcastWizardClient() {
             />
             <div>
               <Label htmlFor="bw-schedule-time">เวลาส่ง</Label>
-              <input
+              <Input
                 id="bw-schedule-time"
                 aria-label="เวลาส่ง"
                 type="time"
                 value={scheduleTime}
                 onChange={(e) => setScheduleTime(e.target.value)}
                 disabled={!scheduleDate}
-                className="h-9 w-full rounded-xl border border-border bg-surface-raised px-4 text-ink disabled:opacity-50"
               />
             </div>
             <FieldHint>ระบบตรวจคิวทุก 30 นาที ประกาศอาจออกช้ากว่าเวลาที่ตั้ง</FieldHint>

@@ -1,5 +1,6 @@
 'use client';
 
+import { Input } from '@/components/ui/field';
 import { ThaiDatePicker } from '@/components/ui/thai-date-picker';
 import { toLocalDatetimeInputValue } from './rich-menu-state';
 
@@ -40,7 +41,7 @@ export function ThaiDateTimeField({
           onChange={(next) => emit(next, timePart || '00:00')}
           className="w-full sm:w-40"
         />
-        <input
+        <Input
           type="time"
           aria-label={`${label} เวลา`}
           value={timePart}
@@ -50,7 +51,7 @@ export function ThaiDateTimeField({
             const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
             emit(datePart || today, e.target.value);
           }}
-          className="h-9 w-full rounded-xl border border-border bg-surface-raised px-3 text-sm text-ink sm:w-32"
+          className="sm:w-40"
         />
       </div>
     </div>

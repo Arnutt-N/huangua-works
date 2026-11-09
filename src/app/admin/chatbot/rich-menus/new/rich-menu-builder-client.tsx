@@ -8,7 +8,9 @@ import { adminApi } from '@/app/admin/_lib/admin-api';
 import { useResource } from '@/app/admin/_lib/use-resource';
 import { PageHeader } from '@/components/admin/page-header';
 import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { Label, Input } from '@/components/ui/field';
+import { SelectField } from '@/components/ui/select';
 import { cn } from '@/lib/cn';
 import { RICH_MENU_DISPLAY_MODES, type RichMenuDisplayMode } from '@/lib/contracts';
 import {
@@ -189,13 +191,11 @@ export function RichMenuBuilderClient() {
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       <PageHeader title="สร้าง Rich Menu">
-        <Link
-          href="/admin/chatbot/rich-menus"
-          aria-label="กลับ"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted hover:bg-accent-sunken hover:text-ink"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
+        <IconButton asChild aria-label="กลับ">
+          <Link href="/admin/chatbot/rich-menus">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+        </IconButton>
       </PageHeader>
 
       {error && (
@@ -274,23 +274,24 @@ export function RichMenuBuilderClient() {
                 const action = area.action;
                 return (
                   <div key={i} className="space-y-3 rounded-2xl border border-border bg-surface-sunken/40 p-4">
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="flex items-center gap-2 text-xs font-bold uppercase text-muted">
                         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-surface text-xs font-bold text-ink">
                           {i + 1}
                         </span>
                         {area.label}
                       </span>
-                      <select
-                        aria-label={`ประเภทการทำงานพื้นที่ ${i + 1}`}
+                      <SelectField
+                        ariaLabel={`ประเภทการทำงานพื้นที่ ${i + 1}`}
                         value={action.type}
-                        onChange={(e) => setAreaType(i, e.target.value as RichMenuAreaAction['type'])}
-                        className="min-h-touch rounded-lg border border-border bg-surface px-2 text-xs"
-                      >
-                        <option value="uri">Open URL</option>
-                        <option value="message">Send Msg</option>
-                        <option value="richmenuswitch">สลับเมนู</option>
-                      </select>
+                        onValueChange={(next) => setAreaType(i, next as RichMenuAreaAction['type'])}
+                        options={[
+                          { value: 'uri', label: 'Open URL' },
+                          { value: 'message', label: 'Send Msg' },
+                          { value: 'richmenuswitch', label: 'สลับเมนู' },
+                        ]}
+                        className="w-40 shrink-0"
+                      />
                     </div>
 
                     {action.type === 'uri' && (
@@ -317,29 +318,31 @@ export function RichMenuBuilderClient() {
                         </div>
                         <div>
                           <Label htmlFor={`rb-obj-${i}`}>ออบเจ็กต์สำเร็จรูป</Label>
-                          <select
+                          <SelectField
                             id={`rb-obj-${i}`}
-                            aria-label={`เลือก reply object หรือ intent พื้นที่ ${i + 1}`}
+                            ariaLabel={`เลือก reply object หรือ intent พื้นที่ ${i + 1}`}
                             value=""
-                            onChange={(e) => quickSelectSystemObject(i, e.target.value)}
-                            className="min-h-touch w-full rounded-lg border border-border bg-surface px-2 text-sm"
-                          >
-                            <option value="">-- เลือกด่วน --</option>
-                            <optgroup label="คำตอบอัตโนมัติ">
-                              {intents.map((intent) => (
-                                <option key={intent.id} value={`intent:${intent.name}`}>
-                                  {intent.name}
-                                </option>
-                              ))}
-                            </optgroup>
-                            <optgroup label="Reply Objects">
-                              {replyObjects.map((obj) => (
-                                <option key={obj.id} value={`obj:${obj.objectId}`}>
-                                  {obj.name ?? obj.objectId}
-                                </option>
-                              ))}
-                            </optgroup>
-                          </select>
+                            onValueChange={(next) => {
+                              if (next) quickSelectSystemObject(i, next);
+                            }}
+                            options={[{ value: '', label: '-- เลือกด่วน --' }]}
+                            groups={[
+                              {
+                                label: 'คำตอบอัตโนมัติ',
+                                options: intents.map((intent) => ({
+                                  value: `intent:${intent.name}`,
+                                  label: intent.name,
+                                })),
+                              },
+                              {
+                                label: 'Reply Objects',
+                                options: replyObjects.map((obj) => ({
+                                  value: `obj:${obj.objectId}`,
+                                  label: obj.name ?? obj.objectId,
+                                })),
+                              },
+                            ]}
+                          />
                         </div>
                       </div>
                     )}
@@ -355,20 +358,16 @@ export function RichMenuBuilderClient() {
                             </Link>
                           </p>
                         ) : (
-                          <select
+                          <SelectField
                             id={`rb-alias-${i}`}
-                            aria-label={`alias ปลายทางพื้นที่ ${i + 1}`}
+                            ariaLabel={`alias ปลายทางพื้นที่ ${i + 1}`}
                             value={action.richMenuAliasId ?? ''}
-                            onChange={(e) => setAreaAction(i, { richMenuAliasId: e.target.value })}
-                            className="min-h-touch w-full rounded-lg border border-border bg-surface px-2 text-sm"
-                          >
-                            <option value="">-- เลือก alias --</option>
-                            {aliases.map((a) => (
-                              <option key={a.aliasId} value={a.aliasId}>
-                                {a.aliasId}
-                              </option>
-                            ))}
-                          </select>
+                            onValueChange={(next) => setAreaAction(i, { richMenuAliasId: next })}
+                            options={[
+                              { value: '', label: '-- เลือก alias --' },
+                              ...aliases.map((a) => ({ value: a.aliasId, label: a.aliasId })),
+                            ]}
+                          />
                         )}
                       </div>
                     )}

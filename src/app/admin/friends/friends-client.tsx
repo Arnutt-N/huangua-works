@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/field';
+import { SelectField } from '@/components/ui/select';
 import { useResource } from '@/app/admin/_lib/use-resource';
 import { adminApi, type FriendItem, type RichMenuItem } from '@/app/admin/_lib/admin-api';
 import { LineAvatar } from '@/app/admin/chat/_components/line-avatar';
@@ -214,32 +215,32 @@ export function FriendsClient() {
 
       <AdminCard>
         <div className="flex flex-col gap-2 sm:flex-row">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted" />
+          <div className="min-w-0 flex-1">
             <Input
               aria-label="ค้นหาเพื่อน"
+              icon={Search}
               value={q}
               onChange={(e) => {
                 setQ(e.target.value);
                 setPage(1);
               }}
               placeholder="Search users..."
-              className="pl-9"
             />
           </div>
-          <select
-            aria-label="กรองสถานะ"
+          <SelectField
+            ariaLabel="กรองสถานะ"
             value={status}
-            onChange={(e) => {
-              setStatus(e.target.value as StatusFilter);
+            onValueChange={(next) => {
+              setStatus(next as StatusFilter);
               setPage(1);
             }}
-            className="min-h-touch rounded-lg border border-border/50 bg-surface px-3 text-sm"
-          >
-            <option value="all">All Status</option>
-            <option value="following">ติดตามอยู่</option>
-            <option value="unfollowed">เลิกติดตาม</option>
-          </select>
+            options={[
+              { value: 'all', label: 'All Status' },
+              { value: 'following', label: 'ติดตามอยู่' },
+              { value: 'unfollowed', label: 'เลิกติดตาม' },
+            ]}
+            className="w-full shrink-0 sm:w-48"
+          />
         </div>
 
         {loading ? (
@@ -255,10 +256,10 @@ export function FriendsClient() {
             {selected.size > 0 && (
               <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface-sunken px-3 py-2 text-sm">
                 <span className="font-medium text-ink">เลือก {selected.size} คน</span>
-                <Button variant="outline" onClick={() => setBulkOpen(true)} className="min-h-touch gap-1 text-xs">
+                <Button variant="outline" size="sm" onClick={() => setBulkOpen(true)} className="gap-1">
                   <LayoutGrid className="h-3.5 w-3.5" /> กำหนด Rich Menu
                 </Button>
-                <Button variant="ghost" onClick={() => setSelected(new Set())} className="min-h-touch text-xs">
+                <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>
                   ล้างการเลือก
                 </Button>
               </div>
@@ -420,28 +421,28 @@ export function FriendsClient() {
                   <Button
                     variant="outline"
                     onClick={() => assignTarget && openAssign(assignTarget)}
-                    className="min-h-touch text-xs"
+                    size="sm"
                   >
                     ลองใหม่
                   </Button>
                 </div>
               ) : (
-                <select
+                <SelectField
                   id="friend-rich-menu"
                   value={selectedMenu}
-                  onChange={(e) => setSelectedMenu(e.target.value)}
-                  className="min-h-touch w-full rounded-lg border border-border/50 bg-surface px-3 text-sm"
-                >
-                  <option value="">เลือกเมนู...</option>
-                  {(menus ?? []).map((m) => {
-                    const usable = isUsableMenu(m);
-                    return (
-                      <option key={m.id} value={m.id} disabled={!usable}>
-                        {m.name}{usable ? '' : ' (ใช้ไม่ได้ — ยังไม่ sync หรือปิดใช้งาน)'}
-                      </option>
-                    );
-                  })}
-                </select>
+                  onValueChange={setSelectedMenu}
+                  options={[
+                    { value: '', label: 'เลือกเมนู...' },
+                    ...(menus ?? []).map((m) => {
+                      const usable = isUsableMenu(m);
+                      return {
+                        value: m.id,
+                        label: `${m.name}${usable ? '' : ' (ใช้ไม่ได้ — ยังไม่ sync หรือปิดใช้งาน)'}`,
+                        disabled: !usable,
+                      };
+                    }),
+                  ]}
+                />
               )}
               <p className="mt-1 text-xs text-muted">
                 เมนูที่ยังไม่ sync ขึ้น LINE หรือถูกปิดใช้งานเลือกไม่ได้ — จัดการที่หน้าริชเมนู
@@ -470,22 +471,21 @@ export function FriendsClient() {
           <div className="space-y-4 py-2">
             <div>
               <Label htmlFor="friend-bulk-menu">เลือก Rich Menu (bulk)</Label>
-              <select
+              <SelectField
                 id="friend-bulk-menu"
+                ariaLabel="เลือก Rich Menu (bulk)"
                 value={bulkMenu}
-                onChange={(e) => setBulkMenu(e.target.value)}
-                className="min-h-touch w-full rounded-lg border border-border/50 bg-surface px-3 text-sm"
-              >
-                <option value="">เลือกเมนู...</option>
-                {usableBulkMenus.map((m) => (
-                  <option key={m.id} value={m.id}>{m.name}</option>
-                ))}
-                {bulkMenus.filter((m) => !isUsableMenu(m)).map((m) => (
-                  <option key={m.id} value={m.id} disabled>
-                    {m.name} (ใช้ไม่ได้ — ยังไม่ sync หรือปิดใช้งาน)
-                  </option>
-                ))}
-              </select>
+                onValueChange={setBulkMenu}
+                options={[
+                  { value: '', label: 'เลือกเมนู...' },
+                  ...usableBulkMenus.map((m) => ({ value: m.id, label: m.name })),
+                  ...bulkMenus.filter((m) => !isUsableMenu(m)).map((m) => ({
+                    value: m.id,
+                    label: `${m.name} (ใช้ไม่ได้ — ยังไม่ sync หรือปิดใช้งาน)`,
+                    disabled: true,
+                  })),
+                ]}
+              />
               <p className="mt-1 text-xs text-muted">
                 ยิงรายคนทีละคำสั่งผ่าน API เดิม — {selected.size} รายการ
               </p>

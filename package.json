@@ -27,7 +27,7 @@
     "check-contrast": "tsx scripts/check-contrast.ts",
     "lint:hardcodes": "python3 scripts/lint_hardcodes.py src/app/admin/_components/ src/app/admin/page.tsx src/app/admin/chat/ src/app/admin/chatbot/",
     "lint:emoji": "python3 scripts/check_no_emoji.py src/app/admin/_components/ src/app/admin/page.tsx",
-    "lint:select": "python3 scripts/lint_native_select.py src/app/admin/cases/ src/app/admin/users/",
+    "lint:select": "python3 scripts/lint_native_select.py src/app src/components",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx scripts/seed.ts",

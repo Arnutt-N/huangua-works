@@ -1,5 +1,6 @@
 import type { RichMenuAliasItem, RichMenuItem } from '@/app/admin/_lib/admin-api';
 import { Button } from '@/components/ui/button';
+import { SelectField } from '@/components/ui/select';
 
 export function AliasList({
   aliases,
@@ -19,18 +20,19 @@ export function AliasList({
           <code className="font-mono text-sm font-medium text-ink">{a.aliasId}</code>
           <span className="text-xs text-muted">→ {a.menuName ?? '(เมนูถูกลบ?)'}</span>
           <div className="flex gap-1 sm:ml-auto">
-            <select
-              aria-label={`ย้ายเป้า ${a.aliasId}`}
-              defaultValue=""
-              onChange={(e) => onRepoint(a.aliasId, e.target.value)}
-              className="min-h-touch rounded-lg border border-border/50 bg-surface px-2 text-xs"
-            >
-              <option value="">ย้ายเป้า…</option>
-              {syncedMenus.map((m) => (
-                <option key={m.id} value={m.id}>{m.name}</option>
-              ))}
-            </select>
-            <Button variant="outline" onClick={() => onDelete(a.aliasId)} className="min-h-touch text-xs">ลบ</Button>
+            <SelectField
+              ariaLabel={`ย้ายเป้า ${a.aliasId}`}
+              value=""
+              onValueChange={(next) => {
+                if (next) onRepoint(a.aliasId, next);
+              }}
+              options={[
+                { value: '', label: 'ย้ายเป้า…' },
+                ...syncedMenus.map((m) => ({ value: m.id, label: m.name })),
+              ]}
+              className="w-44 shrink-0"
+            />
+            <Button variant="outline" size="sm" onClick={() => onDelete(a.aliasId)}>ลบ</Button>
           </div>
         </div>
       ))}

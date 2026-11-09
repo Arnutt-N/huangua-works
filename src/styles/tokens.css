@@ -268,6 +268,13 @@
   [aria-disabled='true'] {
     cursor: not-allowed;
   }
+
+  /* § ไอคอนเวลา/วันที่ของเบราว์เซอร์ชิดขอบขวา — ดันเข้ามาให้หายใจ
+   * ใช้คู่กับ padding ขวาของ Input (fieldPadEndGlyph) เพื่อไม่ให้ข้อความทับ glyph */
+  input:where([type='time'], [type='date'], [type='datetime-local'], [type='month'], [type='week'])::-webkit-calendar-picker-indicator {
+    margin-inline-end: 0.35rem;
+    cursor: pointer;
+  }
 }
 
 /* ---------- Custom utilities ---------- */
