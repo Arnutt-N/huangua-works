@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -119,6 +119,8 @@ describe('A11Y-01 drawer', () => {
     expect(aside.className).toContain('md:translate-x-0');
     expect(aside.className).toContain('md:w-64');
     expect(aside.className).not.toContain('lg:translate-x-0');
+    const offset = aside.nextElementSibling;
+    expect(offset?.className).toContain('md:pl-64');
 
     const hamburger = screen.getByRole('button', { name: 'เปิดเมนู' });
     expect(hamburger.className).toContain('md:hidden');
@@ -137,5 +139,33 @@ describe('A11Y-01 drawer', () => {
     const expand = await screen.findByRole('button', { name: 'ขยายแถบเมนู', hidden: true });
     expect(expand.parentElement?.className).toContain('md:px-2');
     expect(screen.getByRole('complementary').className).toContain('md:w-[4.5rem]');
+    expect(screen.getByRole('complementary').nextElementSibling?.className).toContain('md:pl-[4.5rem]');
+  });
+
+  it('เปิด drawer แล้วข้ามไปจอกว้าง → ปิดสถานะ drawer และไม่ย้ายโฟกัสไปปุ่มที่ถูกซ่อน', async () => {
+    mockUseMediaQuery.mockReturnValue({ isDesktop: false, hydrated: true });
+    const user = userEvent.setup();
+    const view = render(
+      <AdminLayout user={{ fullName: 'T', email: 't@x.go.th', role: 'superadmin' }} active="dashboard" title="T">
+        <p>content</p>
+      </AdminLayout>,
+    );
+
+    const hamburger = screen.getByRole('button', { name: 'เปิดเมนู' });
+    await user.click(hamburger);
+    expect(hamburger).toHaveAttribute('aria-expanded', 'true');
+
+    mockUseMediaQuery.mockReturnValue({ isDesktop: true, hydrated: true });
+    view.rerender(
+      <AdminLayout user={{ fullName: 'T', email: 't@x.go.th', role: 'superadmin' }} active="dashboard" title="T">
+        <p>content</p>
+      </AdminLayout>,
+    );
+
+    await waitFor(() => {
+      expect(hamburger).toHaveAttribute('aria-expanded', 'false');
+    });
+    expect(screen.getByRole('complementary')).not.toHaveAttribute('inert');
+    expect(document.activeElement).not.toBe(hamburger);
   });
 });

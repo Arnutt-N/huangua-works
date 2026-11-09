@@ -55,6 +55,10 @@ export function AdminLayout({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const { isDesktop, hydrated } = useMediaQuery();
+  // § จอกว้างพอที่แถบจะอยู่บนจอเอง ต้องทิ้งสถานะ drawer ในรอบ render เดียวกัน
+  // ไม่งั้นหมุนจอข้าม md ขณะเมนูเปิด จะยังกัก Tab อยู่ในแถบ
+  // ทั้งที่ฉากหลังและปุ่มปิดถูก md:hidden ไปแล้ว
+  if (isDesktop && mobileOpen) setMobileOpen(false);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
   const asideRef = useRef<HTMLElement>(null);
   const navRef = useRef<HTMLElement>(null);
@@ -94,7 +98,7 @@ export function AdminLayout({
   // ปิด drawer เมื่อกด Escape (คู่กับการปิดตอนคลิกลิงก์และคลิกฉากหลัง)
   // + โฟกัสเข้า drawer เมื่อเปิด, คืนให้ hamburger เมื่อปิด, กัก Tab ใน drawer
   useEffect(() => {
-    if (!mobileOpen) return;
+    if (!mobileOpen || isDesktop) return;
     asideRef.current?.querySelector<HTMLElement>('a, button')?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -120,7 +124,7 @@ export function AdminLayout({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [mobileOpen]);
+  }, [mobileOpen, isDesktop]);
 
   // § คืนโฟกัสให้ hamburger เฉพาะตอนที่ drawer "ปิดหลังเคยเปิด" — ห้ามยิงตอน mount
   // ไม่งั้นทุกครั้งที่เข้า/เปลี่ยนหน้า admin บนมือถือ โฟกัสจะถูกกระชากจากตำแหน่งเริ่มต้น
@@ -132,9 +136,10 @@ export function AdminLayout({
     }
     if (wasOpenRef.current) {
       wasOpenRef.current = false;
-      hamburgerRef.current?.focus();
+      // ปุ่มเปิดเมนูเป็น md:hidden บนจอกว้าง — โฟกัสไปที่ปุ่มที่มองไม่เห็นจะทำให้โฟกัสหลุด
+      if (!isDesktop) hamburgerRef.current?.focus();
     }
-  }, [mobileOpen]);
+  }, [mobileOpen, isDesktop]);
 
   const groups = visibleNavGroups(user.role);
 
@@ -157,7 +162,7 @@ export function AdminLayout({
         ref={asideRef}
         // § ใส่ inert เฉพาะหลัง hydrate แล้วเท่านั้น — ระหว่าง SSR ยังไม่รู้ว่าเป็นจอกว้าง
         // หรือจอแคบ ถ้าใส่ไปเลยผู้ใช้จอกว้างจะกดเมนูไม่ได้จนกว่า JS จะทำงาน
-        // isDesktop มาจาก ADMIN_SIDEBAR_QUERY (768px) ซึ่งต้องตรงกับ md: ด้านล่าง
+        // isDesktop มาจาก ADMIN_SIDEBAR_QUERY (48rem) ซึ่งต้องตรงกับ md: ด้านล่าง
         inert={hydrated && !isDesktop && !mobileOpen}
         className={cn(
           'glass-panel fixed inset-y-0 left-0 z-50 flex flex-col border-r shadow-lg',
@@ -193,7 +198,7 @@ export function AdminLayout({
             <BrandMark size="sm" />
             {/* § collapsed เป็นสถานะของ sidebar ตั้งแต่ md ขึ้นไปเท่านั้น
                 จึงซ่อนข้อความด้วยคลาส md: ไม่ใช่ตัดออกจาก DOM — ไม่งั้น drawer
-                ต่ำกว่า 768px (ซึ่งกว้างเต็มที่เสมอ) จะเหลือแต่ไอคอนโดยไม่มีป้ายกำกับ */}
+                ต่ำกว่า breakpoint md (ซึ่งกว้างเต็มที่เสมอ) จะเหลือแต่ไอคอนโดยไม่มีป้ายกำกับ */}
             <span className={cn('min-w-0', collapsed && 'md:hidden')}>
               <span className="block truncate text-sm font-bold text-ink">
                 อบต.หัวงัว

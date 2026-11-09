@@ -3,14 +3,16 @@
 import { useSyncExternalStore } from 'react';
 
 /**
- * ตรงกับ breakpoint `md` ของ Tailwind (48rem = 768px)
+ * ตรงกับ breakpoint `md` ของ Tailwind (`--breakpoint-md: 48rem`)
  *
- * § ต้องเป็นค่าเดียวกับคลาส `md:` ใน AdminLayout
+ * § ต้องเป็นหน่วย rem เดียวกับคลาส `md:` ใน AdminLayout
+ * media query คิด rem จากขนาดตัวอักษรตั้งต้นของเบราว์เซอร์ ไม่ใช่จาก px คงที่
+ * ถ้าเขียน 768px แล้วผู้ใช้ตั้งฟอนต์เริ่มต้นไม่ใช่ 16px คลาส md: จะคนละจังหวะกับ inert
  * ปุ่มเปิดเมนูใช้ `md:hidden` และ sidebar ใช้ `md:translate-x-0`
  * ถ้า query นี้กว้างกว่าคลาส CSS แถบเมนูจะโผล่แต่ถูกใส่ inert กดไม่ได้
  * ถ้า query นี้แคบกว่าคลาส CSS แถบเมนูจะถูกเลื่อนออกจอทั้งที่ปุ่มเปิดเมนูถูกซ่อน
  */
-export const ADMIN_SIDEBAR_QUERY = '(min-width: 768px)';
+export const ADMIN_SIDEBAR_QUERY = '(min-width: 48rem)';
 
 const QUERY = ADMIN_SIDEBAR_QUERY;
 
