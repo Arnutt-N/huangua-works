@@ -113,6 +113,14 @@ export function KpiCard({
     subtext ?? hint
   );
 
+  const detailTitle = trend
+    ? [trend.value, trend.label].filter((part) => part != null && part !== '').join(' ')
+    : typeof subtext === 'string'
+      ? subtext
+      : typeof hint === 'string'
+        ? hint
+        : undefined;
+
   const innerContent = (
     <>
       <span
@@ -131,7 +139,7 @@ export function KpiCard({
           {displayValue}
         </p>
         {detailNode && (
-          <div className="mt-1 text-xs text-muted truncate leading-normal">
+          <div className="mt-1 truncate text-xs leading-normal text-muted" title={detailTitle}>
             {detailNode}
           </div>
         )}

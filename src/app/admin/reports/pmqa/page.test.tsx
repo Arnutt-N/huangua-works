@@ -164,6 +164,23 @@ describe('PmqaReportPage (/admin/reports/pmqa)', () => {
     expect(screen.getByText(/ไม่พบข้อมูลหมวดหมู่เรื่องร้องเรียน/i)).toBeInTheDocument();
   });
 
+  it('ป้ายสถานะที่ถูกตัดมี title เป็นข้อความเต็ม และหัวข้อนับสถานะจริง', async () => {
+    const page = await PmqaReportPage({
+      searchParams: Promise.resolve({}),
+    });
+
+    render(page);
+
+    const label = screen.getByText('รออนุมัติงบประมาณ');
+    expect(label).toHaveClass('truncate');
+    expect(label.parentElement).toHaveAttribute('title', 'รออนุมัติงบประมาณ');
+    expect(screen.getByRole('heading', { name: /จำแนกตามขั้นตอนวงจรชีวิต \(9 สถานะ\)/ })).toBeInTheDocument();
+    expect(screen.getByText('ยุติเรื่อง / ไม่รับดำเนินการ')).toHaveAttribute(
+      'title',
+      'ยุติเรื่อง / ไม่รับดำเนินการ',
+    );
+  });
+
   it('handles zero total cases without error or NaN%', async () => {
     mockGetPmqaReportData.mockResolvedValueOnce({
       ...mockReportData,

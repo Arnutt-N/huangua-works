@@ -20,9 +20,9 @@ describe('KpiCard Component', () => {
       />,
     );
 
-    expect(screen.getByText('เวลาดำเนินการเฉลี่ย')).toBeInTheDocument();
+    expect(screen.getByText('เวลาดำเนินการเฉลี่ย')).toHaveAttribute('title', 'เวลาดำเนินการเฉลี่ย');
     expect(screen.getByText('3.5 วัน')).toBeInTheDocument();
-    expect(screen.getByText('รอบ 30 วัน')).toBeInTheDocument();
+    expect(screen.getByText('รอบ 30 วัน')).toHaveAttribute('title', 'รอบ 30 วัน');
 
     // ต้องไม่มีแท็ก <a> (Link)
     expect(screen.queryByRole('link')).not.toBeInTheDocument();

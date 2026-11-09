@@ -40,19 +40,32 @@ export interface CaseStatusBadgeProps {
   register?: 'admin' | 'citizen';
   label?: string;
   className?: string;
+  /**
+   * ตัดข้อความที่ล้นกรอบเป็น … และใส่ title เป็นข้อความเต็ม
+   * เบราว์เซอร์แสดง title เมื่อโฮเวอร์ — ใช้เมื่อป้ายอยู่ในช่องแคบ
+   */
+  truncate?: boolean;
 }
 
-export function CaseStatusBadge({ status, register = 'admin', label, className }: CaseStatusBadgeProps) {
-  const fallback = register === 'citizen' ? STATUS_LABELS_TH_CITIZEN[status] : STATUS_LABELS_TH[status];
+export function CaseStatusBadge({
+  status,
+  register = 'admin',
+  label,
+  className,
+  truncate = false,
+}: CaseStatusBadgeProps) {
+  const text = label ?? (register === 'citizen' ? STATUS_LABELS_TH_CITIZEN[status] : STATUS_LABELS_TH[status]);
   return (
     <span
+      title={truncate ? text : undefined}
       className={cn(
-        'inline-flex items-center whitespace-nowrap rounded-pill px-3.5 py-1 text-sm font-semibold ring-1 ring-inset',
+        'items-center rounded-pill px-3.5 py-1 text-sm font-semibold ring-1 ring-inset',
+        truncate ? 'flex w-full min-w-0 max-w-full justify-center' : 'inline-flex whitespace-nowrap',
         statusClasses[status],
         className,
       )}
     >
-      {label ?? fallback}
+      {truncate ? <span className="min-w-0 truncate">{text}</span> : text}
     </span>
   );
 }
