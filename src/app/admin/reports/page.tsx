@@ -315,14 +315,14 @@ export default async function CaseManagementPage({
                           </span>
                         ) : null}
                       </div>
-                      <p className="mt-0.5 truncate font-semibold text-ink">{item.title}</p>
+                      <p className="mt-0.5 truncate font-semibold text-ink" title={item.title}>{item.title}</p>
                       {/* § A11Y-05: แสดงข้อมูลบริบทสำคัญบนจอมือถือ (หมวด, ที่ตั้ง, ผู้รับผิดชอบ) ให้เจ้าหน้าที่สแกนได้ทันที */}
                       <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted sm:hidden">
                         {item.categoryName && <span>{item.categoryName}</span>}
                         {item.location && (
                           <span className="inline-flex min-w-0 items-center gap-1">
                             <MapPin className="h-3.5 w-3.5 flex-none" aria-hidden="true" />
-                            <span className="truncate max-w-[180px]">{item.location}</span>
+                            <span className="max-w-[180px] truncate" title={item.location ?? undefined}>{item.location}</span>
                           </span>
                         )}
                         <span>{item.assigneeName ?? 'ยังไม่มอบหมาย'}</span>
@@ -333,9 +333,9 @@ export default async function CaseManagementPage({
                     </span>
                     <span className="mt-1 hidden min-w-0 items-center gap-1 text-sm text-muted sm:mt-0 sm:flex">
                       <MapPin className="h-3.5 w-3.5 flex-none" aria-hidden="true" />
-                      <span className="truncate">{item.location}</span>
+                      <span className="truncate" title={item.location ?? undefined}>{item.location}</span>
                     </span>
-                    <span className="mt-1 hidden truncate text-sm text-muted sm:mt-0 sm:block">
+                    <span className="mt-1 hidden truncate text-sm text-muted sm:mt-0 sm:block" title={item.assigneeName ?? 'ยังไม่มอบหมาย'}>
                       {item.assigneeName ?? 'ยังไม่มอบหมาย'}
                     </span>
                     <div className="mt-2 flex flex-wrap items-center gap-2 sm:mt-0 sm:flex-col sm:items-end sm:gap-1">

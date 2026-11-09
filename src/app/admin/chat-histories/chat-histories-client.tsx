@@ -329,7 +329,7 @@ export function ChatHistoriesClient() {
                             }
                           />
                           <span className="min-w-0">
-                            <span className="block truncate text-sm font-semibold text-accent-strong">{name}</span>
+                            <span className="block truncate text-sm font-semibold text-accent-strong" title={name}>{name}</span>
                             {conv.lineUserId && (
                               <span
                                 className="block font-mono text-[10px] tabular-nums text-muted"
@@ -343,9 +343,9 @@ export function ChatHistoriesClient() {
                       </td>
                       <td className="max-w-60 px-3 py-2.5">
                         {conv.lastMessageText ? (
-                          <span className="block truncate text-sm text-muted">{conv.lastMessageText}</span>
+                          <span className="block truncate text-sm text-muted" title={conv.lastMessageText}>{conv.lastMessageText}</span>
                         ) : (
-                          <span className="block truncate text-sm italic text-muted">ยังไม่มีข้อความ</span>
+                          <span className="block truncate text-sm italic text-muted" title="ยังไม่มีข้อความ">ยังไม่มีข้อความ</span>
                         )}
                       </td>
                       <td className="whitespace-nowrap px-3 py-2.5 text-xs tabular-nums text-muted">
@@ -382,8 +382,8 @@ export function ChatHistoriesClient() {
                   className="flex w-full items-center gap-2.5 rounded-md p-2 text-left transition-colors duration-normal ease-out-expo hover:bg-accent-sunken"
                 >
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-ink">{name}</span>
-                    <span className="line-clamp-1 text-[11px] text-muted">{g.first.snippet}</span>
+                    <span className="block truncate text-sm font-semibold text-ink" title={name}>{name}</span>
+                    <span className="line-clamp-1 text-[11px] text-muted" title={g.first.snippet}>{g.first.snippet}</span>
                   </span>
                   <span className="flex-none text-[10px] text-muted">
                     พบ {g.count} ผลลัพธ์
@@ -599,7 +599,7 @@ export function ChatHistoryDetail({ conversationId }: { conversationId: string }
             }
           />
           <div className="min-w-0">
-            <p className="truncate text-base font-bold text-ink">{name}</p>
+            <p className="truncate text-base font-bold text-ink" title={name}>{name}</p>
             <p className="flex flex-wrap items-center gap-2 text-[11px] text-muted">
               <span className="inline-flex items-center rounded-pill bg-surface-sunken px-1.5 py-0.5 font-medium">
                 {modeLabel(header?.mode ?? '')}

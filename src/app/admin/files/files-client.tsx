@@ -162,7 +162,7 @@ export function FilesClient() {
             {items.map((item) => (
               <div key={item.id} className="rounded-lg border border-border/50 p-3">
                 <MediaThumb item={item} />
-                <p className="truncate text-xs font-medium text-ink">{item.filename}</p>
+                <p className="truncate text-xs font-medium text-ink" title={item.filename}>{item.filename}</p>
                 <p className="text-xs text-muted">{formatSize(item.sizeBytes)} · {item.category}</p>
                 {/* § A11Y-02: ปุ่มแสดงตลอด — เดิมซ่อนด้วย opacity-0 จน hover/focus ผู้ใช้คีย์บอร์ดและจอสัมผัสที่ไม่รองรับ pointer-coarse ต้องเดา */}
                 <div className="mt-2 flex gap-1">

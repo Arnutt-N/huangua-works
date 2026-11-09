@@ -339,7 +339,7 @@ export function BroadcastClient() {
                             <Send className="h-5 w-5" />
                           </span>
                           <div className="min-w-0">
-                            <Link href={`/admin/chatbot/broadcast/${item.id}`} className="block truncate text-sm font-semibold text-accent-strong hover:underline">
+                            <Link href={`/admin/chatbot/broadcast/${item.id}`} className="block truncate text-sm font-semibold text-accent-strong hover:underline" title={broadcastName(item)}>
                               {broadcastName(item)}
                             </Link>
                             <p className="mt-0.5 text-xs text-muted">

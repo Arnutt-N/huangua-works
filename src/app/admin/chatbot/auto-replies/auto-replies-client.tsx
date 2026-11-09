@@ -159,8 +159,8 @@ export function AutoRepliesClient() {
                 {items.map((item) => (
                   <tr key={item.id} className="border-b border-border/50 hover:bg-accent/5">
                     <td className="max-w-xs px-3 py-3">
-                      <p className="truncate font-medium text-ink">{item.question}</p>
-                      <p className="truncate text-xs text-muted">{item.answer}</p>
+                      <p className="truncate font-medium text-ink" title={item.question}>{item.question}</p>
+                      <p className="truncate text-xs text-muted" title={item.answer}>{item.answer}</p>
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex flex-wrap gap-1">

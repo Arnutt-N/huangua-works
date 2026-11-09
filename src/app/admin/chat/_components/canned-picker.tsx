@@ -98,7 +98,7 @@ export function CannedPicker({
                 </span>
               )}
             </span>
-            <span className="line-clamp-1 text-xs text-muted">{item.content}</span>
+            <span className="line-clamp-1 text-xs text-muted" title={item.content}>{item.content}</span>
           </button>
         ))
       )}

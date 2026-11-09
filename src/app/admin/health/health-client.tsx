@@ -72,7 +72,7 @@ export function HealthClient() {
               )}
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-ink">{probe.name}</p>
-                {probe.detail && <p className="truncate text-xs text-danger">{probe.detail}</p>}
+                {probe.detail && <p className="truncate text-xs text-danger" title={probe.detail}>{probe.detail}</p>}
               </div>
               <span className="flex-none text-xs tabular-nums text-muted">{probe.latencyMs}ms</span>
             </div>

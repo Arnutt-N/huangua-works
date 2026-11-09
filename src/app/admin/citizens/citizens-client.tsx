@@ -79,11 +79,19 @@ export function CitizensClient({ rows, query }: { rows: CitizenRow[]; query: str
                     'truncate font-semibold',
                     c.isActive ? 'text-ink' : 'text-muted line-through',
                   )}
+                  title={c.fullName}
                 >
                   {c.fullName}
                 </p>
-                <p className="truncate font-mono text-xs text-muted">{c.email}</p>
-                <p className="mt-0.5 truncate text-xs text-muted">
+                <p className="truncate font-mono text-xs text-muted" title={c.email}>{c.email}</p>
+                <p
+                  className="mt-0.5 truncate text-xs text-muted"
+                  title={`${c.phoneNumber ?? '—'} · ${c.contactEmail ?? 'ไม่มีอีเมลติดต่อ'} · ${
+                    c.lineLinks.length > 0
+                      ? `LINE: ${c.lineLinks[0]?.displayName ?? c.lineLinks[0]?.lineUserId ?? 'ไม่ระบุ'}${c.lineLinks.length > 1 ? ` (+${c.lineLinks.length - 1})` : ''}`
+                      : 'ไม่ผูก LINE'
+                  } · ${c.caseCount} เรื่อง`}
+                >
                   {c.phoneNumber ?? '—'} · {c.contactEmail ?? 'ไม่มีอีเมลติดต่อ'} ·{' '}
                   {c.lineLinks.length > 0
                     ? `LINE: ${c.lineLinks[0]?.displayName ?? c.lineLinks[0]?.lineUserId ?? 'ไม่ระบุ'}${c.lineLinks.length > 1 ? ` (+${c.lineLinks.length - 1})` : ''}`

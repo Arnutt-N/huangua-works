@@ -443,7 +443,7 @@ function PhotoCard({
 
       {photo.caption && (
         <div className="absolute bottom-0 inset-x-0 bg-ink/75 p-1 px-1.5 backdrop-blur-[2px]">
-          <p className="truncate text-[11px] font-medium text-white">{photo.caption}</p>
+          <p className="truncate text-[11px] font-medium text-white" title={photo.caption ?? undefined}>{photo.caption}</p>
         </div>
       )}
     </div>

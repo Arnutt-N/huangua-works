@@ -210,7 +210,7 @@ export default async function AuditPage({
                       {row.userAgent && (
                         <span className="inline-flex items-center gap-1" title={row.userAgent}>
                           <Fingerprint className="h-4 w-4" aria-hidden="true" />
-                          <span className="max-w-[200px] truncate">{row.userAgent}</span>
+                          <span className="max-w-[200px] truncate" title={row.userAgent ?? undefined}>{row.userAgent}</span>
                         </span>
                       )}
                     </div>

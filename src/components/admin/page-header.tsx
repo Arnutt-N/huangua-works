@@ -20,8 +20,8 @@ export function PageHeader({
       )}
     >
       <div className="min-w-0">
-        <h1 className="truncate text-xl font-bold tracking-tight text-ink sm:text-2xl">{title}</h1>
-        {subtitle && <p className="mt-0.5 truncate text-sm text-muted">{subtitle}</p>}
+        <h1 className="truncate text-xl font-bold tracking-tight text-ink sm:text-2xl" title={title}>{title}</h1>
+        {subtitle && <p className="mt-0.5 truncate text-sm text-muted" title={subtitle}>{subtitle}</p>}
       </div>
       {children && <div className="flex flex-wrap items-center gap-2 sm:gap-3">{children}</div>}
     </div>

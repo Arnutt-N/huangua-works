@@ -244,10 +244,10 @@ export function DesignClient() {
                       aria-hidden="true"
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-mono text-xs font-semibold">
+                      <p className="truncate font-mono text-xs font-semibold" title={t.name.replace('--color-', '')}>
                         {t.name.replace('--color-', '')}
                       </p>
-                      <p className="truncate text-xs text-muted">{t.use}</p>
+                      <p className="truncate text-xs text-muted" title={t.use}>{t.use}</p>
                       <p
                         className={cn(
                           'mt-0.5 font-mono text-[11px] tabular-nums',

@@ -105,7 +105,14 @@ export default async function TrackPage({
                 </span>
               )}
               <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold text-base">
+                <p
+                  className="truncate font-semibold text-base"
+                  title={
+                    lineProfile?.displayName
+                      ? `บัญชี LINE: ${lineProfile.displayName}`
+                      : 'เชื่อมต่อกับบัญชี LINE ของท่านเรียบร้อยแล้ว'
+                  }
+                >
                   {lineProfile?.displayName
                     ? `บัญชี LINE: ${lineProfile.displayName}`
                     : 'เชื่อมต่อกับบัญชี LINE ของท่านเรียบร้อยแล้ว'}

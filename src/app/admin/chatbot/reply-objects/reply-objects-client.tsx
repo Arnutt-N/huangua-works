@@ -170,7 +170,7 @@ export function ReplyObjectsClient() {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-mono text-sm font-bold text-accent-strong">$${item.objectId}</p>
-                  <h3 className="mt-1 line-clamp-2 text-base font-bold text-ink">
+                  <h3 className="mt-1 line-clamp-2 text-base font-bold text-ink" title={item.name ?? item.objectId}>
                     {item.name ?? item.objectId}
                   </h3>
                 </div>

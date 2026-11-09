@@ -120,14 +120,14 @@ export function CannedManageDialog({
               >
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-2 text-sm font-semibold text-ink">
-                    <span className="truncate">{item.title}</span>
+                    <span className="truncate" title={item.title}>{item.title}</span>
                     {item.shortcut && (
                       <code className="rounded-sm bg-accent-sunken px-1.5 py-0.5 text-xs font-bold text-accent-strong">
                         /{item.shortcut}
                       </code>
                     )}
                   </p>
-                  <p className="line-clamp-2 text-xs text-muted">{item.content}</p>
+                  <p className="line-clamp-2 text-xs text-muted" title={item.content}>{item.content}</p>
                 </div>
                 <IconButton onClick={() => startEdit(item)} aria-label={`แก้ไข ${item.title}`}>
                   <Pencil className="h-4 w-4" aria-hidden="true" />

@@ -117,10 +117,14 @@ export function ResponsibleClient({
                     'truncate font-semibold',
                     r.isActive ? 'text-ink' : 'text-muted line-through',
                   )}
+                  title={r.raw}
                 >
                   {r.raw}
                 </p>
-                <p className="mt-0.5 truncate text-xs text-muted">
+                <p
+                  className="mt-0.5 truncate text-xs text-muted"
+                  title={`${r.departmentName ?? 'ยังไม่ระบุหน่วยงาน'} · ${r.assigneeName ?? 'ไม่ระบุเจ้าหน้าที่'} · อ้างถึง ${r.referencedCount.toLocaleString('th-TH')} เรื่อง`}
+                >
                   {r.departmentName ?? 'ยังไม่ระบุหน่วยงาน'} · {r.assigneeName ?? 'ไม่ระบุเจ้าหน้าที่'} ·{' '}
                   อ้างถึง {r.referencedCount.toLocaleString('th-TH')} เรื่อง
                 </p>

@@ -65,7 +65,13 @@ export function CaseStatusBadge({
         className,
       )}
     >
-      {truncate ? <span className="min-w-0 truncate">{text}</span> : text}
+      {truncate ? (
+        <span className="min-w-0 truncate" title={text}>
+          {text}
+        </span>
+      ) : (
+        text
+      )}
     </span>
   );
 }

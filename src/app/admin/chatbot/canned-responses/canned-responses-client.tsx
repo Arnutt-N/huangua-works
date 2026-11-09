@@ -214,7 +214,7 @@ export function CannedResponsesClient() {
                     </td>
                     <td className="max-w-md px-4 py-3">
                       <p className="text-sm font-medium text-ink">{item.title}</p>
-                      <p className="line-clamp-2 text-xs text-muted">{item.content}</p>
+                      <p className="line-clamp-2 text-xs text-muted" title={item.content}>{item.content}</p>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-center">
                       <span className="rounded-pill bg-surface-sunken px-2 py-0.5 text-xs font-medium text-ink">

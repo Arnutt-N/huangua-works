@@ -95,6 +95,7 @@ export const ConversationItem = memo(function ConversationItem({
                 'truncate text-sm font-semibold',
                 'text-ink',
               )}
+              title={name}
             >
               {name}
             </span>
@@ -114,6 +115,7 @@ export const ConversationItem = memo(function ConversationItem({
                 'truncate text-xs',
                 'text-muted',
               )}
+              title={conv.lastMessageText ?? '-'}
             >
               {conv.lastMessageText ?? '-'}
             </span>

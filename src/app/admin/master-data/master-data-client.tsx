@@ -110,10 +110,11 @@ export function DepartmentsCard({ rows }: { rows: DepartmentRow[] }) {
                     'truncate font-semibold',
                     d.isActive ? 'text-ink' : 'text-muted line-through',
                   )}
+                  title={d.name}
                 >
                   {d.name}
                 </p>
-                <p className="truncate font-mono text-xs text-muted">{d.slug}</p>
+                <p className="truncate font-mono text-xs text-muted" title={d.slug}>{d.slug}</p>
               </div>
               <ActiveBadge isActive={d.isActive} />
               <div className="flex flex-none items-center gap-1">
@@ -260,10 +261,14 @@ export function CategoriesCard({
                     'truncate font-semibold',
                     c.isActive ? 'text-ink' : 'text-muted line-through',
                   )}
+                  title={c.name}
                 >
                   {c.name}
                 </p>
-                <p className="truncate text-xs text-muted">
+                <p
+                  className="truncate text-xs text-muted"
+                  title={`${c.slug} · ${c.defaultDepartmentName ?? 'ไม่ระบุหน่วยงาน'} · SLA ${c.estimatedDays ?? '—'} วัน`}
+                >
                   <span className="font-mono">{c.slug}</span>
                   {' · '}
                   {c.defaultDepartmentName ?? 'ไม่ระบุหน่วยงาน'}
