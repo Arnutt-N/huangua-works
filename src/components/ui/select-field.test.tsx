@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fieldPad, fieldPadEndGlyph, fieldPadIcon, fieldPadIconReveal, selectTriggerClass } from './control-styles';
+import { Dialog, DialogContent, DialogTitle } from './dialog';
 import { SelectField } from './select';
 
 beforeEach(() => {
@@ -75,5 +76,38 @@ describe('SelectField', () => {
     await user.click(screen.getByRole('combobox', { name: 'สถานะ' }));
     await user.click(await screen.findByRole('option', { name: 'ทุกสถานะ' }));
     expect(screen.getByRole('combobox', { name: 'สถานะ' })).toHaveTextContent('ทุกสถานะ');
+  });
+
+  it('ตัวเลือกที่ปิดไว้กดแล้วค่าไม่เปลี่ยน และความกว้างอยู่ที่กรอบนอก', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    render(
+      <Dialog open>
+        <DialogContent>
+          <DialogTitle>เลือกเมนู</DialogTitle>
+          <SelectField
+            ariaLabel="เมนู"
+            value=""
+            onValueChange={onValueChange}
+            className="w-full sm:w-48"
+            options={[
+              { value: '', label: 'เลือกเมนู...' },
+              { value: 'ok', label: 'เมนูหลัก' },
+              { value: 'bad', label: 'ใช้ไม่ได้', disabled: true },
+            ]}
+          />
+        </DialogContent>
+      </Dialog>,
+    );
+
+    const trigger = screen.getByRole('combobox', { name: 'เมนู' });
+    expect(trigger.parentElement?.className).toContain('sm:w-48');
+    await user.click(trigger);
+    const blocked = await screen.findByRole('option', { name: 'ใช้ไม่ได้' });
+    expect(blocked).toHaveAttribute('data-disabled');
+    await user.click(blocked);
+    expect(onValueChange).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('option', { name: 'เมนูหลัก' }));
+    expect(onValueChange).toHaveBeenCalledWith('ok');
   });
 });
