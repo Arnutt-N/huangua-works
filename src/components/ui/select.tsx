@@ -9,12 +9,8 @@ import { controlChevronIcon, selectTriggerClass } from './control-styles';
 /**
  * Select (DESIGN.md §5)
  * - trigger เป็น field style (hairline + 44px)
- * - เชฟรอน v อยู่ห่างขอบขวา pr-5 และไม่ถูกข้อความยาวทับ (truncate + shrink-0)
- * - content ลอยด้วย overlay shadow ไม่ติดขอบช่องและไม่หลุดจอ
  * - ใช้ Radix จัด focus/escape/portal
- *
- * § ห้ามใช้ <select> ดิบ — glyph ของเบราว์เซอร์ชิดขอบและจัดระยะเองไม่ได้
- * (scripts/lint_native_select.py)
+ * § lint:select rejects a native <select>. Its chevron cannot take this inset.
  */
 
 export const Select = SelectPrimitive.Root;

@@ -18,7 +18,7 @@ import {
  */
 
 const FILTER_BUTTON_CLASSES = cn(
-  // § สูงเท่าช่องตัวกรองอื่น (44px) มุม rounded-md ตัวอักษร text-sm ไม่ตกบรรทัด
+  // § 44px, same as the date fields. h-9 left these chips short of that row.
   'inline-flex min-h-touch cursor-pointer items-center justify-center rounded-md px-3.5 text-sm font-semibold leading-snug whitespace-nowrap transition-colors duration-fast',
   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong',
   'disabled:pointer-events-none disabled:opacity-50',

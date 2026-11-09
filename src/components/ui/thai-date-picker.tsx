@@ -291,8 +291,7 @@ export function ThaiDatePicker({
       <div
         ref={containerRef}
         className={cn(
-          // § สูงเท่าช่องกรอกอื่น (44px) มุม rounded-md
-          // padding ขวา pr-3 กันปุ่มปฏิทิน/กากบาทชิดขอบ
+          // § pr-3 keeps the calendar and clear buttons off the field border.
           'flex min-h-touch w-full items-center gap-1 rounded-md border border-border bg-surface-raised py-1 pl-3 pr-3 text-base leading-snug text-ink shadow-xs transition-colors duration-fast focus-within:border-accent-strong focus-within:ring-2 focus-within:ring-accent-strong/20',
           disabled && 'cursor-not-allowed opacity-60',
         )}
