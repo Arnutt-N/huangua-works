@@ -109,8 +109,8 @@ def main(argv):
         print("chevron hard against the edge and cannot be made to match the system.")
         for f, n, line in found:
             print(f"  x {f}:{n}: {line}")
-        print("\nUse the Listbox or Combobox pattern in components/forms-advanced.md, or add a")
-        print(f"`{ALLOW_SELECT}` comment if this one is deliberate.")
+        print("\nUse SelectField from @/components/ui/select. The browser chevron cannot take that inset.")
+        print(f"Add a `{ALLOW_SELECT}` comment on the line only when a native select is deliberate.")
         return 1
 
     print("OK: no native <select> in generated UI.")
