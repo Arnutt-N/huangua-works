@@ -234,9 +234,9 @@ export function IntentSection() {
                   return (
                     <tr key={item.id} className="border-b border-border/50 hover:bg-accent/5">
                       <td className="max-w-xs px-3 py-3">
-                        <p className="truncate font-medium text-ink">{item.name}</p>
+                        <p className="truncate font-medium text-ink" title={item.name}>{item.name}</p>
                         {item.description && (
-                          <p className="truncate text-xs text-muted">{item.description}</p>
+                          <p className="truncate text-xs text-muted" title={item.description}>{item.description}</p>
                         )}
                       </td>
                       <td className="px-3 py-3">

@@ -89,10 +89,10 @@ export function ChatbotDashboardClient() {
                         $
                       </span>
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-ink">
+                        <p className="truncate text-sm font-medium text-ink" title={obj.name ?? obj.objectId}>
                           {obj.name ?? obj.objectId}
                         </p>
-                        <p className="truncate font-mono text-xs text-muted">${obj.objectId}</p>
+                        <p className="truncate font-mono text-xs text-muted" title={obj.objectId}>${obj.objectId}</p>
                       </div>
                     </div>
                     <span className="flex-none rounded-sm bg-surface-sunken px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-muted">
@@ -140,7 +140,7 @@ export function ChatbotDashboardClient() {
                           #
                         </span>
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-ink">{item.name}</p>
+                          <p className="truncate text-sm font-medium text-ink" title={item.name}>{item.name}</p>
                           <p className="text-xs text-muted">
                             {item.keywords.length} keywords · {item.responses.length} responses
                           </p>

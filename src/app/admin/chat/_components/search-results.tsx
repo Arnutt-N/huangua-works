@@ -35,14 +35,14 @@ export function SearchResults({
           )}
         >
           <span className="flex items-center justify-between gap-2">
-            <span className="truncate text-xs font-medium text-ink">
+            <span className="truncate text-xs font-medium text-ink" title={r.displayName ?? r.lineUserId ?? 'ผู้ใช้ LINE'}>
               {r.displayName ?? r.lineUserId ?? 'ผู้ใช้ LINE'}
             </span>
             <span className="flex-none text-xs text-muted tabular-nums">
               {formatTime(r.createdAt)}
             </span>
           </span>
-          <span className="line-clamp-2 text-xs text-muted">{r.snippet}</span>
+          <span className="line-clamp-2 text-xs text-muted" title={r.snippet}>{r.snippet}</span>
         </button>
       ))}
     </div>

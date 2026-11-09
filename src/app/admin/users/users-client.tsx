@@ -173,8 +173,8 @@ export function UsersClient({
             >
               {/* Name + email */}
               <div className="min-w-0">
-                <p className="truncate font-semibold text-ink">{u.fullName}</p>
-                <p className="mt-0.5 truncate text-sm text-muted">{u.email}</p>
+                <p className="truncate font-semibold text-ink" title={u.fullName}>{u.fullName}</p>
+                <p className="mt-0.5 truncate text-sm text-muted" title={u.email}>{u.email}</p>
                 <p className="mt-1 text-xs text-muted sm:hidden">
                   {u.departmentName ?? '—'} · {u.isActive ? 'ใช้งาน' : 'ระงับ'}
                 </p>

@@ -66,7 +66,7 @@ export function ChatHeader({
           />
 
           <div className="flex min-w-0 items-center gap-2">
-            <p className="truncate text-sm font-bold text-ink">
+            <p className="truncate text-sm font-bold text-ink" title={customerName ?? 'ผู้ใช้ LINE'}>
               {customerName ?? 'ผู้ใช้ LINE'}
             </p>
             <span className="flex-none rounded-pill bg-surface-sunken px-1.5 py-0.5 text-xs font-medium text-muted">

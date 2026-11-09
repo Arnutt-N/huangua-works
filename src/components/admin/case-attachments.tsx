@@ -71,7 +71,7 @@ export function CaseAttachments({ attachments, storageConfigured }: CaseAttachme
                 className="flex aspect-video w-full flex-col items-center justify-center rounded-xl border border-dashed border-border bg-surface-sunken p-2 text-center text-xs text-muted"
               >
                 <FileImage className="mb-1 h-6 w-6 text-muted" aria-hidden="true" />
-                <span className="max-w-full truncate font-medium">{att.name || 'ไฟล์แนบ'}</span>
+                <span className="max-w-full truncate font-medium" title={att.name || 'ไฟล์แนบ'}>{att.name || 'ไฟล์แนบ'}</span>
                 <span className="text-[11px] text-danger-ink">ไม่สามารถโหลดภาพได้</span>
               </div>
             );
@@ -106,7 +106,7 @@ export function CaseAttachments({ attachments, storageConfigured }: CaseAttachme
         <DialogContent className="max-w-3xl p-6">
           <DialogTitle className="flex items-center gap-2 text-base font-semibold text-ink">
             <Camera className="h-4 w-4 text-accent" aria-hidden="true" />
-            <span className="truncate">{selectedAttachment?.name || 'รูปภาพหลักฐาน'}</span>
+            <span className="truncate" title={selectedAttachment?.name || 'รูปภาพหลักฐาน'}>{selectedAttachment?.name || 'รูปภาพหลักฐาน'}</span>
           </DialogTitle>
           <DialogDescription className="sr-only">
             ภาพถ่ายหลักฐานประกอบเรื่องร้องเรียน

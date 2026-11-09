@@ -167,7 +167,10 @@ export function StatusDonutChart({ items }: StatusDonutChartProps) {
                 <span className="text-2xl font-black tabular-nums tracking-tight text-ink">
                   {activeSegment ? activeSegment.count.toLocaleString('th-TH') : totalCases.toLocaleString('th-TH')}
                 </span>
-                <span className="max-w-24 truncate text-xs font-semibold text-muted">
+                <span
+                  className="pointer-events-auto max-w-24 truncate text-xs font-semibold text-muted"
+                  title={activeSegment ? activeSegment.label : 'เรื่องทั้งหมด'}
+                >
                   {activeSegment ? activeSegment.label : 'เรื่องทั้งหมด'}
                 </span>
                 {activeSegment && (

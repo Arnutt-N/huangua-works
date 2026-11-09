@@ -2,7 +2,7 @@
 
 import * as SelectPrimitive from '@radix-ui/react-select';
 import { Check, ChevronDown } from 'lucide-react';
-import { type ComponentPropsWithoutRef, type ElementRef, forwardRef } from 'react';
+import { type ComponentPropsWithoutRef, type ElementRef, forwardRef, useEffect, useRef, useState } from 'react';
 import { cn } from '../../lib/cn';
 import { controlChevronIcon, selectTriggerClass } from './control-styles';
 
@@ -23,18 +23,28 @@ const SELECT_NONE = '__none__';
 export const SelectTrigger = forwardRef<
   ElementRef<typeof SelectPrimitive.Trigger>,
   ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>
->(({ className, children, ...props }, ref) => (
-  <SelectPrimitive.Trigger
-    ref={ref}
-    className={cn(selectTriggerClass, className)}
-    {...props}
-  >
-    <span className="min-w-0 flex-1 truncate text-left">{children}</span>
-    <SelectPrimitive.Icon asChild>
-      <ChevronDown className={controlChevronIcon} aria-hidden="true" />
-    </SelectPrimitive.Icon>
-  </SelectPrimitive.Trigger>
-));
+>(({ className, children, ...props }, ref) => {
+  const labelRef = useRef<HTMLSpanElement>(null);
+  const [labelTitle, setLabelTitle] = useState<string | undefined>();
+  useEffect(() => {
+    const full = labelRef.current?.textContent?.replace(/\s+/g, ' ').trim() || undefined;
+    setLabelTitle((prev) => (prev === full ? prev : full));
+  }, [children]);
+  return (
+    <SelectPrimitive.Trigger
+      ref={ref}
+      className={cn(selectTriggerClass, className)}
+      {...props}
+    >
+      <span ref={labelRef} className="min-w-0 flex-1 truncate text-left" title={labelTitle}>
+        {children}
+      </span>
+      <SelectPrimitive.Icon asChild>
+        <ChevronDown className={controlChevronIcon} aria-hidden="true" />
+      </SelectPrimitive.Icon>
+    </SelectPrimitive.Trigger>
+  );
+});
 SelectTrigger.displayName = 'SelectTrigger';
 
 export const SelectContent = forwardRef<

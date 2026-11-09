@@ -709,7 +709,10 @@ export function IntakeForm({
               </span>
             )}
             <div className="min-w-0 flex-1">
-              <p className="truncate font-semibold text-base">
+              <p
+                className="truncate font-semibold text-base"
+                title={liff.displayName ? `บัญชี LINE: ${liff.displayName}` : 'เชื่อมต่อกับบัญชี LINE ของท่านเรียบร้อยแล้ว'}
+              >
                 {liff.displayName ? `บัญชี LINE: ${liff.displayName}` : 'เชื่อมต่อกับบัญชี LINE ของท่านเรียบร้อยแล้ว'}
               </p>
               <p className="text-sm text-muted">
@@ -1032,7 +1035,7 @@ export function IntakeForm({
                       )}
                     </span>
                     <div className="min-w-0">
-                      <p className="truncate font-medium text-ink">{att.name}</p>
+                      <p className="truncate font-medium text-ink" title={att.name}>{att.name}</p>
                       <p className="text-xs text-muted">
                         {(att.size / (1024 * 1024)).toFixed(2)} MB
                         {att.status === 'uploading' && ' · กำลังอัปโหลด...'}

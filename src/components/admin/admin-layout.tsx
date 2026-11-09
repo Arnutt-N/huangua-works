@@ -200,10 +200,12 @@ export function AdminLayout({
                 จึงซ่อนข้อความด้วยคลาส md: ไม่ใช่ตัดออกจาก DOM — ไม่งั้น drawer
                 ต่ำกว่า breakpoint md (ซึ่งกว้างเต็มที่เสมอ) จะเหลือแต่ไอคอนโดยไม่มีป้ายกำกับ */}
             <span className={cn('min-w-0', collapsed && 'md:hidden')}>
-              <span className="block truncate text-sm font-bold text-ink">
+              <span className="block truncate text-sm font-bold text-ink" title="อบต.หัวงัว">
                 อบต.หัวงัว
               </span>
-              <span className="block truncate text-xs text-muted">ระบบเจ้าหน้าที่</span>
+              <span className="block truncate text-xs text-muted" title="ระบบเจ้าหน้าที่">
+                ระบบเจ้าหน้าที่
+              </span>
             </span>
           </Link>
           <button
@@ -291,7 +293,7 @@ export function AdminLayout({
             <Menu className="h-5 w-5" aria-hidden="true" />
           </button>
 
-          <h1 className="min-w-0 flex-1 truncate text-base font-bold text-ink sm:text-lg">
+          <h1 className="min-w-0 flex-1 truncate text-base font-bold text-ink sm:text-lg" title={title}>
             {title}
           </h1>
 
@@ -337,7 +339,9 @@ function SidebarLink({
       )}
     >
       <Icon className="h-5 w-5 flex-none" aria-hidden="true" />
-      <span className={cn('truncate', collapsed && 'md:hidden')}>{item.label}</span>
+      <span className={cn('truncate', collapsed && 'md:hidden')} title={item.label}>
+        {item.label}
+      </span>
     </Link>
   );
 }

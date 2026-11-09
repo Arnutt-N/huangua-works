@@ -33,7 +33,7 @@ export function Navbar() {
               แล้วสลับความยาวชื่อตามจอแทน */}
           <Link href="/" className="flex min-w-0 items-center gap-2.5">
             <BrandMark />
-            <span className="hidden truncate whitespace-nowrap text-sm font-bold sm:block">
+            <span className="hidden truncate whitespace-nowrap text-sm font-bold sm:block" title="กองช่าง องค์การบริหารส่วนตำบลหัวงัว">
               <span className="lg:hidden">กองช่าง อบต.หัวงัว</span>
               <span className="hidden lg:inline">กองช่าง องค์การบริหารส่วนตำบลหัวงัว</span>
             </span>

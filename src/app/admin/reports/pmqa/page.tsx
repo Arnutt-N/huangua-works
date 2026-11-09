@@ -13,6 +13,7 @@ import {
 import { requireStaff } from '@/lib/auth/require-staff';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { PrintButton } from '@/components/admin/print-button';
+import { KpiCard } from '@/components/admin/kpi-card';
 import { CaseStatusBadge } from '@/components/ui/case-status-badge';
 import { ALL_STATUSES } from '@/lib/cases/state-machine';
 import { getPmqaReportData } from '@/lib/pmqa';
@@ -39,6 +40,9 @@ export default async function PmqaReportPage({ searchParams }: PageProps) {
   const report = await getPmqaReportData({
     fiscalYear: Number.isFinite(parsedYear) ? parsedYear : undefined,
   });
+
+  const kpiPrintClass =
+    'print:break-inside-avoid print:rounded-lg print:border print:border-border print:bg-white print:text-black print:shadow-none';
 
   return (
     <AdminShell user={staffUser} active="pmqa" title="รายงานเกณฑ์ PMQA">
@@ -108,105 +112,56 @@ export default async function PmqaReportPage({ searchParams }: PageProps) {
           </div>
         </div>
 
-        {/* แผง KPI การ์ดสรุปภาพรวม */}
+        {/* แผง KPI — ใช้การ์ดเดียวกับแดชบอร์ด /admin */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 print:grid-cols-4 print:gap-3">
-          <div className="glass-panel rounded-xl p-5 shadow-sm print:break-inside-avoid print:rounded-lg print:border print:border-border print:bg-white print:p-4 print:text-black print:shadow-none">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-muted print:text-muted">
-                เรื่องร้องเรียนทั้งหมด
-              </span>
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent-sunken text-accent-strong print:hidden">
-                <Inbox className="h-5 w-5" aria-hidden="true" />
-              </span>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold text-ink print:text-black">
-                {report.totalCases.toLocaleString('th-TH')}
-              </span>
-              <span className="text-xs text-muted print:text-muted">เรื่อง</span>
-            </div>
-            <p className="mt-1 text-xs text-muted print:text-muted">
-              รับแจ้งในปีงบประมาณ {report.fiscalYear}
-            </p>
-          </div>
-
-          <div className="glass-panel rounded-xl p-5 shadow-sm print:break-inside-avoid print:rounded-lg print:border print:border-border print:bg-white print:p-4 print:text-black print:shadow-none">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-muted print:text-muted">
-                ดำเนินการแล้วเสร็จ
-              </span>
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-success-soft text-success-ink print:hidden">
-                <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
-              </span>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold text-ink print:text-black">
-                {report.resolvedCount.toLocaleString('th-TH')}
-              </span>
-              <span className="text-xs text-muted print:text-muted">เรื่อง</span>
-            </div>
-            <div className="mt-1 flex items-center justify-between text-xs">
-              <span className="font-semibold text-success-ink print:font-bold print:text-black">
-                อัตราความสำเร็จ {report.resolutionRate}%
-              </span>
-              <span className="text-muted print:text-muted">(เสร็จสิ้น/ปิดเรื่อง)</span>
-            </div>
-          </div>
-
-          <div className="glass-panel rounded-xl p-5 shadow-sm print:break-inside-avoid print:rounded-lg print:border print:border-border print:bg-white print:p-4 print:text-black print:shadow-none">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-muted print:text-muted">
-                อยู่ระหว่างดำเนินการ
-              </span>
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-warning-soft text-warning-ink print:hidden">
-                <Clock className="h-5 w-5" aria-hidden="true" />
-              </span>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold text-ink print:text-black">
-                {report.openCount.toLocaleString('th-TH')}
-              </span>
-              <span className="text-xs text-muted print:text-muted">เรื่อง</span>
-            </div>
-            <p className="mt-1 text-xs text-muted print:text-muted">
-              สัดส่วน{' '}
-              {report.totalCases > 0
-                ? Math.round((report.openCount / report.totalCases) * 1000) / 10
-                : 0}
-              % ของเรื่องทั้งหมด
-            </p>
-          </div>
-
-          <div className="glass-panel rounded-xl p-5 shadow-sm print:break-inside-avoid print:rounded-lg print:border print:border-border print:bg-white print:p-4 print:text-black print:shadow-none">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-muted print:text-muted">
-                ยุติเรื่อง / ไม่รับดำเนินการ
-              </span>
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-danger-soft text-danger-ink print:hidden">
-                <XCircle className="h-5 w-5" aria-hidden="true" />
-              </span>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold text-ink print:text-black">
-                {report.rejectedCount.toLocaleString('th-TH')}
-              </span>
-              <span className="text-xs text-muted print:text-muted">เรื่อง</span>
-            </div>
-            <p className="mt-1 text-xs text-muted print:text-muted">ไม่อยู่ในอำนาจหน้าที่/ไม่เข้าเกณฑ์</p>
-          </div>
+          <KpiCard
+            label="เรื่องร้องเรียนทั้งหมด"
+            value={report.totalCases}
+            icon={Inbox}
+            subtext={`รับแจ้งในปีงบประมาณ ${report.fiscalYear}`}
+            className={kpiPrintClass}
+          />
+          <KpiCard
+            label="ดำเนินการแล้วเสร็จ"
+            value={report.resolvedCount}
+            icon={CheckCircle2}
+            variant="success"
+            subtext={`อัตราความสำเร็จ ${report.resolutionRate}% (เสร็จสิ้น/ปิดเรื่อง)`}
+            className={kpiPrintClass}
+          />
+          <KpiCard
+            label="อยู่ระหว่างดำเนินการ"
+            value={report.openCount}
+            icon={Clock}
+            variant="gold"
+            subtext={
+              report.totalCases > 0
+                ? `สัดส่วน ${Math.round((report.openCount / report.totalCases) * 1000) / 10}% ของเรื่องทั้งหมด`
+                : 'ไม่มีเรื่องค้างดำเนินการ'
+            }
+            className={kpiPrintClass}
+          />
+          <KpiCard
+            label="ยุติเรื่อง / ไม่รับดำเนินการ"
+            value={report.rejectedCount}
+            icon={XCircle}
+            variant="danger"
+            subtext="ไม่อยู่ในอำนาจหน้าที่/ไม่เข้าเกณฑ์"
+            className={kpiPrintClass}
+          />
         </div>
 
-        {/* แผงแจกแจงแยกตามสถานะย่อยทั้ง 8 สถานะ (จัดแบบ 4 คอลัมน์ x 2 แถว ในโหมดพิมพ์) */}
+        {/* ป้ายสถานะอยู่ในการ์ด — ข้อความที่ล้นตัดเป็น … และโฮเวอร์เห็นข้อความเต็มผ่าน title */}
         <div className="glass-panel rounded-xl p-5 shadow-sm print:break-inside-avoid print:rounded-lg print:border print:border-border print:bg-white print:p-4 print:text-black print:shadow-none">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="flex items-center gap-2 text-base font-bold text-ink print:text-black">
-              <BarChart3 className="h-4 w-4 text-accent-strong print:hidden" aria-hidden="true" />
-              จำแนกตามขั้นตอนวงจรชีวิต (8 สถานะ)
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h2 className="flex min-w-0 items-center gap-2 text-base font-bold text-ink print:text-black">
+              <BarChart3 className="h-4 w-4 flex-none text-accent-strong print:hidden" aria-hidden="true" />
+              จำแนกตามขั้นตอนวงจรชีวิต ({ALL_STATUSES.length} สถานะ)
             </h2>
-            <span className="text-xs text-muted print:text-muted">สถานะตาม State Machine</span>
+            <span className="shrink-0 text-xs text-muted print:text-muted">สถานะตาม State Machine</span>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8 print:grid-cols-4 print:gap-2">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 print:grid-cols-3 print:gap-2">
             {ALL_STATUSES.map((status) => {
               const count = report.statusCounts[status] ?? 0;
               const pct =
@@ -216,10 +171,10 @@ export default async function PmqaReportPage({ searchParams }: PageProps) {
               return (
                 <div
                   key={status}
-                  className="flex flex-col items-center rounded-lg border border-border bg-surface-sunken/40 p-3 text-center print:break-inside-avoid print:border-border print:bg-white print:p-2.5 print:text-black"
+                  className="flex min-w-0 flex-col items-center rounded-lg border border-border bg-surface-raised p-3 text-center print:break-inside-avoid print:border-border print:bg-white print:p-2.5 print:text-black"
                 >
-                  <CaseStatusBadge status={status} className="text-xs" />
-                  <span className="mt-2 text-xl font-bold text-ink print:text-black">
+                  <CaseStatusBadge status={status} truncate className="text-xs" />
+                  <span className="mt-2 text-xl font-bold tabular-nums text-ink print:text-black">
                     {count.toLocaleString('th-TH')}
                   </span>
                   <span className="text-[11px] text-muted print:text-muted">{pct}%</span>

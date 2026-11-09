@@ -194,7 +194,7 @@ export function RichMenusClient() {
                           <span className="font-medium">Bar Text:</span>{' '}
                           <span className="italic">&quot;{item.chatBarText}&quot;</span>
                         </p>
-                        <p className="mt-1 truncate font-mono text-xs text-muted">
+                        <p className="mt-1 truncate font-mono text-xs text-muted" title={item.lineRichMenuId ?? 'LOCAL_ONLY'}>
                           {item.lineRichMenuId ?? 'LOCAL_ONLY'}
                         </p>
                         {(item.userLinkCount ?? 0) > 0 && (

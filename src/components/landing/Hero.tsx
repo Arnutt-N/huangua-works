@@ -302,14 +302,14 @@ function HeroTrackingCard({ reduce }: { reduce: boolean }) {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold">ไฟฟ้าสาธารณะ</p>
-              <p className="line-clamp-2 text-xs text-muted">หลอดไฟถนนสาธารณะชำรุด 3 ดวง</p>
+              <p className="line-clamp-2 text-xs text-muted" title="หลอดไฟถนนสาธารณะชำรุด 3 ดวง">หลอดไฟถนนสาธารณะชำรุด 3 ดวง</p>
             </div>
           </div>
 
           {/* Location */}
           <div className="bg-surface-sunken/50 flex items-center gap-2 rounded-lg p-2.5 text-xs text-muted">
             <MapPin className="text-accent h-3.5 w-3.5 flex-shrink-0" />
-            <span className="truncate">หมู่ที่ 5 ต.หัวงัว อ.ยางตลาด จ.กาฬสินธุ์</span>
+            <span className="truncate" title="หมู่ที่ 5 ต.หัวงัว อ.ยางตลาด จ.กาฬสินธุ์">หมู่ที่ 5 ต.หัวงัว อ.ยางตลาด จ.กาฬสินธุ์</span>
           </div>
 
           {/* Progress timeline */}

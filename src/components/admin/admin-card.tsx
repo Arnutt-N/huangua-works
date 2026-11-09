@@ -1,6 +1,21 @@
 import { cn } from '@/lib/cn';
 import type { ReactNode } from 'react';
 
+function clipTitle(node: ReactNode): string | undefined {
+  if (node == null || typeof node === 'boolean') return '';
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) {
+    let out = '';
+    for (const child of node) {
+      const part = clipTitle(child);
+      if (part == null) return undefined;
+      out += part;
+    }
+    return out.trim();
+  }
+  return undefined;
+}
+
 /**
  * AdminCard — พื้นผิวการ์ดสำหรับ content grouping
  *
@@ -62,7 +77,12 @@ export function AdminCardTitle({
             {icon}
           </span>
         )}
-        <span className="truncate">{children}</span>
+        <span
+          className="truncate"
+          title={clipTitle(children) || undefined}
+        >
+          {children}
+        </span>
       </h2>
       {action && <div className="flex flex-none items-center gap-2">{action}</div>}
     </div>

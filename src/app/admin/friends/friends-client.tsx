@@ -323,6 +323,7 @@ export function FriendsClient() {
                             <Link
                               href={`/admin/friends/${friend.id}`}
                               className="truncate font-medium text-accent-strong hover:underline"
+                              title={friend.displayName ?? 'ไม่ระบุชื่อ'}
                             >
                               {friend.displayName ?? 'ไม่ระบุชื่อ'}
                             </Link>

@@ -370,7 +370,7 @@ export function IntentDetailClient({ intentId }: { intentId: string }) {
                 <li key={r.id} className="flex items-start justify-between gap-2 rounded-lg border border-border/50 px-3 py-2">
                   <span className="min-w-0 flex-1">
                     {r.replyType === 'text' ? (
-                      <span className="block truncate text-sm text-ink">{r.textContent ?? '—'}</span>
+                      <span className="block truncate text-sm text-ink" title={r.textContent ?? '—'}>{r.textContent ?? '—'}</span>
                     ) : (
                       <span className="block font-mono text-sm font-bold text-accent-strong">${r.replyObjectId ?? '—'}</span>
                     )}
