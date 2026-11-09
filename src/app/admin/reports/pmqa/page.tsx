@@ -42,7 +42,8 @@ export default async function PmqaReportPage({ searchParams }: PageProps) {
   });
 
   const kpiPrintClass =
-    'print:break-inside-avoid print:rounded-lg print:border print:border-border print:bg-white print:text-black print:shadow-none';
+    'print:break-inside-avoid print:rounded-lg print:border print:border-border print:bg-white print:shadow-none ' +
+    '[&_p]:print:text-black [&_.truncate]:print:text-black [&>span]:print:hidden';
 
   return (
     <AdminShell user={staffUser} active="pmqa" title="รายงานเกณฑ์ PMQA">

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -109,5 +109,23 @@ describe('SelectField', () => {
     expect(onValueChange).not.toHaveBeenCalled();
     await user.click(screen.getByRole('option', { name: 'เมนูหลัก' }));
     expect(onValueChange).toHaveBeenCalledWith('ok');
+  });
+
+  it('ชื่อที่ถูกตัดในช่องเลือกมี title เป็นข้อความที่แสดง และตามค่าที่เปลี่ยน', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    const trigger = screen.getByRole('combobox', { name: 'สถานะ' });
+    const label = () => trigger.querySelector('span.truncate');
+
+    await waitFor(() => {
+      expect(label()).toHaveAttribute('title', 'ทุกสถานะ');
+    });
+
+    await user.click(trigger);
+    await user.click(await screen.findByRole('option', { name: 'ส่งแล้ว' }));
+
+    await waitFor(() => {
+      expect(label()).toHaveAttribute('title', 'ส่งแล้ว');
+    });
   });
 });

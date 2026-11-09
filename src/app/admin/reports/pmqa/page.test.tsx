@@ -179,6 +179,9 @@ describe('PmqaReportPage (/admin/reports/pmqa)', () => {
       'title',
       'ยุติเรื่อง / ไม่รับดำเนินการ',
     );
+    const card = screen.getByText('เรื่องร้องเรียนทั้งหมด').closest('.glass-panel');
+    expect(card?.className).toContain('[&_p]:print:text-black');
+    expect(card?.className).toContain('[&>span]:print:hidden');
   });
 
   it('handles zero total cases without error or NaN%', async () => {
