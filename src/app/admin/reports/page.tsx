@@ -15,6 +15,7 @@ import { OPEN_STATUSES, isCaseStatus, type CaseStatus } from '@/lib/cases/state-
 import { parseThaiDateEnd, parseThaiDateStart } from '@/lib/thai-date';
 import { isReversedDateRange } from '@/lib/date-range';
 import { cn } from '@/lib/cn';
+import { Button } from '@/components/ui/button';
 
 export const metadata: Metadata = { title: 'จัดการเรื่อง' };
 
@@ -179,16 +180,13 @@ export default async function CaseManagementPage({
           <p className="text-sm text-muted">
             คลิกที่เรื่องเพื่อดูรายละเอียด เปลี่ยนสถานะ หรือมอบหมาย
           </p>
-          <div className="flex items-center gap-2">
-            <a
-              href={exportUrl}
-              download
-              className="inline-flex min-h-touch items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-ink shadow-xs transition-colors hover:bg-surface-sunken hover:border-border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
-              aria-label="ส่งออกข้อมูลเรื่องร้องเรียนเป็นไฟล์ CSV"
-            >
-              <Download className="h-4 w-4 text-muted" aria-hidden="true" />
-              <span>ส่งออก CSV</span>
-            </a>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button asChild variant="outline" size="sm">
+              <a href={exportUrl} download aria-label="ส่งออกข้อมูลเรื่องร้องเรียนเป็นไฟล์ CSV">
+                <Download className="h-4 w-4 text-muted" aria-hidden="true" />
+                ส่งออก CSV
+              </a>
+            </Button>
           </div>
         </div>
 
@@ -230,14 +228,14 @@ export default async function CaseManagementPage({
 
         {/* ป้ายแสดงสถานะตัวกรองพิเศษ (Overdue หรือ เคสเปิดทั้งหมด) */}
         {isOverdue && (
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-danger-ink/25 bg-danger-soft px-4 py-2.5 text-sm text-danger-ink">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-danger-ink/25 bg-danger-soft px-4 py-2.5 text-sm text-danger-ink">
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 flex-shrink-0 text-danger-ink" aria-hidden="true" />
               <span className="font-semibold">กำลังกรอง: เรื่องที่เกินกำหนดเวลา (SLA Breach)</span>
             </div>
             <Link
               href="/admin/reports"
-              className="inline-flex min-h-touch items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold text-danger-ink underline hover:bg-danger-ink/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-ink"
+              className="inline-flex min-h-touch shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-3 text-sm font-semibold leading-snug text-danger-ink underline hover:bg-danger-ink/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-ink"
             >
               <X className="h-3.5 w-3.5" aria-hidden="true" />
               <span>ล้างตัวกรอง</span>
@@ -246,14 +244,14 @@ export default async function CaseManagementPage({
         )}
 
         {isOpenFilter && !isOverdue && (
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-accent/25 bg-accent-sunken px-4 py-2.5 text-sm text-ink">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent/25 bg-accent-sunken px-4 py-2.5 text-sm text-ink">
             <div className="flex items-center gap-2">
               <Activity className="h-4 w-4 flex-shrink-0 text-accent-strong" aria-hidden="true" />
               <span className="font-semibold">กำลังกรอง: เรื่องที่กำลังดำเนินการทั้งหมด (เคสเปิด)</span>
             </div>
             <Link
               href="/admin/reports"
-              className="inline-flex min-h-touch items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold text-accent-strong underline hover:bg-accent-strong/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
+              className="inline-flex min-h-touch shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-3 text-sm font-semibold leading-snug text-accent-strong underline hover:bg-accent-strong/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
             >
               <X className="h-3.5 w-3.5" aria-hidden="true" />
               <span>ล้างตัวกรอง</span>

@@ -11,6 +11,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { KpiCard } from '@/components/admin/kpi-card';
+import { Button } from '@/components/ui/button';
 import { IntakeTrendChart } from './intake-trend-chart';
 import { StatusDonutChart } from './status-donut-chart';
 import { CategoryRankedChart } from './category-ranked-chart';
@@ -46,21 +47,19 @@ export function AdminDashboardView({
         <p className="text-xs text-muted">
           {metrics.lastUpdatedDateText}
         </p>
-        <div className="flex items-center gap-2">
-          <Link
-            href="/admin/reports/pmqa"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-raised px-3 py-1.5 text-xs font-semibold text-ink shadow-sm transition hover:border-accent-strong hover:text-accent-strong"
-          >
-            <Award className="h-3.5 w-3.5 text-accent-strong" aria-hidden="true" />
-            รายงานเกณฑ์ PMQA
-          </Link>
-          <Link
-            href="/admin/reports"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-raised px-3 py-1.5 text-xs font-semibold text-ink shadow-sm transition hover:border-accent-strong hover:text-accent-strong"
-          >
-            <FileSpreadsheet className="h-3.5 w-3.5 text-accent-strong" aria-hidden="true" />
-            ตารางจัดการเรื่อง
-          </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link href="/admin/reports/pmqa">
+              <Award className="h-4 w-4 text-accent-strong" aria-hidden="true" />
+              รายงานเกณฑ์ PMQA
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/admin/reports">
+              <FileSpreadsheet className="h-4 w-4 text-accent-strong" aria-hidden="true" />
+              ตารางจัดการเรื่อง
+            </Link>
+          </Button>
         </div>
       </div>
 

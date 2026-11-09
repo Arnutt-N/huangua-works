@@ -11,7 +11,9 @@ import { AdminErrorState } from '@/components/admin/admin-error-state';
 import { PageHeader } from '@/components/admin/page-header';
 import { ConfirmDialog } from '@/components/admin/confirm-dialog';
 import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { Input } from '@/components/ui/field';
+import { SelectField } from '@/components/ui/select';
 import { cn } from '@/lib/cn';
 
 
@@ -130,18 +132,17 @@ export function RichMenuAliasesClient() {
               <label htmlFor="alias-target" className="text-xs font-bold uppercase tracking-wider text-muted">
                 ชี้ไปที่เมนู
               </label>
-              <select
+              <SelectField
                 id="alias-target"
-                aria-label="เมนูเป้าหมาย"
+                ariaLabel="เมนูเป้าหมาย"
                 value={aliasTarget}
-                onChange={(e) => setAliasTarget(e.target.value)}
-                className="mt-1 min-h-touch w-full rounded-lg border border-border bg-surface px-3 text-sm"
-              >
-                <option value="">-- เลือกเมนู --</option>
-                {syncedMenus.map((m) => (
-                  <option key={m.id} value={m.id}>{m.name}</option>
-                ))}
-              </select>
+                onValueChange={setAliasTarget}
+                options={[
+                  { value: '', label: '-- เลือกเมนู --' },
+                  ...syncedMenus.map((m) => ({ value: m.id, label: m.name })),
+                ]}
+                className="mt-1 w-full"
+              />
             </div>
             <Button onClick={handleCreate} disabled={creating} className="gap-1.5">
               <Plus className="h-4 w-4" /> {creating ? 'กำลังสร้าง...' : 'สร้าง'}
@@ -175,20 +176,19 @@ export function RichMenuAliasesClient() {
                   <tr key={alias.aliasId} className="hover:bg-accent/5">
                     <td className="px-4 py-4 font-mono text-sm text-ink">{alias.aliasId}</td>
                     <td className="px-4 py-4">
-                      <select
-                        aria-label={`เมนูเป้าหมายของ ${alias.aliasId}`}
+                      <SelectField
+                        ariaLabel={`เมนูเป้าหมายของ ${alias.aliasId}`}
                         value={alias.richMenuId}
                         disabled={repointingAlias === alias.aliasId}
-                        onChange={(e) => void handleRepoint(alias.aliasId, e.target.value)}
-                        className="min-h-touch rounded-lg border border-border bg-surface px-2 text-sm disabled:opacity-50"
-                      >
-                        {!syncedMenus.some((m) => m.id === alias.richMenuId) && (
-                          <option value={alias.richMenuId}>{alias.menuName ?? alias.richMenuId}</option>
-                        )}
-                        {syncedMenus.map((m) => (
-                          <option key={m.id} value={m.id}>{m.name}</option>
-                        ))}
-                      </select>
+                        onValueChange={(next) => void handleRepoint(alias.aliasId, next)}
+                        options={[
+                          ...(!syncedMenus.some((m) => m.id === alias.richMenuId)
+                            ? [{ value: alias.richMenuId, label: alias.menuName ?? alias.richMenuId }]
+                            : []),
+                          ...syncedMenus.map((m) => ({ value: m.id, label: m.name })),
+                        ]}
+                        className="w-56 max-w-full"
+                      />
                     </td>
                     <td className="px-4 py-4 text-center">
                       <span
@@ -203,14 +203,13 @@ export function RichMenuAliasesClient() {
                       </span>
                     </td>
                     <td className="px-4 py-4 text-center">
-                      <button
-                        type="button"
+                      <IconButton
+                        intent="danger"
                         aria-label={`ลบ alias ${alias.aliasId}`}
                         onClick={() => setDeleteTarget(alias.aliasId)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-md text-danger hover:bg-danger/10"
                       >
                         <Trash2 className="h-4 w-4" />
-                      </button>
+                      </IconButton>
                     </td>
                   </tr>
                 ))}

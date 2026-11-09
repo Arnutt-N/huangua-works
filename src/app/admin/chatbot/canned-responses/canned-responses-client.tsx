@@ -15,7 +15,9 @@ import { DetailModal } from '@/components/admin/detail-modal';
 import { AdminErrorState } from '@/components/admin/admin-error-state';
 import { PageHeader } from '@/components/admin/page-header';
 import { useConfirm } from '@/components/admin/use-confirm';
+import { IconButton } from '@/components/ui/icon-button';
 import { FieldError, Input, Label, Textarea } from '@/components/ui/field';
+import { SelectField } from '@/components/ui/select';
 import { useResource } from '@/app/admin/_lib/use-resource';
 import {
   createCannedResponse,
@@ -244,31 +246,26 @@ export function CannedResponsesClient() {
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <div className="flex items-center justify-center gap-1">
-                        <button
-                          type="button"
+                        <IconButton
                           onClick={() => setViewRow(item)}
                           aria-label={`ดูรายละเอียด ${item.title}`}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted hover:bg-accent-sunken hover:text-accent-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
                         >
                           <Eye className="h-4 w-4" aria-hidden="true" />
-                        </button>
-                        <button
-                          type="button"
+                        </IconButton>
+                        <IconButton
                           onClick={() => startEdit(item)}
                           aria-label={`แก้ไข ${item.title}`}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted hover:bg-accent-sunken hover:text-accent-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
                         >
                           <Pencil className="h-4 w-4" aria-hidden="true" />
-                        </button>
-                        <button
-                          type="button"
+                        </IconButton>
+                        <IconButton
+                          intent="danger"
                           disabled={deletingId === item.id || busy}
                           onClick={() => void handleDelete(item)}
                           aria-label={`ลบ ${item.title}`}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted hover:bg-danger-soft hover:text-danger focus-visible:outline focus-visible:outline-2 focus-visible:outline-danger disabled:opacity-50"
                         >
                           <Trash2 className="h-4 w-4" aria-hidden="true" />
-                        </button>
+                        </IconButton>
                       </div>
                     </td>
                   </tr>
@@ -324,18 +321,12 @@ export function CannedResponsesClient() {
             </div>
             <div>
               <Label htmlFor="canned-category">หมวดหมู่</Label>
-              <select
+              <SelectField
                 id="canned-category"
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="min-h-touch w-full rounded-md border border-border bg-surface-raised px-4 text-ink"
-              >
-                {CATEGORY_OPTIONS.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
+                onValueChange={setCategory}
+                options={CATEGORY_OPTIONS.map((c) => ({ value: c.value, label: c.label }))}
+              />
             </div>
             <FieldError>{formError}</FieldError>
             <div className="flex gap-3 pt-2">

@@ -291,8 +291,8 @@ export function ThaiDatePicker({
       <div
         ref={containerRef}
         className={cn(
-          // § สูง h-9 (36px) ตามช่องวันที่ของ JSK
-          'flex h-9 w-full items-center gap-0.5 rounded-xl border border-border bg-surface-raised px-1.5 text-sm text-ink shadow-xs transition-colors duration-fast focus-within:border-accent-strong focus-within:ring-2 focus-within:ring-accent-strong/20',
+          // § pr-3 keeps the calendar and clear buttons off the field border.
+          'flex min-h-touch w-full items-center gap-1 rounded-md border border-border bg-surface-raised py-1 pl-3 pr-3 text-base leading-snug text-ink shadow-xs transition-colors duration-fast focus-within:border-accent-strong focus-within:ring-2 focus-within:ring-accent-strong/20',
           disabled && 'cursor-not-allowed opacity-60',
         )}
       >
@@ -351,7 +351,7 @@ export function ThaiDatePicker({
             disabled={disabled}
             aria-label={`ล้าง${label}`}
             onClick={clearValue}
-            className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-danger/10 text-danger transition-colors duration-fast hover:bg-danger hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
+            className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-danger/10 text-danger transition-colors duration-fast hover:bg-danger hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
           >
             <X className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
@@ -364,7 +364,7 @@ export function ThaiDatePicker({
             aria-expanded={open}
             aria-haspopup="dialog"
             onClick={openCalendar}
-            className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-muted transition-colors duration-fast hover:bg-surface-sunken hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
+            className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted transition-colors duration-fast hover:bg-surface-sunken hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
           >
             <CalendarIcon className="h-4 w-4" aria-hidden="true" />
           </button>
@@ -392,7 +392,7 @@ export function ThaiDatePicker({
                 type="button"
                 aria-label="เดือนก่อนหน้า"
                 onClick={() => stepMonth(-1)}
-                className="flex h-8 w-8 items-center justify-center rounded-md text-muted hover:bg-surface-sunken hover:text-ink"
+                className="flex min-h-touch min-w-touch items-center justify-center rounded-md text-muted hover:bg-surface-sunken hover:text-ink"
               >
                 <ChevronLeft className="h-4 w-4" aria-hidden="true" />
               </button>
@@ -403,7 +403,7 @@ export function ThaiDatePicker({
                 type="button"
                 aria-label="เดือนถัดไป"
                 onClick={() => stepMonth(1)}
-                className="flex h-8 w-8 items-center justify-center rounded-md text-muted hover:bg-surface-sunken hover:text-ink"
+                className="flex min-h-touch min-w-touch items-center justify-center rounded-md text-muted hover:bg-surface-sunken hover:text-ink"
               >
                 <ChevronRight className="h-4 w-4" aria-hidden="true" />
               </button>

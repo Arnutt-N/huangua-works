@@ -39,7 +39,7 @@ describe('ThaiDatePicker', () => {
     expect(screen.getByRole('textbox', { name: 'วันที่' })).toHaveValue('20');
     const clearBtn = screen.getByRole('button', { name: 'ล้างวันที่' });
     expect(clearBtn).toHaveClass('rounded-full', 'bg-danger/10');
-    expect(clearBtn.parentElement).toHaveClass('h-9');
+    expect(clearBtn.parentElement).toHaveClass('min-h-touch');
     expect(screen.queryByRole('button', { name: 'เปิดปฏิทิน วันที่' })).not.toBeInTheDocument();
   });
 

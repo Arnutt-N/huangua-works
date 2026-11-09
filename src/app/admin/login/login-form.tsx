@@ -73,7 +73,7 @@ export function LoginForm() {
             aria-label เปลี่ยนตาม state (ไม่ใช้ aria-pressed ซ้ำ — screen reader ประกาศซ้ำซ้อน)
             § ตั้งชื่อ "แสดงรหัส/ซ่อนรหัส" ไม่ใช่ "แสดงรหัสผ่าน" — e2e ใช้ getByLabel('รหัสผ่าน')
             ซึ่ง match ทุก element ที่ชื่อมี substring นั้น ปุ่มจะกลายเป็น match ที่ 2 → strict mode พัง
-            pr-14 ที่ input กันข้อความมุดใต้ปุ่ม */}
+            prop trailing ใส่ pl-11 pr-14 ทั้งก้อน กันข้อความมุดใต้ปุ่ม */}
         <div className="relative">
           <Input
             id="password"
@@ -82,7 +82,7 @@ export function LoginForm() {
             icon={Lock}
             autoComplete="current-password"
             placeholder="รหัสผ่าน"
-            className="pr-14"
+            trailing
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required

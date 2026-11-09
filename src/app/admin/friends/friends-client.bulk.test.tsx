@@ -48,6 +48,9 @@ const RICH_MENUS = [
 afterEach(() => cleanup());
 
 beforeEach(() => {
+  window.HTMLElement.prototype.hasPointerCapture = vi.fn();
+  window.HTMLElement.prototype.releasePointerCapture = vi.fn();
+  window.HTMLElement.prototype.scrollIntoView = vi.fn();
   listFriends.mockReset();
   listRichMenus.mockReset();
   assignUserRichMenu.mockReset();
@@ -84,7 +87,8 @@ describe('FriendsClient bulk JSK', () => {
     await user.click(screen.getByRole('button', { name: 'กำหนด Rich Menu' }));
     expect(await screen.findByText('กำหนดริชเมนู 2 คน')).toBeInTheDocument();
 
-    await user.selectOptions(screen.getByLabelText('เลือก Rich Menu (bulk)'), 'm1');
+    await user.click(screen.getByRole('combobox', { name: 'เลือก Rich Menu (bulk)' }));
+    await user.click(await screen.findByRole('option', { name: 'เมนูหลัก' }));
     await user.click(screen.getByRole('button', { name: 'ยืนยันกำหนด' }));
 
     expect(await screen.findByText('กำหนดริชเมนูเป็นกลุ่ม')).toBeInTheDocument();
@@ -111,7 +115,8 @@ describe('FriendsClient bulk JSK', () => {
     await user.click(screen.getByRole('button', { name: 'กำหนด Rich Menu' }));
     expect(await screen.findByText('กำหนดริชเมนู 1 คน')).toBeInTheDocument();
 
-    const select = screen.getByLabelText('เลือก Rich Menu (bulk)');
-    expect(within(select as HTMLElement).getByText(/ใช้ไม่ได้/)).toBeInTheDocument();
+    await user.click(screen.getByRole('combobox', { name: 'เลือก Rich Menu (bulk)' }));
+    const unavailable = await screen.findByRole('option', { name: /ใช้ไม่ได้/ });
+    expect(unavailable).toHaveAttribute('data-disabled');
   });
 });

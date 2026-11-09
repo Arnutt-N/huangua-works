@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import {
   Dialog,
   DialogContent,
@@ -128,22 +129,16 @@ export function CannedManageDialog({
                   </p>
                   <p className="line-clamp-2 text-xs text-muted">{item.content}</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => startEdit(item)}
-                  aria-label={`แก้ไข ${item.title}`}
-                  className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-md text-muted hover:bg-accent-sunken hover:text-accent-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
-                >
+                <IconButton onClick={() => startEdit(item)} aria-label={`แก้ไข ${item.title}`}>
                   <Pencil className="h-4 w-4" aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
+                </IconButton>
+                <IconButton
+                  intent="danger"
                   onClick={() => void handleDelete(item.id, item.title)}
                   aria-label={`ลบ ${item.title}`}
-                  className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-md text-muted hover:bg-danger-soft hover:text-danger focus-visible:outline focus-visible:outline-2 focus-visible:outline-danger"
                 >
                   <Trash2 className="h-4 w-4" aria-hidden="true" />
-                </button>
+                </IconButton>
               </div>
             ))}
           </div>

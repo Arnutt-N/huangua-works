@@ -160,9 +160,9 @@ describe('IntentSection หมวดเจตนา JSK', () => {
 
     await user.click(screen.getByRole('button', { name: 'แก้ไข เวลาทำการ' }));
     expect(screen.getByLabelText('keyword ที่ 1')).toHaveValue('เวลา');
-    expect(screen.getByLabelText('วิธีจับคู่ keyword ที่ 1')).toHaveValue('starts_with');
+    expect(screen.getByRole('combobox', { name: 'วิธีจับคู่ keyword ที่ 1' })).toHaveTextContent('ขึ้นต้น');
     expect(screen.getByLabelText('keyword ที่ 2')).toHaveValue('กี่โมง');
-    expect(screen.getByLabelText('ชนิดคำตอบที่ 2')).toHaveValue('reply_object');
+    expect(screen.getByRole('combobox', { name: 'ชนิดคำตอบที่ 2' })).toHaveTextContent('reply object');
     expect(screen.getByLabelText('reply object id คำตอบที่ 2')).toHaveValue('obj-1');
 
     await user.click(screen.getByRole('button', { name: 'บันทึก' }));

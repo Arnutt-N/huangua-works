@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { FieldError, Label, Input } from '@/components/ui/field';
+import { SelectField } from '@/components/ui/select';
 import { REPLY_OBJECT_TYPES } from '@/lib/line/reply-object-validation';
 import { findActionUriViolation, URI_SCHEME_ERROR_TH } from '@/lib/contracts';
 import {
@@ -161,18 +162,12 @@ export function ReplyObjectForm({
           <Label htmlFor="ro-field-object-type" className="text-xs font-semibold uppercase tracking-wide text-muted">
             Message Protocol *
           </Label>
-          <select
+          <SelectField
             id="ro-field-object-type"
             value={form.objectType}
-            onChange={(e) => handleTypeChange(e.target.value)}
-            className="min-h-touch w-full rounded-md border border-border bg-surface-raised px-4 text-sm font-bold text-ink"
-          >
-            {REPLY_OBJECT_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t.toUpperCase()}
-              </option>
-            ))}
-          </select>
+            onValueChange={handleTypeChange}
+            options={REPLY_OBJECT_TYPES.map((t) => ({ value: t, label: t.toUpperCase() }))}
+          />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="ro-field-category" className="text-xs font-semibold uppercase tracking-wide text-muted">

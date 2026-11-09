@@ -7,7 +7,9 @@ import { adminApi, type RichMenuItemDetail } from '@/app/admin/_lib/admin-api';
 import { useResource } from '@/app/admin/_lib/use-resource';
 import { PageHeader } from '@/components/admin/page-header';
 import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { Label, Input } from '@/components/ui/field';
+import { SelectField } from '@/components/ui/select';
 import { cn } from '@/lib/cn';
 import { RICH_MENU_DISPLAY_MODES, toRichMenuDisplayMode, type RichMenuDisplayMode } from '@/lib/contracts';
 import { areaStyle, toLineAction, validateArea, type RichMenuArea } from '../../rich-menu-templates';
@@ -298,13 +300,11 @@ export function RichMenuEditClient({ menuId }: { menuId: string }) {
   return (
     <div className="space-y-4">
       <PageHeader title="แก้ไข Rich Menu" subtitle={`แก้ไขเมนู: ${menu.name}`}>
-        <Link
-          href="/admin/chatbot/rich-menus"
-          aria-label="กลับ"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted hover:bg-accent-sunken hover:text-ink"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
+        <IconButton asChild aria-label="กลับ">
+          <Link href="/admin/chatbot/rich-menus">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+        </IconButton>
       </PageHeader>
 
       {error && (
@@ -431,18 +431,19 @@ export function RichMenuEditClient({ menuId }: { menuId: string }) {
             <div className="grid gap-4 md:grid-cols-2">
               {areas.map((area, i) => (
                 <div key={i} className="space-y-3 rounded-xl border border-border bg-surface-sunken/40 p-4">
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-xs font-bold uppercase text-muted">พื้นที่ {i + 1}</span>
-                    <select
-                      aria-label={`ประเภทการทำงานพื้นที่ ${i + 1}`}
+                    <SelectField
+                      ariaLabel={`ประเภทการทำงานพื้นที่ ${i + 1}`}
                       value={area.action.type}
-                      onChange={(e) => setAreaType(i, e.target.value as RichMenuArea['action']['type'])}
-                      className="min-h-touch rounded-lg border border-border bg-surface px-2 text-xs"
-                    >
-                      <option value="uri">Open URL</option>
-                      <option value="message">Send Msg</option>
-                      <option value="richmenuswitch">สลับเมนู</option>
-                    </select>
+                      onValueChange={(next) => setAreaType(i, next as RichMenuArea['action']['type'])}
+                      options={[
+                        { value: 'uri', label: 'Open URL' },
+                        { value: 'message', label: 'Send Msg' },
+                        { value: 'richmenuswitch', label: 'สลับเมนู' },
+                      ]}
+                      className="w-40 shrink-0"
+                    />
                   </div>
 
                   {area.action.type === 'uri' && (
@@ -477,20 +478,16 @@ export function RichMenuEditClient({ menuId }: { menuId: string }) {
                           </Link>
                         </p>
                       ) : (
-                        <select
+                        <SelectField
                           id={`rm-alias-${i}`}
-                          aria-label={`alias ปลายทางพื้นที่ ${i + 1}`}
+                          ariaLabel={`alias ปลายทางพื้นที่ ${i + 1}`}
                           value={area.action.richMenuAliasId ?? ''}
-                          onChange={(e) => setAreaAction(i, { richMenuAliasId: e.target.value })}
-                          className="min-h-touch w-full rounded-lg border border-border bg-surface px-2 text-sm"
-                        >
-                          <option value="">-- เลือก alias --</option>
-                          {aliases.map((a) => (
-                            <option key={a.aliasId} value={a.aliasId}>
-                              {a.aliasId}
-                            </option>
-                          ))}
-                        </select>
+                          onValueChange={(next) => setAreaAction(i, { richMenuAliasId: next })}
+                          options={[
+                            { value: '', label: '-- เลือก alias --' },
+                            ...aliases.map((a) => ({ value: a.aliasId, label: a.aliasId })),
+                          ]}
+                        />
                       )}
                     </div>
                   )}

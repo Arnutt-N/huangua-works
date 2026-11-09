@@ -4,24 +4,27 @@ import { Label as LabelPrimitive } from '@radix-ui/react-label';
 import type { LucideIcon } from 'lucide-react';
 import { forwardRef, type InputHTMLAttributes, type LabelHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 import { cn } from '../../lib/cn';
+import {
+  fieldChrome,
+  fieldIconClass,
+  fieldPad,
+  fieldPadEndGlyph,
+  fieldPadIcon,
+  fieldPadIconReveal,
+} from './control-styles';
 
 /**
  * Field primitives (DESIGN.md §5 Inputs/Fields)
  * - label ข้างบน field (ไม่ใช่ placeholder แทน label)
- * - 1px hairline border + 10px radius + surface-raised bg
  * - focus = border accent-strong + ring 3px indigo 35%
  * - error = border danger + danger-soft พื้น
  * - touch ≥44px บังคับ
  */
 
-const fieldBase =
-  'min-h-touch w-full rounded-md border bg-surface-raised px-4 text-ink placeholder:text-muted ' +
-  'transition-colors duration-normal ease-out-expo ' +
-  'focus:outline-none focus:border-accent-strong focus-visible:ring focus-visible:ring-accent-strong/35 ' +
-  'disabled:opacity-50 motion-reduce:transition-none';
+const END_GLYPH_TYPES = new Set(['time', 'date', 'datetime-local', 'month', 'week']);
 
 const fieldState = {
-  ok: 'border-border',
+  ok: 'border-border focus:border-accent-strong',
   error: 'border-danger bg-danger-soft/40 focus:border-danger focus-visible:ring-danger/35',
 };
 
@@ -29,25 +32,30 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   invalid?: boolean;
   /** lucide icon แสดงด้านซ้ายของ field (เพิ่ม left padding อัตโนมัติ) */
   icon?: LucideIcon;
+  /** ปุ่มด้านในขอบขวา เช่น แสดงรหัสผ่าน ใช้ระยะขวาชุดเดียว ไม่ส่ง pr- ซ้ำทาง className */
+  trailing?: boolean;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, invalid = false, icon: Icon, ...props }, ref) => {
+  ({ className, invalid = false, icon: Icon, trailing = false, type, ...props }, ref) => {
+    const endGlyph = typeof type === 'string' && END_GLYPH_TYPES.has(type);
+    let pad = fieldPad;
+    if (Icon && trailing) pad = fieldPadIconReveal;
+    else if (Icon) pad = fieldPadIcon;
+    else if (endGlyph) pad = fieldPadEndGlyph;
     const input = (
       <input
         ref={ref}
+        type={type}
         aria-invalid={invalid || undefined}
-        className={cn(fieldBase, invalid ? fieldState.error : fieldState.ok, Icon && 'pl-11', className)}
+        className={cn(fieldChrome, pad, invalid ? fieldState.error : fieldState.ok, className)}
         {...props}
       />
     );
     if (!Icon) return input;
     return (
       <span className="relative block">
-        <Icon
-          aria-hidden="true"
-          className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-muted"
-        />
+        <Icon aria-hidden="true" className={fieldIconClass} />
         {input}
       </span>
     );
@@ -65,7 +73,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
       ref={ref}
       rows={rows}
       aria-invalid={invalid || undefined}
-      className={cn(fieldBase, 'py-3 resize-y', invalid ? fieldState.error : fieldState.ok, className)}
+      className={cn(fieldChrome, fieldPad, 'py-3 resize-y', invalid ? fieldState.error : fieldState.ok, className)}
       {...props}
     />
   ),

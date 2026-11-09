@@ -49,6 +49,9 @@ function page(items: BroadcastItem[]) {
 afterEach(() => cleanup());
 
 beforeEach(() => {
+  window.HTMLElement.prototype.hasPointerCapture = vi.fn();
+  window.HTMLElement.prototype.releasePointerCapture = vi.fn();
+  window.HTMLElement.prototype.scrollIntoView = vi.fn();
   listBroadcasts.mockReset();
   sendBroadcast.mockReset();
   cancelBroadcast.mockReset();
@@ -97,7 +100,8 @@ describe('BroadcastClient ตาราง JSK', () => {
     render(<BroadcastClient />);
     await screen.findByText('ยังไม่มีข้อความ Broadcast');
 
-    await user.selectOptions(screen.getByLabelText('กรองสถานะ'), 'sent');
+    await user.click(screen.getByRole('combobox', { name: 'กรองสถานะ' }));
+    await user.click(await screen.findByRole('option', { name: 'ส่งแล้ว' }));
     await waitFor(() => expect(listBroadcasts).toHaveBeenCalledTimes(2));
   });
 

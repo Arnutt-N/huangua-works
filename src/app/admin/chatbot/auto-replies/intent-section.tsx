@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label, Input, Textarea } from '@/components/ui/field';
+import { SelectField } from '@/components/ui/select';
 
 const MATCH_LABELS: Record<IntentMatchType, string> = {
   exact: 'ตรงทั้งหมด',
@@ -363,7 +364,7 @@ export function IntentSection() {
               <Label id="intent-keywords-label">Keywords *</Label>
               <div className="space-y-2" role="group" aria-labelledby="intent-keywords-label">
                 {form.keywordRows.map((row, i) => (
-                  <div key={i} className="flex gap-2">
+                  <div key={i} className="flex flex-wrap items-center gap-2">
                     <Input
                       aria-label={`keyword ที่ ${i + 1}`}
                       value={row.keyword}
@@ -378,25 +379,20 @@ export function IntentSection() {
                       placeholder="เช่น กี่โมง"
                       className="flex-1"
                     />
-                    <select
-                      aria-label={`วิธีจับคู่ keyword ที่ ${i + 1}`}
+                    <SelectField
+                      ariaLabel={`วิธีจับคู่ keyword ที่ ${i + 1}`}
                       value={row.matchType}
-                      onChange={(e) =>
+                      onValueChange={(next) =>
                         setForm((f) => ({
                           ...f,
                           keywordRows: f.keywordRows.map((r, j) =>
-                            j === i ? { ...r, matchType: e.target.value as IntentMatchType } : r,
+                            j === i ? { ...r, matchType: next as IntentMatchType } : r,
                           ),
                         }))
                       }
-                      className="min-h-touch rounded-md border border-border bg-surface-raised px-2 text-sm text-ink"
-                    >
-                      {MATCH_TYPES.map((t) => (
-                        <option key={t} value={t}>
-                          {MATCH_LABELS[t]}
-                        </option>
-                      ))}
-                    </select>
+                      options={MATCH_TYPES.map((t) => ({ value: t, label: MATCH_LABELS[t] }))}
+                      className="w-40 shrink-0"
+                    />
                     <Button
                       variant="ghost"
                       aria-label={`ลบ keyword ที่ ${i + 1}`}
@@ -430,25 +426,26 @@ export function IntentSection() {
               <div className="space-y-2" role="group" aria-labelledby="intent-responses-label">
                 {form.responseRows.map((row, i) => (
                   <div key={i} className="space-y-2 rounded-md border border-border/50 p-2">
-                    <div className="flex gap-2">
-                      <select
-                        aria-label={`ชนิดคำตอบที่ ${i + 1}`}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <SelectField
+                        ariaLabel={`ชนิดคำตอบที่ ${i + 1}`}
                         value={row.replyType}
-                        onChange={(e) =>
+                        onValueChange={(next) =>
                           setForm((f) => ({
                             ...f,
                             responseRows: f.responseRows.map((r, j) =>
                               j === i
-                                ? { ...r, replyType: e.target.value as 'text' | 'reply_object' }
+                                ? { ...r, replyType: next as 'text' | 'reply_object' }
                                 : r,
                             ),
                           }))
                         }
-                        className="min-h-touch rounded-md border border-border bg-surface-raised px-2 text-sm text-ink"
-                      >
-                        <option value="text">ข้อความ</option>
-                        <option value="reply_object">reply object</option>
-                      </select>
+                        options={[
+                          { value: 'text', label: 'ข้อความ' },
+                          { value: 'reply_object', label: 'reply object' },
+                        ]}
+                        className="w-44 shrink-0"
+                      />
                       <Button
                         variant="ghost"
                         aria-label={`ลบคำตอบที่ ${i + 1}`}

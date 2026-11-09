@@ -54,7 +54,7 @@ describe('DatePresetFilter', () => {
     expect(handlePresetChange).toHaveBeenCalledWith('year');
   });
 
-  it('ปุ่มที่ถูกเลือก (active) มี aria-pressed=true และมุมโค้ง xl', () => {
+  it('ปุ่มที่ถูกเลือก (active) มี aria-pressed=true และมุมโค้งเท่าปุ่มอื่น', () => {
     render(
       <DatePresetFilter
         preset="30d"
@@ -68,7 +68,7 @@ describe('DatePresetFilter', () => {
 
     const btn30d = screen.getByRole('button', { name: '30 วัน' });
     expect(btn30d).toHaveAttribute('aria-pressed', 'true');
-    expect(btn30d.className).toContain('rounded-xl');
+    expect(btn30d.className).toContain('rounded-md');
 
     const btn7d = screen.getByRole('button', { name: '7 วัน' });
     expect(btn7d).toHaveAttribute('aria-pressed', 'false');

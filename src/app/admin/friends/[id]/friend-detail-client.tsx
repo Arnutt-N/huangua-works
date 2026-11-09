@@ -34,14 +34,14 @@ export function FriendDetailClient({ friendId }: { friendId: string }) {
 
   return (
     <div className="space-y-4">
-      <Link href="/admin/friends" className="inline-flex min-h-touch items-center gap-1.5 text-sm font-semibold text-accent-strong">
+      <Link href="/admin/friends" className="inline-flex min-h-touch items-center gap-1.5 whitespace-nowrap text-sm font-semibold leading-snug text-accent-strong">
         <ArrowLeft className="h-4 w-4" /> กลับไปรายการ
       </Link>
       <AdminCard>
         <AdminCardTitle
           icon={<UserRound className="h-4 w-4" />}
           action={
-            <Button variant="outline" onClick={() => { friend.reload(); events.reload(); }} className="min-h-touch gap-1.5 text-xs">
+            <Button variant="outline" size="sm" onClick={() => { friend.reload(); events.reload(); }} className="gap-1.5">
               <RefreshCw className="h-3.5 w-3.5" /> รีเฟรช
             </Button>
           }

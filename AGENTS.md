@@ -301,6 +301,7 @@ Each rule pairs with what enforces it — a rule with no enforcement is a repeat
 |---|---|
 | Timing-sensitive tests (real waits ≥ ~1s, e.g. anti-spam `MIN_SUBMIT_MS`) must use explicit query timeouts and file `testTimeout`, never Testing Library/vitest defaults | `src/app/intake/intake-test-timeouts.ts` + the 14 intake tests (8 failed on defaults, green after; PR #120 — merge that first) |
 | Library-boundary behavior (Auth error identity with no JWT, Upstash unsubscribe, tier fail-closed) must be covered by contract tests importing the real modules, not stubs | `auth-error-contract`, `tier-failclosed-contract`, `upstash-subscriber-contract` tests (mutating the error base class breaks 2 of them; the old stub suite catches only 1) |
+| Do not add a native `<select>` under `src/app` or `src/components`. Use `SelectField` from `@/components/ui/select`. | `pnpm lint:select` (`scripts/lint_native_select.py`). A file with `<select>` exits 1 and names `SelectField`. |
 
 ---
 

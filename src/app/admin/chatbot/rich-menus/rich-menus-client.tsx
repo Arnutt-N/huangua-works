@@ -8,6 +8,7 @@ import type { RichMenuItem } from '@/app/admin/_lib/admin-api';
 import { adminApi } from '@/app/admin/_lib/admin-api';
 import { useResource } from '@/app/admin/_lib/use-resource';
 import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { PageHeader } from '@/components/admin/page-header';
 import { AdminErrorState } from '@/components/admin/admin-error-state';
 import { DetailModal } from '@/components/admin/detail-modal';
@@ -219,7 +220,7 @@ export function RichMenusClient() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="gap-1 text-xs"
+                              className="gap-1"
                               onClick={() => handleSync(item)}
                               disabled={syncingId === item.id}
                             >
@@ -231,7 +232,7 @@ export function RichMenusClient() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="gap-1 text-xs"
+                              className="gap-1"
                               onClick={() => handleSync(item)}
                               disabled={syncingId === item.id}
                             >
@@ -247,7 +248,7 @@ export function RichMenusClient() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="gap-1 text-xs"
+                              className="gap-1"
                               onClick={() => pickImage(item)}
                               disabled={uploadingId === item.id}
                               aria-label={`อัปรูป ${item.name}`}
@@ -258,7 +259,7 @@ export function RichMenusClient() {
                             </Button>
                           )}
                           {action === 'publish' && (
-                            <Button size="sm" className="text-xs" onClick={() => handlePublish(item)} disabled={publishingId !== null}>
+                            <Button size="sm" onClick={() => handlePublish(item)} disabled={publishingId !== null}>
                               {publishingId === item.id ? 'กำลังตั้งค่า...' : 'Set Active'}
                             </Button>
                           )}
@@ -270,37 +271,30 @@ export function RichMenusClient() {
 
                           <div className="flex items-center gap-1 border-l border-border pl-3">
                             {item.lineRichMenuId && (
-                              <Link
-                                href={`/admin/chatbot/rich-menus/${item.id}/insights`}
-                                aria-label={`สถิติ ${item.name}`}
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted hover:bg-accent-sunken hover:text-accent-strong"
-                              >
-                                <BarChart3 className="h-4 w-4" />
-                              </Link>
+                              <IconButton asChild aria-label={`สถิติ ${item.name}`}>
+                                <Link href={`/admin/chatbot/rich-menus/${item.id}/insights`}>
+                                  <BarChart3 className="h-4 w-4" />
+                                </Link>
+                              </IconButton>
                             )}
-                            <button
-                              type="button"
+                            <IconButton
                               aria-label={`ดูรายละเอียด ${item.name}`}
                               onClick={() => setViewMenu(item)}
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted hover:bg-accent-sunken hover:text-accent-strong"
                             >
                               <Eye className="h-4 w-4" />
-                            </button>
-                            <Link
-                              href={`/admin/chatbot/rich-menus/${item.id}/edit`}
-                              aria-label={`แก้ไข ${item.name}`}
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted hover:bg-accent-sunken hover:text-accent-strong"
-                            >
-                              <SquarePen className="h-4 w-4" />
-                            </Link>
-                            <button
-                              type="button"
+                            </IconButton>
+                            <IconButton asChild aria-label={`แก้ไข ${item.name}`}>
+                              <Link href={`/admin/chatbot/rich-menus/${item.id}/edit`}>
+                                <SquarePen className="h-4 w-4" />
+                              </Link>
+                            </IconButton>
+                            <IconButton
+                              intent="danger"
                               aria-label={`ลบ ${item.name}`}
                               onClick={() => setDeleteTarget(item)}
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-danger hover:bg-danger/10"
                             >
                               <Trash2 className="h-4 w-4" />
-                            </button>
+                            </IconButton>
                           </div>
                         </div>
                       </td>

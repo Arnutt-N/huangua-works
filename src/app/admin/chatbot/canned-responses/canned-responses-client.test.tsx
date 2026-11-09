@@ -39,6 +39,9 @@ afterEach(() => {
 });
 
 beforeEach(() => {
+  window.HTMLElement.prototype.hasPointerCapture = vi.fn();
+  window.HTMLElement.prototype.releasePointerCapture = vi.fn();
+  window.HTMLElement.prototype.scrollIntoView = vi.fn();
   fetchCannedResponses.mockReset();
   createCannedResponse.mockReset();
   updateCannedResponse.mockReset();
@@ -143,7 +146,8 @@ describe('CannedResponsesClient ตาราง JSK', () => {
     await user.type(screen.getByLabelText(/ชอร์ตคัต/), 'hello');
     await user.type(screen.getByLabelText('ชื่อ'), 'ทักทาย');
     await user.type(screen.getByLabelText('เนื้อหา'), 'สวัสดีครับ ยินดีให้บริการ');
-    await user.selectOptions(screen.getByLabelText('หมวดหมู่'), 'greeting');
+    await user.click(screen.getByRole('combobox', { name: 'หมวดหมู่' }));
+    await user.click(await screen.findByRole('option', { name: 'ทักทาย' }));
     await user.click(screen.getByRole('button', { name: 'เพิ่ม' }));
 
     await waitFor(() =>

@@ -147,23 +147,19 @@ export function CaseFilterBar({ categories }: { categories: CategoryOption[] }) 
       aria-label="ตัวกรองเรื่อง"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto_auto]">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {/* Search */}
-          <div className="relative">
+          <div className="min-w-0 sm:col-span-2 xl:col-span-1">
             <Label htmlFor="q" className="sr-only">
               ค้นหา
             </Label>
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
-              aria-hidden="true"
-            />
             <Input
               id="q"
               type="search"
+              icon={Search}
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="ค้นหาเลขที่เรื่อง / หัวเรื่อง / ที่ตั้ง"
-              className="pl-10"
             />
           </div>
 
@@ -177,7 +173,7 @@ export function CaseFilterBar({ categories }: { categories: CategoryOption[] }) 
               value={currentStatus}
               onValueChange={(v) => updateFilter('status', v)}
             >
-              <SelectTrigger id="f-status" className="min-w-[160px]">
+              <SelectTrigger id="f-status" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -200,7 +196,7 @@ export function CaseFilterBar({ categories }: { categories: CategoryOption[] }) 
               value={currentCategory}
               onValueChange={(v) => updateFilter('category', v)}
             >
-              <SelectTrigger id="f-category" className="min-w-[160px]">
+              <SelectTrigger id="f-category" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -224,7 +220,7 @@ export function CaseFilterBar({ categories }: { categories: CategoryOption[] }) 
               value={currentPriority}
               onValueChange={(v) => updateFilter('priority', v)}
             >
-              <SelectTrigger id="f-priority" className="min-w-[160px]">
+              <SelectTrigger id="f-priority" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -251,7 +247,7 @@ export function CaseFilterBar({ categories }: { categories: CategoryOption[] }) 
           disabled={isPending}
         />
 
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="flex items-center gap-1.5 text-xs text-muted">
             <Filter className="h-3.5 w-3.5" aria-hidden="true" />
             {hasActiveFilter ? 'กำลังใช้ตัวกรอง' : 'ไม่มีตัวกรอง'}
