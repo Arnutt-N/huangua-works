@@ -32,7 +32,10 @@ vi.mock('@/components/admin/admin-nav', async (importOriginal) => {
 
 import { AdminLayout } from '@/components/admin/admin-layout';
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  window.localStorage.removeItem('admin:sidebar-collapsed');
+});
 
 describe('A11Y-01 drawer', () => {
   it('mobileOpen=false + viewport มือถือ → aside มี inert, Tab ไม่เข้าเมนู', () => {
@@ -102,5 +105,37 @@ describe('A11Y-01 drawer', () => {
 
     const aside = screen.getByRole('complementary');
     expect(aside).not.toHaveAttribute('inert');
+  });
+
+  it('แถบเมนูอยู่บนจอตั้งแต่ breakpoint md และปุ่มเปิดเมนูหายในช่วงเดียวกัน', () => {
+    mockUseMediaQuery.mockReturnValue({ isDesktop: true, hydrated: true });
+    render(
+      <AdminLayout user={{ fullName: 'T', email: 't@x.go.th', role: 'superadmin' }} active="dashboard" title="T">
+        <p>content</p>
+      </AdminLayout>,
+    );
+
+    const aside = screen.getByRole('complementary');
+    expect(aside.className).toContain('md:translate-x-0');
+    expect(aside.className).toContain('md:w-64');
+    expect(aside.className).not.toContain('lg:translate-x-0');
+
+    const hamburger = screen.getByRole('button', { name: 'เปิดเมนู' });
+    expect(hamburger.className).toContain('md:hidden');
+    expect(hamburger.className).not.toContain('lg:hidden');
+  });
+
+  it('ตอนย่อ หัวแถบใช้ padding ที่ใส่ปุ่ม 44px ในราง 72px ได้', async () => {
+    window.localStorage.setItem('admin:sidebar-collapsed', '1');
+    mockUseMediaQuery.mockReturnValue({ isDesktop: true, hydrated: true });
+    render(
+      <AdminLayout user={{ fullName: 'T', email: 't@x.go.th', role: 'superadmin' }} active="dashboard" title="T">
+        <p>content</p>
+      </AdminLayout>,
+    );
+
+    const expand = await screen.findByRole('button', { name: 'ขยายแถบเมนู', hidden: true });
+    expect(expand.parentElement?.className).toContain('md:px-2');
+    expect(screen.getByRole('complementary').className).toContain('md:w-[4.5rem]');
   });
 });

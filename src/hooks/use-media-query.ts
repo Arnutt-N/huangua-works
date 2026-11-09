@@ -2,7 +2,17 @@
 
 import { useSyncExternalStore } from 'react';
 
-const QUERY = '(min-width: 1024px)';
+/**
+ * ตรงกับ breakpoint `md` ของ Tailwind (48rem = 768px)
+ *
+ * § ต้องเป็นค่าเดียวกับคลาส `md:` ใน AdminLayout
+ * ปุ่มเปิดเมนูใช้ `md:hidden` และ sidebar ใช้ `md:translate-x-0`
+ * ถ้า query นี้กว้างกว่าคลาส CSS แถบเมนูจะโผล่แต่ถูกใส่ inert กดไม่ได้
+ * ถ้า query นี้แคบกว่าคลาส CSS แถบเมนูจะถูกเลื่อนออกจอทั้งที่ปุ่มเปิดเมนูถูกซ่อน
+ */
+export const ADMIN_SIDEBAR_QUERY = '(min-width: 768px)';
+
+const QUERY = ADMIN_SIDEBAR_QUERY;
 
 function subscribe(onChange: () => void): () => void {
   const mql = window.matchMedia(QUERY);
