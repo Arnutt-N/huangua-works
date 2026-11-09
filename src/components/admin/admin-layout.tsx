@@ -55,6 +55,10 @@ export function AdminLayout({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const { isDesktop, hydrated } = useMediaQuery();
+  // § จอกว้างพอที่แถบจะอยู่บนจอเอง ต้องทิ้งสถานะ drawer ในรอบ render เดียวกัน
+  // ไม่งั้นหมุนจอข้าม md ขณะเมนูเปิด จะยังกัก Tab อยู่ในแถบ
+  // ทั้งที่ฉากหลังและปุ่มปิดถูก md:hidden ไปแล้ว
+  if (isDesktop && mobileOpen) setMobileOpen(false);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
   const asideRef = useRef<HTMLElement>(null);
   const navRef = useRef<HTMLElement>(null);
@@ -94,7 +98,7 @@ export function AdminLayout({
   // ปิด drawer เมื่อกด Escape (คู่กับการปิดตอนคลิกลิงก์และคลิกฉากหลัง)
   // + โฟกัสเข้า drawer เมื่อเปิด, คืนให้ hamburger เมื่อปิด, กัก Tab ใน drawer
   useEffect(() => {
-    if (!mobileOpen) return;
+    if (!mobileOpen || isDesktop) return;
     asideRef.current?.querySelector<HTMLElement>('a, button')?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -120,7 +124,7 @@ export function AdminLayout({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [mobileOpen]);
+  }, [mobileOpen, isDesktop]);
 
   // § คืนโฟกัสให้ hamburger เฉพาะตอนที่ drawer "ปิดหลังเคยเปิด" — ห้ามยิงตอน mount
   // ไม่งั้นทุกครั้งที่เข้า/เปลี่ยนหน้า admin บนมือถือ โฟกัสจะถูกกระชากจากตำแหน่งเริ่มต้น
@@ -132,9 +136,10 @@ export function AdminLayout({
     }
     if (wasOpenRef.current) {
       wasOpenRef.current = false;
-      hamburgerRef.current?.focus();
+      // ปุ่มเปิดเมนูเป็น md:hidden บนจอกว้าง — โฟกัสไปที่ปุ่มที่มองไม่เห็นจะทำให้โฟกัสหลุด
+      if (!isDesktop) hamburgerRef.current?.focus();
     }
-  }, [mobileOpen]);
+  }, [mobileOpen, isDesktop]);
 
   const groups = visibleNavGroups(user.role);
 
@@ -146,7 +151,7 @@ export function AdminLayout({
       {mobileOpen && (
         <button
           type="button"
-          className="fixed inset-0 z-40 bg-ink/40 backdrop-blur-sm lg:hidden print:hidden"
+          className="fixed inset-0 z-40 bg-ink/40 backdrop-blur-sm md:hidden print:hidden"
           onClick={() => setMobileOpen(false)}
           aria-label="ปิดเมนู"
         />
@@ -155,14 +160,15 @@ export function AdminLayout({
       {/* ── Sidebar ── */}
       <aside
         ref={asideRef}
-        // § ใส่ inert เฉพาะหลัง hydrate แล้วเท่านั้น — ระหว่าง SSR ยังไม่รู้ว่าเป็น desktop
-        // หรือ mobile ถ้าใส่ไปเลยผู้ใช้ desktop จะกดเมนูไม่ได้จนกว่า JS จะทำงาน
+        // § ใส่ inert เฉพาะหลัง hydrate แล้วเท่านั้น — ระหว่าง SSR ยังไม่รู้ว่าเป็นจอกว้าง
+        // หรือจอแคบ ถ้าใส่ไปเลยผู้ใช้จอกว้างจะกดเมนูไม่ได้จนกว่า JS จะทำงาน
+        // isDesktop มาจาก ADMIN_SIDEBAR_QUERY (48rem) ซึ่งต้องตรงกับ md: ด้านล่าง
         inert={hydrated && !isDesktop && !mobileOpen}
         className={cn(
           'glass-panel fixed inset-y-0 left-0 z-50 flex flex-col border-r shadow-lg',
           'transition-[width,transform] duration-normal ease-out-expo',
-          collapsed ? 'lg:w-[4.5rem]' : 'lg:w-64',
-          'w-72 lg:translate-x-0',
+          collapsed ? 'md:w-[4.5rem]' : 'md:w-64',
+          'w-72 md:translate-x-0',
           mobileOpen ? 'translate-x-0' : '-translate-x-full',
           'print:hidden',
         )}
@@ -170,24 +176,30 @@ export function AdminLayout({
         aria-label="นำทางหลัก"
       >
         {/* แบรนด์ */}
-        <div className="flex h-16 flex-none items-center gap-2.5 border-b border-border px-4">
-          {/* § ตอนย่อ: ซ่อนตราบนจอใหญ่
-              รางกว้าง 4.5rem (72px) หัก padding แล้วเหลือ ~40px ใส่ได้แค่ปุ่มเดียว
-              ถ้าเก็บตราไว้ด้วย ปุ่มขยายจะถูกดันตกออกนอกกรอบจนมองไม่เห็นและกดไม่ได้
-              → ย่อแล้วขยายกลับไม่ได้เลย ตราไม่หายจริงเพราะยังอยู่บน drawer มือถือ */}
+        <div
+          className={cn(
+            'flex h-16 flex-none items-center gap-2.5 border-b border-border px-4',
+            // § รางย่อกว้าง 72px — px-4 เหลือที่ 40px แต่ปุ่มขยายสูง 44px จะล้นขอบ
+            collapsed && 'md:px-2',
+          )}
+        >
+          {/* § ตอนย่อ: ซ่อนตราบนจอ md ขึ้นไป
+              รางกว้าง 4.5rem (72px) ถ้ายังมีตราคู่กับปุ่ม 44px ปุ่มขยายจะล้นกรอบ
+              จนมองไม่เห็นและกดไม่ได้ → ย่อแล้วขยายกลับไม่ได้
+              ตราไม่หายจริงเพราะ drawer ต่ำกว่า md ยังแสดงตราพร้อมชื่อ */}
           <Link
             href="/admin"
             className={cn(
               'flex min-w-0 items-center gap-2.5',
-              collapsed && 'lg:hidden',
+              collapsed && 'md:hidden',
             )}
             onClick={() => setMobileOpen(false)}
           >
             <BrandMark size="sm" />
-            {/* § collapsed เป็นสถานะของ sidebar ฝั่ง desktop เท่านั้น
-                จึงซ่อนข้อความด้วยคลาส lg: ไม่ใช่ตัดออกจาก DOM — ไม่งั้น drawer
-                บนมือถือ (ซึ่งกว้างเต็มที่เสมอ) จะเหลือแต่ไอคอนโดยไม่มีป้ายกำกับ */}
-            <span className={cn('min-w-0', collapsed && 'lg:hidden')}>
+            {/* § collapsed เป็นสถานะของ sidebar ตั้งแต่ md ขึ้นไปเท่านั้น
+                จึงซ่อนข้อความด้วยคลาส md: ไม่ใช่ตัดออกจาก DOM — ไม่งั้น drawer
+                ต่ำกว่า breakpoint md (ซึ่งกว้างเต็มที่เสมอ) จะเหลือแต่ไอคอนโดยไม่มีป้ายกำกับ */}
+            <span className={cn('min-w-0', collapsed && 'md:hidden')}>
               <span className="block truncate text-sm font-bold text-ink">
                 อบต.หัวงัว
               </span>
@@ -197,7 +209,7 @@ export function AdminLayout({
           <button
             type="button"
             onClick={() => setMobileOpen(false)}
-            className="ml-auto flex h-11 w-11 flex-none items-center justify-center rounded-md text-muted hover:bg-accent-sunken hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong lg:hidden"
+            className="ml-auto flex h-11 w-11 flex-none items-center justify-center rounded-md text-muted hover:bg-accent-sunken hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong md:hidden"
             aria-label="ปิดเมนู"
           >
             <X className="h-5 w-5" aria-hidden="true" />
@@ -209,8 +221,8 @@ export function AdminLayout({
             type="button"
             onClick={toggleCollapsed}
             className={cn(
-              'hidden h-11 w-11 flex-none items-center justify-center rounded-md text-muted hover:bg-accent-sunken hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong lg:flex',
-              collapsed ? 'lg:mx-auto' : 'lg:ml-auto',
+              'hidden h-11 w-11 flex-none items-center justify-center rounded-md text-muted hover:bg-accent-sunken hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong md:flex',
+              collapsed ? 'md:mx-auto' : 'md:ml-auto',
             )}
             aria-label={collapsed ? 'ขยายแถบเมนู' : 'ย่อแถบเมนู'}
             title={collapsed ? 'ขยายแถบเมนู' : 'ย่อแถบเมนู'}
@@ -232,13 +244,13 @@ export function AdminLayout({
               <p
                 className={cn(
                   'px-3 pb-1.5 text-xs font-semibold tracking-wide text-muted',
-                  collapsed && 'lg:hidden',
+                  collapsed && 'md:hidden',
                 )}
               >
                 {group.label}
               </p>
               {collapsed && i > 0 && (
-                <div className="mx-2 mb-2 hidden border-t border-border lg:block" aria-hidden="true" />
+                <div className="mx-2 mb-2 hidden border-t border-border md:block" aria-hidden="true" />
               )}
               <ul className="space-y-1">
                 {group.items.map((item) => (
@@ -261,7 +273,7 @@ export function AdminLayout({
       <div
         className={cn(
           'relative z-10 flex min-h-dvh flex-col transition-[padding] duration-normal ease-out-expo',
-          collapsed ? 'lg:pl-[4.5rem]' : 'lg:pl-64',
+          collapsed ? 'md:pl-[4.5rem]' : 'md:pl-64',
           'print:m-0 print:min-h-0 print:pl-0',
         )}
       >
@@ -270,7 +282,7 @@ export function AdminLayout({
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
-            className="flex h-11 w-11 flex-none items-center justify-center rounded-md text-ink hover:bg-accent-sunken focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong lg:hidden"
+            className="flex h-11 w-11 flex-none items-center justify-center rounded-md text-ink hover:bg-accent-sunken focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong md:hidden"
             ref={hamburgerRef}
             aria-label="เปิดเมนู"
             aria-expanded={mobileOpen}
@@ -318,14 +330,14 @@ function SidebarLink({
       title={collapsed ? item.label : undefined}
       className={cn(
         'flex min-h-touch items-center gap-3 rounded-md px-3 text-sm font-semibold transition-colors duration-normal ease-out-expo',
-        collapsed && 'lg:justify-center lg:px-0',
+        collapsed && 'md:justify-center md:px-0',
         isActive
           ? 'bg-accent-strong text-on-accent shadow-sm'
           : 'text-muted hover:bg-accent-sunken hover:text-accent-strong',
       )}
     >
       <Icon className="h-5 w-5 flex-none" aria-hidden="true" />
-      <span className={cn('truncate', collapsed && 'lg:hidden')}>{item.label}</span>
+      <span className={cn('truncate', collapsed && 'md:hidden')}>{item.label}</span>
     </Link>
   );
 }
