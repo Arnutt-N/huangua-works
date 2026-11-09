@@ -2,7 +2,7 @@
 
 import * as SelectPrimitive from '@radix-ui/react-select';
 import { Check, ChevronDown } from 'lucide-react';
-import { type ComponentPropsWithoutRef, type ElementRef, forwardRef, useEffect, useRef, useState } from 'react';
+import { type ComponentPropsWithoutRef, type ElementRef, forwardRef, useLayoutEffect, useRef, useState } from 'react';
 import { cn } from '../../lib/cn';
 import { controlChevronIcon, selectTriggerClass } from './control-styles';
 
@@ -26,9 +26,19 @@ export const SelectTrigger = forwardRef<
 >(({ className, children, ...props }, ref) => {
   const labelRef = useRef<HTMLSpanElement>(null);
   const [labelTitle, setLabelTitle] = useState<string | undefined>();
-  useEffect(() => {
-    const full = labelRef.current?.textContent?.replace(/\s+/g, ' ').trim() || undefined;
-    setLabelTitle((prev) => (prev === full ? prev : full));
+  // § Radix เขียนชื่อตัวเลือกที่เลือกเข้า span ทีหลัง โดย children ของ trigger ไม่เปลี่ยน
+  // อ่าน textContent แล้วเฝ้าการเปลี่ยน ไม่งั้น title ค้างเป็นค่าแรกทั้งที่ป้ายบนจอเปลี่ยนแล้ว
+  useLayoutEffect(() => {
+    const el = labelRef.current;
+    if (!el) return;
+    const sync = () => {
+      const full = el.textContent?.replace(/\s+/g, ' ').trim() || undefined;
+      setLabelTitle((prev) => (prev === full ? prev : full));
+    };
+    sync();
+    const observer = new MutationObserver(sync);
+    observer.observe(el, { subtree: true, childList: true, characterData: true });
+    return () => observer.disconnect();
   }, [children]);
   return (
     <SelectPrimitive.Trigger
