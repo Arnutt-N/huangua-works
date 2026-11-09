@@ -2,8 +2,8 @@
 
 import { Plus } from 'lucide-react';
 import { LINE_QUICK_REPLY_MAX_ITEMS } from '@/lib/line/reply-object-validation';
+import { Input } from '@/components/ui/field';
 import {
-  FIELD_CLS,
   LABEL_CLS,
   getItemKey,
   makeEmptyAction,
@@ -77,8 +77,7 @@ export function QuickReplyEditor({
                 onRemove={items.length > 1 ? () => removeItem(i) : undefined}
                 removeLabel={`ลบปุ่มลัดที่ ${i + 1}`}
               />
-              <input
-                className={FIELD_CLS}
+              <Input
                 aria-label={`imageUrl ไอคอนปุ่มลัดที่ ${i + 1} (ไม่บังคับ)`}
                 placeholder="imageUrl ไอคอนปุ่ม (ไม่บังคับ)"
                 value={item.imageUrl ?? ''}

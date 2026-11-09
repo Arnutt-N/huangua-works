@@ -4,16 +4,21 @@ import { Label as LabelPrimitive } from '@radix-ui/react-label';
 import type { LucideIcon } from 'lucide-react';
 import { forwardRef, type InputHTMLAttributes, type LabelHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 import { cn } from '../../lib/cn';
-import { fieldChrome, fieldPad, fieldPadEndGlyph, fieldPadIcon } from './control-styles';
+import {
+  fieldChrome,
+  fieldIconClass,
+  fieldPad,
+  fieldPadEndGlyph,
+  fieldPadIcon,
+  fieldPadIconReveal,
+} from './control-styles';
 
 /**
  * Field primitives (DESIGN.md §5 Inputs/Fields)
  * - label ข้างบน field (ไม่ใช่ placeholder แทน label)
- * - 1px hairline border + 12px radius + surface-raised bg
  * - focus = border accent-strong + ring 3px indigo 35%
  * - error = border danger + danger-soft พื้น
  * - touch ≥44px บังคับ
- * - leading-snug กันตัวอักษร 17px ของ body (line-height 1.6) ดันกล่องจนอึดอัด
  */
 
 const END_GLYPH_TYPES = new Set(['time', 'date', 'datetime-local', 'month', 'week']);
@@ -27,32 +32,30 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   invalid?: boolean;
   /** lucide icon แสดงด้านซ้ายของ field (เพิ่ม left padding อัตโนมัติ) */
   icon?: LucideIcon;
+  /** ปุ่มด้านในขอบขวา เช่น แสดงรหัสผ่าน ใช้ระยะขวาชุดเดียว ไม่ส่ง pr- ซ้ำทาง className */
+  trailing?: boolean;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, invalid = false, icon: Icon, type, ...props }, ref) => {
+  ({ className, invalid = false, icon: Icon, trailing = false, type, ...props }, ref) => {
     const endGlyph = typeof type === 'string' && END_GLYPH_TYPES.has(type);
+    let pad = fieldPad;
+    if (Icon && trailing) pad = fieldPadIconReveal;
+    else if (Icon) pad = fieldPadIcon;
+    else if (endGlyph) pad = fieldPadEndGlyph;
     const input = (
       <input
         ref={ref}
         type={type}
         aria-invalid={invalid || undefined}
-        className={cn(
-          fieldChrome,
-          Icon ? fieldPadIcon : endGlyph ? fieldPadEndGlyph : fieldPad,
-          invalid ? fieldState.error : fieldState.ok,
-          className,
-        )}
+        className={cn(fieldChrome, pad, invalid ? fieldState.error : fieldState.ok, className)}
         {...props}
       />
     );
     if (!Icon) return input;
     return (
       <span className="relative block">
-        <Icon
-          aria-hidden="true"
-          className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-muted"
-        />
+        <Icon aria-hidden="true" className={fieldIconClass} />
         {input}
       </span>
     );

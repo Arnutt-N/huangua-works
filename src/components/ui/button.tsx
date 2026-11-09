@@ -13,7 +13,7 @@ export type ButtonVariant = 'primary' | 'secondary' | 'destructive' | 'ghost' | 
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 const base =
-  'inline-flex cursor-pointer items-center justify-center gap-2 rounded-md font-semibold leading-snug whitespace-nowrap ' +
+  'inline-flex min-h-touch cursor-pointer items-center justify-center gap-2 rounded-md font-semibold leading-snug whitespace-nowrap ' +
   // transition-[color,background-color,border-color,opacity] แทน transition-colors
   // เพราะ primary hover เปลี่ยนที่ opacity (gradient ทำ transition สีตรง ๆ ไม่ได้)
   'transition-[color,background-color,border-color,opacity] duration-normal ease-out-expo ' +
@@ -27,21 +27,18 @@ const variantClass: Record<ButtonVariant, string> = {
   // intake) ต้องเขียน style={{ background: 'linear-gradient(...)' }} ทับเอง
   // รวม 6 จุด — ปุ่ม "primary จริง" จึงไม่เคยมาจาก component นี้เลย และฝั่งแอดมิน
   // ที่เรียกใช้ตรง ๆ ก็ได้ปุ่มคนละหน้าตากับหน้าสาธารณะ
-  //
-  // § padding อยู่ที่ size เท่านั้น — cn() ไม่ merge class ที่ชนกัน
-  // ถ้า variant ก็ใส่ px ขนาด sm/lg จะแพ้หรือชนะแบบสุ่มตามลำดับใน stylesheet
-  primary: 'min-h-touch bg-accent-gradient text-on-accent shadow-md hover:opacity-90',
-  secondary:
-    'min-h-touch border border-border-strong bg-transparent text-accent-strong hover:bg-accent-sunken',
-  outline: 'min-h-touch border border-border-strong bg-transparent text-ink hover:bg-accent-sunken',
-  destructive: 'min-h-touch bg-danger text-on-accent hover:bg-danger/90',
-  ghost: 'min-h-touch text-ink/80 hover:bg-accent-sunken hover:text-ink',
+  // § padding lives on sizeClass only. cn() does not drop a conflicting px.
+  primary: 'bg-accent-gradient text-on-accent shadow-md hover:opacity-90',
+  secondary: 'border border-border-strong bg-transparent text-accent-strong hover:bg-accent-sunken',
+  outline: 'border border-border-strong bg-transparent text-ink hover:bg-accent-sunken',
+  destructive: 'bg-danger text-on-accent hover:bg-danger/90',
+  ghost: 'text-ink/80 hover:bg-accent-sunken hover:text-ink',
 };
 
 const sizeClass: Record<ButtonSize, string> = {
-  sm: 'min-h-touch px-4 text-sm',
-  md: 'min-h-touch px-7 text-base',
-  lg: 'min-h-touch px-8 text-lg',
+  sm: 'px-4 text-sm',
+  md: 'px-7 text-base',
+  lg: 'px-8 text-lg',
 };
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {

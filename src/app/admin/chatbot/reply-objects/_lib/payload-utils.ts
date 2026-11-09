@@ -1,8 +1,3 @@
-import { fieldControlClass } from '@/components/ui/control-styles';
-
-/** ช่องกรอกในตัวแก้ไข reply object — ใช้มาตรวัดเดียวกับ Input */
-export const FIELD_CLS = fieldControlClass;
-
 export const LABEL_CLS = 'text-xs font-semibold uppercase tracking-wide text-muted';
 
 export interface LineAction {

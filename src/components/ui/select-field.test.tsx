@@ -4,6 +4,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fieldPad, fieldPadEndGlyph, fieldPadIcon, fieldPadIconReveal, selectTriggerClass } from './control-styles';
 import { SelectField } from './select';
 
 beforeEach(() => {
@@ -30,6 +31,16 @@ function Harness() {
     />
   );
 }
+
+describe('control padding', () => {
+  it('ไม่ใส่ px คู่กับ pl หรือ pr ในคลาสเดียวกัน', () => {
+    for (const cls of [fieldPad, fieldPadIcon, fieldPadIconReveal, fieldPadEndGlyph, selectTriggerClass]) {
+      const hasPx = /\bpx-/.test(cls);
+      const hasSide = /\b(?:pl|pr)-/.test(cls);
+      expect(hasPx && hasSide).toBe(false);
+    }
+  });
+});
 
 describe('SelectField', () => {
   it('เว้นระยะเชฟรอนจากขอบและไม่ให้ข้อความทับไอคอน', () => {

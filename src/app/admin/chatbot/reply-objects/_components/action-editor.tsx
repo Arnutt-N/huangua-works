@@ -4,8 +4,9 @@ import { useId } from 'react';
 import { Trash2 } from 'lucide-react';
 import { isAllowedActionUri, URI_SCHEME_ERROR_TH } from '@/lib/contracts';
 import { IconButton } from '@/components/ui/icon-button';
+import { Input } from '@/components/ui/field';
 import { SelectField } from '@/components/ui/select';
-import { FIELD_CLS, type LineAction } from '../_lib/payload-utils';
+import { type LineAction } from '../_lib/payload-utils';
 
 const ACTION_TYPES = ['message', 'uri', 'postback'] as const;
 
@@ -31,8 +32,7 @@ export function ActionEditor({
     <div className="space-y-2 rounded-lg border border-border/60 bg-surface p-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="min-w-48 flex-1">
-          <input
-            className={FIELD_CLS}
+          <Input
             aria-label="ป้ายปุ่ม (label)"
             placeholder="ป้ายปุ่ม (label)"
             value={action.label ?? ''}
@@ -54,8 +54,7 @@ export function ActionEditor({
       </div>
 
       {type === 'message' && (
-        <input
-          className={FIELD_CLS}
+        <Input
           aria-label="ข้อความที่จะส่ง (text)"
           placeholder="ข้อความที่จะส่ง (text)"
           value={action.text ?? ''}
@@ -64,8 +63,7 @@ export function ActionEditor({
       )}
       {type === 'uri' && (
         <>
-          <input
-            className={FIELD_CLS}
+          <Input
             aria-label="ลิงก์ (uri)"
             placeholder="https://example.com"
             value={uriValue}
@@ -82,15 +80,13 @@ export function ActionEditor({
       )}
       {type === 'postback' && (
         <>
-          <input
-            className={FIELD_CLS}
+          <Input
             aria-label="ข้อมูล postback (data)"
             placeholder="data (เช่น action=buy&id=1)"
             value={action.data ?? ''}
             onChange={(e) => set({ data: e.target.value })}
           />
-          <input
-            className={FIELD_CLS}
+          <Input
             aria-label="displayText (ไม่บังคับ)"
             placeholder="displayText (ไม่บังคับ)"
             value={action.displayText ?? ''}
