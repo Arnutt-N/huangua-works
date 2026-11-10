@@ -1,12 +1,18 @@
 'use client';
 
-import { ArrowDownWideNarrow, Inbox, PanelLeftClose, Search } from 'lucide-react';
+import { ArrowDownWideNarrow, Inbox, PanelLeftClose, PanelLeftOpen, Search } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Input } from '@/components/ui/field';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { ConversationFilter, ConversationSort } from '../_hooks/use-conversations';
 import type { Conversation, MessageSearchResult } from '../_lib/types';
 import { ConversationItem } from './conversation-item';
+import { LineAvatar } from './line-avatar';
 import { SearchResults } from './search-results';
+
+function roomName(conv: Conversation): string {
+  return conv.displayName ?? (conv.lineUserId ? `ผู้ใช้ LINE ${conv.lineUserId}` : 'ผู้ใช้ LINE');
+}
 
 const FILTER_CHIPS: { key: ConversationFilter; label: string }[] = [
   { key: 'all', label: 'ทั้งหมด' },
@@ -30,6 +36,84 @@ function SkeletonRows() {
         </div>
       ))}
     </div>
+  );
+}
+
+function CollapsedRoomRail({
+  visible,
+  loading,
+  selectedId,
+  onSelect,
+  onExpand,
+}: {
+  visible: Conversation[];
+  loading: boolean;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  onExpand: () => void;
+}) {
+  return (
+      <div className="flex h-full flex-col items-center gap-1 py-2">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={onExpand}
+              aria-label="แสดงรายการสนทนา"
+              className="mb-1 inline-flex h-11 w-11 items-center justify-center rounded-md text-muted hover:bg-surface-sunken hover:text-ink"
+            >
+              <PanelLeftOpen className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right">แสดงรายการสนทนา</TooltipContent>
+        </Tooltip>
+        <div className="flex w-full flex-1 flex-col gap-1 overflow-y-auto px-1.5">
+          {loading
+            ? [0, 1, 2].map((i) => (
+                <div key={i} className="mx-auto h-10 w-10 animate-pulse rounded-pill bg-border" aria-hidden="true" />
+              ))
+            : visible.map((conv) => {
+                const name = roomName(conv);
+                const selected = selectedId === conv.id;
+                return (
+                  <Tooltip key={conv.id}>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={() => onSelect(conv.id)}
+                        aria-label={name}
+                        aria-current={selected ? 'true' : undefined}
+                        className={cn(
+                          'relative flex w-full items-center justify-center rounded-lg p-1.5',
+                          selected ? 'bg-accent-sunken' : 'hover:bg-accent-sunken',
+                        )}
+                      >
+                        <LineAvatar
+                          src={conv.pictureUrl}
+                          className="h-10 w-10 rounded-pill object-cover"
+                          fallback={
+                            <span
+                              className={cn(
+                                'inline-flex h-10 w-10 items-center justify-center rounded-pill text-sm font-bold',
+                                selected ? 'bg-accent text-on-accent' : 'bg-accent-sunken text-accent-strong',
+                              )}
+                              aria-hidden="true"
+                            >
+                              {name.slice(0, 1).toUpperCase()}
+                            </span>
+                          }
+                        />
+                        {conv.unreadAdmin > 0 && (
+                          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-pill bg-danger" aria-hidden="true" />
+                        )}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">{name}</TooltipContent>
+                  </Tooltip>
+                );
+              })}
+        </div>
+      </div>
   );
 }
 
@@ -90,27 +174,41 @@ export function ConversationList({
   ));
 
   return (
+    <TooltipProvider delayDuration={300} skipDelayDuration={120}>
     <aside
       aria-label="การสนทนา LINE"
       className={cn(
-        'w-full flex-none flex-col overflow-hidden border-r border-border',
-        'bg-surface-raised text-ink md:w-80',
-        collapsed ? 'hidden' : selectedId ? 'hidden md:flex' : 'flex',
+        'flex-none flex-col overflow-hidden border-r border-border bg-surface-raised text-ink',
+        collapsed ? 'hidden w-[4.5rem] md:flex' : 'w-full md:w-80',
+        !collapsed && (selectedId ? 'hidden md:flex' : 'flex'),
       )}
     >
+      {collapsed ? (
+        <CollapsedRoomRail
+          visible={visible}
+          loading={loading}
+          selectedId={selectedId}
+          onSelect={onSelect}
+          onExpand={onToggleCollapsed}
+        />
+      ) : (
       <div className="flex h-full flex-col">
         <div className="flex-none space-y-2.5 px-3 pb-3 pt-3">
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-sm font-bold text-ink">Live Chat</h2>
-            <button
-              type="button"
-              onClick={onToggleCollapsed}
-              aria-label="ซ่อนรายการสนทนา"
-              title="ซ่อนรายการสนทนา"
-              className="hidden items-center justify-center rounded-md p-1.5 text-muted transition-colors duration-normal ease-out-expo hover:bg-surface-sunken hover:text-ink md:inline-flex"
-            >
-              <PanelLeftClose className="h-4 w-4" aria-hidden="true" />
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={onToggleCollapsed}
+                  aria-label="ย่อรายการสนทนา"
+                  className="hidden items-center justify-center rounded-md p-1.5 text-muted transition-colors duration-normal ease-out-expo hover:bg-surface-sunken hover:text-ink md:inline-flex"
+                >
+                  <PanelLeftClose className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">ย่อรายการสนทนา</TooltipContent>
+            </Tooltip>
           </div>
           <Input
             type="search"
@@ -156,26 +254,28 @@ export function ConversationList({
                 </button>
               );
             })}
-            <button
-              type="button"
-              onClick={() => setSort(sort === 'newest' ? 'oldest' : 'newest')}
-              aria-label={sort === 'newest' ? 'เรียงตามรอนานสุด' : 'เรียงตามล่าสุด'}
-              aria-pressed={sort === 'oldest'}
-              title={
-                sort === 'newest'
-                  ? 'ล่าสุดก่อน - กดเพื่อสลับเป็นรอนานสุด'
-                  : 'รอนานสุดก่อน - กดเพื่อสลับเป็นล่าสุด'
-              }
-              className={cn(
-                'inline-flex min-h-touch min-w-touch shrink-0 items-center justify-center rounded-md',
-                'transition-colors duration-normal ease-out-expo',
-                sort === 'oldest'
-                  ? 'bg-accent-gradient text-on-accent shadow-lg'
-                  : 'bg-surface-sunken text-muted hover:text-ink',
-              )}
-            >
-              <ArrowDownWideNarrow className="h-4 w-4" aria-hidden="true" />
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => setSort(sort === 'newest' ? 'oldest' : 'newest')}
+                  aria-label={sort === 'newest' ? 'เรียงตามรอนานสุด' : 'เรียงตามล่าสุด'}
+                  aria-pressed={sort === 'oldest'}
+                  className={cn(
+                    'inline-flex min-h-touch min-w-touch shrink-0 items-center justify-center rounded-md',
+                    'transition-colors duration-normal ease-out-expo',
+                    sort === 'oldest'
+                      ? 'bg-accent-gradient text-on-accent shadow-lg'
+                      : 'bg-surface-sunken text-muted hover:text-ink',
+                  )}
+                >
+                  <ArrowDownWideNarrow className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {sort === 'newest' ? 'ล่าสุดก่อน กดเพื่อสลับเป็นรอนานสุด' : 'รอนานสุดก่อน กดเพื่อสลับเป็นล่าสุด'}
+              </TooltipContent>
+            </Tooltip>
           </div>
         </div>
 
@@ -214,6 +314,8 @@ export function ConversationList({
           </div>
         </div>
       </div>
+      )}
     </aside>
+    </TooltipProvider>
   );
 }

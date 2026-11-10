@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { cn } from '@/lib/cn';
+import { ClipText } from '@/components/ui/tooltip';
 import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
@@ -113,14 +114,6 @@ export function KpiCard({
     subtext ?? hint
   );
 
-  const detailTitle = trend
-    ? [trend.value, trend.label].filter((part) => part != null && part !== '').join(' ')
-    : typeof subtext === 'string'
-      ? subtext
-      : typeof hint === 'string'
-        ? hint
-        : undefined;
-
   const innerContent = (
     <>
       <span
@@ -132,16 +125,12 @@ export function KpiCard({
         <Icon className={cn('h-6 w-6', styles.iconColor)} aria-hidden="true" />
       </span>
       <div className="flex flex-col min-w-0">
-        <p className="text-xs font-semibold text-muted truncate leading-normal" title={label}>
-          {label}
-        </p>
+        <ClipText className="text-xs font-semibold leading-normal text-muted">{label}</ClipText>
         <p className={cn('mt-0.5 text-2xl sm:text-3xl font-extrabold tracking-tight tabular-nums leading-tight', styles.valueColor)}>
           {displayValue}
         </p>
         {detailNode && (
-          <div className="mt-1 truncate text-xs leading-normal text-muted" title={detailTitle}>
-            {detailNode}
-          </div>
+          <ClipText className="mt-1 text-xs leading-normal text-muted">{detailNode}</ClipText>
         )}
       </div>
     </>
