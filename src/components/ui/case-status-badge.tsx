@@ -1,4 +1,5 @@
 import { cn } from '../../lib/cn';
+import { ClipText } from './tooltip';
 import {
   STATUS_LABELS_TH,
   STATUS_LABELS_TH_CITIZEN,
@@ -41,8 +42,8 @@ export interface CaseStatusBadgeProps {
   label?: string;
   className?: string;
   /**
-   * ตัดข้อความที่ล้นกรอบเป็น … และใส่ title เป็นข้อความเต็ม
-   * เบราว์เซอร์แสดง title เมื่อโฮเวอร์ — ใช้เมื่อป้ายอยู่ในช่องแคบ
+   * ตัดข้อความที่ล้นกรอบเป็น …
+   * ทูลทิปธีมโผล่เฉพาะตอนข้อความล้นจริง
    */
   truncate?: boolean;
 }
@@ -55,20 +56,20 @@ export function CaseStatusBadge({
   truncate = false,
 }: CaseStatusBadgeProps) {
   const text = label ?? (register === 'citizen' ? STATUS_LABELS_TH_CITIZEN[status] : STATUS_LABELS_TH[status]);
+  const frame = truncate
+    ? 'flex w-full min-w-0 max-w-full justify-center'
+    : 'inline-flex whitespace-nowrap';
   return (
     <span
-      title={truncate ? text : undefined}
       className={cn(
         'items-center rounded-pill px-3.5 py-1 text-sm font-semibold ring-1 ring-inset',
-        truncate ? 'flex w-full min-w-0 max-w-full justify-center' : 'inline-flex whitespace-nowrap',
+        frame,
         statusClasses[status],
         className,
       )}
     >
       {truncate ? (
-        <span className="min-w-0 truncate" title={text}>
-          {text}
-        </span>
+        <ClipText>{text}</ClipText>
       ) : (
         text
       )}

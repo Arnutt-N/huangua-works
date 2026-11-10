@@ -2,6 +2,7 @@
 
 import { MessagesSquare, PanelLeftOpen, Wifi, WifiOff } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { ClipText, Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { ConversationFilter } from '../_hooks/use-conversations';
 import type { CannedResponse, Message } from '../_lib/types';
 import { ChatHeader } from './chat-header';
@@ -69,17 +70,21 @@ export function ChatArea({
       <div className="flex h-10 flex-none items-center justify-between gap-3 border-b border-border bg-surface px-3">
         <div className="flex min-w-0 items-center gap-2">
           {listCollapsed && (
-            <button
-              type="button"
-              onClick={onToggleList}
-              aria-label="แสดงรายการสนทนา"
-              title="แสดงรายการสนทนา"
-              className="hidden items-center justify-center rounded-md p-1.5 text-muted hover:bg-surface-sunken hover:text-ink md:inline-flex"
-            >
-              <PanelLeftOpen className="h-4 w-4" aria-hidden="true" />
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={onToggleList}
+                  aria-label="แสดงรายการสนทนา"
+                  className="hidden items-center justify-center rounded-md p-1.5 text-muted hover:bg-surface-sunken hover:text-ink md:inline-flex"
+                >
+                  <PanelLeftOpen className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">แสดงรายการสนทนา</TooltipContent>
+            </Tooltip>
           )}
-          <span className="truncate text-sm font-bold text-ink" title="Live Chat Console">Live Chat Console</span>
+          <ClipText className="text-sm font-bold text-ink">Live Chat Console</ClipText>
         </div>
         <span
           className={cn(

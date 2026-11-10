@@ -14,6 +14,7 @@ import {
   type UserRole,
 } from '@/components/admin/admin-nav';
 import { cn } from '@/lib/cn';
+import { ClipText, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 /**
  * AdminLayout — โครง sidebar + topbar ของแอดมิน
@@ -143,7 +144,10 @@ export function AdminLayout({
 
   const groups = visibleNavGroups(user.role);
 
+  const iconOnly = collapsed && isDesktop && hydrated;
+
   return (
+    <TooltipProvider delayDuration={300} skipDelayDuration={120}>
     <div className="mesh-gradient relative min-h-dvh text-ink print:min-h-0 print:bg-white print:bg-none print:text-black">
       <div className="thai-pattern pointer-events-none fixed inset-0 print:hidden" aria-hidden="true" />
 
@@ -200,12 +204,8 @@ export function AdminLayout({
                 จึงซ่อนข้อความด้วยคลาส md: ไม่ใช่ตัดออกจาก DOM — ไม่งั้น drawer
                 ต่ำกว่า breakpoint md (ซึ่งกว้างเต็มที่เสมอ) จะเหลือแต่ไอคอนโดยไม่มีป้ายกำกับ */}
             <span className={cn('min-w-0', collapsed && 'md:hidden')}>
-              <span className="block truncate text-sm font-bold text-ink" title="อบต.หัวงัว">
-                อบต.หัวงัว
-              </span>
-              <span className="block truncate text-xs text-muted" title="ระบบเจ้าหน้าที่">
-                ระบบเจ้าหน้าที่
-              </span>
+              <ClipText className="block text-sm font-bold text-ink" side="right">อบต.หัวงัว</ClipText>
+              <ClipText className="block text-xs text-muted" side="right">ระบบเจ้าหน้าที่</ClipText>
             </span>
           </Link>
           <button
@@ -219,22 +219,26 @@ export function AdminLayout({
 
           {/* ย่อ/ขยาย — วางเป็นไอคอนคู่กับแบรนด์ ไม่ให้กินที่เป็นเมนูเต็มแถวปนกับ
               รายการนำทางจริงด้านล่าง (ผู้ใช้กดครั้งเดียวแล้วแทบไม่กดอีก) */}
-          <button
-            type="button"
-            onClick={toggleCollapsed}
-            className={cn(
-              'hidden h-11 w-11 flex-none items-center justify-center rounded-md text-muted hover:bg-accent-sunken hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong md:flex',
-              collapsed ? 'md:mx-auto' : 'md:ml-auto',
-            )}
-            aria-label={collapsed ? 'ขยายแถบเมนู' : 'ย่อแถบเมนู'}
-            title={collapsed ? 'ขยายแถบเมนู' : 'ย่อแถบเมนู'}
-          >
-            {collapsed ? (
-              <PanelLeftOpen className="h-5 w-5" aria-hidden="true" />
-            ) : (
-              <PanelLeftClose className="h-5 w-5" aria-hidden="true" />
-            )}
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={toggleCollapsed}
+                className={cn(
+                  'hidden h-11 w-11 flex-none items-center justify-center rounded-md text-muted hover:bg-accent-sunken hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong md:flex',
+                  collapsed ? 'md:mx-auto' : 'md:ml-auto',
+                )}
+                aria-label={collapsed ? 'ขยายแถบเมนู' : 'ย่อแถบเมนู'}
+              >
+                {collapsed ? (
+                  <PanelLeftOpen className="h-5 w-5" aria-hidden="true" />
+                ) : (
+                  <PanelLeftClose className="h-5 w-5" aria-hidden="true" />
+                )}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">{collapsed ? 'ขยายแถบเมนู' : 'ย่อแถบเมนู'}</TooltipContent>
+          </Tooltip>
         </div>
 
         {/* เมนูงาน — แบ่งกลุ่มตามหน้าที่ */}
@@ -261,6 +265,7 @@ export function AdminLayout({
                       item={item}
                       isActive={item.key === active}
                       collapsed={collapsed}
+                      iconOnly={iconOnly}
                       onNavigate={() => setMobileOpen(false)}
                     />
                   </li>
@@ -293,8 +298,8 @@ export function AdminLayout({
             <Menu className="h-5 w-5" aria-hidden="true" />
           </button>
 
-          <h1 className="min-w-0 flex-1 truncate text-base font-bold text-ink sm:text-lg" title={title}>
-            {title}
+          <h1 className="min-w-0 flex-1 text-base font-bold text-ink sm:text-lg">
+            <ClipText className="block">{title}</ClipText>
           </h1>
 
           {/* เมนูผู้ใช้ — avatar dropdown: โปรไฟล์ของฉัน / ออกจากระบบ (ยืนยันก่อนออก)
@@ -309,6 +314,7 @@ export function AdminLayout({
         <SessionTimeoutWarning />
       </div>
     </div>
+    </TooltipProvider>
   );
 }
 
@@ -316,20 +322,21 @@ function SidebarLink({
   item,
   isActive,
   collapsed,
+  iconOnly,
   onNavigate,
 }: {
   item: AdminNavItem;
   isActive: boolean;
   collapsed: boolean;
+  iconOnly: boolean;
   onNavigate: () => void;
 }) {
   const Icon = item.icon;
-  return (
+  const link = (
     <Link
       href={item.href}
       onClick={onNavigate}
       aria-current={isActive ? 'page' : undefined}
-      title={collapsed ? item.label : undefined}
       className={cn(
         'flex min-h-touch items-center gap-3 rounded-md px-3 text-sm font-semibold transition-colors duration-normal ease-out-expo',
         collapsed && 'md:justify-center md:px-0',
@@ -339,9 +346,16 @@ function SidebarLink({
       )}
     >
       <Icon className="h-5 w-5 flex-none" aria-hidden="true" />
-      <span className={cn('truncate', collapsed && 'md:hidden')} title={item.label}>
+      <ClipText className={cn(collapsed && 'md:hidden')} side="right">
         {item.label}
-      </span>
+      </ClipText>
     </Link>
+  );
+  if (!iconOnly) return link;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{link}</TooltipTrigger>
+      <TooltipContent side="right">{item.label}</TooltipContent>
+    </Tooltip>
   );
 }

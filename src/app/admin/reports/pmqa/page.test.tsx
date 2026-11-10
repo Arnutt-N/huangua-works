@@ -164,7 +164,7 @@ describe('PmqaReportPage (/admin/reports/pmqa)', () => {
     expect(screen.getByText(/ไม่พบข้อมูลหมวดหมู่เรื่องร้องเรียน/i)).toBeInTheDocument();
   });
 
-  it('ป้ายสถานะที่ถูกตัดมี title เป็นข้อความเต็ม และหัวข้อนับสถานะจริง', async () => {
+  it('ป้ายสถานะที่ถูกตัดใช้ทูลทิปธีมแทน title และหัวข้อนับสถานะจริง', async () => {
     const page = await PmqaReportPage({
       searchParams: Promise.resolve({}),
     });
@@ -173,12 +173,11 @@ describe('PmqaReportPage (/admin/reports/pmqa)', () => {
 
     const label = screen.getByText('รออนุมัติงบประมาณ');
     expect(label).toHaveClass('truncate');
-    expect(label.parentElement).toHaveAttribute('title', 'รออนุมัติงบประมาณ');
+    expect(label).not.toHaveAttribute('title');
     expect(screen.getByRole('heading', { name: /จำแนกตามขั้นตอนวงจรชีวิต \(9 สถานะ\)/ })).toBeInTheDocument();
-    expect(screen.getByText('ยุติเรื่อง / ไม่รับดำเนินการ')).toHaveAttribute(
-      'title',
-      'ยุติเรื่อง / ไม่รับดำเนินการ',
-    );
+    const rejected = screen.getByText('ยุติเรื่อง / ไม่รับดำเนินการ');
+    expect(rejected).toHaveClass('truncate');
+    expect(rejected).not.toHaveAttribute('title');
     const card = screen.getByText('เรื่องร้องเรียนทั้งหมด').closest('.glass-panel');
     expect(card?.className).toContain('[&_p]:print:text-black');
     expect(card?.className).toContain('[&>span]:print:hidden');

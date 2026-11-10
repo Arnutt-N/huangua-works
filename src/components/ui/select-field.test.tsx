@@ -111,21 +111,23 @@ describe('SelectField', () => {
     expect(onValueChange).toHaveBeenCalledWith('ok');
   });
 
-  it('ชื่อที่ถูกตัดในช่องเลือกมี title เป็นข้อความที่แสดง และตามค่าที่เปลี่ยน', async () => {
+  it('ชื่อในช่องเลือกอยู่บนข้อความที่แสดง ไม่ใช้ title ของเบราว์เซอร์ และตามค่าที่เปลี่ยน', async () => {
     const user = userEvent.setup();
     render(<Harness />);
     const trigger = screen.getByRole('combobox', { name: 'สถานะ' });
     const label = () => trigger.querySelector('span.truncate');
 
     await waitFor(() => {
-      expect(label()).toHaveAttribute('title', 'ทุกสถานะ');
+      expect(label()).toHaveTextContent('ทุกสถานะ');
     });
+    expect(label()).not.toHaveAttribute('title');
 
     await user.click(trigger);
     await user.click(await screen.findByRole('option', { name: 'ส่งแล้ว' }));
 
     await waitFor(() => {
-      expect(label()).toHaveAttribute('title', 'ส่งแล้ว');
+      expect(label()).toHaveTextContent('ส่งแล้ว');
     });
+    expect(label()).not.toHaveAttribute('title');
   });
 });

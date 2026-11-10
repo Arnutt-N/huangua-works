@@ -8,6 +8,7 @@ import { logout } from '@/app/admin/actions';
 import { initialsOf, type UserRole } from '@/components/admin/admin-nav';
 import { RoleBadge } from '@/components/admin/role-badge';
 import { Button } from '@/components/ui/button';
+import { ClipText } from '@/components/ui/tooltip';
 import {
   Dialog,
   DialogClose,
@@ -70,9 +71,7 @@ export function UserMenu({
           className="flex flex-none items-center gap-2.5 rounded-pill py-1 pl-1.5 pr-3.5 outline-none transition-colors duration-fast hover:bg-accent-sunken focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong data-[state=open]:bg-accent-sunken"
         >
           <span className="hidden text-right sm:block">
-            <span className="block max-w-[12rem] truncate text-sm font-semibold text-ink" title={fullName}>
-              {fullName}
-            </span>
+            <ClipText className="block max-w-[12rem] text-sm font-semibold text-ink">{fullName}</ClipText>
           </span>
           <span
             aria-hidden="true"
@@ -86,8 +85,8 @@ export function UserMenu({
         <DropdownMenuContent align="end" className="min-w-64">
           {/* หัวเมนู: ตัวตน + บทบาท — badge บทบาทอยู่ที่นี่ที่เดียว ไม่ซ้ำบน topbar */}
           <DropdownMenuLabel className="py-2.5">
-            <span className="block truncate font-bold" title={fullName}>{fullName}</span>
-            <span className="block truncate text-xs font-normal text-muted" title={email}>{email}</span>
+            <ClipText className="block font-bold">{fullName}</ClipText>
+            <ClipText className="block text-xs font-normal text-muted">{email}</ClipText>
             <RoleBadge role={role} className="mt-2" />
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
