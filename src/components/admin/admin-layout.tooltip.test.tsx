@@ -46,7 +46,7 @@ describe('ไซดบาร์ใช้ทูลทิปธีมเดีย�
     fireEvent.pointerMove(link, { pointerType: 'mouse' });
     const tip = await screen.findByRole('tooltip');
     expect(tip).toHaveTextContent('แดชบอร์ด');
-    expect(document.body.querySelector('[data-side]')?.className).toContain('bg-surface-raised');
+    expect(document.body.querySelector('[data-side]')?.className).toContain('bg-tooltip');
   });
 
   it('ตอนขยาย เมนูที่อ่านได้ไม่มีทูลทิป', () => {

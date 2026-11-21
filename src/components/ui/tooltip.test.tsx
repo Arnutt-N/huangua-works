@@ -25,7 +25,7 @@ describe('ClipText', () => {
     expect(label).not.toHaveAttribute('title');
   });
 
-  it('ข้อความที่ล้นบนการ์ดโชว์ทูลทิปด้วยสีของธีม', async () => {
+  it('ข้อความที่ล้นโชว์ทูลทิปสีกลับธีม', async () => {
     render(<ClipText delayMs={0}>ผู้รับผิดชอบย้อนหลัง</ClipText>);
     const label = screen.getByText('ผู้รับผิดชอบย้อนหลัง');
     mockBox(label, true);
@@ -35,9 +35,9 @@ describe('ClipText', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent('ผู้รับผิดชอบย้อนหลัง');
     const bubble = document.body.querySelector('[data-side]');
     expect(bubble).not.toBeNull();
-    expect(bubble?.className).toContain('bg-surface-raised');
-    expect(bubble?.className).toContain('text-ink');
-    expect(bubble?.className).toContain('border-border');
+    expect(bubble?.className).toContain('bg-tooltip');
+    expect(bubble?.className).toContain('text-on-tooltip');
+    expect(bubble?.className).not.toContain('border-border');
     expect(bubble?.className).toContain('font-sans');
   });
 

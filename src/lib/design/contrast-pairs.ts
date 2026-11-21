@@ -52,6 +52,7 @@ export function pairLabel(p: ContrastPair): string {
  */
 export const CONTRAST_PAIRS: ContrastPair[] = [
   { fg: 'ink', bg: 'surface', min: AA_TEXT, kind: 'text', where: 'ข้อความทั่วไปทั้งระบบ' },
+  { fg: 'on-tooltip', bg: 'tooltip', min: AA_TEXT, kind: 'text', where: 'ข้อความทูลทิปบนพื้นกลับธีม' },
   { fg: 'ink', bg: 'surface-raised', min: AA_TEXT, kind: 'text', where: 'ข้อความในการ์ด' },
   { fg: 'muted', bg: 'surface', min: AA_TEXT, kind: 'text', where: 'subtitle, label รอง' },
   { fg: 'muted', bg: 'surface-raised', min: AA_TEXT, kind: 'text', where: 'ข้อความรองในการ์ด' },

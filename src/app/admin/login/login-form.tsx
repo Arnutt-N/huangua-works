@@ -3,7 +3,6 @@
 import { AlertCircle, Eye, EyeOff, Loader2, Lock, LogIn, Mail } from 'lucide-react';
 import { useActionState, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { login, type LoginState } from '../actions';
 import { Button } from '../../../components/ui/button';
 import { Input, Label } from '../../../components/ui/field';
@@ -14,10 +13,9 @@ export function LoginForm() {
   const [state, formAction, isPending] = useActionState(login, initialState);
   const [showPassword, setShowPassword] = useState(false);
   // § คุมค่า input ผ่าน state (controlled) — React 19 reset uncontrolled input อัตโนมัติ
-  // หลัง server action จบ ทำให้ช่องกรอกว่างวูบระหว่างรอ router.push commit (blank flash)
+  // หลัง server action จบ ทำให้ช่องกรอกว่างวูบระหว่างรอโหลดหน้าแอดมิน (blank flash)
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const router = useRouter();
 
   // § ปุ่ม submit แสดง spinner ตราบใดที่ยัง submit ค้างอยู่ หรือ success แล้วรอ navigation —
   // best practice: feedback อยู่ที่ปุ่มเอง ไม่สลับทั้งฟอร์มเป็น panel spinner แยก
@@ -32,15 +30,15 @@ export function LoginForm() {
   }, []);
 
   useEffect(() => {
-    // § navigate ฝั่ง client หลัง response ของ server action (พร้อม Set-Cookie) ถึง browser
-    // แล้วเท่านั้น — ไม่ redirect() ใน server action เดียวกับที่ signIn() ตั้ง cookie (ดู actions.ts)
-    // § ไม่เรียก router.refresh() — refresh จะ re-render หน้า login ปัจจุบันทันที ทำให้
-    // input ว่างวูบก่อน navigation commit = อาการ "หน้ากระพริบ" ที่ผู้ใช้รายงาน
-    // router.push('/admin') ไป render หน้า admin ใหม่ทั้งหน้าอยู่แล้ว ไม่ต้อง refresh หน้าเดิม
+    // § โหลด /admin ทั้งเอกสาร หลัง Set-Cookie ถึง browser แล้ว
+    // ไม่ redirect() ใน server action คู่กับ signIn() เพราะ cookie ไม่ถูก commit (ดู actions.ts)
+    // ไม่ใช้ router.push เพราะ layout ของ /admin ถูกเรนเดอร์ตอนหน้า login ยังไม่มี session
+    // client navigation ไม่รัน layout ซ้ำ จึงไม่มีแถบเมนูจนกว่าจะรีเฟรช
+    // ไม่ใช้ router.refresh() เพราะมันเรนเดอร์หน้า login ทันที ช่องกรอกว่างวูบ
     if (state.success) {
-      router.push('/admin');
+      window.location.assign('/admin');
     }
-  }, [state.success, router]);
+  }, [state.success]);
 
   return (
     <form action={formAction} className="mt-6 flex flex-col gap-4">

@@ -27,6 +27,12 @@
   --color-ink: oklch(18% 0.02 255);
   --color-muted: oklch(47% 0.02 255); /* 6.6:1 บน surface (เดิม 50% = 5.8:1) */
   --color-on-accent: oklch(99% 0.005 255);
+  /* § ทูลทิปเป็นป้ายลอย ไม่ใช่การ์ด จึงไม่ใช้ surface-raised
+   * ธีมสว่างใช้พื้นถ่านอมน้ำเงิน ธีมมืดใช้พื้นอ่อนอมน้ำเงิน
+   * ไม่ใช้ดำล้วนหรือขาวล้วน เพราะขาวบนธีมมืดจ้าเกิน และดำล้วนบนธีมสว่างแข็งเกิน
+   * chroma คุมให้อยู่ในเพดาน sRGB ที่คอมเมนต์ accent ด้านล่าง */
+  --color-tooltip: oklch(28% 0.02 255);
+  --color-on-tooltip: oklch(98% 0.005 255);
 
   /* hairline
    * เดิม border 90% ให้ contrast แค่ 1.31:1 บน surface — โครงหน้าจอ "หายไป"
@@ -142,6 +148,9 @@
   --color-ink: oklch(97% 0.005 255);
   --color-muted: oklch(70% 0.02 255);
   --color-on-accent: oklch(15% 0.015 255);
+  /* กลับทิศจากธีมสว่าง พื้น L92 ไม่ใช่ขาวล้วน ตัวอักษรเกือบเท่า ink ของธีมสว่าง */
+  --color-tooltip: oklch(92% 0.012 255);
+  --color-on-tooltip: oklch(24% 0.025 255);
   --color-border: oklch(38% 0.02 255);
   --color-border-strong: oklch(55% 0.02 255);
   /* dark กลับทิศ: accent-strong สว่างกว่า accent เพราะต้องเด่นบนพื้นเข้ม */
@@ -173,6 +182,8 @@
   --color-surface-raised: var(--color-surface-raised);
   --color-surface-sunken: var(--color-surface-sunken);
   --color-ink: var(--color-ink);
+  --color-tooltip: var(--color-tooltip);
+  --color-on-tooltip: var(--color-on-tooltip);
   --color-muted: var(--color-muted);
   --color-on-accent: var(--color-on-accent);
   --color-border: var(--color-border);
