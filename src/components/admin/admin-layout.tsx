@@ -332,11 +332,13 @@ function SidebarLink({
   onNavigate: () => void;
 }) {
   const Icon = item.icon;
+  // § ตอนย่อ ป้ายถูกซ่อนและไอคอนเป็น aria-hidden ลิงก์จะไม่มีชื่อถ้าไม่ตั้ง aria-label
   const link = (
     <Link
       href={item.href}
       onClick={onNavigate}
       aria-current={isActive ? 'page' : undefined}
+      aria-label={iconOnly ? item.label : undefined}
       className={cn(
         'flex min-h-touch items-center gap-3 rounded-md px-3 text-sm font-semibold transition-colors duration-normal ease-out-expo',
         collapsed && 'md:justify-center md:px-0',
