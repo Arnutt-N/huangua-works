@@ -24,8 +24,8 @@ export const TooltipContent = forwardRef<
       ref={ref}
       sideOffset={sideOffset}
       className={cn(
-        'group z-[80] max-w-56 rounded-[6px] border border-border bg-surface-raised px-2 py-1',
-        'text-left font-sans text-xs font-medium leading-snug text-ink shadow-sm',
+        'group z-[80] max-w-56 rounded-[6px] bg-tooltip px-2 py-1',
+        'text-left font-sans text-xs font-medium leading-snug text-on-tooltip shadow-sm',
         'data-[state=open]:animate-in data-[state=closed]:animate-out',
         className,
       )}
@@ -35,7 +35,7 @@ export const TooltipContent = forwardRef<
       <span
         aria-hidden="true"
         className={cn(
-          'absolute h-2 w-2 rotate-45 bg-surface-raised',
+          'absolute h-2 w-2 rotate-45 bg-tooltip',
           'group-data-[side=top]:bottom-0 group-data-[side=top]:left-1/2 group-data-[side=top]:-translate-x-1/2 group-data-[side=top]:translate-y-1/2',
           'group-data-[side=bottom]:top-0 group-data-[side=bottom]:left-1/2 group-data-[side=bottom]:-translate-x-1/2 group-data-[side=bottom]:-translate-y-1/2',
           'group-data-[side=left]:right-0 group-data-[side=left]:top-1/2 group-data-[side=left]:translate-x-1/2 group-data-[side=left]:-translate-y-1/2',
