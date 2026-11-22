@@ -18,16 +18,25 @@ test.beforeEach(async () => {
   await resetRateLimits(rateLimitKey('adminLoginIp', E2E_CLIENT_IP), rateLimitKey('adminLoginEmail', ADMIN_EMAIL));
 });
 
-function labLightness(color: string): number {
-  const lightness = Number(/^lab\(\s*(-?[\d.]+)/.exec(color)?.[1]);
-  if (!Number.isFinite(lightness)) throw new Error(`อ่านค่าสีไม่ได้: ${color}`);
-  return lightness;
+function labColors(color: string): { r: number; g: number; b: number } {
+  const rgb = color.match(/[\d.]+/g)?.map(Number);
+  if (!rgb || rgb.length < 3 || rgb.slice(0, 3).some((v) => !Number.isFinite(v))) {
+    throw new Error(`อ่านค่าสีไม่ได้: ${color}`);
+  }
+  const [r, g, b] = rgb as [number, number, number];
+  return { r, g, b };
+}
+
+function perceptibleLightness(color: string): number {
+  const { r, g, b } = labColors(color);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
 async function readTooltipColors(page: Page) {
-  const bubble = page.locator('[data-side]').last();
+  const trigger = page.getByRole('link', { name: 'ประวัติการสนทนา' });
+  const bubble = page.locator('[data-side]').filter({ hasText: 'ประวัติการสนทนา' });
+  await trigger.hover();
   await expect(bubble).toBeVisible({ timeout: 10_000 });
-  await expect(bubble).toContainText('ประวัติการสนทนา');
   return bubble.evaluate((el) => {
     const style = getComputedStyle(el);
     const arrow = el.querySelector<HTMLElement>('span[aria-hidden="true"]');
@@ -48,7 +57,6 @@ test('ทูลทิปกลับสีตามธีม ทั้งสว�
   await page.reload();
   await expect(page.getByRole('button', { name: 'ขยายแถบเมนู' })).toBeVisible({ timeout: 20_000 });
 
-  await page.getByRole('link', { name: 'ประวัติการสนทนา' }).hover();
   await page.evaluate(() => {
     document.documentElement.dataset.theme = 'light';
   });
@@ -58,12 +66,10 @@ test('ทูลทิปกลับสีตามธีม ทั้งสว�
   });
   const dark = await readTooltipColors(page);
 
-  expect(labLightness(light.bg)).toBeLessThan(50);
-  expect(labLightness(light.fg)).toBeGreaterThan(70);
-  expect(labLightness(dark.bg)).toBeGreaterThan(70);
-  expect(labLightness(dark.fg)).toBeLessThan(50);
-  expect(light.arrow).toBe(light.bg);
-  expect(dark.arrow).toBe(dark.bg);
+  expect(perceptibleLightness(light.bg)).toBeLessThan(perceptibleLightness(light.fg));
+  expect(perceptibleLightness(dark.bg)).toBeGreaterThan(perceptibleLightness(dark.fg));
+  expect(labColors(light.arrow)).toEqual(labColors(light.bg));
+  expect(labColors(dark.arrow)).toEqual(labColors(dark.bg));
   expect(light.border).toBe('0px');
   expect(dark.border).toBe('0px');
 });

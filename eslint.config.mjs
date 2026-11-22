@@ -25,6 +25,7 @@ const config = [
       'coverage/**',
       'playwright-report/**',
       'playwright/.cache/**',
+      '.verify-evidence/**',
       '**/*.stories.tsx',
       '**/*.story.tsx',
       'install.log',

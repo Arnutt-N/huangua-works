@@ -213,7 +213,7 @@ A whitelist equal to one of the four tier constants is resolved through the DB t
 
 ### Case lifecycle
 
-`src/lib/cases/intake.ts` → `createCase()` is the **single intake path** for both web and LINE; it resolves/creates the submitter, records consent (web only), assigns a tracking code with collision retry, and writes the audit row.
+`src/lib/cases/intake.ts` → `createCase()` is the **single intake path** for web, LINE bot and LIFF; it resolves/creates the submitter, records consent for every channel through `intakeConsentVia()` (`intake_submit`, `line_bot_submit`, `liff_submit`), assigns a tracking code with collision retry, and writes the audit row.
 
 ```
 pending → received → reviewing → assigned → in_progress → done → closed
