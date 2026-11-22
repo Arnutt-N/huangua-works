@@ -23,7 +23,10 @@ test('sidebar ย่อแล้วยังเรียกเมนูด้ว
   await login(page);
   await page.evaluate(() => window.localStorage.setItem('admin:sidebar-collapsed', '1'));
   await page.reload();
-  await expect(page.getByRole('link', { name: 'ประวัติการสนทนา' })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('button', { name: 'ขยายแถบเมนู' })).toBeVisible({ timeout: 20_000 });
+  const link = page.getByRole('link', { name: 'ประวัติการสนทนา' });
+  await expect(link).toHaveAttribute('aria-label', 'ประวัติการสนทนา');
+  await expect(link.locator('span[data-ds-allow-clip]')).toBeHidden();
 });
 
 test('sidebar กาง: โฟกัสเมนูที่อ่านได้ไม่มีทูลทิป', async ({ page }) => {
