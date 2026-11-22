@@ -65,6 +65,7 @@ test('ทูลทิปกลับสีตามธีม ทั้งสว�
   expect(light.arrow).toBe(light.bg);
   expect(dark.arrow).toBe(dark.bg);
   expect(light.border).toBe('0px');
+  expect(dark.border).toBe('0px');
 });
 
 test('หลังเข้าสู่ระบบเห็นแถบเมนูโดยไม่ต้องรีเฟรช', async ({ page }) => {
