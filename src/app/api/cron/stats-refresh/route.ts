@@ -8,8 +8,10 @@ import { getDb } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { cases, caseStatsDaily } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
-import { sql, eq } from 'drizzle-orm';
+import { sql, and, eq, isNotNull } from 'drizzle-orm';
 import { requireCron } from '@/lib/cron-auth';
+import { deriveStatusStats } from '@/lib/cases/stats';
+import type { CaseStatus } from '@/lib/cases/state-machine';
 
 export async function GET(req: NextRequest) {
   const auth = requireCron(req);
@@ -24,37 +26,28 @@ export async function GET(req: NextRequest) {
     .from(cases)
     .groupBy(cases.status);
 
-  const countByStatus = new Map<string, number>();
+  const countByStatus: Partial<Record<CaseStatus, number>> = {};
   for (const row of statusCounts) {
     // count(*) จาก postgres-js คืนเป็น string (bigint) โดย default — ต้อง Number() ก่อนบวกรวม
-    countByStatus.set(row.status, Number(row.count));
+    countByStatus[row.status] = Number(row.count);
   }
 
-  const receivedCount = countByStatus.get('received') ?? 0;
-  const closedCount = countByStatus.get('closed') ?? 0;
-  const rejectedCount = countByStatus.get('rejected') ?? 0;
-  const inProgressCount =
-    (countByStatus.get('in_progress') ?? 0) +
-    (countByStatus.get('assigned') ?? 0) +
-    (countByStatus.get('reviewing') ?? 0);
-
-  // § Calculate average resolution days (closed cases only)
+  // § เฉลี่ยวันปิดหารเฉพาะแถวที่มี closedAt จริง — เรื่อง closed ที่ไม่มีวันปิด
+  // (ข้อมูลนำเข้าเก่า) ต้องไม่ไปลดค่าเฉลี่ย
   const closedCases = await db
-    .select()
+    .select({ createdAt: cases.createdAt, closedAt: cases.closedAt })
     .from(cases)
-    .where(eq(cases.status, 'closed'));
+    .where(and(eq(cases.status, 'closed'), isNotNull(cases.closedAt)));
+  const closedDurationsDays = closedCases.map((c) =>
+    Math.floor((new Date(c.closedAt!).getTime() - new Date(c.createdAt).getTime()) / 86400000),
+  );
 
-  let avgResolutionDays: number | null = null;
-  if (closedCases.length > 0) {
-    const totalDays = closedCases.reduce((sum, c) => {
-      if (!c.closedAt) return sum;
-      const resolutionDays = Math.floor(
-        (new Date(c.closedAt).getTime() - new Date(c.createdAt).getTime()) / 86400000,
-      );
-      return sum + resolutionDays;
-    }, 0);
-    avgResolutionDays = Math.round(totalDays / closedCases.length);
-  }
+  const stats = deriveStatusStats(countByStatus, closedDurationsDays);
+  const receivedCount = stats.totalReceived;
+  const closedCount = stats.totalClosed;
+  const rejectedCount = stats.totalRejected;
+  const inProgressCount = stats.totalInProgress;
+  const avgResolutionDays = stats.avgResolutionDays;
 
   // § Group by department (คำนวณแบบง่าย — ใช้ in-memory)
   const allCases = await db.select().from(cases);

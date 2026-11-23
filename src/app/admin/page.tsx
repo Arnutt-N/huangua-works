@@ -20,6 +20,7 @@ import {
   type CaseStatus,
 } from '@/lib/cases/state-machine';
 import { formatThaiDateLong, THAI_MONTHS_SHORT } from '@/lib/thai-date';
+import { deriveStatusStats } from '@/lib/cases/stats';
 
 export const metadata: Metadata = { title: 'แดชบอร์ดเจ้าหน้าที่' };
 export const dynamic = 'force-dynamic';
@@ -90,17 +91,16 @@ export default async function AdminDashboardPage() {
   );
   const slaBreach = Number(slaResult?.c ?? 0);
 
-  // § คำนวณ KPI values
-  const totalReceived = latest?.totalReceived ?? totalCases;
-  const totalInProgress =
-    latest?.totalInProgress ??
-    (statusMap.get('received') ?? 0) +
-      (statusMap.get('reviewing') ?? 0) +
-      (statusMap.get('assigned') ?? 0) +
-      (statusMap.get('in_progress') ?? 0);
-  const totalClosed = latest?.totalClosed ?? (statusMap.get('closed') ?? 0);
+  // § คำนวณ KPI values — snapshot มาจาก cron ตามมาตรฐานเดียวกับ live fallback
+  // ถ้า snapshot ยังไม่มี (cron ยังไม่รัน) ให้ derive จาก status counts แบบ live
+  const liveStats = deriveStatusStats(Object.fromEntries(statusMap), []);
+  const totalReceived = latest?.totalReceived ?? liveStats.totalReceived;
+  const totalInProgress = latest?.totalInProgress ?? liveStats.totalInProgress;
+  const totalClosed = latest?.totalClosed ?? liveStats.totalClosed;
   const avgResolutionDays = latest?.avgResolutionDays ?? null;
-  const resolutionRate = totalReceived > 0 ? Math.round((totalClosed / totalReceived) * 100) : 0;
+  const resolutionRate = latest
+    ? totalReceived > 0 ? Math.round((totalClosed / totalReceived) * 100) : 0
+    : liveStats.resolutionRate;
 
   // § จัดการ trend points อย่างปลอดภัย (รองรับทั้ง DB จริงและ test mock)
   let trendPoints: DailyTrendPoint[] = [];
