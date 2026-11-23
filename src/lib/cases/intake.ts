@@ -1,10 +1,11 @@
 import { eq } from 'drizzle-orm';
+import { isUniqueViolation } from '../db/errors';
 import { getDb } from '../db';
 import { firstOrUndefined } from '../db/query-helpers';
 import { cases, categories } from '../db/schema';
 import { generateId } from '../id';
 import { generateTrackingCode } from '../case-tracking';
-import { checkDuplicate, recordDedupHash } from '../dedup';
+import { checkDuplicate, claimDedupHash } from '../dedup';
 import { AUDIT_ACTIONS, logAudit } from '../audit';
 import { getFiscalYear } from '../thai-date';
 import { keyFromUrl } from '../storage';
@@ -37,6 +38,13 @@ export interface CaseIntakeInput {
   lineUserId?: string;
   ipAddress?: string;
   userAgent?: string;
+}
+
+/** ใช้เพื่อ rollback transaction เมื่อ unique(hash) ให้สิทธิ์เรื่องอื่นไปแล้ว */
+class ClaimLostError extends Error {
+  constructor(readonly existingTrackingCode?: string) {
+    super('dedup claim lost');
+  }
 }
 
 export type CaseIntakeResult =
@@ -89,60 +97,42 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
       : input.channel === 'line' && input.lineUserId
         ? `line:${input.lineUserId}`
         : null;
-  if (dedupKey) {
-    const dupCheck = await checkDuplicate(dedupKey, input.title, input.description);
-    if (dupCheck.isDuplicate) {
-      // § reveal policy: คืน trackingCode เฉพาะเมื่อพิสูจน์ว่าผู้ขอ = เจ้าของเรื่องเดิม
-      // channel 'line' = lineUserId ผ่านการ verify มาแล้วเสมอ (LIFF: HMAC session
-      // cookie ที่ server sign, บอท: LINE webhook จากเซิร์ฟเวอร์ LINE) — ปลอมไม่ได้
-      // ฝั่ง web(cid): attacker ที่รู้ cid ใครก็ได้+เดา title/desc ตรงเป๊ะ อาจถาม
-      // รู้ตัวแล้ว → bare 409 ไม่คืนอะไรเลย (review PR #73 suggestion #1)
-      const provenOwner = input.channel === 'line' && Boolean(input.lineUserId);
-      let existingTrackingCode: string | undefined;
-      if (provenOwner && dupCheck.caseId) {
-        const existing = await firstOrUndefined(
-          db.select({ trackingCode: cases.trackingCode }).from(cases).where(eq(cases.id, dupCheck.caseId)).limit(1),
-        );
-        existingTrackingCode = existing?.trackingCode ?? undefined;
-      }
-      return {
-        ok: false,
-        error: 'คุณเคยแจ้งเรื่องนี้ไปแล้วภายใน 7 วัน',
-        errorCode: 'duplicate',
-        ...(existingTrackingCode ? { existingTrackingCode } : {}),
-      };
-    }
-  }
-
   const caseId = generateId();
   const fiscalYear = getFiscalYear(new Date());
   const estimatedDays = category.estimatedDays || 7;
   const dueDate = new Date(Date.now() + estimatedDays * 24 * 60 * 60 * 1000);
 
-  // § ตรวจทุกรหัสที่สุ่มได้ก่อนใช้ — เดิมวนสุ่มใหม่ตอนชนแล้วออกจากลูปโดยไม่ได้ตรวจ
-  // ตัวสุดท้าย ทำให้รหัสที่ไม่เคยผ่านการตรวจหลุดไปถึง insert แล้วพังที่ unique index
-  // § ออกเลขติดตามก่อนสร้างผู้แจ้ง เพื่อไม่ทิ้ง user/consent เมื่อออกเลขไม่ได้
-  let trackingCode: string | null = null;
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const candidate = generateTrackingCode();
-    const collision = await firstOrUndefined(
-      db.select({ id: cases.id }).from(cases).where(eq(cases.trackingCode, candidate)).limit(1)
-    );
-    if (!collision) {
-      trackingCode = candidate;
-      break;
-    }
-  }
-  if (!trackingCode) {
-    return { ok: false, error: 'ไม่สามารถออกเลขติดตามได้ กรุณาลองใหม่', errorCode: 'internal' };
-  }
-
-  const issuedTrackingCode = trackingCode;
-
   // § การเขียนผู้แจ้ง/link/consent/เรื่อง/dedup/audit ต้อง commit หรือ rollback พร้อมกัน
   // ระบุตัวตนด้วย resolveCitizen ใน tx นี้ (ลบ resolveSubmitter แล้ว — ดู citizen-access)
-  const result = await db.transaction(async (tx): Promise<CaseIntakeResult> => {
-    const submitterId = await resolveCitizen(identity, tx);
+  let result: CaseIntakeResult;
+  try {
+    result = await db.transaction(async (tx): Promise<CaseIntakeResult> => {
+      // § ตัดสิน duplicate ใน transaction เดียวกับ insert และก่อน resolveCitizen —
+      // ด่านเดิมอยู่นอก tx (สองคำขอผ่านพร้อมกันได้) แต่ถ้าย้ายเข้ามาโดยไม่เลื่อนขึ้นก่อน
+      // duplicate submit จะทิ้ง user row ค้างไว้
+      if (dedupKey) {
+        const dupCheck = await checkDuplicate(dedupKey, input.title, input.description, tx);
+        if (dupCheck.isDuplicate) {
+          // § reveal policy: เฉพาะ channel line ที่ verify แล้วเท่านั้นที่ได้ trackingCode เดิม
+          // ฝั่ง web(cid) attacker ที่รู้ CID + title/desc ได้ bare 409 (review PR #73)
+          const provenOwner = input.channel === 'line' && Boolean(input.lineUserId);
+          let existingTrackingCode: string | undefined;
+          if (provenOwner && dupCheck.caseId) {
+            const existing = await firstOrUndefined(
+              tx.select({ trackingCode: cases.trackingCode }).from(cases).where(eq(cases.id, dupCheck.caseId)).limit(1),
+            );
+            existingTrackingCode = existing?.trackingCode ?? undefined;
+          }
+          return {
+            ok: false,
+            error: 'คุณเคยแจ้งเรื่องนี้ไปแล้วภายใน 7 วัน',
+            errorCode: 'duplicate',
+            ...(existingTrackingCode ? { existingTrackingCode } : {}),
+          };
+        }
+      }
+
+      const submitterId = await resolveCitizen(identity, tx);
 
     // § ทุกช่องทางบันทึกความยินยอมตอนแจ้ง — เดิมบอทไม่บันทึกเพราะไม่มี checkbox ในแชท
     // ผลคือเรื่องจากบอท 404 บน /track ขณะที่บอทเองโชว์ได้ (กติกาไม่เท่ากัน)
@@ -154,49 +144,95 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
       tx,
     );
 
-    await tx.insert(cases).values({
-      id: caseId,
-      status: 'pending',
-      priority: 'normal',
-      title: input.title,
-      description: input.description,
-      location: input.location ?? '',
-      provinceId: input.provinceId ?? null,
-      districtId: input.districtId ?? null,
-      subDistrictId: input.subDistrictId ?? null,
-      villageId: input.villageId ?? null,
-      village: input.village || null,
-      categoryId: input.categoryId,
-      submittedBy: submitterId,
-      departmentId: category.defaultDepartmentId || null,
-      dueDate,
-      attachments: storageKeys ? JSON.stringify(storageKeys) : null,
-      metadata: JSON.stringify({
-        fiscalYear,
-        source: input.channel,
-        ...(input.origin === 'liff' ? { origin: 'liff' } : {}),
-        // § ไม่เก็บ ipAddress/userAgent ที่นี่ — IP อยู่ใน auditLogs (มี retention ลบตาม
-        // cleanup-audit-logs) ส่วน cases.metadata ไม่มีลบ เก็บถาวรขัด PDPA retention
-      }),
-      trackingCode: issuedTrackingCode,
+      // § unique index (cases_tracking_code_idx) เป็นตัวตัดสิน — SELECT ก่อน insert
+      // ไม่พอเพราะสองคำขอคนละเรื่องสุ่มเลขเดียวกันได้ ก่อนหน้านี้ insert พัง 500
+      // § ใช้ savepoint ต่อ collision เพื่อไม่ให้ error 23505 ทำให้ทั้ง tx abort
+      const caseValues: typeof cases.$inferInsert = {
+        id: caseId,
+        status: 'pending',
+        priority: 'normal',
+        title: input.title,
+        description: input.description,
+        location: input.location ?? '',
+        provinceId: input.provinceId ?? null,
+        districtId: input.districtId ?? null,
+        subDistrictId: input.subDistrictId ?? null,
+        villageId: input.villageId ?? null,
+        village: input.village || null,
+        categoryId: input.categoryId,
+        submittedBy: submitterId,
+        departmentId: category.defaultDepartmentId || null,
+        dueDate,
+        attachments: storageKeys ? JSON.stringify(storageKeys) : null,
+        metadata: JSON.stringify({
+          fiscalYear,
+          source: input.channel,
+          ...(input.origin === 'liff' ? { origin: 'liff' } : {}),
+          // § ไม่เก็บ ipAddress/userAgent ที่นี่ — IP อยู่ใน auditLogs (มี retention ลบตาม
+          // cleanup-audit-logs) ส่วน cases.metadata ไม่มีลบ เก็บถาวรขัด PDPA retention
+        }),
+        trackingCode: null,
+      };
+
+      let issuedTrackingCode: string | null = null;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const candidate = generateTrackingCode();
+        try {
+          await tx.transaction(async (savepoint) => {
+            await savepoint.insert(cases).values({ ...caseValues, trackingCode: candidate });
+          });
+          issuedTrackingCode = candidate;
+          break;
+        } catch (error) {
+          if (!isUniqueViolation(error)) throw error;
+        }
+      }
+      if (!issuedTrackingCode) {
+        // § ต้อง rollback user/consent ที่สร้างไปแล้ว — return จากใน tx จะ commit ของค้าง
+        throw new Error('tracking code exhausted');
+      }
+
+      if (dedupKey) {
+        const claimed = await claimDedupHash(dedupKey, input.title, input.description, caseId, tx);
+        if (claimed.caseId !== caseId) {
+          // § ต้อง rollback เรื่องที่เพิ่ง insert มิเช่นนั้น caller ได้ duplicate แต่ DB มีเรื่องค้าง
+          // ดึงเลขเรื่องเดิมก่อน throw เพื่อรักษาสัญญา existingTrackingCode ทุกช่องทาง (รวม race)
+          const provenOwner = input.channel === 'line' && Boolean(input.lineUserId);
+          const existing = provenOwner
+            ? await firstOrUndefined(
+                tx.select({ trackingCode: cases.trackingCode }).from(cases).where(eq(cases.id, claimed.caseId)).limit(1),
+              )
+            : undefined;
+          throw new ClaimLostError(existing?.trackingCode ?? undefined);
+        }
+      }
+
+      await logAudit({
+        userId: submitterId,
+        action: AUDIT_ACTIONS.SUBMIT_CASE,
+        resource: 'cases',
+        resourceId: caseId,
+        ipAddress: input.ipAddress,
+        userAgent: input.userAgent,
+        metadata: { categoryId: input.categoryId, fiscalYear, channel: input.channel },
+      }, tx);
+
+      return { ok: true, caseId, trackingCode: issuedTrackingCode, estimatedDays };
     });
-
-    if (dedupKey) {
-      await recordDedupHash(dedupKey, input.title, input.description, caseId, tx);
+  } catch (error) {
+    if (error instanceof ClaimLostError) {
+      return {
+        ok: false,
+        error: 'คุณเคยแจ้งเรื่องนี้ไปแล้วภายใน 7 วัน',
+        errorCode: 'duplicate',
+        ...(error.existingTrackingCode ? { existingTrackingCode: error.existingTrackingCode } : {}),
+      };
     }
-
-    await logAudit({
-      userId: submitterId,
-      action: AUDIT_ACTIONS.SUBMIT_CASE,
-      resource: 'cases',
-      resourceId: caseId,
-      ipAddress: input.ipAddress,
-      userAgent: input.userAgent,
-      metadata: { categoryId: input.categoryId, fiscalYear, channel: input.channel },
-    }, tx);
-
-    return { ok: true, caseId, trackingCode: issuedTrackingCode, estimatedDays };
-  });
+    if (error instanceof Error && error.message === 'tracking code exhausted') {
+      return { ok: false, error: 'ไม่สามารถออกเลขติดตามได้ กรุณาลองใหม่', errorCode: 'internal' };
+    }
+    throw error;
+  }
 
   // § แจ้งเจ้าหน้าที่หลัง commit สำเร็จเท่านั้น — fail-open สองชั้น (notifyNewCase สัญญา
   // ไม่ throw อยู่แล้ว + try/catch นี้กันของใหม่ในอนาคต) เพราะเคสถูกบันทึกไปแล้ว

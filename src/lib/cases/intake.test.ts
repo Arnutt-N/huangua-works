@@ -13,7 +13,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockState, mockDb } = vi.hoisted(() => {
   const mockState = {
-    /** จำนวนครั้งที่ query ตาราง cases จะตอบว่า "ชน" ก่อนจะเริ่มตอบว่าว่าง */
+    /** จำนวนครั้งที่ insert ตาราง cases จะตอบว่า unique violation ก่อนจะเริ่มตอบว่าสำเร็จ */
     collisionsRemaining: 0,
     conflictWinner: null as { id: string; email: string } | null,
     /** แถวที่ query ตาราง users จะคืน (จำลอง user ที่มีอยู่แล้ว) */
@@ -103,7 +103,14 @@ const { mockState, mockDb } = vi.hoisted(() => {
       returning: vi.fn(() => Promise.resolve(mockState.conflictWinner ? [] : [{ id: mockState.insertedUsers.at(-1)?.id }])),
       values: vi.fn((row: Record<string, unknown>) => {
         if (tableName === 'users' && !mockState.conflictWinner) mockState.insertedUsers.push(row);
-        if (tableName === 'cases') mockState.insertedCases.push(row);
+        if (tableName === 'cases') {
+          if (mockState.collisionsRemaining > 0) {
+            mockState.collisionsRemaining -= 1;
+            const error = Object.assign(new Error('unique tracking_code'), { code: '23505' });
+            return Promise.reject(error);
+          }
+          mockState.insertedCases.push(row);
+        }
         return obj;
       }),
     };
@@ -124,7 +131,10 @@ vi.mock('@/lib/db', () => ({ getDb: vi.fn(async () => mockDb) }));
 // dedup / consent / audit แตะ DB จริงคนละทาง — ตัดออกเพื่อโฟกัสที่ createCase
 vi.mock('@/lib/dedup', () => ({
   checkDuplicate: vi.fn(async () => ({ isDuplicate: false })),
-  recordDedupHash: vi.fn(async () => undefined),
+  claimDedupHash: vi.fn(async (_cid: string, _title: string, _desc: string, caseId: string) => ({
+    caseId,
+    fingerprint: `hash-${caseId}`,
+  })),
 }));
 vi.mock('@/lib/consent', () => ({
   grantConsent: vi.fn(async () => undefined),
@@ -205,7 +215,7 @@ describe('createCase · ลูปกันชนของ trackingCode', () => {
     if (result.ok) return;
     expect(result.errorCode).toBe('internal');
     expect(result.error).toContain('เลขติดตาม');
-    // ต้องไม่ insert เคสที่ไม่มีเลขติดตาม
+    // mock ไม่ rollback จริง — การ throw เพื่อให้ DB rollback ตรวจใน integration
     expect(mockState.insertedCases).toHaveLength(0);
   });
 
@@ -315,5 +325,21 @@ describe('createCase · attachments ต้องชี้ storage ของเ�
 
     expect(result.ok).toBe(true);
     expect(mockState.insertedCases[0]?.attachments).toBeNull();
+  });
+});
+
+
+describe('createCase · duplicate ต้องตัดสินก่อนสร้างผู้แจ้ง', () => {
+  it('checkDuplicate พบซ้ำ → ไม่แตะ users แม้จะอยู่ใน transaction เดียวกัน', async () => {
+    const { checkDuplicate } = await import('@/lib/dedup');
+    vi.mocked(checkDuplicate).mockResolvedValueOnce({ isDuplicate: true, caseId: 'existing-case' });
+    mockDb.select.mockClear();
+    mockDb.insert.mockClear();
+
+    const result = await createCase(webInput());
+
+    expect(result).toMatchObject({ ok: false, errorCode: 'duplicate' });
+    expect(mockState.insertedUsers).toHaveLength(0);
+    expect(mockState.insertedCases).toHaveLength(0);
   });
 });

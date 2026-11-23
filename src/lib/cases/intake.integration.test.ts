@@ -11,6 +11,20 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vit
  */
 const auditControl = vi.hoisted(() => ({ failNext: false }));
 
+/**
+ * § บังคับให้สอง createCase สุ่มเลขติดตามตัวเดียวกันใน integration test
+ * แทนการแก้ RNG ฝั่งโค้ด — ใช้ resolve ภายนอกผ่าน hoisted state
+ */
+const trackingControl = vi.hoisted(() => ({ forcedQueue: [] as string[] }));
+
+vi.mock('../case-tracking', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/case-tracking')>();
+  return {
+    ...actual,
+    generateTrackingCode: vi.fn(() => trackingControl.forcedQueue.shift() ?? actual.generateTrackingCode()),
+  };
+});
+
 vi.mock('@/lib/audit', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/audit')>();
   return {
@@ -42,6 +56,7 @@ const createdCaseIds: string[] = [];
 const createdEmails: string[] = [];
 const LINE_NEW = `U-it-aw-new-${RUN}`;
 const LINE_EXISTING = `U-it-aw-old-${RUN}`;
+const LINE_RACE = `U-it-aw-race-${RUN}`;
 let categoryId: string;
 
 /** ลบของ fixture นี้แม้ฟังก์ชัน throw ก่อน push id — ไม่พึ่งผลสำเร็จ (C6-03) */
@@ -57,6 +72,10 @@ async function cleanupFixture(): Promise<void> {
     `บอท consent ${RUN}`,
     `LIFF consent ${RUN}`,
     `บอท ติดตามได้ ${RUN}`,
+    `ทดสอบชนพร้อมกัน ${RUN}`,
+    `ทดสอบชนเลขติดตาม A ${RUN}`,
+    `ทดสอบชนเลขติดตาม B ${RUN}`,
+    `ทดสอบ race LINE ${RUN}`,
   ];
   const leaked = await db.select({ id: cases.id }).from(cases).where(inArray(cases.title, titles));
   const caseIds = [...new Set([...createdCaseIds, ...leaked.map((r) => r.id)])];
@@ -66,7 +85,7 @@ async function cleanupFixture(): Promise<void> {
     await db.delete(cases).where(inArray(cases.id, caseIds));
   }
   // § LINE_BOT/LINE_LIFF ของ c1 ประกาศท้ายไฟล์ — afterAll รันหลัง module โหลดครบจึงอ้างได้
-  const rawIds = [LINE_NEW, LINE_EXISTING, LINE_BOT, LINE_LIFF];
+  const rawIds = [LINE_NEW, LINE_EXISTING, LINE_BOT, LINE_LIFF, LINE_RACE];
   await db.delete(lineUsers).where(inArray(lineUsers.lineUserIdHash, rawIds.map(lookupHash)));
   const { linePlaceholderEmail } = await import('@/lib/line/placeholder-email');
   const userRows = await db
@@ -95,6 +114,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   auditControl.failNext = false;
+  trackingControl.forcedQueue = [];
 });
 
 afterAll(async () => {
@@ -306,4 +326,70 @@ describe('createCase · บันทึกความยินยอมทุ�
     expect((await findTrackableCase(result.trackingCode, { channel: 'web' }))?.case.title).toBe(title);
     expect(await findTrackableCase(result.trackingCode, { channel: 'line_bot' })).not.toBeNull();
   });
+});
+
+// ─── PR-B: การรับเรื่องพร้อมกันและการจองเลขติดตาม ───
+describe('createCase · concurrent intake (integration)', () => {
+  test('ยิงคำขอเดียวกันพร้อมกัน → เรื่องเดียว hash เดียว audit เดียว', async () => {
+    const cid = cidFor(4);
+    const input = webInput(cid, `ทดสอบชนพร้อมกัน ${RUN}`);
+    createdEmails.push(cidEmail(cid));
+
+    // § ทั้งสองคำขอเริ่มพร้อมกัน — unique constraint ของ users/cases/dedup_hashes
+    // เป็นตัวตัดสิน ไม่ใช้ barrier ภายใน tx (จะทำให้ tx ค้างรอกันเองจนตายได้)
+    const results = await Promise.all([createCase(input), createCase(input)]);
+
+    const successes = results.filter((r) => r.ok);
+    const duplicates = results.filter((r) => !r.ok && r.errorCode === 'duplicate');
+    expect(successes).toHaveLength(1);
+    expect(duplicates).toHaveLength(1);
+
+    if (!successes[0]?.ok) return;
+    createdCaseIds.push(successes[0].caseId);
+    const db = await getDb();
+    const rows = await db.select().from(cases).where(eq(cases.title, input.title));
+    expect(rows).toHaveLength(1);
+    const hash = generateDedupHash(cid, input.title, input.description);
+    expect(await db.select().from(dedupHashes).where(eq(dedupHashes.hash, hash))).toHaveLength(1);
+    const audits = await db.select().from(auditLogs).where(eq(auditLogs.resourceId, successes[0].caseId));
+    expect(audits.map((a) => a.action)).toEqual(['submit_case']);
+  }, 20000);
+
+  test('สองคำขอสุ่มเลขติดตามตัวเดียวกัน → ได้เลขต่างกันหลัง retry', async () => {
+    const forced = `HG${String(RUN).padStart(9, '0').slice(0, 9)}`;
+    // § บังคับเฉพาะครั้งแรกของทั้งสองคำขอ — retry ต้องสุ่มรหัสใหม่เอง
+    trackingControl.forcedQueue = [forced];
+    const a = await createCase(webInput(cidFor(5), `ทดสอบชนเลขติดตาม A ${RUN}`));
+    trackingControl.forcedQueue = [forced];
+    const b = await createCase(webInput(cidFor(6), `ทดสอบชนเลขติดตาม B ${RUN}`));
+
+    expect(a.ok).toBe(true);
+    expect(b.ok).toBe(true);
+    if (!a.ok || !b.ok) return;
+    createdCaseIds.push(a.caseId, b.caseId);
+    createdEmails.push(cidEmail(cidFor(5)), cidEmail(cidFor(6)));
+    expect(a.trackingCode).toBe(forced);
+    expect(b.trackingCode).not.toBe(forced);
+    expect(b.trackingCode).toMatch(/^HG\d{9}$/);
+  });
+
+  test('LINE ยิงซ้ำพร้อมกัน → ฝ่ายแพ้ได้ existingTrackingCode ของเรื่องที่ชนะ', async () => {
+    const title = `ทดสอบ race LINE ${RUN}`;
+    const input = {
+      channel: 'line' as const,
+      lineUserId: LINE_RACE,
+      categoryId,
+      title,
+      description: 'รายละเอียด race LINE',
+    };
+    const results = await Promise.all([createCase(input), createCase(input)]);
+    const winner = results.find((r) => r.ok);
+    const loser = results.find((r) => !r.ok && r.errorCode === 'duplicate');
+
+    expect(winner?.ok).toBe(true);
+    expect(loser?.ok).toBe(false);
+    if (!winner?.ok || !loser || loser.ok) return;
+    createdCaseIds.push(winner.caseId);
+    expect(loser.existingTrackingCode).toBe(winner.trackingCode);
+  }, 20000);
 });

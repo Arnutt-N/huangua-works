@@ -4,7 +4,7 @@ import { closeDb, getDb } from '@/lib/db';
 import { dedupHashes } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import { generateDedupHash, generateLegacyDedupHash } from '@/lib/cid-hmac';
-import { checkDuplicate } from './dedup';
+import { checkDuplicate, claimDedupHash } from './dedup';
 
 /**
  * checkDuplicate ช่วงเปลี่ยนผ่านสูตร normalize (#117) — ข้อมูลสมมติล้วน (prefix it-dedup)
@@ -49,5 +49,35 @@ describe('checkDuplicate · legacy hash', () => {
     const caseId = await insertRow(generateDedupHash(cid, 'ถนน ชำรุด', 'x'), 24 * 60 * 60 * 1000);
 
     expect(await checkDuplicate(cid, 'ถนน   ชำรุด', 'x')).toEqual({ isDuplicate: true, caseId });
+  });
+});
+
+describe('claimDedupHash · สิทธิ์เขียนด้วย unique constraint', () => {
+  test('แถวหมดอายุถูกต่ออายุและเปลี่ยนเจ้าของ → คำขอถัดไปซ้ำทันที', async () => {
+    const db = await getDb();
+    const cid = `it-dedup-claim-expired-${RUN}`;
+    const title = `ถนน เสีย ${RUN}`;
+    const desc = 'รายละเอียดต่ออายุ';
+    const oldCaseId = await insertRow(generateDedupHash(cid, title, desc), -60 * 1000);
+    const newCaseId = `it-dedup-claim-new-${RUN}`;
+
+    const claimed = await claimDedupHash(cid, title, desc, newCaseId);
+    expect(claimed.caseId).toBe(newCaseId);
+
+    const rows = await db.select().from(dedupHashes).where(inArray(dedupHashes.caseId, [oldCaseId, newCaseId]));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.caseId).toBe(newCaseId);
+    expect(rows[0]!.expiresAt.getTime()).toBeGreaterThan(Date.now());
+    expect(await checkDuplicate(cid, title, desc)).toEqual({ isDuplicate: true, caseId: newCaseId });
+  });
+
+  test('แถวยังไม่หมดอายุ → ไม่ถูกแย่งและคืน caseId เดิม', async () => {
+    const cid = `it-dedup-claim-live-${RUN}`;
+    const title = `ไฟฟ้า ขัดข้อง ${RUN}`;
+    const desc = 'รายละเอียดยังไม่หมดอายุ';
+    const owner = await insertRow(generateDedupHash(cid, title, desc), 24 * 60 * 60 * 1000);
+
+    const claimed = await claimDedupHash(cid, title, desc, `it-dedup-claim-intruder-${RUN}`);
+    expect(claimed.caseId).toBe(owner);
   });
 });
