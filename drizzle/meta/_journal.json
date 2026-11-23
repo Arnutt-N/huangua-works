@@ -260,6 +260,13 @@
       "when": 1793633574381,
       "tag": "0036_fast_master_chief",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1795448275351,
+      "tag": "0037_right_solo",
+      "breakpoints": true
     }
   ]
 }
