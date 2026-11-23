@@ -8,7 +8,7 @@ import { firstOrUndefined } from './db/query-helpers';
 import { dedupHashes } from './db/schema';
 import { generateId } from './id';
 import { generateDedupHash, generateLegacyDedupHash } from './cid-hmac';
-import { eq, and, gt, inArray, lte } from 'drizzle-orm';
+import { eq, sql, and, gt, inArray, lte } from 'drizzle-orm';
 
 const DEDUP_WINDOW_DAYS = 7;
 
@@ -48,42 +48,42 @@ export async function checkDuplicate(
 }
 
 /**
- * บันทึก hash เพื่อป้องกันซ้ำ
- *
- * § ห้าม catch-unique: createCase เรียกฟังก์ชันนี้ใน transaction ถ้าชน unique(hash)
- * แบบ concurrent แล้ว statement error จะทำให้ทั้ง tx abort
- * ใช้ ON CONFLICT DO NOTHING เพื่อไม่ throw และ RETURNING เพื่อคืน caseId ของแถวที่ชนะ
+ * § เจ้าของสิทธิ์เขียน hash ต้องเป็น UNIQUE constraint ไม่ใช่ SELECT ก่อน insert
+ * แถวที่ยังไม่หมดอายุ = duplicate → DO NOTHING
+ * แถวที่หมดอายุแล้ว = เรื่องเก่าหลุด window → อัปเดต caseId/expiresAt ให้เรื่องใหม่
+ * ทั้งสองทาง RETURNING caseId ของแถวที่ชนะ เพื่อให้ caller ตัดสินได้ใน transaction เดียว
  */
-export async function recordDedupHash(
+export async function claimDedupHash(
   cid: string,
   title: string,
   description: string,
   caseId: string,
   db?: DbOrTx,
-): Promise<string> {
+): Promise<{ caseId: string; fingerprint?: string }> {
   const _db = db ?? await getDb();
   const hash = generateDedupHash(cid, title, description);
   const expiresAt = new Date(Date.now() + DEDUP_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
-  const inserted = await _db
+  const rows = await _db
     .insert(dedupHashes)
-    .values({
-      id: generateId(),
-      hash,
-      caseId,
-      expiresAt,
+    .values({ id: generateId(), hash, caseId, expiresAt })
+    .onConflictDoUpdate({
+      target: dedupHashes.hash,
+      // § setWhere (ไม่ใช่ targetWhere): targetWhere เป็น prediction ของ partial unique index
+      // แต่(hash) เป็น unique ธรรมดา → inference ไม่ตรง แล้ว DO UPDATE ก็จะอัปเดต
+      // ทั้งแถวที่ยังไม่หมดอายุ ทำให้เรื่องเก่าถูกแย่ง
+      setWhere: lte(dedupHashes.expiresAt, sql`now()`),
+      set: { caseId, expiresAt },
     })
-    .onConflictDoNothing({ target: dedupHashes.hash })
-    .returning({ caseId: dedupHashes.caseId });
+    .returning({ caseId: dedupHashes.caseId, id: dedupHashes.id });
 
-  if (inserted[0]?.caseId) {
-    return inserted[0].caseId;
-  }
-
+  // § ถ้า DO NOTHING (แถวยังไม่หมดอายุ) RETURNING จะว่าง — ต้องอ่านเจ้าของเดิม
+  // ไม่ใช่คืน caseId ของผู้พยายาม (ไม่งั้น caller คิดว่าชนะแล้วสร้างเรื่องซ้ำ)
+  if (rows[0]) return { caseId: rows[0].caseId, fingerprint: rows[0].id };
   const existing = await firstOrUndefined(
-    _db.select({ caseId: dedupHashes.caseId }).from(dedupHashes).where(eq(dedupHashes.hash, hash)).limit(1)
+    _db.select({ caseId: dedupHashes.caseId, id: dedupHashes.id }).from(dedupHashes).where(eq(dedupHashes.hash, hash)).limit(1),
   );
-  return existing?.caseId ?? caseId;
+  return { caseId: existing?.caseId ?? caseId, fingerprint: existing?.id };
 }
 
 /**
