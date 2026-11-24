@@ -38,6 +38,13 @@ export interface TrackedCaseView {
   resolutionPhotos?: PublicResolutionPhoto[];
 }
 
+/** § บอท LINE ใช้แค่สามฟิลด์นี้ — อย่าให้ projection อ่านหมวด/ไทม์ไลน์/รูป/ signed URL */
+export interface TrackedCaseStatus {
+  trackingCode: string;
+  status: CaseStatus;
+  title: string;
+}
+
 /** แถว "เรื่องของฉัน" — updatedAt เป็น ISO string เพื่อข้าม server→client boundary ได้ */
 export interface MyCaseItem {
   trackingCode: string;
@@ -53,6 +60,25 @@ const VIEW_VIA: Record<ViewContext['channel'], string> = {
   web: 'tracking_code',
   line_bot: 'line_bot',
 };
+
+/** § หนึ่ง helper สำหรับทุก projection — กัน audit ของช่องทางใดช่องทางหนึ่ง drift */
+async function logCaseView(
+  caseId: string,
+  ctx: ViewContext,
+  db: DbOrTx,
+): Promise<void> {
+  await logAudit(
+    {
+      action: AUDIT_ACTIONS.VIEW_CASE,
+      resource: 'cases',
+      resourceId: caseId,
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+      metadata: { via: VIEW_VIA[ctx.channel] },
+    },
+    db,
+  );
+}
 
 /**
  * ค้นเรื่องด้วยเลขติดตามสำหรับประชาชน (ติดตามเรื่องทางเว็บ + บอท LINE)
@@ -128,17 +154,7 @@ export async function findTrackableCase(
 
   const resolutionPhotos = sanitizeResolutionPhotosForCitizen(signedPhotos);
 
-  await logAudit(
-    {
-      action: AUDIT_ACTIONS.VIEW_CASE,
-      resource: 'cases',
-      resourceId: row.id,
-      ipAddress: ctx.ipAddress,
-      userAgent: ctx.userAgent,
-      metadata: { via: VIEW_VIA[ctx.channel] },
-    },
-    _db,
-  );
+  await logCaseView(row.id, ctx, _db);
 
   return {
     case: {
@@ -156,6 +172,33 @@ export async function findTrackableCase(
     updates,
     resolutionPhotos,
   };
+}
+
+/**
+ * § projection สำหรับบอท LINE — อ่านแค่ id/status/title ใน query เดียว
+ * § ใช้ consentActiveFor ตัวเดิมกับ findTrackableCase → เรื่องที่ถอนความยินยอมหายจากแชทเหมือนเว็บ
+ */
+export async function findTrackableCaseStatus(
+  rawCode: string,
+  ctx: ViewContext,
+  db?: DbOrTx,
+): Promise<TrackedCaseStatus | null> {
+  const trackingCode = normalizeTrackingCode(rawCode);
+  if (!trackingCode) return null;
+  const _db = db ?? (await getDb());
+
+  const row = await firstOrUndefined(
+    _db
+      .select({ id: cases.id, status: cases.status, title: cases.title })
+      .from(cases)
+      .where(and(eq(cases.trackingCode, trackingCode), consentActiveFor(cases.submittedBy)))
+      .limit(1),
+  );
+  if (!row) return null;
+
+  await logCaseView(row.id, ctx, _db);
+
+  return { trackingCode, status: row.status, title: row.title };
 }
 
 /**

@@ -101,7 +101,6 @@ describe('POST /api/cases/upload', () => {
     // § ต้องปฏิเสธจาก metadata ก่อน materialize — spy บน prototype เพื่อจับ File clone
     // ที่ Undici สร้างตอน serialize body ผ่าน NextRequest
     const arrayBuffer = vi.spyOn(File.prototype, 'arrayBuffer');
-    arrayBuffer.mockClear();
 
     const req = new NextRequest('http://localhost:3000/api/cases/upload', {
       method: 'POST',
