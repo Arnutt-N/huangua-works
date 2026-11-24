@@ -60,7 +60,7 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
   const db = await getDb();
   let result: CaseIntakeResult;
   try {
-    // § § rollback ต้องเกิดนอก catch — ถ้าจับ ClaimLostError ใน tx แล้วคืน duplicate tx จะ commit เรื่องค้าง
+    // § rollback ต้องเกิดนอก catch — ถ้าจับ ClaimLostError ใน tx แล้วคืน duplicate tx จะ commit เรื่องค้าง
     result = await db.transaction((tx) => createCaseInTx(tx, input));
   } catch (error) {
     result = intakeFailureFrom(error);
@@ -121,7 +121,6 @@ export async function createCaseInTx(db: DbOrTx, input: CaseIntakeInput): Promis
   // § การเขียนผู้แจ้ง/link/consent/เรื่อง/dedup/audit ต้อง commit หรือ rollback พร้อมกัน
   // ระบุตัวตนด้วย resolveCitizen ใน tx นี้ (ลบ resolveSubmitter แล้ว — ดู citizen-access)
   const tx = db;
-  {
       // § ตัดสิน duplicate ใน transaction เดียวกับ insert และก่อน resolveCitizen —
       // ด่านเดิมอยู่นอก tx (สองคำขอผ่านพร้อมกันได้) แต่ถ้าย้ายเข้ามาโดยไม่เลื่อนขึ้นก่อน
       // duplicate submit จะทิ้ง user row ค้างไว้
@@ -233,7 +232,6 @@ export async function createCaseInTx(db: DbOrTx, input: CaseIntakeInput): Promis
       }, tx);
 
     return { ok: true, caseId, trackingCode: issuedTrackingCode, estimatedDays };
-  }
 }
 
 /** § แปลง error จาก tx ที่ rollback แล้วให้เป็นคำตอบ — เรียกนอก transaction เสมอ */

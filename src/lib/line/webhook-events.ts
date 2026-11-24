@@ -115,7 +115,7 @@ export async function claimNextWebhookEvent(limit = 1): Promise<WebhookEventRow[
 
     // § claim แบบ condition update — คู่แข่งที่ claim พร้อมกันมีแถวเดียวชนะ
     const leaseUntil = new Date(Date.now() + CLAIM_LEASE_MS);
-    // § § token ประจำ claim — worker เก่าที่ lease หมดแล้วห้ามมา markDone/renew ของ claim ใหม่
+    // § token ประจำ claim — worker เก่าที่ lease หมดแล้วห้ามมา markDone/renew ของ claim ใหม่
     const owner = generateId();
     const [won] = await db
       .update(lineWebhookEvents)
@@ -161,7 +161,7 @@ export async function commitEffects(
 ): Promise<{ replies: LineOutgoingMessage[]; state?: unknown } | null> {
   await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${row.lineUserIdHash}, 0))`);
 
-  // § § ได้ lock แล้วต้องอ่านแถวเดิมอีกครั้ง — claim เก่าอาจ commit effects ไปแล้วก่อนเราได้ lock
+  // § ได้ lock แล้วต้องอ่านแถวเดิมอีกครั้ง — claim เก่าอาจ commit effects ไปแล้วก่อนเราได้ lock
   // (row ใน memory ตอน claim เป็น snapshot) ถ้า commit แล้วข้าม effects ทันที ไม่สร้างซ้ำ
   const [fresh] = await tx
     .select({ effectsCommittedAt: lineWebhookEvents.effectsCommittedAt })
