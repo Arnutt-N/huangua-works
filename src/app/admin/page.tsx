@@ -20,7 +20,7 @@ import {
   type CaseStatus,
 } from '@/lib/cases/state-machine';
 import { formatThaiDateLong, THAI_MONTHS_SHORT } from '@/lib/thai-date';
-import { deriveStatusStats } from '@/lib/cases/stats';
+import { deriveStatusStats, totalCasesFromSnapshot } from '@/lib/cases/stats';
 
 export const metadata: Metadata = { title: 'แดชบอร์ดเจ้าหน้าที่' };
 export const dynamic = 'force-dynamic';
@@ -94,13 +94,14 @@ export default async function AdminDashboardPage() {
   // § คำนวณ KPI values — snapshot มาจาก cron ตามมาตรฐานเดียวกับ live fallback
   // ถ้า snapshot ยังไม่มี (cron ยังไม่รัน) ให้ derive จาก status counts แบบ live
   const liveStats = deriveStatusStats(Object.fromEntries(statusMap), []);
-  const totalReceived = latest?.totalReceived ?? liveStats.totalReceived;
+  // § KPI เรื่องรับทั้งหมด = ยอดทั้งหมดตาม Excel — เก็บใน metadata เพราะคอลัมน์เดิม
+  // total_received ยังใช้เป็นยอดตามสถานะ received สำหรับกราฟแนวโน้ม
+  const snapshotTotalCases = latest ? totalCasesFromSnapshot(latest.metadata) : null;
+  const totalReceived = snapshotTotalCases ?? (latest ? latest.totalReceived : liveStats.totalCases);
   const totalInProgress = latest?.totalInProgress ?? liveStats.totalInProgress;
   const totalClosed = latest?.totalClosed ?? liveStats.totalClosed;
   const avgResolutionDays = latest?.avgResolutionDays ?? null;
-  const resolutionRate = latest
-    ? totalReceived > 0 ? Math.round((totalClosed / totalReceived) * 100) : 0
-    : liveStats.resolutionRate;
+  const resolutionRate = totalReceived > 0 ? Math.round((totalClosed / totalReceived) * 100) : 0;
 
   // § จัดการ trend points อย่างปลอดภัย (รองรับทั้ง DB จริงและ test mock)
   let trendPoints: DailyTrendPoint[] = [];

@@ -32,12 +32,20 @@ export function deriveStatusStats(
 
   return {
     totalCases,
-    // § ชื่อ field เดิมยังใช้ใน snapshot/UI — ตอนนี้หมายถึงยอดเรื่องทั้งหมดตาม Excel
-    totalReceived: totalCases,
+    // § totalReceived ยังหมายถึงสถานะ received เหมือนเดิม เพราะ trend/graph ใช้เป็นยอดรายวัน
+    // ยอดทั้งหมดตาม Excel อยู่ใน totalCases แยกต่างหาก
+    totalReceived: statusCounts.received ?? 0,
     totalClosed,
     totalRejected,
     totalInProgress,
     resolutionRate,
     avgResolutionDays,
   };
+}
+
+/** อ่านยอดเรื่องทั้งหมดจาก metadata ของ snapshot เดิมที่ยังไม่มีคอลัมน์ totalCases */
+export function totalCasesFromSnapshot(metadata: unknown): number | null {
+  if (typeof metadata !== 'object' || metadata === null || !('totalCases' in metadata)) return null;
+  const value = (metadata as { totalCases: unknown }).totalCases;
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }

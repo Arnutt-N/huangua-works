@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deriveStatusStats } from './stats';
+import { deriveStatusStats, totalCasesFromSnapshot } from './stats';
 
 describe('deriveStatusStats · มาตรฐานจาก Excel และ state machine', () => {
   it('ยอดทั้งหมด = ทุกสถานะ ไม่ใช่เฉพาะ received', () => {
@@ -9,6 +9,7 @@ describe('deriveStatusStats · มาตรฐานจาก Excel และ st
     );
 
     expect(result.totalCases).toBe(11);
+    expect(result.totalReceived).toBe(2);
     expect(result.totalClosed).toBe(4);
     expect(result.totalRejected).toBe(1);
     expect(result.resolutionRate).toBe(36);
@@ -40,5 +41,15 @@ describe('deriveStatusStats · มาตรฐานจาก Excel และ st
       resolutionRate: 0,
       avgResolutionDays: null,
     });
+  });
+});
+
+describe('totalCasesFromSnapshot', () => {
+  it('อ่าน totalCases จาก metadata ที่ cron เขียน', () => {
+    expect(totalCasesFromSnapshot({ refreshedAt: 'x', totalCases: 270 })).toBe(270);
+  });
+
+  it('snapshot เก่าที่ไม่มี totalCases → null', () => {
+    expect(totalCasesFromSnapshot({ refreshedAt: 'x' })).toBeNull();
   });
 });

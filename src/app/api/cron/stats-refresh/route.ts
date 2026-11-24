@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
         avgResolutionDays,
         byDepartment: JSON.stringify(byDepartment),
         byCategory: JSON.stringify(byCategory),
-        metadata: JSON.stringify({ refreshedAt: new Date().toISOString() }),
+        metadata: JSON.stringify({ refreshedAt: new Date().toISOString(), totalCases: stats.totalCases }),
       })
       .where(eq(caseStatsDaily.date, today));
   } else {
@@ -91,7 +91,7 @@ export async function GET(req: NextRequest) {
       avgResolutionDays,
       byDepartment: JSON.stringify(byDepartment),
       byCategory: JSON.stringify(byCategory),
-      metadata: JSON.stringify({ refreshedAt: new Date().toISOString() }),
+      metadata: JSON.stringify({ refreshedAt: new Date().toISOString(), totalCases: stats.totalCases }),
     });
   }
 
@@ -99,6 +99,7 @@ export async function GET(req: NextRequest) {
     success: true,
     date: today,
     stats: {
+      totalCases: stats.totalCases,
       totalReceived: receivedCount,
       totalClosed: closedCount,
       totalRejected: rejectedCount,

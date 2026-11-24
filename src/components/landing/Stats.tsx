@@ -2,6 +2,7 @@ import { desc } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { caseStatsDaily } from '@/lib/db/schema';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
+import { totalCasesFromSnapshot } from '@/lib/cases/stats';
 import { StatsClient, type StatItem } from './stats-client';
 
 /**
@@ -38,7 +39,7 @@ export async function Stats() {
   const stats: StatItem[] = [
     {
       label: 'เรื่องดำเนินการ',
-      value: hasData ? formatNumber(latest!.totalInProgress + latest!.totalReceived) : '—',
+      value: hasData ? formatNumber(latest!.totalInProgress) : '—',
       // change% ไม่แสดงเพราะต้องเทียบกับวันก่อนหน้า (เก็บไว้ทำใน PR #3 reports)
       change: null,
       icon: 'TrendingUp',
@@ -57,7 +58,7 @@ export async function Stats() {
     },
     {
       label: 'เรื่องรับทั้งหมด',
-      value: hasData ? formatNumber(latest!.totalReceived) : '—',
+      value: hasData ? formatNumber(totalCasesFromSnapshot(latest!.metadata) ?? latest!.totalReceived) : '—',
       change: null,
       icon: 'Users',
       colorClass: 'text-accent',

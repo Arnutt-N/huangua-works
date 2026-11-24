@@ -4,6 +4,7 @@ import { afterAll, describe, expect, test } from 'vitest';
 import { closeDb, getDb } from '@/lib/db';
 import { cases, caseStatsDaily } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
+import { totalCasesFromSnapshot } from '@/lib/cases/stats';
 import { GET } from './route';
 
 /**
@@ -14,11 +15,15 @@ import { GET } from './route';
 
 const RUN = Date.now();
 const createdCaseIds: string[] = [];
+let createdSnapshotDate: string | null = null;
 
 afterAll(async () => {
   const db = await getDb();
   if (createdCaseIds.length) {
     await db.delete(cases).where(inArray(cases.id, createdCaseIds));
+  }
+  if (createdSnapshotDate) {
+    await db.delete(caseStatsDaily).where(eq(caseStatsDaily.date, createdSnapshotDate));
   }
   await closeDb();
 });
@@ -40,8 +45,8 @@ describe('cron/stats-refresh · มาตรฐานสถานะ', () => {
         title: `it-stats pending ${RUN}`,
         description: 'ข้อมูลสมมติ',
         location: '',
-        categoryId: 'it-stats-cat',
-        submittedBy: 'it-stats-user',
+        categoryId: `it-stats-cat-${RUN}`,
+        submittedBy: `it-stats-user-${RUN}`,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
@@ -51,8 +56,8 @@ describe('cron/stats-refresh · มาตรฐานสถานะ', () => {
         title: `it-stats closed ${RUN}`,
         description: 'ข้อมูลสมมติ',
         location: '',
-        categoryId: 'it-stats-cat',
-        submittedBy: 'it-stats-user',
+        categoryId: `it-stats-cat-${RUN}`,
+        submittedBy: `it-stats-user-${RUN}`,
         createdAt,
         updatedAt: closedAt,
         closedAt,
@@ -69,16 +74,32 @@ describe('cron/stats-refresh · มาตรฐานสถานะ', () => {
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      stats: { totalReceived: number; totalClosed: number; totalInProgress: number };
+      stats: { totalCases: number; totalReceived: number; totalClosed: number; totalInProgress: number; avgResolutionDays: number | null };
     };
 
+    const closedRows = await db
+      .select({ createdAt: cases.createdAt, closedAt: cases.closedAt })
+      .from(cases)
+      .where(eq(cases.status, 'closed'));
+    const durations = closedRows
+      .filter((row) => row.closedAt !== null)
+      .map((row) => Math.floor((new Date(row.closedAt!).getTime() - new Date(row.createdAt).getTime()) / 86400000));
+    const expectedAvg = durations.length
+      ? Math.round(durations.reduce((sum, d) => sum + d, 0) / durations.length)
+      : null;
+
     const [actual] = await db.select({ c: count() }).from(cases);
-    expect(body.stats.totalReceived).toBe(Number(actual?.c ?? 0));
-    expect(body.stats.totalReceived).toBeGreaterThanOrEqual(baseline + 2);
+    expect(body.stats.totalCases).toBe(Number(actual?.c ?? 0));
+    expect(body.stats.totalCases).toBeGreaterThanOrEqual(baseline + 2);
+    expect(body.stats.totalReceived).toBeGreaterThanOrEqual(0);
     expect(body.stats.totalInProgress).toBeGreaterThanOrEqual(1);
     expect(body.stats.totalClosed).toBeGreaterThanOrEqual(1);
+    expect(body.stats.avgResolutionDays).toBe(expectedAvg);
 
-    const [after] = await db.select({ c: count() }).from(caseStatsDaily);
-    expect(Number(after?.c ?? 0)).toBeGreaterThan(0);
+    const today = new Date().toISOString().split('T')[0]!;
+    const [snapshot] = await db.select().from(caseStatsDaily).where(eq(caseStatsDaily.date, today));
+    expect(snapshot).toBeDefined();
+    expect(totalCasesFromSnapshot(snapshot!.metadata)).toBe(body.stats.totalCases);
+    createdSnapshotDate = today;
   });
 });

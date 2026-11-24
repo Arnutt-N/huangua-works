@@ -22,6 +22,6 @@ Excel ใช้สูตร `COUNTA(DATA!B4:B1047)` นับเลขเรื�
 
 ## การใช้งานในโค้ด
 
-`deriveStatusStats()` ใน `src/lib/cases/stats.ts` เป็นตัวคำนวณเดียวสำหรับ cron และ dashboard ใช้ชื่อ field `totalReceived` เพื่อความเข้ากันได้กับ snapshot เดิม แต่ค่านี้หมายถึงยอดเรื่องทั้งหมดตาม Excel ไม่ใช่ `count(status = 'received')`
+`deriveStatusStats()` ใน `src/lib/cases/stats.ts` เป็นตัวคำนวณเดียวสำหรับ cron และ dashboard ฟิลด์ `totalReceived` ยังหมายถึง `count(status = 'received')` เพราะกราฟแนวโน้มใช้เป็นยอดตามสถานะ ส่วนยอดเรื่องทั้งหมดตาม Excel อยู่ในฟิลด์ `totalCases` ซึ่ง cron เขียนลง `metadata` ของ `case_stats_daily` เพื่อไม่ต้องเพิ่มคอลัมน์
 
-`src/app/api/cron/stats-refresh/route.ts` เขียนค่าลง `case_stats_daily` ตามนิยามนี้ `src/app/admin/page.tsx` ใช้ค่าจาก snapshot และใช้ `deriveStatusStats()` เป็น fallback เมื่อยังไม่มี snapshot
+`src/app/api/cron/stats-refresh/route.ts` เขียนค่าลง `case_stats_daily` ตามนิยามนี้ `src/app/admin/page.tsx` และ `src/components/landing/Stats.tsx` อ่าน `totalCases` จาก `metadata` แล้วใช้ `deriveStatusStats()` เป็น fallback เมื่อยังไม่มี snapshot
