@@ -77,6 +77,7 @@ export async function POST(request: Request) {
   }
 
   // § rate limit ต่อ IP หลัง verify — request ปลอมไม่เปลือง quota, flood จริงโดน 429
+  // policy lineWebhookIp เป็น kind public (fail-open: Redis ล่มยังรับ webhook ได้)
   const rateLimit = await enforceRateLimit('lineWebhookIp', clientIpFromHeaders(request.headers));
   if (!rateLimit.allowed) {
     return NextResponse.json(
@@ -85,6 +86,8 @@ export async function POST(request: Request) {
     );
   }
 
+  // § body ผ่าน signature แล้วแต่ parse ไม่ได้/ไม่มี events array = request ผิดรูป → 400 ตามความหมาย
+  // (ไม่ปล่อย JSON.parse throw เป็น 500 ปน error จริงใน log)
   let parsed: LineWebhookRequestBody;
   try {
     parsed = JSON.parse(body) as LineWebhookRequestBody;
