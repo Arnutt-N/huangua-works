@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { closeDb, getDb } from '@/lib/db';
 import { chatBroadcasts, chatBroadcastFailedRecipients, lineUsers } from '@/lib/db/schema';
@@ -12,7 +12,8 @@ import {
   STALE_SENDING_MS,
 } from './broadcast-service';
 
-vi.setConfig({ testTimeout: 30_000 });
+// § full suite โหลดพร้อมกัน 501 แถว + retry 3 ครั้ง → timeout เริ่มต้น 10s ไม่พอทั้ง test/hook
+vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
 
 const { multicastMock, LineApiErrorMock } = vi.hoisted(() => {
   class LineApiErrorMock extends Error {
@@ -48,12 +49,14 @@ beforeAll(async () => {
 
 afterAll(async () => {
   const db = await getDb();
-  for (const id of createdBroadcastIds) {
-    await db.delete(chatBroadcastFailedRecipients).where(eq(chatBroadcastFailedRecipients.broadcastId, id));
-    await db.delete(chatBroadcasts).where(eq(chatBroadcasts.id, id));
+  if (createdBroadcastIds.length > 0) {
+    await db
+      .delete(chatBroadcastFailedRecipients)
+      .where(inArray(chatBroadcastFailedRecipients.broadcastId, createdBroadcastIds));
+    await db.delete(chatBroadcasts).where(inArray(chatBroadcasts.id, createdBroadcastIds));
   }
-  for (const id of createdUserIds) {
-    await db.delete(lineUsers).where(eq(lineUsers.id, id));
+  if (createdUserIds.length > 0) {
+    await db.delete(lineUsers).where(inArray(lineUsers.id, createdUserIds));
   }
   await closeDb();
 });
@@ -86,17 +89,13 @@ describe('recoverStaleSending · ฐานจริง', () => {
 describe('sendBroadcast · counters/hash บนฐานจริง', () => {
   it('501 recipients แบ่งชุด key ต่างกัน ชุดสองล้ม → counters + failed hash ถูกต้อง', async () => {
     const db = await getDb();
-    const ids: string[] = [];
-    for (let i = 0; i < MULTICAST_BATCH_SIZE + 1; i++) {
+    const rows = Array.from({ length: MULTICAST_BATCH_SIZE + 1 }, (_, i) => {
       const id = generateId();
-      ids.push(id);
       createdUserIds.push(id);
-      await db.insert(lineUsers).values({
-        id,
-        lineUserIdHash: `prf-hash-${id}`,
-        lineUserIdEnc: `U${i}`,
-      });
-    }
+      return { id, lineUserIdHash: `prf-hash-${id}`, lineUserIdEnc: `U${i}` };
+    });
+    const ids = rows.map((row) => row.id);
+    await db.insert(lineUsers).values(rows);
     const broadcastId = generateId();
     createdBroadcastIds.push(broadcastId);
     await db.insert(chatBroadcasts).values({
