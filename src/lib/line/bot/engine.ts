@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { getDb, type DbOrTx } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { lineUsers, chatConversations, chatMessages, lineWebhookEvents } from '@/lib/db/schema';
@@ -26,6 +26,7 @@ import {
   commitEffects,
   markDone,
   markFailed,
+  renewLease,
   restoreEvent,
   BarrierDeferred,
 } from '../webhook-events';
@@ -43,7 +44,7 @@ import {
 
 type Db = Awaited<ReturnType<typeof getDb>>;
 
-/** § Tx-aware bot reply writer — recordBotReplies() ใช้ getDb() ข้างในจึงใช้ใน effects transaction ไม่ได้ */
+/** bot reply writer ใช้ db ที่รับมา — helpers ทุกตัวใน effects ต้องอยู่ใน transaction เดียวกัน */
 async function persistBotReplies(db: DbOrTx, conversationId: string, replies: LineOutgoingMessage[]) {
   if (replies.length === 0) return;
   await db.insert(chatMessages).values(
@@ -128,7 +129,7 @@ export async function processWebhookEvents(
       if (error instanceof BarrierDeferred) {
         // § event เก่ายังไม่ commit — คืน pending โดยไม่เพิ่ม attempts (cron รอบหน้าลองใหม่)
         result.deferred++;
-        await releaseLease(row.id);
+        await releaseLease(row.id, row.leaseOwner);
       } else {
         console.error('[line-webhook] event failed', { id: row.id, error });
         await markFailed(row.id, row.attempts);
@@ -140,22 +141,28 @@ export async function processWebhookEvents(
   return result;
 }
 
-async function releaseLease(id: string): Promise<void> {
+async function releaseLease(id: string, owner: string | null): Promise<void> {
+  if (!owner) return;
   const db = await getDb();
   await db.update(lineWebhookEvents)
-    .set({ status: 'pending', leaseUntil: null, updatedAt: new Date() })
-    .where(eq(lineWebhookEvents.id, id));
+    .set({ status: 'pending', leaseUntil: null, leaseOwner: null, updatedAt: new Date() })
+    .where(and(eq(lineWebhookEvents.id, id), eq(lineWebhookEvents.leaseOwner, owner)));
 }
 
 async function processOne(row: WebhookEventRow, transport: LineTransport): Promise<void> {
   const db = await getDb();
 
   // § failure หลัง effects commit — ส่ง pendingReplies ซ้ำโดยไม่แตะ effects
+  // § owner ต้องตรงกับ claim ปัจจุบัน — ถ้า lease หมดแล้วคนอื่น claim ต่อ ห้ามมาปิดทับ
+  const owner = row.leaseOwner;
   if (row.pendingReplies) {
     await transport.reply(row.replyToken ?? '', row.pendingReplies.slice(0, 5));
-    await markDone(row.id);
+    if (owner) await markDone(row.id, owner);
     return;
   }
+
+  // § ต่ออายุ lease ก่อนเข้า effects ที่อาจใช้เวลานานกว่า 60s (เฉพาะ owner เดิม)
+  if (owner) await renewLease(row.id, owner);
 
   let replies: LineOutgoingMessage[] = [];
   await db.transaction(async (tx) => {
@@ -171,12 +178,12 @@ async function processOne(row: WebhookEventRow, transport: LineTransport): Promi
   if (replies.length > 0) {
     await transport.reply(row.replyToken ?? '', replies.slice(0, 5));
   }
-  await markDone(row.id);
+  if (owner) await markDone(row.id, owner);
 }
 
 const PROFILE_RETRY_MS = 24 * 60 * 60 * 1000; // ลองดึงโปรไฟล์ที่พลาดซ้ำได้วันละครั้ง
 
-async function getOrCreateLineUser(db: Db, lineUserId: string, transport: LineTransport) {
+async function getOrCreateLineUser(db: DbOrTx, lineUserId: string, transport: LineTransport) {
   const existing = await findLineUserByRaw(db, lineUserId);
 
   if (existing) {
@@ -221,7 +228,7 @@ async function getOrCreateLineUser(db: Db, lineUserId: string, transport: LineTr
   return { id: winnerId, botState: winner?.botState ?? null };
 }
 
-async function getOrCreateConversation(db: Db, lineUserId: string) {
+async function getOrCreateConversation(db: DbOrTx, lineUserId: string) {
   const hash = lookupHash(lineUserId);
   const [found] = await db
     .select()
@@ -263,7 +270,7 @@ async function handleMessageEvent(
 
   // § duplicate path: redelivery ผ่าน durable queue แล้วจะเจอ dedupKey เดิม (ON CONFLICT DO NOTHING)
   // จึงไม่ต้อง repairDuplicate — effects commit แล้ว row เดิมมี pendingReplies/done ให้ส่งต่อ
-  const dup = await findInboundByLineMessageId(msg.id);
+  const dup = await findInboundByLineMessageId(db, msg.id);
   if (dup) return [];
 
   // § record-first: บันทึกแถวข้อความก่อนดึงสื่อเสมอ — crash กลาง ingest จะเหลือแถวให้ redelivery
@@ -276,9 +283,9 @@ async function handleMessageEvent(
   const botEnabled = await getChatSetting('bot_enabled');
   const staffHandling = isHumanHandled(mode);
 
-  // § recordInboundMessage ใช้ getDb() ข้างใน — ต้องอยู่นอก effects transaction ตอน durable path
+  // § ใช้ db ที่รับมา (tx ได้) — ทุก write ต้อง commit/rollback พร้อม effects transaction
   // ตัวมัน idempotent ด้วย lineMessageId unique อยู่แล้ว retry จึงไม่ซ้ำ
-  const { messageId, isNew } = await recordInboundMessage({
+  const { messageId, isNew } = await recordInboundMessage(db, {
     conversationId,
     mode,
     messageType,
@@ -297,13 +304,13 @@ async function handleMessageEvent(
     const knownSize = msg.type === 'file' ? msg.fileSize : undefined;
     const ingested = await ingestLineMedia(msg.id, undefined, { knownSize });
     if (ingested.kind === 'stored') {
-      await attachInboundMedia(messageId, conversationId, messageType, ingested.url, {
+      await attachInboundMedia(db, messageId, conversationId, messageType, ingested.url, {
         contentType: ingested.contentType,
         sizeBytes: ingested.sizeBytes,
         ...(msg.type === 'file' ? { fileName: msg.fileName } : {}),
       });
     } else {
-      await attachInboundMedia(messageId, conversationId, messageType, null, { skipped: ingested.reason });
+      await attachInboundMedia(db, messageId, conversationId, messageType, null, { skipped: ingested.reason });
     }
   }
 
@@ -326,7 +333,7 @@ export const BOT_DISABLED_TEXT =
 // ห้าม UPDATE mode ตรง — สอง event ที่อ่าน bot_active พร้อมกันจะส่ง notice สองครั้งและทับห้องที่ admin claim แทรก
 // ตอบ notice เฉพาะผู้ที่ changeMode สำเร็จ (changed: true) คนที่แพ้ race ไม่ตอบซ้ำ
 async function routeToStaffWhileBotDisabled(db: DbOrTx, conversationId: string): Promise<LineOutgoingMessage[]> {
-  const changed = await changeMode(conversationId, 'waiting_handoff');
+  const changed = await changeMode(db, conversationId, 'waiting_handoff');
   if (!changed.ok || !changed.changed) return [];
 
   const replies: LineOutgoingMessage[] = [{ type: 'text', text: BOT_DISABLED_TEXT }];
@@ -350,7 +357,7 @@ export async function routeBotMessage(
       if (botState?.step === 'location') {
         const loc = event.message;
         const locText = loc.address ?? `${loc.latitude},${loc.longitude}`;
-        const result = await processCaseFlow(locText, botState, event.source.userId);
+        const result = await processCaseFlow(db, locText, botState, event.source.userId);
         return { replies: result.replies, state: result.state };
       }
     }
@@ -364,7 +371,7 @@ export async function routeBotMessage(
     normalized.includes('ร้องเรียน') ||
     normalized === 'แจ้ง'
   ) {
-    const { state, reply } = await startCaseFlow();
+    const { state, reply } = await startCaseFlow(db);
     return { replies: [reply], state };
   }
 
@@ -386,7 +393,7 @@ export async function routeBotMessage(
   const botState = user?.botState as CaseFlowState | null;
 
   if (botState) {
-    const result = await processCaseFlow(text, botState, event.source.userId);
+    const result = await processCaseFlow(db, text, botState, event.source.userId);
     return { replies: result.replies, state: result.state };
   }
 
@@ -398,7 +405,7 @@ export async function routeBotMessage(
     }
   }
 
-  const faqResult = await matchFaq(text);
+  const faqResult = await matchFaq(db, text);
   if (faqResult) {
     return { replies: await parseResponseText(faqResult.answer) };
   }
@@ -410,7 +417,7 @@ export async function routeBotMessage(
     if (!isWithinBusinessHours(hours, now)) {
       return { replies: [{ type: 'text', text: outsideBusinessHoursText(hours) }] };
     }
-    return { replies: await triggerHandoff(conversationId) };
+    return { replies: await triggerHandoff(db, conversationId) };
   }
 
   return { replies: [{
@@ -479,7 +486,7 @@ async function handlePostbackEvent(db: DbOrTx, event: LinePostbackEvent, convers
       .from(chatConversations)
       .where(eq(chatConversations.id, conversationId))
       .limit(1);
-    const recorded = await recordCsatResponse(conversationId, csatData.score, conv?.resolvedAt ?? null);
+    const recorded = await recordCsatResponse(db, conversationId, csatData.score, conv?.resolvedAt ?? null);
     // § กดซ้ำไม่ตอบขอบคุณซ้ำ — คะแนนแถวแรกชนะแล้ว thank-you มีในประวัติแล้ว
     if (recorded.kind === 'recorded') {
       const thanks: LineOutgoingMessage[] = [{ type: 'text', text: csatThankYou(recorded.score) }];
@@ -495,7 +502,7 @@ async function handlePostbackEvent(db: DbOrTx, event: LinePostbackEvent, convers
   const lineUser = await findLineUserByRaw(db, event.source.userId);
   const botState = (lineUser?.botState as CaseFlowState | null) ?? null;
   // § นอก confirm step (เช่น กดปุ่มซ้ำหลังส่งเรื่องแล้ว) คืน null → คง log-only ไม่ตอบซ้ำ
-  const result = await handleConfirmPostback(confirmData, botState, event.source.userId);
+  const result = await handleConfirmPostback(db, confirmData, botState, event.source.userId);
   if (!result) return [];
 
   if (lineUser) {

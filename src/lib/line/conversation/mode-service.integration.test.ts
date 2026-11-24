@@ -46,7 +46,7 @@ describe('changeMode', () => {
   test('claim: bot_active → human_active ตั้งเจ้าของห้อง + broadcast mode_change', async () => {
     const id = await createConv('bot_active');
 
-    const result = await changeMode(id, 'human_active', { actorAdminId: ADMIN_A });
+    const result = await changeMode(await getDb(), id, 'human_active', { actorAdminId: ADMIN_A });
 
     expect(result).toEqual({ ok: true, changed: true });
     const conv = await loadConv(id);
@@ -63,12 +63,12 @@ describe('changeMode', () => {
   test('claim ซ้อน: แอดมินอื่นได้ conflict; เจ้าของเดิมได้ idempotent และไม่ broadcast', async () => {
     const id = await createConv('human_active', ADMIN_A);
 
-    expect(await changeMode(id, 'human_active', { actorAdminId: ADMIN_B })).toEqual({
+    expect(await changeMode(await getDb(), id, 'human_active', { actorAdminId: ADMIN_B })).toEqual({
       ok: false,
       reason: 'conflict',
       currentMode: 'human_active',
     });
-    expect(await changeMode(id, 'human_active', { actorAdminId: ADMIN_A })).toEqual({
+    expect(await changeMode(await getDb(), id, 'human_active', { actorAdminId: ADMIN_A })).toEqual({
       ok: true,
       changed: false,
     });
@@ -79,7 +79,7 @@ describe('changeMode', () => {
   test('handoff: bot_active → waiting_handoff broadcast payload มีแค่ mode', async () => {
     const id = await createConv('bot_active');
 
-    expect(await changeMode(id, 'waiting_handoff')).toEqual({ ok: true, changed: true });
+    expect(await changeMode(await getDb(), id, 'waiting_handoff')).toEqual({ ok: true, changed: true });
     expect(broadcast).toHaveBeenCalledWith({
       type: 'mode_change',
       conversationId: id,
@@ -89,13 +89,13 @@ describe('changeMode', () => {
 
   test('resolved → waiting_handoff ได้ (ผู้ใช้ทักห้องที่ปิดแล้วขอคุยกับเจ้าหน้าที่)', async () => {
     const id = await createConv('resolved');
-    expect(await changeMode(id, 'waiting_handoff')).toEqual({ ok: true, changed: true });
+    expect(await changeMode(await getDb(), id, 'waiting_handoff')).toEqual({ ok: true, changed: true });
     expect((await loadConv(id)).mode).toBe('waiting_handoff');
   });
 
   test('human_active → resolved ตั้ง resolvedAt', async () => {
     const id = await createConv('human_active', ADMIN_A);
-    expect(await changeMode(id, 'resolved')).toEqual({ ok: true, changed: true });
+    expect(await changeMode(await getDb(), id, 'resolved')).toEqual({ ok: true, changed: true });
     const conv = await loadConv(id);
     expect(conv.mode).toBe('resolved');
     expect(conv.resolvedAt).toBeInstanceOf(Date);
@@ -103,7 +103,7 @@ describe('changeMode', () => {
 
   test('§ resolved → human_active เป็น conflict — ตรงกับ claim guard เดิม', async () => {
     const id = await createConv('resolved');
-    expect(await changeMode(id, 'human_active', { actorAdminId: ADMIN_A })).toEqual({
+    expect(await changeMode(await getDb(), id, 'human_active', { actorAdminId: ADMIN_A })).toEqual({
       ok: false,
       reason: 'conflict',
       currentMode: 'resolved',
@@ -113,7 +113,7 @@ describe('changeMode', () => {
 
   test('เปลี่ยนเป็นโหมดเดิม (bot_active → bot_active) idempotent ไม่ broadcast', async () => {
     const id = await createConv('bot_active');
-    expect(await changeMode(id, 'bot_active')).toEqual({ ok: true, changed: false });
+    expect(await changeMode(await getDb(), id, 'bot_active')).toEqual({ ok: true, changed: false });
     expect(broadcast).not.toHaveBeenCalled();
   });
 
@@ -121,7 +121,7 @@ describe('changeMode', () => {
     const id = await createConv('human_active', ADMIN_A);
     const caseId = generateId();
 
-    expect(await changeMode(id, 'resolved', { linkedCaseId: caseId })).toEqual({ ok: true, changed: true });
+    expect(await changeMode(await getDb(), id, 'resolved', { linkedCaseId: caseId })).toEqual({ ok: true, changed: true });
     expect((await loadConv(id)).linkedCaseId).toBe(caseId);
     expect(broadcast).toHaveBeenCalledWith({
       type: 'mode_change',
@@ -131,12 +131,12 @@ describe('changeMode', () => {
   });
 
   test('ห้องที่ไม่มีอยู่ → not_found', async () => {
-    expect(await changeMode(generateId(), 'resolved')).toEqual({ ok: false, reason: 'not_found' });
+    expect(await changeMode(await getDb(), generateId(), 'resolved')).toEqual({ ok: false, reason: 'not_found' });
   });
 
   test('human_active โดยไม่ระบุ actorAdminId → throw (bug ของผู้เรียก ไม่ใช่ input ผู้ใช้)', async () => {
     const id = await createConv('bot_active');
-    await expect(changeMode(id, 'human_active')).rejects.toThrow('actorAdminId');
+    await expect(changeMode(await getDb(), id, 'human_active')).rejects.toThrow('actorAdminId');
   });
 });
 

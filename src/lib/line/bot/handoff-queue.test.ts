@@ -1,3 +1,4 @@
+import { getDb } from '@/lib/db';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../settings', () => ({
@@ -24,7 +25,7 @@ const { triggerHandoff } = await import('./handoff');
 
 describe('triggerHandoff · แจ้งคิวรอ', () => {
   it('คืน flex + text ที่บอกตำแหน่งคิว', async () => {
-    const replies = await triggerHandoff('conv-1');
+    const replies = await triggerHandoff(await getDb(), 'conv-1');
 
     expect(replies).toHaveLength(2);
     expect(replies[0]).toMatchObject({ type: 'flex' });

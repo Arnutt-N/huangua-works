@@ -1,5 +1,5 @@
 import { eq, and, sql } from 'drizzle-orm';
-import { getDb } from '@/lib/db';
+import type { DbOrTx } from '@/lib/db';
 import { chatFaq } from '@/lib/db/schema';
 
 interface FaqMatch {
@@ -8,8 +8,7 @@ interface FaqMatch {
   score: number;
 }
 
-export async function matchFaq(input: string): Promise<FaqMatch | null> {
-  const db = await getDb();
+export async function matchFaq(db: DbOrTx, input: string): Promise<FaqMatch | null> {
   const normalized = input.toLowerCase().trim();
 
   const faqs = await db

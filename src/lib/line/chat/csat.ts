@@ -1,5 +1,5 @@
 import { and, eq } from 'drizzle-orm';
-import { getDb } from '@/lib/db';
+import { getDb, type DbOrTx } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { chatConversations, chatCsatResponses, lineUsers } from '@/lib/db/schema';
 import { resolveRawLineId } from '../identity';
@@ -104,6 +104,7 @@ const THANK_YOU: Record<number, string> = {
  * คืนผล {kind, score} ให้ผู้เรียกตัดสินใจต่อ (ข้อความขอบคุณแยกอยู่ csatThankYou) ไม่ throw
  */
 export async function recordCsatResponse(
+  db: DbOrTx,
   conversationId: string,
   score: number,
   resolvedAt: Date | null,
@@ -112,7 +113,6 @@ export async function recordCsatResponse(
   if (!Number.isInteger(score) || score < CSAT_SCORE_MIN || score > CSAT_SCORE_MAX) return { kind: 'invalid' };
   // § resolvedAt null ไม่มีวันชน unique (NULL ไม่เท่ากันเอง) — รับมาจะไหลไม่จำกัดแถว ปัดทิ้งตรงนี้
   if (resolvedAt === null) return { kind: 'invalid' };
-  const db = await getDb();
   // § เขียนครั้งเดียวด้วย upsert — pre-select กัน race ไม่ได้อยู่ดี ปล่อยให้ constraint ตัดสิน
   const [inserted] = await db
     .insert(chatCsatResponses)

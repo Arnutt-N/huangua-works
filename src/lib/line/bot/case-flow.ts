@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
-import { getDb } from '@/lib/db';
+import type { DbOrTx } from '@/lib/db';
 import { categories } from '@/lib/db/schema';
-import { createCase } from '@/lib/cases/intake';
+import { createCaseInTx } from '@/lib/cases/intake';
 import type { LineOutgoingMessage } from '../types';
 import {
   caseConfirmFlex,
@@ -49,16 +49,15 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
 export const BOT_CONSENT_NOTICE =
   '🔒 การพิมพ์ "ยืนยัน" ถือว่าท่านยินยอมให้ อบต.หัวงัว เก็บและใช้ข้อมูลที่แจ้งในแชทนี้ (รวมถึงชื่อที่แสดงและรหัสผู้ใช้ LINE) เพื่อดำเนินการเรื่องของท่าน ตามนโยบายความเป็นส่วนตัวของ อบต. — หากต้องการถอนความยินยอม ติดต่อ 043-601-494';
 
-export async function startCaseFlow(): Promise<{ state: CaseFlowState; reply: LineOutgoingMessage }> {
+export async function startCaseFlow(db: DbOrTx): Promise<{ state: CaseFlowState; reply: LineOutgoingMessage }> {
   return {
     state: { step: 'category' },
-    reply: faqMenuFlex(await fetchActiveCategories()),
+    reply: faqMenuFlex(await fetchActiveCategories(db)),
   };
 }
 
 /** รายการหมวดหมู่ที่เปิดรับ — ใช้ร่วมกันทั้งเริ่มโฟลวใหม่และย้อนแก้หมวดหมู่จาก bubble ยืนยัน */
-async function fetchActiveCategories(): Promise<Array<{ label: string; value: string }>> {
-  const db = await getDb();
+async function fetchActiveCategories(db: DbOrTx): Promise<Array<{ label: string; value: string }>> {
   const cats = await db.select().from(categories).where(eq(categories.isActive, true));
   return cats.map((c) => ({ label: c.name, value: c.id }));
 }
@@ -90,6 +89,7 @@ function buildConfirmReply(state: CaseFlowState): LineOutgoingMessage {
 }
 
 export async function processCaseFlow(
+  db: DbOrTx,
   input: string,
   state: CaseFlowState,
   lineUserId: string,
@@ -98,7 +98,7 @@ export async function processCaseFlow(
 
   switch (state.step) {
     case 'category': {
-      const matched = await resolveCategory(text);
+      const matched = await resolveCategory(db, text);
       if (!matched) {
         const missCount = (state.missCount ?? 0) + 1;
         if (missCount >= 3) {
@@ -155,7 +155,7 @@ export async function processCaseFlow(
         return { state: null, replies: [{ type: 'text', text: CANCELLED_TEXT }] };
       }
       if (text.includes('ยืนยัน') || text.toLowerCase() === 'confirm' || text === 'ใช่' || text === 'ok') {
-        return submitConfirm(state, lineUserId);
+        return submitConfirm(db, state, lineUserId);
       }
       return { state, replies: [{ type: 'text', text: 'กรุณาพิมพ์ "ยืนยัน" เพื่อส่งเรื่อง หรือ "ยกเลิก" เพื่อเริ่มใหม่' }] };
     }
@@ -167,6 +167,7 @@ export async function processCaseFlow(
  * state ไม่ใช่ confirm (เช่น กดปุ่มซ้ำหลังส่งเรื่องแล้ว) คืน null ให้ engine คงพฤติกรรมเดิม (log only)
  */
 export async function handleConfirmPostback(
+  db: DbOrTx,
   data: CaseConfirmPostbackData,
   state: CaseFlowState | null,
   lineUserId: string,
@@ -176,13 +177,13 @@ export async function handleConfirmPostback(
   switch (data) {
     // § confirm:ok เดิน path เดียวกับพิมพ์ "ยืนยัน" — submit path เดียวกันผ่าน resolveCitizen
     case 'confirm:ok':
-      return submitConfirm(state, lineUserId);
+      return submitConfirm(db, state, lineUserId);
     case 'confirm:cancel':
       return { state: null, replies: [{ type: 'text', text: CANCELLED_TEXT }] };
     case 'confirm:edit:category':
       return {
         state: { ...state, step: 'category', editingField: 'category' },
-        replies: [faqMenuFlex(await fetchActiveCategories())],
+        replies: [faqMenuFlex(await fetchActiveCategories(db))],
       };
     case 'confirm:edit:title':
       return {
@@ -211,10 +212,11 @@ export async function handleConfirmPostback(
  * (tracking-code shape ผ่าน resolveCitizen ใน createCase เหมือนเดิม ไม่แตะ submit path)
  */
 async function submitConfirm(
+  db: DbOrTx,
   state: CaseFlowState,
   lineUserId: string,
 ): Promise<{ state: CaseFlowState | null; replies: LineOutgoingMessage[] }> {
-  const submission = await submitLineCase(state, lineUserId);
+  const submission = await submitLineCase(db, state, lineUserId);
   if (submission.ok) {
     return {
       state: null,
@@ -238,8 +240,7 @@ async function submitConfirm(
  * เรียงตามความแม่น: กดจากรายการ (ได้ id) → พิมพ์ชื่อตรง → keyword
  * คืน row จริงเสมอ เพื่อให้ state.categoryId ใช้สร้างเรื่องได้ตรงๆ
  */
-async function resolveCategory(input: string): Promise<{ id: string; name: string } | null> {
-  const db = await getDb();
+async function resolveCategory(db: DbOrTx, input: string): Promise<{ id: string; name: string } | null> {
   const cats = await db
     .select({ id: categories.id, name: categories.name })
     .from(categories)
@@ -271,12 +272,12 @@ type LineSubmission =
   | { ok: true; trackingCode: string }
   | { ok: false; duplicateTrackingCode?: string; message: string };
 
-async function submitLineCase(state: CaseFlowState, lineUserId: string): Promise<LineSubmission> {
+async function submitLineCase(db: DbOrTx, state: CaseFlowState, lineUserId: string): Promise<LineSubmission> {
   if (!state.categoryId) {
     throw new Error('LINE case creation failed: missing categoryId');
   }
 
-  const result = await createCase({
+  const result = await createCaseInTx(db, {
     channel: 'line',
     title: state.title!,
     description: state.description!,

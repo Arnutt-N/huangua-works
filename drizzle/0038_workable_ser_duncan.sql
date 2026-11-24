@@ -1,0 +1,1 @@
+ALTER TABLE "line_webhook_events" ADD COLUMN "lease_owner" text;

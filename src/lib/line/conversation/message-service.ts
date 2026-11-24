@@ -1,5 +1,5 @@
 import { and, eq, gt, sql } from 'drizzle-orm';
-import { getDb } from '@/lib/db';
+import { getDb, type DbOrTx } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { chatConversations, chatMessages, lineUsers } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
@@ -40,8 +40,7 @@ export interface InboundDupRow {
 }
 
 /** หาแถวข้อความขาเข้าจาก LINE message id — redelivery หลัง crash ต้องเจอแถวเดิม ไม่ insert ซ้ำ */
-export async function findInboundByLineMessageId(lineMessageId: string): Promise<InboundDupRow | null> {
-  const db = await getDb();
+export async function findInboundByLineMessageId(db: DbOrTx, lineMessageId: string): Promise<InboundDupRow | null> {
   return (await firstOrUndefined(
     db
       .select({
@@ -99,8 +98,8 @@ function broadcastInbound(args: InboundPayloadArgs): void {
     },
   });
 }
-export async function recordInboundMessage(input: InboundMessage): Promise<{ messageId: string; isNew: boolean }> {
-  const db = await getDb();
+/** § helper รับ db (หรือ tx) จาก caller — ทุก write ต้องอยู่ในขอบเขต transaction เดียวกับ effects */
+export async function recordInboundMessage(db: DbOrTx, input: InboundMessage): Promise<{ messageId: string; isNew: boolean }> {
   const messageId = generateId();
   const preview = input.textContent ?? `[${input.messageType}]`;
 
@@ -122,7 +121,7 @@ export async function recordInboundMessage(input: InboundMessage): Promise<{ mes
     .onConflictDoNothing({ target: chatMessages.lineMessageId, where: sql`line_message_id is not null` })
     .returning({ id: chatMessages.id });
   if (!inserted) {
-    const winner = await findInboundByLineMessageId(input.lineMessageId);
+    const winner = await findInboundByLineMessageId(db, input.lineMessageId);
     // § ชนะแต่หาแถวไม่เจอเป็นไปไม่ได้ นอกจากแถวถูกลบพร้อมกัน — ให้ webhook catch จัดการแล้ว redelivery ซ่อมทาง dup
     if (!winner) throw new Error(`inbound race lost with no winner: ${input.lineMessageId}`);
     return { messageId: winner.id, isNew: false };
@@ -158,13 +157,13 @@ export async function recordInboundMessage(input: InboundMessage): Promise<{ mes
  * ใช้ id เดิม broadcast ซ้ำ — client แทนที่ด้วย id จึงไม่ขึ้นซ้ำ
  */
 export async function attachInboundMedia(
+  db: DbOrTx,
   messageId: string,
   conversationId: string,
   messageType: InboundMessageType,
   mediaUrl: string | null,
   mediaMetadata: Record<string, unknown> | null,
 ): Promise<void> {
-  const db = await getDb();
   await db
     .update(chatMessages)
     .set({ mediaUrl, metadata: mediaMetadata })

@@ -28,15 +28,15 @@ afterAll(async () => {
 describe('recordCsatResponse', () => {
   test('บันทึกครั้งแรก → recorded', async () => {
     const conv = await createConv();
-    const result = await recordCsatResponse(conv, 5, new Date('2026-10-17T10:00:00Z'));
+    const result = await recordCsatResponse(await getDb(), conv, 5, new Date('2026-10-17T10:00:00Z'));
     expect(result).toEqual({ kind: 'recorded', score: 5 });
   });
 
   test('กดซ้ำรอบปิดเดิม → duplicate ไม่เพิ่มแถว', async () => {
     const conv = await createConv();
     const cycle = new Date('2026-10-17T10:00:00Z');
-    await recordCsatResponse(conv, 4, cycle);
-    const again = await recordCsatResponse(conv, 2, cycle);
+    await recordCsatResponse(await getDb(), conv, 4, cycle);
+    const again = await recordCsatResponse(await getDb(), conv, 2, cycle);
     expect(again).toEqual({ kind: 'duplicate', score: 4 });
 
     const db = await getDb();
@@ -49,8 +49,8 @@ describe('recordCsatResponse', () => {
 
   test('ปิดรอบใหม่ → โหวตใหม่ได้', async () => {
     const conv = await createConv();
-    await recordCsatResponse(conv, 4, new Date('2026-10-17T10:00:00Z'));
-    const second = await recordCsatResponse(conv, 5, new Date('2026-10-17T11:00:00Z'));
+    await recordCsatResponse(await getDb(), conv, 4, new Date('2026-10-17T10:00:00Z'));
+    const second = await recordCsatResponse(await getDb(), conv, 5, new Date('2026-10-17T11:00:00Z'));
     expect(second).toEqual({ kind: 'recorded', score: 5 });
   });
 });

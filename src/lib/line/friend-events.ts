@@ -1,12 +1,12 @@
 import { eq, count, sql } from 'drizzle-orm';
-import { getDb } from '@/lib/db';
+import type { DbOrTx } from '@/lib/db';
 import { lineFriendEvents } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 
 // § บันทึก follow/unfollow แบบทนการส่งซ้ำ — unique webhook_event_id + ON CONFLICT DO NOTHING
 // ทำให้ redelivery หลัง Redis dedup TTL หมดไม่สร้างแถวซ้ำ (engine ห่อ best-effort กัน welcome ล้ม)
 export async function recordFriendEvent(
-  db: Awaited<ReturnType<typeof getDb>>,
+  db: DbOrTx,
   lineUserPk: string,
   event: 'follow' | 'unfollow',
   webhookEventId: string,
@@ -51,7 +51,7 @@ export function countFollowStats(eventsOldestFirst: FollowEventLike[]): {
 }
 
 export async function getRefollowCount(
-  db: Awaited<ReturnType<typeof getDb>>,
+  db: DbOrTx,
   lineUserPk: string,
 ): Promise<number> {
   const rows = await db
@@ -64,7 +64,7 @@ export async function getRefollowCount(
 
 /** จำนวน follow ทั้งหมดของผู้ใช้ — ใช้แทน placeholder {follow_count} ในข้อความต้อนรับ */
 export async function getFollowCount(
-  db: Awaited<ReturnType<typeof getDb>>,
+  db: DbOrTx,
   lineUserPk: string,
 ): Promise<number> {
   const [row] = await db

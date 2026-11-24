@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { isUniqueViolation } from '../db/errors';
-import { getDb } from '../db';
+import { getDb, type DbOrTx } from '../db';
 import { firstOrUndefined } from '../db/query-helpers';
 import { cases, categories } from '../db/schema';
 import { generateId } from '../id';
@@ -52,6 +52,24 @@ export type CaseIntakeResult =
   | { ok: false; error: string; errorCode: 'duplicate' | 'invalid_category' | 'invalid_attachment' | 'internal'; existingTrackingCode?: string };
 
 export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResult> {
+  // § กัน input ผิดก่อนเปิด transaction — ด่านเดิมอยู่ก่อนแตะ DB และเทสต์ยืนยันพฤติกรรมนี้
+  if (!citizenIdentityOf(input)) {
+    console.error(`[intake] createCase ไม่มีตัวตนผู้แจ้ง (channel=${input.channel})`);
+    return { ok: false, error: 'ไม่สามารถสร้างผู้ใช้งานได้', errorCode: 'internal' };
+  }
+  const db = await getDb();
+  let result: CaseIntakeResult;
+  try {
+    // § rollback ต้องเกิดนอก catch — ถ้าจับ ClaimLostError ใน tx แล้วคืน duplicate tx จะ commit เรื่องค้าง
+    result = await db.transaction((tx) => createCaseInTx(tx, input));
+  } catch (error) {
+    result = intakeFailureFrom(error);
+  }
+  return notifyOnResult(result, input);
+}
+
+/** § เรียกจาก effects tx ได้โดยไม่เปิด transaction ซ้อน — ทุก write อยู่ใน tx เดียวกับ caller */
+export async function createCaseInTx(db: DbOrTx, input: CaseIntakeInput): Promise<CaseIntakeResult> {
   // § ด่าน input ก่อนแตะ DB — ไม่มีตัวตน (เว็บไม่มี cid / line ไม่มี lineUserId) = caller ส่ง input ผิด
   // คืน internal แทน throw (caller map เป็น 500/ข้อความทั่วไป) + log ให้เห็น (ไม่มี PII — แค่ channel)
   const identity = citizenIdentityOf(input);
@@ -59,8 +77,6 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
     console.error(`[intake] createCase ไม่มีตัวตนผู้แจ้ง (channel=${input.channel})`);
     return { ok: false, error: 'ไม่สามารถสร้างผู้ใช้งานได้', errorCode: 'internal' };
   }
-
-  const db = await getDb();
 
   // § attachments[].url มาจาก /api/cases/submit ซึ่งไม่ต้อง login — เดิมรับ URL ภายนอก
   // อะไรก็ได้ (บังคับแค่ http/https) = ฝัง URL ของคนอื่นลง DB รอวันมีหน้าเอาไป render
@@ -104,9 +120,7 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
 
   // § การเขียนผู้แจ้ง/link/consent/เรื่อง/dedup/audit ต้อง commit หรือ rollback พร้อมกัน
   // ระบุตัวตนด้วย resolveCitizen ใน tx นี้ (ลบ resolveSubmitter แล้ว — ดู citizen-access)
-  let result: CaseIntakeResult;
-  try {
-    result = await db.transaction(async (tx): Promise<CaseIntakeResult> => {
+  const tx = db;
       // § ตัดสิน duplicate ใน transaction เดียวกับ insert และก่อน resolveCitizen —
       // ด่านเดิมอยู่นอก tx (สองคำขอผ่านพร้อมกันได้) แต่ถ้าย้ายเข้ามาโดยไม่เลื่อนขึ้นก่อน
       // duplicate submit จะทิ้ง user row ค้างไว้
@@ -178,7 +192,7 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
       for (let attempt = 0; attempt < 5; attempt++) {
         const candidate = generateTrackingCode();
         try {
-          await tx.transaction(async (savepoint) => {
+          await db.transaction(async (savepoint) => {
             await savepoint.insert(cases).values({ ...caseValues, trackingCode: candidate });
           });
           issuedTrackingCode = candidate;
@@ -217,32 +231,37 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
         metadata: { categoryId: input.categoryId, fiscalYear, channel: input.channel },
       }, tx);
 
-      return { ok: true, caseId, trackingCode: issuedTrackingCode, estimatedDays };
-    });
-  } catch (error) {
-    if (error instanceof ClaimLostError) {
-      return {
-        ok: false,
-        error: 'คุณเคยแจ้งเรื่องนี้ไปแล้วภายใน 7 วัน',
-        errorCode: 'duplicate',
-        ...(error.existingTrackingCode ? { existingTrackingCode: error.existingTrackingCode } : {}),
-      };
-    }
-    if (error instanceof Error && error.message === 'tracking code exhausted') {
-      return { ok: false, error: 'ไม่สามารถออกเลขติดตามได้ กรุณาลองใหม่', errorCode: 'internal' };
-    }
-    throw error;
-  }
+    return { ok: true, caseId, trackingCode: issuedTrackingCode, estimatedDays };
+}
 
-  // § แจ้งเจ้าหน้าที่หลัง commit สำเร็จเท่านั้น — fail-open สองชั้น (notifyNewCase สัญญา
-  // ไม่ throw อยู่แล้ว + try/catch นี้กันของใหม่ในอนาคต) เพราะเคสถูกบันทึกไปแล้ว
-  // การแจ้งเตือนพังต้องไม่ลอยขึ้นไปทำให้ผู้แจ้งได้ error ทั้งที่เรื่องถูกรับไว้แล้ว
+/** § แปลง error จาก tx ที่ rollback แล้วให้เป็นคำตอบ — เรียกนอก transaction เสมอ */
+function intakeFailureFrom(error: unknown): CaseIntakeResult {
+  if (error instanceof ClaimLostError) {
+    return {
+      ok: false,
+      error: 'คุณเคยแจ้งเรื่องนี้ไปแล้วภายใน 7 วัน',
+      errorCode: 'duplicate',
+      ...(error.existingTrackingCode ? { existingTrackingCode: error.existingTrackingCode } : {}),
+    };
+  }
+  if (error instanceof Error && error.message === 'tracking code exhausted') {
+    return { ok: false, error: 'ไม่สามารถออกเลขติดตามได้ กรุณาลองใหม่', errorCode: 'internal' };
+  }
+  throw error;
+}
+
+/** § แจ้งเจ้าหน้าที่หลัง commit สำเร็จเท่านั้น — fail-open สองชั้น (notifyNewCase สัญญา
+ * ไม่ throw อยู่แล้ว + try/catch นี้กันของใหม่ในอนาคต) เพราะเคสถูกบันทึกไปแล้ว
+ * การแจ้งเตือนพังต้องไม่ลอยขึ้นไปทำให้ผู้แจ้งได้ error ทั้งที่เรื่องถูกรับไว้แล้ว */
+async function notifyOnResult(result: CaseIntakeResult, input: CaseIntakeInput): Promise<CaseIntakeResult> {
   if (result.ok) {
     try {
+      const db = await getDb();
+      const category = await firstOrUndefined(db.select().from(categories).where(eq(categories.id, input.categoryId)).limit(1));
       await notifyNewCase({
         trackingCode: result.trackingCode,
         title: input.title,
-        categoryName: category.name,
+        categoryName: category?.name ?? '',
         channel: input.channel,
         location: input.location,
       });
@@ -250,7 +269,6 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
       console.warn('[notify] new-case notice failed', error);
     }
   }
-
   return result;
 }
 
