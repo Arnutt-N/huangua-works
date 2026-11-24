@@ -222,9 +222,10 @@ describe('sendBroadcast · targeted multicast', () => {
     expect(calls[0]?.[0]).toHaveLength(500);
     expect(calls[1]?.[0]).toHaveLength(1);
     const keys = calls.map((call) => call[2]);
-    const batch1 = Array.from({ length: 500 }, (_, i) => `U${i}`);
-    expect(keys[0]).toBe(broadcastRetryKey('bt', batch1));
-    expect(keys[1]).toBe(broadcastRetryKey('bt', ['U500']));
+    const sorted = Object.values(rawByInternal).sort();
+    expect(calls[0]?.[0]).toEqual(sorted.slice(0, MULTICAST_BATCH_SIZE));
+    expect(keys[0]).toBe(broadcastRetryKey('bt', sorted.slice(0, MULTICAST_BATCH_SIZE)));
+    expect(keys[1]).toBe(broadcastRetryKey('bt', sorted.slice(MULTICAST_BATCH_SIZE)));
     expect(keys[0]).not.toBe(keys[1]);
     expect(outcome).toMatchObject({ kind: 'sent', totalRecipients: total, successCount: total, failedCount: 0 });
     expect(updates.at(-1)).toMatchObject({ status: 'sent', successCount: total });
@@ -280,12 +281,13 @@ describe('sendBroadcast · targeted multicast', () => {
     expect(multicastMock).toHaveBeenCalledTimes(4);
     const retryKeys = multicastMock.mock.calls.slice(1).map((call) => call[2]);
     expect(new Set(retryKeys).size).toBe(1);
-    expect(retryKeys[0]).toBe(broadcastRetryKey('bp', ['U500']));
+    const lastRecipient = Object.values(big).sort().at(-1)!;
+    expect(retryKeys[0]).toBe(broadcastRetryKey('bp', [lastRecipient]));
     expect(outcome).toMatchObject({ kind: 'failed', totalRecipients: 501, successCount: 500, failedCount: 1 });
     expect(updates.at(-1)).toMatchObject({ status: 'failed', successCount: 500, failedCount: 1 });
     expect(failedInserts).toHaveLength(1);
-    expect(failedInserts[0]).toMatchObject({ recipientHash: hash('U500'), attempts: 3 });
-    expect(JSON.stringify(failedInserts)).not.toContain('U500');
+    expect(failedInserts[0]).toMatchObject({ recipientHash: hash(lastRecipient), attempts: 3 });
+    expect(JSON.stringify(failedInserts)).not.toContain(lastRecipient);
   }, 15000);
 
   it('ผล query สลับลำดับ → key เดิม; ผู้รับเปลี่ยน → key เปลี่ยน (header ที่ LINE เห็น)', async () => {

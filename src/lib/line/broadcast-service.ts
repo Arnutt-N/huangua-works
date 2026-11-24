@@ -213,6 +213,8 @@ async function deliverTargeted(
       continue;
     }
   }
+  // § inArray ไม่รับประกันลำดับ — sort ก่อนตัดชุดเพื่อให้สมาชิกแต่ละชุดคงที่แม้ replay ผล query สลับ
+  rawIds.sort();
   const total = rawIds.length;
 
   if (total === 0) {

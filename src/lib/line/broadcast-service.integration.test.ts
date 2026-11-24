@@ -115,9 +115,12 @@ describe('sendBroadcast · counters/hash บนฐานจริง', () => {
     const calls = multicastMock.mock.calls;
     expect(calls[0]?.[0]).toHaveLength(MULTICAST_BATCH_SIZE);
     expect(calls[1]?.[0]).toHaveLength(1);
-    const batch1 = Array.from({ length: MULTICAST_BATCH_SIZE }, (_, i) => `U${i}`);
+    const sorted = rows.map((_, i) => `U${i}`).sort();
+    const batch1 = sorted.slice(0, MULTICAST_BATCH_SIZE);
+    const batch2 = sorted.slice(MULTICAST_BATCH_SIZE);
+    expect(calls[0]?.[0]).toEqual(batch1);
     expect(calls[0]?.[2]).toBe(broadcastRetryKey(broadcastId, batch1));
-    expect(calls[3]?.[2]).toBe(broadcastRetryKey(broadcastId, [`U${MULTICAST_BATCH_SIZE}`]));
+    expect(calls[3]?.[2]).toBe(broadcastRetryKey(broadcastId, batch2));
     expect(calls[0]?.[2]).not.toBe(calls[3]?.[2]);
     expect(outcome).toMatchObject({
       kind: 'failed',
@@ -138,7 +141,7 @@ describe('sendBroadcast · counters/hash บนฐานจริง', () => {
       .select()
       .from(chatBroadcastFailedRecipients)
       .where(eq(chatBroadcastFailedRecipients.broadcastId, broadcastId));
-    const rawLast = `U${MULTICAST_BATCH_SIZE}`;
+    const rawLast = batch2[0]!;
     expect(failed).toHaveLength(1);
     expect(failed[0]).toMatchObject({
       recipientHash: createHash('sha256').update(rawLast).digest('hex'),
