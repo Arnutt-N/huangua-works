@@ -1,0 +1,105 @@
+import { count, eq, inArray } from 'drizzle-orm';
+import { NextRequest } from 'next/server';
+import { afterAll, describe, expect, test } from 'vitest';
+import { closeDb, getDb } from '@/lib/db';
+import { cases, caseStatsDaily } from '@/lib/db/schema';
+import { generateId } from '@/lib/id';
+import { totalCasesFromSnapshot } from '@/lib/cases/stats';
+import { GET } from './route';
+
+/**
+ * stats-refresh ต้องนับ "เรื่องทั้งหมด" ตามมาตรฐาน Excel COUNTA
+ * (ไม่ใช่ count(status='received')) และเฉลี่ยวันปิดจากแถวที่มี closedAt จริง
+ * ข้อมูลสมมติล้วน (prefix it-stats)
+ */
+
+const RUN = Date.now();
+const createdCaseIds: string[] = [];
+let createdSnapshotDate: string | null = null;
+
+afterAll(async () => {
+  const db = await getDb();
+  if (createdCaseIds.length) {
+    await db.delete(cases).where(inArray(cases.id, createdCaseIds));
+  }
+  if (createdSnapshotDate) {
+    await db.delete(caseStatsDaily).where(eq(caseStatsDaily.date, createdSnapshotDate));
+  }
+  await closeDb();
+});
+
+describe('cron/stats-refresh · มาตรฐานสถานะ', () => {
+  test('นับทุกสถานะเป็นยอดรับทั้งหมด และเฉลี่ยจากแถวที่มีวันปิด', async () => {
+    const db = await getDb();
+    const [before] = await db.select({ c: count() }).from(cases);
+    const baseline = Number(before?.c ?? 0);
+
+    const newId = generateId();
+    const closedId = generateId();
+    const closedAt = new Date();
+    const createdAt = new Date(closedAt.getTime() - 2 * 86400000);
+    await db.insert(cases).values([
+      {
+        id: newId,
+        status: 'pending',
+        title: `it-stats pending ${RUN}`,
+        description: 'ข้อมูลสมมติ',
+        location: '',
+        categoryId: `it-stats-cat-${RUN}`,
+        submittedBy: `it-stats-user-${RUN}`,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: closedId,
+        status: 'closed',
+        title: `it-stats closed ${RUN}`,
+        description: 'ข้อมูลสมมติ',
+        location: '',
+        categoryId: `it-stats-cat-${RUN}`,
+        submittedBy: `it-stats-user-${RUN}`,
+        createdAt,
+        updatedAt: closedAt,
+        closedAt,
+      },
+    ]);
+    createdCaseIds.push(newId, closedId);
+
+    const secret = process.env.CRON_SECRET;
+    expect(secret && secret.length >= 16).toBe(true);
+    const res = await GET(
+      new NextRequest('http://localhost/api/cron/stats-refresh', {
+        headers: { authorization: `Bearer ${secret}` },
+      }),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      stats: { totalCases: number; totalReceived: number; totalClosed: number; totalInProgress: number; avgResolutionDays: number | null };
+    };
+
+    const closedRows = await db
+      .select({ createdAt: cases.createdAt, closedAt: cases.closedAt })
+      .from(cases)
+      .where(eq(cases.status, 'closed'));
+    const durations = closedRows
+      .filter((row) => row.closedAt !== null)
+      .map((row) => Math.floor((new Date(row.closedAt!).getTime() - new Date(row.createdAt).getTime()) / 86400000));
+    const expectedAvg = durations.length
+      ? Math.round(durations.reduce((sum, d) => sum + d, 0) / durations.length)
+      : null;
+
+    const [actual] = await db.select({ c: count() }).from(cases);
+    expect(body.stats.totalCases).toBe(Number(actual?.c ?? 0));
+    expect(body.stats.totalCases).toBeGreaterThanOrEqual(baseline + 2);
+    expect(body.stats.totalReceived).toBeGreaterThanOrEqual(0);
+    expect(body.stats.totalInProgress).toBeGreaterThanOrEqual(1);
+    expect(body.stats.totalClosed).toBeGreaterThanOrEqual(1);
+    expect(body.stats.avgResolutionDays).toBe(expectedAvg);
+
+    const today = new Date().toISOString().split('T')[0]!;
+    const [snapshot] = await db.select().from(caseStatsDaily).where(eq(caseStatsDaily.date, today));
+    expect(snapshot).toBeDefined();
+    expect(totalCasesFromSnapshot(snapshot!.metadata)).toBe(body.stats.totalCases);
+    createdSnapshotDate = today;
+  });
+});
