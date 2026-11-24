@@ -120,12 +120,17 @@ beforeEach(() => {
 });
 
 describe('broadcastRetryKey', () => {
-  it('eterministic ตาม broadcastId และ batchIndex รูป UUID v5 ตัวพิมพ์เล็ก', () => {
-    const first = broadcastRetryKey('b1', 0);
-    expect(first).toBe(broadcastRetryKey('b1', 0));
+  it('deterministic ตาม broadcastId และชุดผู้รับ รูป UUID v5 ตัวพิมพ์เล็ก', () => {
+    const first = broadcastRetryKey('b1', ['U1', 'U2']);
+    expect(first).toBe(broadcastRetryKey('b1', ['U1', 'U2']));
     expect(first).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
-    expect(broadcastRetryKey('b1', 1)).not.toBe(first);
-    expect(broadcastRetryKey('b2', 0)).not.toBe(first);
+    expect(broadcastRetryKey('b1', ['U3'])).not.toBe(first);
+    expect(broadcastRetryKey('b2', ['U1', 'U2'])).not.toBe(first);
+  });
+
+  it('ลำดับผล query ที่สลับกันได้ key เดิม แต่ชุดผู้รับต่างกันได้ key ต่างกัน', () => {
+    expect(broadcastRetryKey('b1', ['U2', 'U1'])).toBe(broadcastRetryKey('b1', ['U1', 'U2']));
+    expect(broadcastRetryKey('b1', ['U1', 'U3'])).not.toBe(broadcastRetryKey('b1', ['U1', 'U2']));
   });
 });
 
