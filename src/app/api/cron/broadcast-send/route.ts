@@ -10,7 +10,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { getDueScheduled, sendBroadcast } from '@/lib/line/broadcast-service';
+import { getDueScheduled, recoverStaleSending, sendBroadcast } from '@/lib/line/broadcast-service';
 import { requireCron } from '@/lib/cron-auth';
 
 export const runtime = 'nodejs';
@@ -19,18 +19,28 @@ export async function GET(request: Request) {
   const auth = requireCron(request);
   if (!auth.ok) return auth.response;
 
+  // § requeue งาน sending ค้างก่อนหางานเสมอ — ไม่ต้องรอมี scheduled ใหม่ค่อยตรวจ
+  const recovered = await recoverStaleSending();
   const due = await getDueScheduled();
   let sent = 0;
   let failed = 0;
   let skipped = 0;
+  const results: Record<string, unknown>[] = [];
 
   for (const item of due) {
-    const outcome = await sendBroadcast(item.id);
-    // § นับ sent เฉพาะที่ส่งสำเร็จจริง — เดิมนับทุกแถวที่แตะทำให้ failed ดูเหมือนส่งแล้ว
-    if (outcome.kind === 'sent') sent++;
-    else if (outcome.kind === 'failed') failed++;
-    else skipped++;
+    // § หนึ่ง try/catch ต่อรายการ — รายการแรกพังต้องไม่หยุดรายการที่เหลือ
+    try {
+      const outcome = await sendBroadcast(item.id);
+      results.push({ id: item.id, ...outcome });
+      if (outcome.kind === 'sent') sent++;
+      else if (outcome.kind === 'failed') failed++;
+      else skipped++;
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
+      results.push({ id: item.id, kind: 'error', error });
+      failed++;
+    }
   }
 
-  return NextResponse.json({ ok: true, sent, failed, skipped });
+  return NextResponse.json({ ok: true, recovered, sent, failed, skipped, results });
 }

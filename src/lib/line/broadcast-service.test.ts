@@ -1,16 +1,39 @@
 import { createHash } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { broadcastMock, followerMock, multicastMock } = vi.hoisted(() => ({
-  broadcastMock: vi.fn(),
-  followerMock: vi.fn(),
-  multicastMock: vi.fn(),
-}));
+const { broadcastMock, followerMock, multicastMock, LineApiErrorMock, LineCircuitOpenErrorMock } =
+  vi.hoisted(() => {
+    class LineApiErrorMock extends Error {
+      constructor(endpoint: string, public readonly status: number, detail: string) {
+        super(`LINE API ${endpoint} failed (${status}): ${detail}`);
+        this.name = 'LineApiError';
+      }
+    }
+    class LineCircuitOpenErrorMock extends Error {
+      constructor(endpoint = 'x') {
+        super(`LINE API circuit is open (${endpoint})`);
+        this.name = 'LineCircuitOpenError';
+      }
+    }
+    return {
+      broadcastMock: vi.fn(),
+      followerMock: vi.fn(),
+      multicastMock: vi.fn(),
+      LineApiErrorMock,
+      LineCircuitOpenErrorMock,
+    };
+  });
 
 vi.mock('./client', () => ({
   broadcastMessage: broadcastMock,
   getFollowerIds: followerMock,
   multicast: multicastMock,
+  LineApiError: LineApiErrorMock,
+}));
+
+vi.mock('./circuit-breaker', () => ({
+  withLineCircuit: vi.fn(),
+  LineCircuitOpenError: LineCircuitOpenErrorMock,
 }));
 
 vi.mock('./identity', () => ({
@@ -22,7 +45,15 @@ vi.mock('@/lib/db', () => ({
 }));
 
 const { getDb } = await import('@/lib/db');
-const { sendBroadcast, dryRunBroadcast, MULTICAST_BATCH_SIZE } = await import('./broadcast-service');
+const { LineApiError } = await import('./client');
+const { LineCircuitOpenError } = await import('./circuit-breaker');
+const {
+  broadcastRetryKey,
+  sendBroadcast,
+  dryRunBroadcast,
+  recoverStaleSending,
+  MULTICAST_BATCH_SIZE,
+} = await import('./broadcast-service');
 
 interface Row { id: string; content: unknown; target: unknown }
 
@@ -30,29 +61,41 @@ function hash(raw: string) {
   return createHash('sha256').update(raw).digest('hex');
 }
 
-function dbStub(row: Row | null, rawByInternal: Record<string, string> = {}) {
+interface StubResult {
+  db: unknown;
+  updates: Record<string, unknown>[];
+  failedInserts: Record<string, unknown>[];
+  returningRows: (v: Record<string, unknown>) => Row[];
+}
+
+function dbStub(row: Row | null, rawByInternal: Record<string, string> = {}, rawOrder?: string[]): StubResult {
   const updates: Record<string, unknown>[] = [];
   const failedInserts: Record<string, unknown>[] = [];
   let claimCount = 0;
+  const orderedValues = (rawOrder ?? Object.keys(rawByInternal)).map((id) => ({ lineUserIdEnc: rawByInternal[id]! }));
+
   const db = {
     update: () => ({
       set: (v: Record<string, unknown>) => {
         updates.push(v);
-        return {
-          where: () => ({
+        const buildWhere = () => {
+          const where = {
+            then: (resolve: (x: unknown) => void) => resolve([]),
             returning: async () => {
               claimCount++;
-              // update แรกคือ stale recovery (ไม่มี returning chain ในโค้ดจริงใช้ await ตรง)
-              if (row && claimCount <= 2 && (v.status === 'sending')) return [row];
+              if (row && claimCount <= 2 && v.status === 'sending') return [row];
+              if (v.status === 'scheduled') return [{ id: 'stale-1' }];
               return [];
             },
-          }),
+          };
+          return where;
         };
+        return { where: buildWhere };
       },
     }),
     select: () => ({
       from: () => ({
-        where: async () => Object.values(rawByInternal).map((lineUserId) => ({ lineUserIdEnc: lineUserId })),
+        where: async () => orderedValues,
       }),
     }),
     insert: () => ({
@@ -62,27 +105,12 @@ function dbStub(row: Row | null, rawByInternal: Record<string, string> = {}) {
       },
     }),
   };
-  // stale recovery update ไม่มี .returning — where ต้อง await ได้
-  const origUpdate = db.update;
-  db.update = (() => {
-    const chain = origUpdate();
-    const origSet = chain.set;
-    chain.set = (v: Record<string, unknown>) => {
-      const r = origSet(v);
-      const origWhere = r.where;
-      r.where = (() => {
-        const w = origWhere();
-        const thenable = Object.assign(w, {
-          then: (resolve: (x: unknown) => void) => resolve([]),
-        });
-        return thenable;
-      }) as never;
-      return r;
-    };
-    return chain;
-  }) as never;
-  return { db, updates, failedInserts };
+  return { db, updates, failedInserts, returningRows: () => [] };
 }
+
+const transient500 = () => new LineApiError('/message/broadcast', 500, 'LINE down');
+const transient429 = () => new LineApiError('/message/broadcast', 429, 'rate limited');
+const permanent400 = () => new LineApiError('/message/broadcast', 400, 'bad request');
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -92,19 +120,38 @@ beforeEach(() => {
   followerMock.mockResolvedValue({ userIds: [] });
 });
 
-describe('sendBroadcast · all path', () => {
-  it('ล้ม 2 ครั้งแล้วสำเร็จ → ยิง 3 ครั้ง สถานะ sent พร้อม counters จาก follower count', async () => {
+describe('broadcastRetryKey', () => {
+  it('deterministic ตาม broadcastId และชุดผู้รับ รูป UUID v5 ตัวพิมพ์เล็ก', () => {
+    const first = broadcastRetryKey('b1', ['U1', 'U2']);
+    expect(first).toBe(broadcastRetryKey('b1', ['U1', 'U2']));
+    expect(first).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(broadcastRetryKey('b1', ['U3'])).not.toBe(first);
+    expect(broadcastRetryKey('b2', ['U1', 'U2'])).not.toBe(first);
+  });
+
+  it('ลำดับผล query ที่สลับกันได้ key เดิม แต่ชุดผู้รับต่างกันได้ key ต่างกัน', () => {
+    expect(broadcastRetryKey('b1', ['U2', 'U1'])).toBe(broadcastRetryKey('b1', ['U1', 'U2']));
+    expect(broadcastRetryKey('b1', ['U1', 'U3'])).not.toBe(broadcastRetryKey('b1', ['U1', 'U2']));
+  });
+});
+
+describe('sendBroadcast · all path retry', () => {
+  it('ล้มชั่วคราว 2 ครั้งแล้วสำเร็จ → 3 ครั้ง retry key เดิม', async () => {
     const { db, updates } = dbStub({ id: 'b1', content: [], target: { kind: 'all' } });
     vi.mocked(getDb).mockResolvedValue(db as never);
     followerMock.mockResolvedValue({ userIds: ['U1', 'U2'] });
     broadcastMock
-      .mockRejectedValueOnce(new Error('500'))
-      .mockRejectedValueOnce(new Error('500'))
+      .mockRejectedValueOnce(transient500())
+      .mockRejectedValueOnce(transient429())
       .mockResolvedValueOnce(undefined);
 
     const outcome = await sendBroadcast('b1');
 
     expect(broadcastMock).toHaveBeenCalledTimes(3);
+    const keys = broadcastMock.mock.calls.map((call) => call[1]);
+    expect(new Set(keys).size).toBe(1);
+    expect(keys[0]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(keys[0]).not.toBe(broadcastRetryKey('b1', ['U1', 'U2']));
     expect(outcome).toMatchObject({ kind: 'sent', totalRecipients: 2, successCount: 2, failedCount: 0 });
     expect(updates.at(-1)).toMatchObject({ status: 'sent', totalRecipients: 2, successCount: 2 });
   });
@@ -112,13 +159,35 @@ describe('sendBroadcast · all path', () => {
   it('ล้มครบ 3 ครั้ง → failed outcome', async () => {
     const { db, updates } = dbStub({ id: 'b2', content: [], target: 'all' });
     vi.mocked(getDb).mockResolvedValue(db as never);
-    broadcastMock.mockRejectedValue(new Error('LINE down'));
+    broadcastMock.mockRejectedValue(transient500());
 
     const outcome = await sendBroadcast('b2');
 
     expect(broadcastMock).toHaveBeenCalledTimes(3);
     expect(outcome.kind).toBe('failed');
     expect(updates.at(-1)).toMatchObject({ status: 'failed' });
+  });
+
+  it('400 ถาวร → ยิงครั้งเดียว', async () => {
+    const { db } = dbStub({ id: 'b-perm', content: [], target: { kind: 'all' } });
+    vi.mocked(getDb).mockResolvedValue(db as never);
+    broadcastMock.mockRejectedValue(permanent400());
+
+    const outcome = await sendBroadcast('b-perm');
+
+    expect(broadcastMock).toHaveBeenCalledTimes(1);
+    expect(outcome.kind).toBe('failed');
+  });
+
+  it('circuit open → ยิงครั้งเดียว', async () => {
+    const { db } = dbStub({ id: 'b-circuit', content: [], target: { kind: 'all' } });
+    vi.mocked(getDb).mockResolvedValue(db as never);
+    broadcastMock.mockRejectedValue(new LineCircuitOpenError('/message/broadcast'));
+
+    const outcome = await sendBroadcast('b-circuit');
+
+    expect(broadcastMock).toHaveBeenCalledTimes(1);
+    expect(outcome.kind).toBe('failed');
   });
 
   it('claim ไม่ได้ (ส่งแล้ว) → skipped-not-claimable', async () => {
@@ -131,50 +200,135 @@ describe('sendBroadcast · all path', () => {
 });
 
 describe('sendBroadcast · targeted multicast', () => {
-  it('แบ่งชุดละ 500 และนับ success ครบ', async () => {
+  it('501 recipients แบ่ง 2 ชุด retry key ต่างกัน และ retry ในชุดใช้ key ของชุด', async () => {
     const total = MULTICAST_BATCH_SIZE + 1;
-    const rawByInternal: Record<string, string> = {};
     const ids: string[] = [];
+    const rawByInternal: Record<string, string> = {};
     for (let i = 0; i < total; i++) {
       ids.push(`pk-${i}`);
       rawByInternal[`pk-${i}`] = `U${i}`;
     }
-    const { db, updates } = dbStub({ id: 'bt', content: [], target: { kind: 'line_user_ids', ids } }, rawByInternal);
+    const { db, updates } = dbStub(
+      { id: 'bt', content: [], target: { kind: 'line_user_ids', ids } },
+      rawByInternal,
+    );
     vi.mocked(getDb).mockResolvedValue(db as never);
     multicastMock.mockResolvedValue(undefined);
 
     const outcome = await sendBroadcast('bt');
 
     expect(multicastMock).toHaveBeenCalledTimes(2);
-    expect(multicastMock.mock.calls[0]?.[0]).toHaveLength(500);
-    expect(multicastMock.mock.calls[1]?.[0]).toHaveLength(1);
+    const calls = multicastMock.mock.calls;
+    expect(calls[0]?.[0]).toHaveLength(500);
+    expect(calls[1]?.[0]).toHaveLength(1);
+    const keys = calls.map((call) => call[2]);
+    const sorted = Object.values(rawByInternal).sort();
+    expect(calls[0]?.[0]).toEqual(sorted.slice(0, MULTICAST_BATCH_SIZE));
+    expect(keys[0]).toBe(broadcastRetryKey('bt', sorted.slice(0, MULTICAST_BATCH_SIZE)));
+    expect(keys[1]).toBe(broadcastRetryKey('bt', sorted.slice(MULTICAST_BATCH_SIZE)));
+    expect(keys[0]).not.toBe(keys[1]);
     expect(outcome).toMatchObject({ kind: 'sent', totalRecipients: total, successCount: total, failedCount: 0 });
     expect(updates.at(-1)).toMatchObject({ status: 'sent', successCount: total });
-    expect(broadcastMock).not.toHaveBeenCalled();
   });
 
-  it('ชุดที่สองล้มครบ retry → failed counters แยกชุด + failed rows เก็บ hash ไม่เก็บ raw id', async () => {
-    const rawByInternal = { 'pk-1': 'U1', 'pk-2': 'U2' };
-    // บังคับชุดละ 1 ด้วยการ mock batch boundary ไม่ได้ — ใช้ 501 รายให้ชุดสองมี 1 รายแทน
-    const big: Record<string, string> = {};
+  it('501 recipients: ผล query สลับลำดับ → สมาชิกชุดและ key คงเดิม (header ที่ LINE เห็น)', async () => {
+    const total = MULTICAST_BATCH_SIZE + 1;
+    const ids = Array.from({ length: total }, (_, i) => `pk-${i}`);
+    const rawByInternal = Object.fromEntries(ids.map((id, i) => [id, `U${i}`]));
+    const target = { kind: 'line_user_ids' as const, ids };
+    const sortedRaw = Object.values(rawByInternal).sort();
+    const expectedBatches = [
+      sortedRaw.slice(0, MULTICAST_BATCH_SIZE),
+      sortedRaw.slice(MULTICAST_BATCH_SIZE),
+    ];
+    const idByRaw = new Map(Object.entries(rawByInternal).map(([id, raw]) => [raw, id]));
+    const sortedOrder = sortedRaw.map((raw) => idByRaw.get(raw)!);
+
+    const capture = async (order: string[]) => {
+      const { db } = dbStub({ id: 'b501', content: [], target }, rawByInternal, order);
+      vi.mocked(getDb).mockResolvedValueOnce(db as never);
+      await sendBroadcast('b501');
+      return multicastMock.mock.calls.slice(-2).map((call) => ({
+        recipients: call[0] as string[],
+        key: call[2] as string,
+      }));
+    };
+
+    const forward = await capture(sortedOrder);
+    const reversed = await capture([...sortedOrder].reverse());
+
+    expect(forward.map((call) => call.recipients)).toEqual(expectedBatches);
+    expect(reversed.map((call) => call.recipients)).toEqual(expectedBatches);
+    expect(reversed.map((call) => call.key)).toEqual(forward.map((call) => call.key));
+  }, 15000);
+
+  it('ชุดที่สองล้มครบ retry → ใช้ key เดิม 3 ครั้ง counters + failed hash ถูกต้อง', async () => {
     const ids: string[] = [];
+    const big: Record<string, string> = {};
     for (let i = 0; i < 501; i++) {
       ids.push(`pk-${i}`);
       big[`pk-${i}`] = `U${i}`;
     }
-    void rawByInternal;
-    const { db, updates, failedInserts } = dbStub({ id: 'bp', content: [], target: { kind: 'line_user_ids', ids } }, big);
+    const { db, updates, failedInserts } = dbStub(
+      { id: 'bp', content: [], target: { kind: 'line_user_ids', ids } },
+      big,
+    );
     vi.mocked(getDb).mockResolvedValue(db as never);
-    multicastMock.mockResolvedValueOnce(undefined).mockRejectedValue(new Error('429'));
+    multicastMock.mockResolvedValueOnce(undefined).mockRejectedValue(transient500());
 
     const outcome = await sendBroadcast('bp');
 
+    expect(multicastMock).toHaveBeenCalledTimes(4);
+    const retryKeys = multicastMock.mock.calls.slice(1).map((call) => call[2]);
+    expect(new Set(retryKeys).size).toBe(1);
+    const lastRecipient = Object.values(big).sort().at(-1)!;
+    expect(retryKeys[0]).toBe(broadcastRetryKey('bp', [lastRecipient]));
     expect(outcome).toMatchObject({ kind: 'failed', totalRecipients: 501, successCount: 500, failedCount: 1 });
     expect(updates.at(-1)).toMatchObject({ status: 'failed', successCount: 500, failedCount: 1 });
     expect(failedInserts).toHaveLength(1);
-    expect(failedInserts[0]).toMatchObject({ recipientHash: hash('U500'), attempts: 3 });
-    expect(JSON.stringify(failedInserts)).not.toContain('U500');
+    expect(failedInserts[0]).toMatchObject({ recipientHash: hash(lastRecipient), attempts: 3 });
+    expect(JSON.stringify(failedInserts)).not.toContain(lastRecipient);
   }, 15000);
+
+  it('ผล query สลับลำดับ → key เดิม; ผู้รับเปลี่ยน → key เปลี่ยน (header ที่ LINE เห็น)', async () => {
+    const rawByInternal = { 'pk-1': 'U1', 'pk-2': 'U2' };
+    const target = { kind: 'line_user_ids' as const, ids: ['pk-1', 'pk-2'] };
+    const ordered = dbStub({ id: 'bo', content: [], target }, rawByInternal, ['pk-1', 'pk-2']);
+    vi.mocked(getDb).mockResolvedValueOnce(ordered.db as never);
+    multicastMock.mockResolvedValueOnce(undefined);
+    await sendBroadcast('bo');
+    const firstKey = multicastMock.mock.calls[0]?.[2];
+
+    const reordered = dbStub({ id: 'bo', content: [], target }, rawByInternal, ['pk-2', 'pk-1']);
+    vi.mocked(getDb).mockResolvedValueOnce(reordered.db as never);
+    await sendBroadcast('bo');
+    const reorderedKey = multicastMock.mock.calls[1]?.[2];
+
+    const changed = dbStub({ id: 'bo', content: [], target }, { 'pk-1': 'U1', 'pk-2': 'U3' }, ['pk-1', 'pk-2']);
+    vi.mocked(getDb).mockResolvedValueOnce(changed.db as never);
+    await sendBroadcast('bo');
+    const changedKey = multicastMock.mock.calls[2]?.[2];
+
+    expect(reorderedKey).toBe(firstKey);
+    expect(changedKey).not.toBe(firstKey);
+  });
+
+  it('retry ในชุดใช้ key เดิมเมื่อ results สลับลำดับ', async () => {
+    const { db } = dbStub(
+      { id: 'br', content: [], target: { kind: 'line_user_ids', ids: ['pk-1', 'pk-2'] } },
+      { 'pk-1': 'U1', 'pk-2': 'U2' },
+      ['pk-2', 'pk-1'],
+    );
+    vi.mocked(getDb).mockResolvedValue(db as never);
+    multicastMock.mockRejectedValueOnce(transient500()).mockResolvedValueOnce(undefined);
+
+    await sendBroadcast('br');
+
+    expect(multicastMock).toHaveBeenCalledTimes(2);
+    const keys = multicastMock.mock.calls.map((call) => call[2]);
+    expect(keys[0]).toBe(keys[1]);
+    expect(keys[0]).toBe(broadcastRetryKey('br', ['U1', 'U2']));
+  });
 
   it('เป้าหมายว่างหลัง resolve → failed ไม่ยิง multicast', async () => {
     const { db } = dbStub({ id: 'be', content: [], target: { kind: 'line_user_ids', ids: ['pk-x'] } }, {});
@@ -185,13 +339,29 @@ describe('sendBroadcast · targeted multicast', () => {
   });
 });
 
-describe('sendBroadcast · stale sending recovery', () => {
-  it('update แรกของ send คือการ mark stale sending เป็น failed', async () => {
+describe('recoverStaleSending', () => {
+  it('requeue sending ค้างเป็น scheduled และคืนจำนวนแถว', async () => {
     const { db, updates } = dbStub(null);
     vi.mocked(getDb).mockResolvedValue(db as never);
-    await sendBroadcast('stale-check');
-    expect(updates[0]).toMatchObject({ status: 'failed' });
-    expect(String(updates[0]?.errorMessage)).toContain('ค้างสถานะกำลังส่ง');
+
+    const recovered = await recoverStaleSending();
+
+    expect(recovered).toBe(1);
+    expect(updates[0]).toMatchObject({ status: 'scheduled' });
+    expect(updates[0]?.scheduledAt).toBeInstanceOf(Date);
+    expect(updates[0]?.updatedAt).toBeInstanceOf(Date);
+    expect(String(updates[0]?.errorMessage ?? '')).toBe('');
+  });
+
+  it('sendBroadcast ไม่ mark stale เป็น failed อีกต่อไป', async () => {
+    const { db, updates } = dbStub({ id: 'b1', content: [], target: { kind: 'all' } });
+    vi.mocked(getDb).mockResolvedValue(db as never);
+    followerMock.mockResolvedValue({ userIds: [] });
+    broadcastMock.mockResolvedValue(undefined);
+
+    await sendBroadcast('b1');
+
+    expect(updates.some((u) => String(u.errorMessage ?? '').includes('ค้างสถานะกำลังส่ง'))).toBe(false);
   });
 });
 
@@ -205,7 +375,6 @@ describe('dryRunBroadcast', () => {
 
   it('targeted นับจาก DB ไม่ยิง LINE', async () => {
     const { db } = dbStub(null, { 'pk-1': 'U1', 'pk-2': 'U2' });
-    // dryRun targeted ใช้ select({id}) — stub คืน raw map ก็ยังนับจำนวนแถวได้
     vi.mocked(getDb).mockResolvedValue(db as never);
     const result = await dryRunBroadcast({ kind: 'line_user_ids', ids: ['pk-1', 'pk-2'] });
     expect(result.estimatedRecipients).toBe(2);
