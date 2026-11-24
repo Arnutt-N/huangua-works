@@ -98,6 +98,11 @@ describe('POST /api/cases/upload', () => {
     const formData = new FormData();
     formData.append('file', bigFile);
 
+    // § ต้องปฏิเสธจาก metadata ก่อน materialize — spy บน prototype เพื่อจับ File clone
+    // ที่ Undici สร้างตอน serialize body ผ่าน NextRequest
+    const arrayBuffer = vi.spyOn(File.prototype, 'arrayBuffer');
+    arrayBuffer.mockClear();
+
     const req = new NextRequest('http://localhost:3000/api/cases/upload', {
       method: 'POST',
       body: formData,
@@ -105,6 +110,10 @@ describe('POST /api/cases/upload', () => {
 
     const res = await POST(req);
     expect(res.status).toBe(413);
+    const body = await res.json();
+    expect(body.error).toContain('ใหญ่เกิน');
+    expect(arrayBuffer).not.toHaveBeenCalled();
+    expect(uploadFile).not.toHaveBeenCalled();
   });
 
   it('ตอบกลับ 415 เมื่อ Content-Type และ Magic bytes ไม่ตรง (ไฟล์ปลอม)', async () => {
