@@ -230,6 +230,37 @@ describe('sendBroadcast · targeted multicast', () => {
     expect(updates.at(-1)).toMatchObject({ status: 'sent', successCount: total });
   });
 
+  it('501 recipients: ผล query สลับลำดับ → สมาชิกชุดและ key คงเดิม (header ที่ LINE เห็น)', async () => {
+    const total = MULTICAST_BATCH_SIZE + 1;
+    const ids = Array.from({ length: total }, (_, i) => `pk-${i}`);
+    const rawByInternal = Object.fromEntries(ids.map((id, i) => [id, `U${i}`]));
+    const target = { kind: 'line_user_ids' as const, ids };
+    const sortedRaw = Object.values(rawByInternal).sort();
+    const expectedBatches = [
+      sortedRaw.slice(0, MULTICAST_BATCH_SIZE),
+      sortedRaw.slice(MULTICAST_BATCH_SIZE),
+    ];
+    const idByRaw = new Map(Object.entries(rawByInternal).map(([id, raw]) => [raw, id]));
+    const sortedOrder = sortedRaw.map((raw) => idByRaw.get(raw)!);
+
+    const capture = async (order: string[]) => {
+      const { db } = dbStub({ id: 'b501', content: [], target }, rawByInternal, order);
+      vi.mocked(getDb).mockResolvedValueOnce(db as never);
+      await sendBroadcast('b501');
+      return multicastMock.mock.calls.slice(-2).map((call) => ({
+        recipients: call[0] as string[],
+        key: call[2] as string,
+      }));
+    };
+
+    const forward = await capture(sortedOrder);
+    const reversed = await capture([...sortedOrder].reverse());
+
+    expect(forward.map((call) => call.recipients)).toEqual(expectedBatches);
+    expect(reversed.map((call) => call.recipients)).toEqual(expectedBatches);
+    expect(reversed.map((call) => call.key)).toEqual(forward.map((call) => call.key));
+  }, 15000);
+
   it('ชุดที่สองล้มครบ retry → ใช้ key เดิม 3 ครั้ง counters + failed hash ถูกต้อง', async () => {
     const ids: string[] = [];
     const big: Record<string, string> = {};
