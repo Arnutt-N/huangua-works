@@ -629,6 +629,41 @@ export const lineFriendEvents = pgTable(
   })
 );
 
+// § durability queue สำหรับ EVENT ที่ยัง commit effects ไม่เสร็จ — เก็บ raw userId เป็น hash เท่านั้น
+// (payload ที่ jsonb เก็บจึงต้องแทนที่ source.userId ด้วย hash ก่อน insert)
+export const lineWebhookEvents = pgTable(
+  'line_webhook_events',
+  {
+    id: text('id').primaryKey(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+    dedupKey: text('dedup_key').notNull().unique(),
+    eventType: text('event_type').notNull(),
+    lineUserIdHash: text('line_user_id_hash').notNull(),
+    eventTimestamp: integer('event_timestamp').notNull(),
+    replyToken: text('reply_token'),
+    payload: jsonb('payload').notNull(),
+    status: text('status').notNull().default('pending'),
+    effectsCommittedAt: timestamp('effects_committed_at', { mode: 'date' }),
+    pendingReplies: jsonb('pending_replies'),
+    attempts: integer('attempts').notNull().default(0),
+    leaseUntil: timestamp('lease_until', { mode: 'date' }),
+  },
+  (table) => ({
+    eventTypeCheck: check('line_webhook_events_event_type_check',
+      sql`${table.eventType} IN ('message', 'follow', 'unfollow', 'postback')`),
+    statusCheck: check('line_webhook_events_status_check',
+      sql`${table.status} IN ('pending', 'processing', 'done', 'failed')`),
+    // § กัน worker สองตัวเลือก event เดียวกัน / กัน event เก่าของ user เดียวข้าม event ใหม่
+    pendingByUserIdx: index('line_webhook_events_pending_by_user_idx')
+      .on(table.lineUserIdHash, table.eventTimestamp, table.id)
+      .where(sql`status IN ('pending', 'processing')`),
+    leaseIdx: index('line_webhook_events_lease_idx')
+      .on(table.leaseUntil, table.createdAt)
+      .where(sql`status = 'processing'`),
+  })
+);
+
 export const chatConversations = pgTable(
   'chat_conversations',
   {

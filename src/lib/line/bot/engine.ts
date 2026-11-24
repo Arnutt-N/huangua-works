@@ -1,8 +1,7 @@
 import { eq } from 'drizzle-orm';
-import { getDb } from '@/lib/db';
+import { getDb, type DbOrTx } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
-import { redis } from '@/lib/upstash';
-import { lineUsers, chatConversations, chatMessages } from '@/lib/db/schema';
+import { lineUsers, chatConversations, chatMessages, lineWebhookEvents } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import type { LineWebhookEvent, LineMessageEvent, LineFollowEvent, LinePostbackEvent, LineOutgoingMessage } from '../types';
 import type { ConversationMode } from '../chat-modes';
@@ -23,44 +22,156 @@ import { COPY } from '@/lib/copy';
 import { isWithinBusinessHours, outsideBusinessHoursText } from '../business-hours';
 import { getFollowCount, recordFriendEvent } from '../friend-events';
 import {
+  claimNextWebhookEvent,
+  commitEffects,
+  markDone,
+  markFailed,
+  restoreEvent,
+  BarrierDeferred,
+} from '../webhook-events';
+import type { WebhookEventRow } from '../webhook-events';
+import {
   changeMode,
   httpLineTransport,
   attachInboundMedia,
   findInboundByLineMessageId,
-  hasBotReplyAfter,
   isHumanHandled,
-  recordBotReplies,
   recordInboundMessage,
-  type InboundDupRow,
   type InboundMessageType,
   type LineTransport,
 } from '../conversation';
 
 type Db = Awaited<ReturnType<typeof getDb>>;
 
-export async function handleEvent(event: LineWebhookEvent, transport: LineTransport = httpLineTransport) {
-  const userId = event.source.userId;
-  if (!userId) return;
+/** § Tx-aware bot reply writer — recordBotReplies() ใช้ getDb() ข้างในจึงใช้ใน effects transaction ไม่ได้ */
+async function persistBotReplies(db: DbOrTx, conversationId: string, replies: LineOutgoingMessage[]) {
+  if (replies.length === 0) return;
+  await db.insert(chatMessages).values(
+    replies.map((reply) => ({
+      id: generateId(),
+      conversationId,
+      sender: 'bot' as const,
+      messageType: reply.type,
+      textContent: reply.type === 'text' ? reply.text : null,
+      flexPayload: reply.type === 'flex' ? reply.contents : null,
+      metadata: reply.type === 'text' || reply.type === 'flex' ? null : { reply },
+    })),
+  );
+}
 
+/** § compatibility path — process ตรง (route ใช้ enqueue + processWebhookEvents แล้ว) */
+export async function handleEvent(event: LineWebhookEvent, transport: LineTransport = httpLineTransport) {
   const db = await getDb();
+  const replies = await runEventEffects(db, event, transport);
+  const replyToken = 'replyToken' in event ? event.replyToken : '';
+  if (replies.length > 0 && replyToken) await transport.reply(replyToken, replies.slice(0, 5));
+}
+
+/**
+ * § all-inbound effects อยู่ใน transaction เดียว ภายใต้ lock ต่อ user — เฉพาะ reply
+ * ที่ถูกส่งจริงเท่านั้นที่อยู่นอก transaction (LINE API ไม่ใช่ DB effect)
+ */
+export async function runEventEffects(db: DbOrTx, event: LineWebhookEvent, transport: LineTransport = httpLineTransport) {
+  const userId = event.source.userId;
+  if (!userId) return [];
+
+  // § bot ปิด → routeToStaffWhileBotDisabled ส่ง typing เอง — อย่าส่งซ้ำตรงนี้
+  // § transport effect อยู่นอก effects transaction — retry หลัง commit ต้องไม่ยิง typing ซ้ำ
+  const botEnabled = await getChatSetting('bot_enabled');
+  if (botEnabled && event.type === 'message' && event.message.type !== 'sticker') {
+    await transport.showTyping(userId);
+  }
+
   const lineUser = await getOrCreateLineUser(db, userId, transport);
   const conversation = await getOrCreateConversation(db, userId);
 
   switch (event.type) {
-    case 'message':
-      await handleMessageEvent(db, event, lineUser.id, conversation.id, conversation.mode, transport);
-      break;
+    case 'message': {
+      return handleMessageEvent(db, event, lineUser.id, conversation.id, conversation.mode);
+    }
     case 'follow':
-      await handleFollowEvent(db, event, lineUser.id, conversation.id, transport);
-      break;
+      return handleFollowEvent(db, event, lineUser.id, conversation.id, transport);
     case 'postback':
-      await handlePostbackEvent(db, event, conversation.id, transport);
-      break;
+      return handlePostbackEvent(db, event, conversation.id);
     case 'unfollow':
       // § บันทึก event อย่างเดียว ไม่ตอบกลับ (unfollow ไม่มี replyToken ให้ใช้อยู่แล้ว)
       await recordFriendEvent(db, lineUser.id, 'unfollow', event.webhookEventId).catch(() => false);
-      break;
+      return [];
   }
+}
+
+export interface ProcessWebhookResult {
+  attempted: number;
+  done: number;
+  retried: number;
+  failed: number;
+  deferred: number;
+}
+
+/**
+ * § recovery + inline processing ทางเดียว: ตาม timestamp แล้ว id เสมอ หนึ่ง try/catch ต่อ event
+ * ก่อน commit ถ้าพัง → pending row ยังอยู่ (retry ไม่ duplicate inbound)
+ * หลัง commit ถ้าพัง → pendingReplies ยังอยู่ (retry ส่ง reply โดยไม่ทำ effects ซ้ำ)
+ */
+export async function processWebhookEvents(
+  limit = 20,
+  transport: LineTransport = httpLineTransport,
+): Promise<ProcessWebhookResult> {
+  const result = { attempted: 0, done: 0, retried: 0, failed: 0, deferred: 0 };
+  const rows = await claimNextWebhookEvent(limit);
+  for (const row of rows) {
+    result.attempted++;
+    try {
+      await processOne(row, transport);
+      result.done++;
+    } catch (error) {
+      if (error instanceof BarrierDeferred) {
+        // § event เก่ายังไม่ commit — คืน pending โดยไม่เพิ่ม attempts (cron รอบหน้าลองใหม่)
+        result.deferred++;
+        await releaseLease(row.id);
+      } else {
+        console.error('[line-webhook] event failed', { id: row.id, error });
+        await markFailed(row.id, row.attempts);
+        if (row.attempts >= 5) result.failed++;
+        else result.retried++;
+      }
+    }
+  }
+  return result;
+}
+
+async function releaseLease(id: string): Promise<void> {
+  const db = await getDb();
+  await db.update(lineWebhookEvents)
+    .set({ status: 'pending', leaseUntil: null, updatedAt: new Date() })
+    .where(eq(lineWebhookEvents.id, id));
+}
+
+async function processOne(row: WebhookEventRow, transport: LineTransport): Promise<void> {
+  const db = await getDb();
+
+  // § failure หลัง effects commit — ส่ง pendingReplies ซ้ำโดยไม่แตะ effects
+  if (row.pendingReplies) {
+    await transport.reply(row.replyToken ?? '', row.pendingReplies.slice(0, 5));
+    await markDone(row.id);
+    return;
+  }
+
+  let replies: LineOutgoingMessage[] = [];
+  await db.transaction(async (tx) => {
+    // § payload เก็บ hash — ถอด raw จาก line_users.lineUserIdEnc ก่อนส่งเข้า engine
+    const restored = await restoreEvent(tx, row);
+    const outcome = await commitEffects(tx, row, async () => {
+      const out = await runEventEffects(tx, restored, transport);
+      return { replies: out };
+    });
+    replies = outcome?.replies ?? [];
+  });
+
+  if (replies.length > 0) {
+    await transport.reply(row.replyToken ?? '', replies.slice(0, 5));
+  }
+  await markDone(row.id);
 }
 
 const PROFILE_RETRY_MS = 24 * 60 * 60 * 1000; // ลองดึงโปรไฟล์ที่พลาดซ้ำได้วันละครั้ง
@@ -134,21 +245,13 @@ async function getOrCreateConversation(db: Db, lineUserId: string) {
   return winner ?? { id: winnerId, mode: 'bot_active' as const };
 }
 
-const REPAIR_AGE_MS = 90_000;
-const REPAIR_LEASE_S = 120;
-
-function isMediaRow(row: InboundDupRow): boolean {
-  return row.messageType === 'image' || row.messageType === 'file' || row.messageType === 'video' || row.messageType === 'audio';
-}
-
 async function handleMessageEvent(
-  db: Db,
+  db: DbOrTx,
   event: LineMessageEvent,
   lineUserPk: string,
   conversationId: string,
   mode: ConversationMode,
-  transport: LineTransport,
-) {
+): Promise<LineOutgoingMessage[]> {
   const msg = event.message;
   const messageType: InboundMessageType = msg.type === 'image' ? 'image'
     : msg.type === 'file' ? 'file'
@@ -158,52 +261,10 @@ async function handleMessageEvent(
     : msg.type === 'sticker' ? 'sticker'
     : 'text';
 
-  // § redelivery หลัง crash ต้องเจอแถวเดิม — ซ่อมผ่าน repairDuplicate ทางเดียว ไม่แยกทาง first/dup
-  // age-gate 90 วิ: ต้นฉบับอาจยังรันอยู่ อย่าตอบซ้ำ + lease กันซ่อมพร้อมกัน (ใครได้ lease คนเดียวที่ซ่อม)
-  const repairDuplicate = async (row: InboundDupRow): Promise<void> => {
-    if (Date.now() - row.createdAt.getTime() < REPAIR_AGE_MS) return;
-    const lease = await redis
-      .set(`repair:${msg.id}`, '1', { nx: true, ex: REPAIR_LEASE_S })
-      .catch(() => null);
-    if (!lease) return;
-    const botEnabledDup = await getChatSetting('bot_enabled');
-    if (isHumanHandled(mode) || !botEnabledDup) return;
-    // § สื่อค้าง (crash ระหว่าง record กับ attach) รัน ingest+attach ซ่อมให้จบ
-    if (isMediaRow(row) && !row.mediaUrl && !(row.metadata as { skipped?: unknown } | null)?.skipped) {
-      const knownSize = msg.type === 'file' ? msg.fileSize : undefined;
-      const ingested = await ingestLineMedia(msg.id, undefined, { knownSize });
-      if (ingested.kind === 'stored') {
-        await attachInboundMedia(row.id, conversationId, messageType, ingested.url, {
-          contentType: ingested.contentType,
-          sizeBytes: ingested.sizeBytes,
-          ...(msg.type === 'file' ? { fileName: msg.fileName } : {}),
-        });
-      } else {
-        await attachInboundMedia(row.id, conversationId, messageType, null, { skipped: ingested.reason });
-      }
-    }
-    // § ค้างกลาง case-flow ไม่ป้อนซ้ำ (กัน state เพี้ยน) + มีคำตอบแล้วไม่ตอบซ้ำ
-    if (await hasBotReplyAfter(conversationId, row.createdAt)) return;
-    const [lu] = await db
-      .select({ botState: lineUsers.botState })
-      .from(lineUsers)
-      .where(eq(lineUsers.id, lineUserPk))
-      .limit(1);
-    if (lu?.botState) return;
-    const replies = await routeBotMessage(db, event, msg.type === 'text' ? msg.text : null, lineUserPk, conversationId);
-    await recordBotReplies(conversationId, replies);
-    try {
-      await transport.reply(event.replyToken, replies.slice(0, 5));
-    } catch {
-      await transport.push(event.source.userId, replies.slice(0, 5));
-    }
-  };
-
+  // § duplicate path: redelivery ผ่าน durable queue แล้วจะเจอ dedupKey เดิม (ON CONFLICT DO NOTHING)
+  // จึงไม่ต้อง repairDuplicate — effects commit แล้ว row เดิมมี pendingReplies/done ให้ส่งต่อ
   const dup = await findInboundByLineMessageId(msg.id);
-  if (dup) {
-    await repairDuplicate(dup);
-    return;
-  }
+  if (dup) return [];
 
   // § record-first: บันทึกแถวข้อความก่อนดึงสื่อเสมอ — crash กลาง ingest จะเหลือแถวให้ redelivery
   // เห็น ไม่ใช่หายทั้งข้อความ (dedup mark ก่อน process จึงต้องมีแถวรอก่อน) ingest เสร็จค่อยแนบทับ
@@ -215,6 +276,8 @@ async function handleMessageEvent(
   const botEnabled = await getChatSetting('bot_enabled');
   const staffHandling = isHumanHandled(mode);
 
+  // § recordInboundMessage ใช้ getDb() ข้างใน — ต้องอยู่นอก effects transaction ตอน durable path
+  // ตัวมัน idempotent ด้วย lineMessageId unique อยู่แล้ว retry จึงไม่ซ้ำ
   const { messageId, isNew } = await recordInboundMessage({
     conversationId,
     mode,
@@ -228,12 +291,7 @@ async function handleMessageEvent(
     lineMessageId: msg.id,
     countUnread: staffHandling || !botEnabled,
   });
-  if (!isNew) {
-    // § แพ้ race อีก worker — แถวผู้ชนะมีแล้ว เดินทางซ่อมเดียวกับ redelivery
-    const winner = await findInboundByLineMessageId(msg.id);
-    if (winner) await repairDuplicate(winner);
-    return;
-  }
+  if (!isNew) return [];
 
   if (isMedia) {
     const knownSize = msg.type === 'file' ? msg.fileSize : undefined;
@@ -249,20 +307,16 @@ async function handleMessageEvent(
     }
   }
 
-  if (staffHandling) {
-    return;
-  }
+  if (staffHandling) return [];
 
   if (!botEnabled) {
-    await routeToStaffWhileBotDisabled(event.replyToken, conversationId, transport);
-    return;
+    return routeToStaffWhileBotDisabled(db, conversationId);
   }
 
-  await transport.showTyping(event.source.userId);
-
-  const replies = await routeBotMessage(db, event, msg.type === 'text' ? msg.text : null, lineUserPk, conversationId);
-  await recordBotReplies(conversationId, replies);
-  await transport.reply(event.replyToken, replies.slice(0, 5));
+  const routed = await routeBotMessage(db, event, msg.type === 'text' ? msg.text : null, lineUserPk, conversationId);
+  if (routed.state !== undefined) await updateBotState(db, lineUserPk, routed.state);
+  await persistBotReplies(db, conversationId, routed.replies);
+  return routed.replies;
 }
 
 export const BOT_DISABLED_TEXT =
@@ -271,12 +325,13 @@ export const BOT_DISABLED_TEXT =
 // § บอทปิด → ย้ายห้องเข้าคิวเจ้าหน้าที่ (waiting_handoff) ผ่าน changeMode ของ c4
 // ห้าม UPDATE mode ตรง — สอง event ที่อ่าน bot_active พร้อมกันจะส่ง notice สองครั้งและทับห้องที่ admin claim แทรก
 // ตอบ notice เฉพาะผู้ที่ changeMode สำเร็จ (changed: true) คนที่แพ้ race ไม่ตอบซ้ำ
-async function routeToStaffWhileBotDisabled(replyToken: string, conversationId: string, transport: LineTransport) {
+async function routeToStaffWhileBotDisabled(db: DbOrTx, conversationId: string): Promise<LineOutgoingMessage[]> {
   const changed = await changeMode(conversationId, 'waiting_handoff');
-  if (!changed.ok || !changed.changed) return;
+  if (!changed.ok || !changed.changed) return [];
 
-  await recordBotReplies(conversationId, [{ type: 'text', text: BOT_DISABLED_TEXT }]);
-  await transport.reply(replyToken, [{ type: 'text', text: BOT_DISABLED_TEXT }]);
+  const replies: LineOutgoingMessage[] = [{ type: 'text', text: BOT_DISABLED_TEXT }];
+  await persistBotReplies(db, conversationId, replies);
+  return replies;
 }
 
 export async function routeBotMessage(
@@ -286,7 +341,8 @@ export async function routeBotMessage(
   lineUserPk: string,
   conversationId: string,
   now: Date = new Date(),
-): Promise<LineOutgoingMessage[]> {
+): Promise<{ replies: LineOutgoingMessage[]; state?: CaseFlowState | null }> {
+  // § routeBotMessage เป็น pure decision — ห้ามเขียน botState เอง (เขียนตอน commitEffects เท่านั้น)
   if (!text) {
     if (event.message.type === 'location') {
       const [user] = await db.select().from(lineUsers).where(eq(lineUsers.id, lineUserPk)).limit(1);
@@ -295,11 +351,10 @@ export async function routeBotMessage(
         const loc = event.message;
         const locText = loc.address ?? `${loc.latitude},${loc.longitude}`;
         const result = await processCaseFlow(locText, botState, event.source.userId);
-        await updateBotState(db, lineUserPk, result.state);
-        return result.replies;
+        return { replies: result.replies, state: result.state };
       }
     }
-    return [{ type: 'text', text: 'ได้รับแล้วครับ (รองรับข้อความและ location) พิมพ์ "แจ้งเรื่องใหม่" เพื่อเริ่มแจ้งเรื่อง' }];
+    return { replies: [{ type: 'text', text: 'ได้รับแล้วครับ (รองรับข้อความและ location) พิมพ์ "แจ้งเรื่องใหม่" เพื่อเริ่มแจ้งเรื่อง' }] };
   }
 
   const normalized = text.trim().toLowerCase();
@@ -310,14 +365,13 @@ export async function routeBotMessage(
     normalized === 'แจ้ง'
   ) {
     const { state, reply } = await startCaseFlow();
-    await updateBotState(db, lineUserPk, state);
-    return [reply];
+    return { replies: [reply], state };
   }
 
   if (normalized.startsWith('ติดตาม')) {
     const code = text.replace(/ติดตาม\s*/i, '').trim().toUpperCase();
-    if (code) return trackCase(db, code);
-    return [{ type: 'text', text: 'กรุณาระบุเลขติดตาม เช่น "ติดตาม HG123456789"' }];
+    if (code) return { replies: await trackCase(db, code) };
+    return { replies: [{ type: 'text', text: 'กรุณาระบุเลขติดตาม เช่น "ติดตาม HG123456789"' }] };
   }
 
   // § ปุ่ม rich menu "คำถามที่พบบ่อย" ส่งข้อความนี้ — เดิมไม่มี handler ตก
@@ -325,7 +379,7 @@ export async function routeBotMessage(
   // § match แบบ exact เท่านั้น — includes('faq') เดิมกว้างเกิน (audit: ข้อความ
   // อื่นที่มี substring โดน short-circuit ข้าม handoff/case-flow recovery)
   if (normalized === COPY.FAQ_LABEL || normalized === 'faq') {
-    return [getFaqReply()];
+    return { replies: [getFaqReply()] };
   }
 
   const [user] = await db.select().from(lineUsers).where(eq(lineUsers.id, lineUserPk)).limit(1);
@@ -333,21 +387,20 @@ export async function routeBotMessage(
 
   if (botState) {
     const result = await processCaseFlow(text, botState, event.source.userId);
-    await updateBotState(db, lineUserPk, result.state);
-    return result.replies;
+    return { replies: result.replies, state: result.state };
   }
 
   const engineV2 = await getChatSetting('bot_engine_v2');
   if (engineV2) {
     const intentResult = await matchIntent(text);
     if (intentResult) {
-      return intentResult.responses;
+      return { replies: intentResult.responses };
     }
   }
 
   const faqResult = await matchFaq(text);
   if (faqResult) {
-    return parseResponseText(faqResult.answer);
+    return { replies: await parseResponseText(faqResult.answer) };
   }
 
   if (await isHandoffRequest(text)) {
@@ -355,15 +408,15 @@ export async function routeBotMessage(
     // "ติดตาม …") จนเจ้าหน้าที่เข้างาน บอกตรง ๆ ว่านอกเวลาแล้วให้ใช้บริการอัตโนมัติไปก่อน
     const hours = await getChatSetting('business_hours');
     if (!isWithinBusinessHours(hours, now)) {
-      return [{ type: 'text', text: outsideBusinessHoursText(hours) }];
+      return { replies: [{ type: 'text', text: outsideBusinessHoursText(hours) }] };
     }
-    return triggerHandoff(conversationId);
+    return { replies: await triggerHandoff(conversationId) };
   }
 
-  return [{
+  return { replies: [{
     type: 'text',
     text: 'ขออภัยครับ ไม่เข้าใจคำถาม\n\nลองพิมพ์:\n• "แจ้งเรื่องใหม่" — แจ้งเรื่อง\n• "ติดตาม HGxxxxxxxxx" — ตรวจสอบสถานะ\n• "ติดต่อเจ้าหน้าที่" — พูดคุยกับเจ้าหน้าที่',
-  }];
+  }] };
 }
 
 async function trackCase(db: Db, trackingCode: string): Promise<LineOutgoingMessage[]> {
@@ -377,14 +430,15 @@ async function trackCase(db: Db, trackingCode: string): Promise<LineOutgoingMess
   return [caseStatusFlex(view.case.trackingCode, view.case.status, view.case.title)];
 }
 
-async function updateBotState(db: Db, lineUserPk: string, state: CaseFlowState | null) {
+// § เขียนได้เฉพาะใน transaction ตอน commitEffects — ห้ามเรียกจาก routeBotMessage
+async function updateBotState(db: DbOrTx, lineUserPk: string, state: CaseFlowState | null) {
   await db
     .update(lineUsers)
     .set({ botState: state, updatedAt: new Date() })
     .where(eq(lineUsers.id, lineUserPk));
 }
 
-async function handleFollowEvent(db: Db, event: LineFollowEvent, lineUserPk: string, conversationId: string, transport: LineTransport) {
+async function handleFollowEvent(db: DbOrTx, event: LineFollowEvent, lineUserPk: string, conversationId: string, transport: LineTransport): Promise<LineOutgoingMessage[]> {
   // § บันทึก friend event ก่อน (best-effort) เพื่อให้ {follow_count} รวมครั้งนี้ — พังห้ามล้ม welcome
   await recordFriendEvent(db, lineUserPk, 'follow', event.webhookEventId).catch(() => false);
   const followCount = await getFollowCount(db, lineUserPk).catch(() => null);
@@ -401,10 +455,10 @@ async function handleFollowEvent(db: Db, event: LineFollowEvent, lineUserPk: str
     textContent: (replies[0] as { type: 'text'; text: string }).text,
   });
 
-  await transport.reply(event.replyToken, replies);
+  return replies;
 }
 
-async function handlePostbackEvent(db: Db, event: LinePostbackEvent, conversationId: string, transport: LineTransport = httpLineTransport) {
+async function handlePostbackEvent(db: DbOrTx, event: LinePostbackEvent, conversationId: string): Promise<LineOutgoingMessage[]> {
   await db.insert(chatMessages).values({
     id: generateId(),
     conversationId,
@@ -414,7 +468,8 @@ async function handlePostbackEvent(db: Db, event: LinePostbackEvent, conversatio
     metadata: event.postback.params ?? null,
   });
 
-  // § postback ที่ไม่ใช่ confirm/csat protocol คงพฤติกรรมเดิม: log only ไม่ตอบอะไร
+  // § § barrier-forced message vs postback: ถ้า postback มาก่อน message ที่ยังไม่ commit effects
+  // ต้องไม่ record postback (log) ก่อน — commitEffects จะ throw BarrierDeferred และ rollback transaction
   const csatData = parseCsatPostback(event.postback.data);
   if (csatData) {
     // § ให้คะแนนห้องของคนกดเท่านั้น — wire มีแค่ score ห้องใช้ของ session นี้ (ไม่มี id ให้ปลอม)
@@ -428,26 +483,25 @@ async function handlePostbackEvent(db: Db, event: LinePostbackEvent, conversatio
     // § กดซ้ำไม่ตอบขอบคุณซ้ำ — คะแนนแถวแรกชนะแล้ว thank-you มีในประวัติแล้ว
     if (recorded.kind === 'recorded') {
       const thanks: LineOutgoingMessage[] = [{ type: 'text', text: csatThankYou(recorded.score) }];
-      await recordBotReplies(conversationId, thanks);
-      await transport.reply(event.replyToken, thanks);
+      await persistBotReplies(db, conversationId, thanks);
+      return thanks;
     }
-    return;
+    return [];
   }
 
   const confirmData = parseConfirmPostback(event.postback.data);
-  if (!confirmData) return;
+  if (!confirmData) return [];
 
   const lineUser = await findLineUserByRaw(db, event.source.userId);
   const botState = (lineUser?.botState as CaseFlowState | null) ?? null;
   // § นอก confirm step (เช่น กดปุ่มซ้ำหลังส่งเรื่องแล้ว) คืน null → คง log-only ไม่ตอบซ้ำ
   const result = await handleConfirmPostback(confirmData, botState, event.source.userId);
-  if (!result) return;
+  if (!result) return [];
 
   if (lineUser) {
     await updateBotState(db, lineUser.id, result.state);
   }
-  // § persist-ก่อน-reply เหมือนสาย message — ตอบผ่าน transport เดิม
-  // (circuit breaker ห่อทุก POST ใน client.ts) ห้ามยิง LINE ตรง
-  await recordBotReplies(conversationId, result.replies);
-  await transport.reply(event.replyToken, result.replies.slice(0, 5));
+  // § persist-ก่อน-reply เหมือนสาย message — persist อยู่ใน transaction, reply อยู่นอก
+  await persistBotReplies(db, conversationId, result.replies);
+  return result.replies;
 }
