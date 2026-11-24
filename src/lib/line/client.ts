@@ -15,22 +15,31 @@ export class LineApiError extends Error {
   }
 }
 
-export function getHeaders(): HeadersInit {
+export function getHeaders(retryKey?: string): HeadersInit {
   return {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`,
+    ...(retryKey ? { 'X-Line-Retry-Key': retryKey } : {}),
   };
 }
 
-async function postLine(endpoint: string, payload: unknown): Promise<void> {
+interface PostLineOptions {
+  retryKey?: string;
+  timeoutMs?: number;
+}
+
+async function postLine(endpoint: string, payload: unknown, opts: PostLineOptions = {}): Promise<void> {
   // § circuit breaker ห่อทุก POST — LINE ล่ม 5 ครั้งติด open 30s แล้ว fast-fail
   await withLineCircuit(endpoint, async () => {
     const res = await fetch(`${LINE_API_BASE}${endpoint}`, {
       method: 'POST',
-      headers: getHeaders(),
+      headers: getHeaders(opts.retryKey),
       body: JSON.stringify(payload),
+      ...(opts.timeoutMs !== undefined ? { signal: AbortSignal.timeout(opts.timeoutMs) } : {}),
     });
     if (!res.ok) {
+      // § 409 พร้อม accepted request id แปลว่า LINE รับคำขอเดิมแล้ว (retry ด้วย key เดิม) — ถือว่าสำเร็จ
+      if (res.status === 409 && (res.headers.get('x-line-accepted-request-id') ?? '').trim() !== '') return;
       const detail = await res.text().catch(() => '');
       throw new LineApiError(endpoint, res.status, detail.slice(0, 500));
     }
@@ -124,12 +133,15 @@ export async function getProfile(userId: string): Promise<LineProfile | null> {
   return res.json();
 }
 
-export async function broadcastMessage(messages: LineOutgoingMessage[]): Promise<void> {
-  await postLine('/message/broadcast', { messages });
+// § timeout เฉพาะ broadcast/multicast — ถ้า connection ตัดหลัง LINE รับแล้ว retry ด้วย key เดิมต้องไม่ซ้ำ
+const BROADCAST_TIMEOUT_MS = 10000;
+
+export async function broadcastMessage(messages: LineOutgoingMessage[], retryKey: string): Promise<void> {
+  await postLine('/message/broadcast', { messages }, { retryKey, timeoutMs: BROADCAST_TIMEOUT_MS });
 }
 
-export async function multicast(userIds: string[], messages: LineOutgoingMessage[]): Promise<void> {
-  await postLine('/message/multicast', { to: userIds, messages });
+export async function multicast(userIds: string[], messages: LineOutgoingMessage[], retryKey: string): Promise<void> {
+  await postLine('/message/multicast', { to: userIds, messages }, { retryKey, timeoutMs: BROADCAST_TIMEOUT_MS });
 }
 
 export interface FollowerIdsResponse {
