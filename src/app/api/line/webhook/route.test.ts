@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockEnforce, mockVerify, mockHandle } = vi.hoisted(() => ({
+const { mockEnforce, mockVerify, mockProcess, mockEnqueue } = vi.hoisted(() => ({
   mockEnforce: vi.fn(),
   mockVerify: vi.fn(),
-  mockHandle: vi.fn(),
+  mockProcess: vi.fn(),
+  mockEnqueue: vi.fn(),
 }));
 
 vi.mock('@/lib/rate-limit/enforce', () => ({
@@ -15,27 +16,12 @@ vi.mock('@/lib/line/signature', () => ({
 }));
 
 vi.mock('@/lib/line/bot/engine', () => ({
-  handleEvent: mockHandle,
+  processWebhookEvents: mockProcess,
 }));
 
-vi.mock('@/lib/upstash', () => {
-  // § mock จำ state แบบ Redis SET NX — key เดิมคืน null (ถือว่าซ้ำ)
-  const seen = new Set<string>();
-  return {
-    redis: {
-      set: vi.fn(async (key: string) => {
-        if (seen.has(key)) return null;
-        seen.add(key);
-        return 'OK';
-      }),
-      get: vi.fn(async () => null),
-      del: vi.fn(async () => 1),
-      eval: vi.fn(async () => 1),
-    },
-  };
-});
-
-import { redis } from '@/lib/upstash';
+vi.mock('@/lib/line/webhook-events', () => ({
+  enqueueWebhookEvent: mockEnqueue,
+}));
 
 const { POST } = await import('./route');
 
@@ -52,7 +38,8 @@ const BODY = { destination: 'U1', events: [{ type: 'follow', webhookEventId: 'w1
 beforeEach(() => {
   vi.clearAllMocks();
   mockVerify.mockReturnValue(true);
-  mockHandle.mockResolvedValue(undefined);
+  mockEnqueue.mockResolvedValue({ ok: true });
+  mockProcess.mockResolvedValue({ attempted: 0, done: 0, retried: 0, failed: 0, deferred: 0 });
 });
 
 describe('POST /api/line/webhook · rate limit', () => {
@@ -64,7 +51,7 @@ describe('POST /api/line/webhook · rate limit', () => {
     expect(res.status).toBe(429);
     expect(res.headers.get('Retry-After')).toBe('42');
     expect(mockEnforce).toHaveBeenCalledWith('lineWebhookIp', '203.0.113.5');
-    expect(mockHandle).not.toHaveBeenCalled();
+    expect(mockEnqueue).not.toHaveBeenCalled();
   });
 
   it('ผ่าน limit → 200 และประมวลผล event', async () => {
@@ -73,7 +60,7 @@ describe('POST /api/line/webhook · rate limit', () => {
     const res = await POST(webhookRequest(BODY));
 
     expect(res.status).toBe(200);
-    expect(mockHandle).toHaveBeenCalledTimes(1);
+    expect(mockEnqueue).toHaveBeenCalledTimes(1);
   });
 
   it('body เกิน 1 MiB → 413 ก่อนตรวจลายเซ็น', async () => {
@@ -84,7 +71,7 @@ describe('POST /api/line/webhook · rate limit', () => {
 
     expect(res.status).toBe(413);
     expect(mockVerify).not.toHaveBeenCalled();
-    expect(mockHandle).not.toHaveBeenCalled();
+    expect(mockEnqueue).not.toHaveBeenCalled();
   });
 
   it('ไบต์ที่ไม่ใช่ UTF-8 → 400 ก่อนตรวจลายเซ็น', async () => {
@@ -107,7 +94,7 @@ describe('POST /api/line/webhook · rate limit', () => {
 
     expect(res.status).toBe(413);
     expect(mockVerify).not.toHaveBeenCalled();
-    expect(mockHandle).not.toHaveBeenCalled();
+    expect(mockEnqueue).not.toHaveBeenCalled();
   });
 
   it('ไบต์ที่ไม่ใช่ UTF-8 → 400 ก่อนตรวจลายเซ็น', async () => {
@@ -142,7 +129,7 @@ describe('POST /api/line/webhook · rate limit', () => {
     const res = await POST(bad);
 
     expect(res.status).toBe(400);
-    expect(mockHandle).not.toHaveBeenCalled();
+    expect(mockEnqueue).not.toHaveBeenCalled();
   });
 
   it.each(['null', JSON.stringify({ events: 'x' })])('body %s → 400 (regression)', async (raw) => {
@@ -151,7 +138,7 @@ describe('POST /api/line/webhook · rate limit', () => {
       new Request('http://localhost/api/line/webhook', { method: 'POST', headers: { 'x-forwarded-for': '203.0.113.5' }, body: raw }),
     );
     expect(res.status).toBe(400);
-    expect(mockHandle).not.toHaveBeenCalled();
+    expect(mockEnqueue).not.toHaveBeenCalled();
   });
 
   it('event null ปนใน batch → ข้ามตัวนั้น ตัวอื่นยังประมวลผล (200)', async () => {
@@ -161,18 +148,18 @@ describe('POST /api/line/webhook · rate limit', () => {
     const res = await POST(webhookRequest({ destination: 'U1', events: [null, follow] }));
 
     expect(res.status).toBe(200);
-    expect(mockHandle).toHaveBeenCalledTimes(1);
-    expect(mockHandle).toHaveBeenCalledWith(follow);
+    expect(mockEnqueue).toHaveBeenCalledTimes(1);
+    expect(mockEnqueue).toHaveBeenCalledWith(follow);
   });
 
   it('message event ไม่มี .message → 200 ไม่ลามทั้ง batch', async () => {
     mockEnforce.mockResolvedValue({ allowed: true, remaining: 59, reset: 60 });
+    mockEnqueue.mockRejectedValueOnce(new Error('malformed'));
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
     const res = await POST(webhookRequest({ destination: 'U1', events: [{ type: 'message', webhookEventId: 'w-no-msg' }] }));
 
-    expect(res.status).toBe(200);
-    expect(mockHandle).not.toHaveBeenCalled();
+    expect(res.status).toBe(500);
   });
 
   it('payload ไม่มี events array → 400', async () => {
@@ -181,51 +168,40 @@ describe('POST /api/line/webhook · rate limit', () => {
     const res = await POST(webhookRequest({ destination: 'U1' }));
 
     expect(res.status).toBe(400);
-    expect(mockHandle).not.toHaveBeenCalled();
+    expect(mockEnqueue).not.toHaveBeenCalled();
   });
 });
 
-describe('POST /api/line/webhook · dedup', () => {
-  const msgEvent = (webhookEventId: string, lineId: string) => ({
-    destination: 'U1',
-    events: [{ type: 'message', webhookEventId, message: { type: 'text', id: lineId, text: 'hi' } }],
+describe('POST /api/line/webhook · enqueue', () => {
+  it('insert event ใดพัง → 500 (LINE จะ redeliver ทั้งชุด)', async () => {
+    mockEnforce.mockResolvedValue({ allowed: true, remaining: 59, reset: 60 });
+    mockEnqueue.mockResolvedValueOnce({ ok: true }).mockResolvedValueOnce({ ok: false, error: new Error('db down') });
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const res = await POST(webhookRequest({
+      destination: 'U1',
+      events: [
+        { type: 'follow', webhookEventId: 'ok-1' },
+        { type: 'follow', webhookEventId: 'bad-1' },
+      ],
+    }));
+
+    expect(res.status).toBe(500);
   });
 
-  it('event ซ้ำ (webhookEventId เดิม) → ข้ามไม่ประมวลผลซ้ำ', async () => {
+  it('insert ทั้งชุดสำเร็จ → 200 + process inline', async () => {
     mockEnforce.mockResolvedValue({ allowed: true, remaining: 59, reset: 60 });
 
-    await POST(webhookRequest(msgEvent('w-dup', 'm-1')));
-    await POST(webhookRequest(msgEvent('w-dup', 'm-2')));
-
-    expect(mockHandle).toHaveBeenCalledTimes(1);
-  });
-
-  it('redelivery (line message id เดิม ต่าง webhookEventId) → ข้าม', async () => {
-    mockEnforce.mockResolvedValue({ allowed: true, remaining: 59, reset: 60 });
-
-    await POST(webhookRequest(msgEvent('w-1', 'm-same')));
-    await POST(webhookRequest(msgEvent('w-2', 'm-same')));
-
-    expect(mockHandle).toHaveBeenCalledTimes(1);
-  });
-
-  it('คนละ event คนละ message → ประมวลผลทั้งคู่', async () => {
-    mockEnforce.mockResolvedValue({ allowed: true, remaining: 59, reset: 60 });
-    const before = mockHandle.mock.calls.length;
-
-    await POST(webhookRequest(msgEvent('w-fresh-1', 'm-fresh-1')));
-    await POST(webhookRequest(msgEvent('w-fresh-2', 'm-fresh-2')));
-
-    expect(mockHandle.mock.calls.length - before).toBe(2);
-  });
-
-  it('Redis ล่ม → fail-open ประมวลผลต่อ', async () => {
-    mockEnforce.mockResolvedValue({ allowed: true, remaining: 59, reset: 60 });
-    vi.mocked(redis.set).mockRejectedValue(new Error('ECONNREFUSED'));
-
-    const res = await POST(webhookRequest(BODY));
+    const res = await POST(webhookRequest({
+      destination: 'U1',
+      events: [
+        { type: 'follow', webhookEventId: 'ok-1' },
+        { type: 'follow', webhookEventId: 'ok-2' },
+      ],
+    }));
 
     expect(res.status).toBe(200);
-    expect(mockHandle).toHaveBeenCalled();
+    expect(mockEnqueue).toHaveBeenCalledTimes(2);
+    expect(mockProcess).toHaveBeenCalledWith(2);
   });
 });

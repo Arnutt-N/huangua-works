@@ -1,15 +1,13 @@
 import { NextResponse } from 'next/server';
 import { verifyLineSignature } from '@/lib/line/signature';
-import { handleEvent } from '@/lib/line/bot/engine';
-import { redis } from '@/lib/upstash';
+import { processWebhookEvents } from '@/lib/line/bot/engine';
+import { enqueueWebhookEvent } from '@/lib/line/webhook-events';
 import { enforceRateLimit } from '@/lib/rate-limit/enforce';
 import { formatReset } from '@/lib/rate-limit/format-reset';
 import { clientIpFromHeaders } from '@/lib/rate-limit/client-ip';
 import type { LineWebhookEvent, LineWebhookRequestBody } from '@/lib/line/types';
 
 export const runtime = 'nodejs';
-
-const DEDUP_TTL_SECONDS = 300;
 
 // § 1 MiB — ข้อความ LINE จริงเล็กกว่านี้มาก แต่ลายเซ็นต้องอ่านทั้งก้อน
 // จึงต้องตัดก่อนที่ request ไม่มีลายเซ็นจะบังคับให้โปรเซสถือ body ใหญ่ได้
@@ -68,30 +66,6 @@ async function readWebhookBody(
   }
 }
 
-// at-most-once 2 ชั้น — LINE redelivery จะไม่ทำข้อความ/เคสซ้ำ
-// ชั้น 1: webhookEventId (ต่อ delivery) · ชั้น 2: line message id (ต่อข้อความ, กัน redelivery ต่าง event id)
-// Redis ล่ม ⇒ fail-open (ยอมเสี่ยง duplicate ดีกว่า drop ข้อความทั้งหมด)
-function lineMessageIdOf(event: LineWebhookEvent): string | null {
-  return event.type === 'message' ? (event.message.id ?? null) : null;
-}
-
-async function isDuplicateEvent(event: LineWebhookEvent): Promise<boolean> {
-  const keys = [
-    ...(event.webhookEventId ? [`webhook:event:${event.webhookEventId}`] : []),
-    ...(lineMessageIdOf(event) ? [`webhook:msg:${lineMessageIdOf(event)}`] : []),
-  ];
-  if (keys.length === 0) return false;
-  try {
-    const results = await Promise.all(
-      keys.map((key) => redis.set(key, '1', { nx: true, ex: DEDUP_TTL_SECONDS })),
-    );
-    return results.some((acquired) => acquired === null);
-  } catch {
-    console.warn('[line-webhook] dedup unavailable — processing event (fail-open)');
-    return false;
-  }
-}
-
 export async function POST(request: Request) {
   const read = await readWebhookBody(request);
   if (!read.ok) return read.response;
@@ -103,7 +77,6 @@ export async function POST(request: Request) {
   }
 
   // § rate limit ต่อ IP หลัง verify — request ปลอมไม่เปลือง quota, flood จริงโดน 429
-  // policy lineWebhookIp เป็น kind public (fail-open: Redis ล่มยังรับ webhook ได้)
   const rateLimit = await enforceRateLimit('lineWebhookIp', clientIpFromHeaders(request.headers));
   if (!rateLimit.allowed) {
     return NextResponse.json(
@@ -112,9 +85,6 @@ export async function POST(request: Request) {
     );
   }
 
-  // § body ผ่าน signature แล้วแต่ parse ไม่ได้/ไม่มี events array = request ผิดรูป → 400 ตามความหมาย
-  // (ไม่ปล่อย JSON.parse throw เป็น 500 ปน error จริงใน log) — หมายเหตุ: LINE redeliver ทุกสถานะ
-  // ที่ไม่ใช่ 2xx เมื่อเปิด webhook redelivery 400 จึงไม่ได้กัน redeliver
   let parsed: LineWebhookRequestBody;
   try {
     parsed = JSON.parse(body) as LineWebhookRequestBody;
@@ -125,24 +95,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Invalid webhook payload' }, { status: 400 });
   }
 
-  await Promise.all(
+  // § เก็บทุก event ก่อนประมวลผล — insert ตัวใดพังให้ 500 เพื่อให้ LINE redeliver ทั้งชุด
+  // (ON CONFLICT DO NOTHING กัน redelivery ซ้ำ; อีกตัวในชุดยังเข้า DB ครบ)
+  const results = await Promise.all(
     parsed.events.map(async (event) => {
-      // § event ผิดรูป (null/ไม่ใช่ object) ข้ามทีละตัว และ dedup อยู่ใน try ด้วย —
-      // message event ที่ไม่มี .message ทำ lineMessageIdOf throw ได้ ห้ามลามเป็น 500 ทั้ง batch
-      if (!event || typeof event !== 'object') return;
+      if (!event || typeof event !== 'object') return { ok: true };
       try {
-        if (await isDuplicateEvent(event)) return;
-        await handleEvent(event);
+        return await enqueueWebhookEvent(event as LineWebhookEvent);
       } catch (error) {
-        // event เดียวพังไม่ควรทำให้ทั้ง batch เป็น 500 (LINE จะ redeliver ทั้งชุด)
-        console.error('[line-webhook] event failed', {
-          webhookEventId: event.webhookEventId,
-          type: event.type,
-          error,
-        });
+        return { ok: false, error };
       }
-    })
+    }),
   );
+  const failures = results.filter((r) => !r.ok);
+  if (failures.length > 0) {
+    console.error('[line-webhook] enqueue failed', failures);
+    return NextResponse.json({ message: 'Failed to store webhook events' }, { status: 500 });
+  }
 
-  return NextResponse.json({ ok: true });
+  // § inline processing ตาม timestamp แล้ว id (processWebhookEvents จัดลำดับให้)
+  const outcome = await processWebhookEvents(parsed.events.length || 20);
+  return NextResponse.json({ ok: true, ...outcome });
 }

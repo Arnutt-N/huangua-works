@@ -115,9 +115,9 @@ describe('handleEvent — bot_enabled', () => {
 
 describe('routeBotMessage — business_hours ที่ทางแยก handoff', () => {
   it('ในเวลาทำการ: handoff ตามปกติ (flex แจ้งเจ้าหน้าที่ + broadcast mode_change)', async () => {
-    const replies = await routeBotMessage(
+    const replies = (await routeBotMessage(
       mockDb, textEvent('ติดต่อเจ้าหน้าที่'), 'ติดต่อเจ้าหน้าที่', 'user-pk', 'conv-1', MON_1000_TH,
-    );
+    )).replies;
 
     expect(replies[0]!.type).toBe('flex');
     expect(broadcast).toHaveBeenCalledWith({
@@ -128,9 +128,9 @@ describe('routeBotMessage — business_hours ที่ทางแยก handoff
   });
 
   it('นอกเวลาทำการ: ตอบข้อความนอกเวลา และไม่เปลี่ยน mode', async () => {
-    const replies = await routeBotMessage(
+    const replies = (await routeBotMessage(
       mockDb, textEvent('ติดต่อเจ้าหน้าที่'), 'ติดต่อเจ้าหน้าที่', 'user-pk', 'conv-1', SAT_1000_TH,
-    );
+    )).replies;
 
     expect(replies).toHaveLength(1);
     expect((replies[0] as { text: string }).text).toContain('นอกเวลาทำการ');
@@ -140,9 +140,9 @@ describe('routeBotMessage — business_hours ที่ทางแยก handoff
   });
 
   it('นอกเวลาทำการ: ติดตามสถานะยังใช้ได้', async () => {
-    const replies = await routeBotMessage(
+    const replies = (await routeBotMessage(
       mockDb, textEvent('ติดตาม'), 'ติดตาม', 'user-pk', 'conv-1', SAT_1000_TH,
-    );
+    )).replies;
 
     expect((replies[0] as { text: string }).text).toContain('HG');
   });
