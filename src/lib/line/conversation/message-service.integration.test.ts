@@ -70,9 +70,10 @@ afterAll(async () => {
 
 describe('recordInboundMessage', () => {
   test('bot_active: บันทึกข้อความ + last message + unread=0 + broadcast new_message แล้ว conversation_update', async () => {
+    const db = await getDb();
     const id = await createConv('bot_active', 3);
 
-    const { messageId } = await recordInboundMessage({
+    const { messageId } = await recordInboundMessage(db, {
       conversationId: id,
       mode: 'bot_active',
       messageType: 'text',
@@ -95,8 +96,9 @@ describe('recordInboundMessage', () => {
   });
 
   test('human_active: นับ unreadAdmin เพิ่ม', async () => {
+    const db = await getDb();
     const id = await createConv('human_active', 2);
-    await recordInboundMessage({
+    await recordInboundMessage(db, {
       conversationId: id,
       mode: 'human_active',
       messageType: 'text',
@@ -108,8 +110,9 @@ describe('recordInboundMessage', () => {
   });
 
   test('§ countUnread: true บังคับนับ unread แม้ห้องเป็น bot_active (engine ส่งมาตอน bot_enabled=false)', async () => {
+    const db = await getDb();
     const id = await createConv('bot_active', 5);
-    await recordInboundMessage({
+    await recordInboundMessage(db, {
       conversationId: id,
       mode: 'bot_active',
       messageType: 'text',
@@ -122,9 +125,10 @@ describe('recordInboundMessage', () => {
   });
 
   test('ข้อความไม่มี text (location) ใช้ "[location]" เป็นข้อความล่าสุด + เก็บ locationData', async () => {
+    const db = await getDb();
     const id = await createConv('bot_active');
     const locationData = { title: 'บ้าน', address: 'หัวงัว', latitude: 16.4, longitude: 103.3 };
-    await recordInboundMessage({
+    await recordInboundMessage(db, {
       conversationId: id,
       mode: 'bot_active',
       messageType: 'location',

@@ -43,7 +43,7 @@ import {
 
 type Db = Awaited<ReturnType<typeof getDb>>;
 
-/** § Tx-aware bot reply writer — recordBotReplies() ใช้ getDb() ข้างในจึงใช้ใน effects transaction ไม่ได้ */
+/** bot reply writer ใช้ db ที่รับมา — helpers ทุกตัวใน effects ต้องอยู่ใน transaction เดียวกัน */
 async function persistBotReplies(db: DbOrTx, conversationId: string, replies: LineOutgoingMessage[]) {
   if (replies.length === 0) return;
   await db.insert(chatMessages).values(
@@ -176,7 +176,7 @@ async function processOne(row: WebhookEventRow, transport: LineTransport): Promi
 
 const PROFILE_RETRY_MS = 24 * 60 * 60 * 1000; // ลองดึงโปรไฟล์ที่พลาดซ้ำได้วันละครั้ง
 
-async function getOrCreateLineUser(db: Db, lineUserId: string, transport: LineTransport) {
+async function getOrCreateLineUser(db: DbOrTx, lineUserId: string, transport: LineTransport) {
   const existing = await findLineUserByRaw(db, lineUserId);
 
   if (existing) {
@@ -221,7 +221,7 @@ async function getOrCreateLineUser(db: Db, lineUserId: string, transport: LineTr
   return { id: winnerId, botState: winner?.botState ?? null };
 }
 
-async function getOrCreateConversation(db: Db, lineUserId: string) {
+async function getOrCreateConversation(db: DbOrTx, lineUserId: string) {
   const hash = lookupHash(lineUserId);
   const [found] = await db
     .select()
@@ -263,7 +263,7 @@ async function handleMessageEvent(
 
   // § duplicate path: redelivery ผ่าน durable queue แล้วจะเจอ dedupKey เดิม (ON CONFLICT DO NOTHING)
   // จึงไม่ต้อง repairDuplicate — effects commit แล้ว row เดิมมี pendingReplies/done ให้ส่งต่อ
-  const dup = await findInboundByLineMessageId(msg.id);
+  const dup = await findInboundByLineMessageId(db, msg.id);
   if (dup) return [];
 
   // § record-first: บันทึกแถวข้อความก่อนดึงสื่อเสมอ — crash กลาง ingest จะเหลือแถวให้ redelivery
@@ -276,9 +276,9 @@ async function handleMessageEvent(
   const botEnabled = await getChatSetting('bot_enabled');
   const staffHandling = isHumanHandled(mode);
 
-  // § recordInboundMessage ใช้ getDb() ข้างใน — ต้องอยู่นอก effects transaction ตอน durable path
+  // § ใช้ db ที่รับมา (tx ได้) — ทุก write ต้อง commit/rollback พร้อม effects transaction
   // ตัวมัน idempotent ด้วย lineMessageId unique อยู่แล้ว retry จึงไม่ซ้ำ
-  const { messageId, isNew } = await recordInboundMessage({
+  const { messageId, isNew } = await recordInboundMessage(db, {
     conversationId,
     mode,
     messageType,
@@ -297,13 +297,13 @@ async function handleMessageEvent(
     const knownSize = msg.type === 'file' ? msg.fileSize : undefined;
     const ingested = await ingestLineMedia(msg.id, undefined, { knownSize });
     if (ingested.kind === 'stored') {
-      await attachInboundMedia(messageId, conversationId, messageType, ingested.url, {
+      await attachInboundMedia(db, messageId, conversationId, messageType, ingested.url, {
         contentType: ingested.contentType,
         sizeBytes: ingested.sizeBytes,
         ...(msg.type === 'file' ? { fileName: msg.fileName } : {}),
       });
     } else {
-      await attachInboundMedia(messageId, conversationId, messageType, null, { skipped: ingested.reason });
+      await attachInboundMedia(db, messageId, conversationId, messageType, null, { skipped: ingested.reason });
     }
   }
 

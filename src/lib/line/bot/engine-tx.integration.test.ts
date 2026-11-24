@@ -34,7 +34,7 @@ describe('issue #229 · effects transaction boundary', () => {
   test('rollback ของ effects transaction ต้องไม่ทิ้ง chat_messages ไว้', async () => {
     const db = await getDb();
     const event = messageEvent();
-    const lineMessageId = (event.message as { id: string }).id;
+    const lineMessageId = `msg-tx-${RUN}-1`;
 
     await expect(db.transaction(async (tx) => {
       await runEventEffects(tx, event, createRecordingTransport());
