@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { getDb, type DbOrTx } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { lineUsers, chatConversations, chatMessages, lineWebhookEvents } from '@/lib/db/schema';
@@ -26,6 +26,7 @@ import {
   commitEffects,
   markDone,
   markFailed,
+  renewLease,
   restoreEvent,
   BarrierDeferred,
 } from '../webhook-events';
@@ -128,7 +129,7 @@ export async function processWebhookEvents(
       if (error instanceof BarrierDeferred) {
         // § event เก่ายังไม่ commit — คืน pending โดยไม่เพิ่ม attempts (cron รอบหน้าลองใหม่)
         result.deferred++;
-        await releaseLease(row.id);
+        await releaseLease(row.id, row.leaseOwner);
       } else {
         console.error('[line-webhook] event failed', { id: row.id, error });
         await markFailed(row.id, row.attempts);
@@ -140,22 +141,28 @@ export async function processWebhookEvents(
   return result;
 }
 
-async function releaseLease(id: string): Promise<void> {
+async function releaseLease(id: string, owner: string | null): Promise<void> {
+  if (!owner) return;
   const db = await getDb();
   await db.update(lineWebhookEvents)
-    .set({ status: 'pending', leaseUntil: null, updatedAt: new Date() })
-    .where(eq(lineWebhookEvents.id, id));
+    .set({ status: 'pending', leaseUntil: null, leaseOwner: null, updatedAt: new Date() })
+    .where(and(eq(lineWebhookEvents.id, id), eq(lineWebhookEvents.leaseOwner, owner)));
 }
 
 async function processOne(row: WebhookEventRow, transport: LineTransport): Promise<void> {
   const db = await getDb();
 
   // § failure หลัง effects commit — ส่ง pendingReplies ซ้ำโดยไม่แตะ effects
+  // § owner ต้องตรงกับ claim ปัจจุบัน — ถ้า lease หมดแล้วคนอื่น claim ต่อ ห้ามมาปิดทับ
+  const owner = row.leaseOwner;
   if (row.pendingReplies) {
     await transport.reply(row.replyToken ?? '', row.pendingReplies.slice(0, 5));
-    await markDone(row.id);
+    if (owner) await markDone(row.id, owner);
     return;
   }
+
+  // § ต่ออายุ lease ก่อนเข้า effects ที่อาจใช้เวลานานกว่า 60s (เฉพาะ owner เดิม)
+  if (owner) await renewLease(row.id, owner);
 
   let replies: LineOutgoingMessage[] = [];
   await db.transaction(async (tx) => {
@@ -171,7 +178,7 @@ async function processOne(row: WebhookEventRow, transport: LineTransport): Promi
   if (replies.length > 0) {
     await transport.reply(row.replyToken ?? '', replies.slice(0, 5));
   }
-  await markDone(row.id);
+  if (owner) await markDone(row.id, owner);
 }
 
 const PROFILE_RETRY_MS = 24 * 60 * 60 * 1000; // ลองดึงโปรไฟล์ที่พลาดซ้ำได้วันละครั้ง

@@ -648,6 +648,8 @@ export const lineWebhookEvents = pgTable(
     pendingReplies: jsonb('pending_replies'),
     attempts: integer('attempts').notNull().default(0),
     leaseUntil: timestamp('lease_until', { mode: 'date' }),
+    // § § lease owner กัน worker เก่าที่ lease หมดแล้วกลับมา markDone/reclaim ของคนอื่น
+    leaseOwner: text('lease_owner'),
   },
   (table) => ({
     eventTypeCheck: check('line_webhook_events_event_type_check',

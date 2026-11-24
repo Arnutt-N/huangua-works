@@ -10,6 +10,7 @@ import {
   chatMessages,
   lineFriendEvents,
   lineUsers,
+  lineWebhookEvents,
 } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import { pseudonymizeLineId } from '../identity';
@@ -21,6 +22,7 @@ import { processCaseFlow, type CaseFlowState } from './case-flow';
 import { createRecordingTransport } from '../conversation/recording-transport';
 import type { LineWebhookEvent } from '../types';
 import { runEventEffects } from './engine';
+import { commitEffects, markDone, renewLease, type WebhookEventRow } from '../webhook-events';
 
 // § ต้องมี docker compose up -d postgres redis up-redis + .env.local ก่อนรัน
 vi.setConfig({ testTimeout: 30_000 });
@@ -31,6 +33,8 @@ const USER_HASH = pseudonymizeLineId(RAW_USER_ID).hash;
 const LINE_MESSAGE_ID = `msg-tx-${RUN}-1`;
 const CATEGORY_ID = `cat-tx-${RUN}`;
 const FAQ_ID = `faq-tx-${RUN}`;
+const EVENT_ID = `evt-row-${RUN}`;
+const OWNER_ID = `owner-tx-${RUN}`;
 const CONV_ID = `conv-tx-${RUN}`;
 const CSAT_CONV_ID = `conv-csat-tx-${RUN}`;
 let seq = 0;
@@ -57,6 +61,7 @@ afterAll(async () => {
   await db.delete(lineUsers).where(eq(lineUsers.lineUserIdHash, USER_HASH));
   await db.delete(chatFaq).where(eq(chatFaq.id, FAQ_ID));
   await db.delete(categories).where(eq(categories.id, CATEGORY_ID));
+  await db.delete(lineWebhookEvents).where(eq(lineWebhookEvents.id, EVENT_ID));
   await closeDb();
 });
 
@@ -189,4 +194,54 @@ describe('issue #229 · effects transaction boundary', () => {
       .where(eq(cases.title, `case-tx-${RUN}`));
     expect(rows).toHaveLength(0);
   });
+
+  test('§ แถวเดียวกัน commit effects แล้ว → stale worker ไม่ทำ effects ซ้ำ', async () => {
+    const db = await getDb();
+    await db.insert(lineWebhookEvents).values({
+      id: EVENT_ID,
+      dedupKey: `w:${EVENT_ID}`,
+      eventType: 'message',
+      lineUserIdHash: USER_HASH,
+      eventTimestamp: RUN % 100_000,
+      payload: {},
+      status: 'processing',
+      effectsCommittedAt: new Date(RUN),
+      leaseOwner: OWNER_ID,
+      leaseUntil: new Date(Date.now() + 60_000),
+    });
+    const [row] = await db.select().from(lineWebhookEvents)
+      .where(eq(lineWebhookEvents.id, EVENT_ID)).limit(1);
+
+    let called = false;
+    const outcome = await db.transaction((tx) => commitEffects(
+      tx,
+      row as WebhookEventRow,
+      async () => {
+        called = true;
+        return { replies: [{ type: 'text', text: 'ซ้ำ' }] };
+      },
+    ));
+
+    expect(called).toBe(false);
+    expect(outcome?.replies).toEqual([]);
+  });
+
+  test('markDone/renewLease ต้องตรง owner ของ claim', async () => {
+    const db = await getDb();
+    expect(await renewLease(EVENT_ID, 'wrong-owner')).toBe(false);
+    await markDone(EVENT_ID, 'wrong-owner');
+    const [afterWrong] = await db.select({ status: lineWebhookEvents.status }).from(lineWebhookEvents)
+      .where(eq(lineWebhookEvents.id, EVENT_ID)).limit(1);
+    expect(afterWrong?.status).toBe('processing');
+
+    expect(await renewLease(EVENT_ID, OWNER_ID)).toBe(true);
+    await markDone(EVENT_ID, OWNER_ID);
+    const [afterOwner] = await db.select({
+      status: lineWebhookEvents.status,
+      leaseOwner: lineWebhookEvents.leaseOwner,
+    }).from(lineWebhookEvents).where(eq(lineWebhookEvents.id, EVENT_ID)).limit(1);
+    expect(afterOwner?.status).toBe('done');
+    expect(afterOwner?.leaseOwner).toBeNull();
+  });
+
 });

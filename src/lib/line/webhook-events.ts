@@ -24,6 +24,7 @@ export interface WebhookEventRow {
   pendingReplies: LineOutgoingMessage[] | null;
   attempts: number;
   leaseUntil: Date | null;
+  leaseOwner: string | null;
   updatedAt: Date;
 }
 
@@ -114,9 +115,17 @@ export async function claimNextWebhookEvent(limit = 1): Promise<WebhookEventRow[
 
     // § claim แบบ condition update — คู่แข่งที่ claim พร้อมกันมีแถวเดียวชนะ
     const leaseUntil = new Date(Date.now() + CLAIM_LEASE_MS);
+    // § § token ประจำ claim — worker เก่าที่ lease หมดแล้วห้ามมา markDone/renew ของ claim ใหม่
+    const owner = generateId();
     const [won] = await db
       .update(lineWebhookEvents)
-      .set({ status: 'processing', leaseUntil, attempts: sql`${lineWebhookEvents.attempts} + 1`, updatedAt: now })
+      .set({
+        status: 'processing',
+        leaseUntil,
+        leaseOwner: owner,
+        attempts: sql`${lineWebhookEvents.attempts} + 1`,
+        updatedAt: now,
+      })
       .where(and(
         eq(lineWebhookEvents.id, row.id),
         or(
@@ -132,6 +141,7 @@ export async function claimNextWebhookEvent(limit = 1): Promise<WebhookEventRow[
       attempts: row.attempts + 1,
       updatedAt: now,
       leaseUntil,
+      leaseOwner: owner,
     });
     if (claimed.length >= limit) break;
   }
@@ -150,6 +160,16 @@ export async function commitEffects(
   effects: () => Promise<{ state?: unknown; replies?: LineOutgoingMessage[] }>,
 ): Promise<{ replies: LineOutgoingMessage[]; state?: unknown } | null> {
   await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${row.lineUserIdHash}, 0))`);
+
+  // § § ได้ lock แล้วต้องอ่านแถวเดิมอีกครั้ง — claim เก่าอาจ commit effects ไปแล้วก่อนเราได้ lock
+  // (row ใน memory ตอน claim เป็น snapshot) ถ้า commit แล้วข้าม effects ทันที ไม่สร้างซ้ำ
+  const [fresh] = await tx
+    .select({ effectsCommittedAt: lineWebhookEvents.effectsCommittedAt })
+    .from(lineWebhookEvents)
+    .where(eq(lineWebhookEvents.id, row.id))
+    .limit(1);
+  if (fresh?.effectsCommittedAt) return { replies: [], state: undefined };
+
   const earlier = await tx
     .select({ id: lineWebhookEvents.id })
     .from(lineWebhookEvents)
@@ -173,12 +193,34 @@ export async function commitEffects(
 }
 
 /** § done หลังส่ง reply สำเร็จ — pendingReplies ถูกล้างเพื่อไม่ส่งซ้ำตอน recovery */
-export async function markDone(id: string): Promise<void> {
+/** § เฉพาะ owner ของ claim ปัจจุบันเท่านั้นที่ปิด event ได้ — worker เก่าที่ lease หมดต้องไม่ทับ */
+export async function markDone(id: string, owner: string): Promise<void> {
   const db = await getDb();
   await db
     .update(lineWebhookEvents)
-    .set({ status: 'done', pendingReplies: null, leaseUntil: null, updatedAt: new Date() })
-    .where(eq(lineWebhookEvents.id, id));
+    .set({
+      status: 'done',
+      pendingReplies: null,
+      leaseUntil: null,
+      leaseOwner: null,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(lineWebhookEvents.id, id), eq(lineWebhookEvents.leaseOwner, owner)));
+}
+
+/** § ต่ออายุ lease เฉพาะ owner เดิม — ใช้ก่อน 작업ที่อาจนานกว่าหน้าต่าง claim */
+export async function renewLease(id: string, owner: string): Promise<boolean> {
+  const db = await getDb();
+  const rows = await db
+    .update(lineWebhookEvents)
+    .set({ leaseUntil: new Date(Date.now() + CLAIM_LEASE_MS), updatedAt: new Date() })
+    .where(and(
+      eq(lineWebhookEvents.id, id),
+      eq(lineWebhookEvents.leaseOwner, owner),
+      eq(lineWebhookEvents.status, 'processing'),
+    ))
+    .returning({ id: lineWebhookEvents.id });
+  return rows.length > 0;
 }
 
 const MAX_ATTEMPTS = 5;

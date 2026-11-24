@@ -267,6 +267,13 @@
       "when": 1795448275351,
       "tag": "0037_right_solo",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1795512872088,
+      "tag": "0038_workable_ser_duncan",
+      "breakpoints": true
     }
   ]
 }
