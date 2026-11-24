@@ -20,14 +20,17 @@ export const MULTICAST_BATCH_SIZE = 500;
 export const STALE_SENDING_MS = 30 * 60 * 1000;
 
 const RETRY_KEY_NAMESPACE = 'huangua-line-broadcast';
+const RETRY_KEY_ALL_MARKER = 'all';
 
 /**
- * retry key ต่อ (broadcastId, batchIndex) — ใช้ SHA-1 แล้วเซ็ต v5 version/variant ให้เป็น UUID v5
- * § LINE ใช้ key ซ้ำเพื่อ dedup เฉพาะคำขอที่ผู้รับเหมือนกันBatch ของ multicast ผู้รับต่างกันจึงต้องคนละ key
+ * retry key ต่อ (broadcastId, ชุดผู้รับ) — ใช้ SHA-1 แล้วเซ็ต v5 version/variant ให้เป็น UUID v5
+ * § LINE ใช้ key ซ้ำเพื่อ dedup เฉพาะคำขอที่ผู้รับเหมือนกัน การเรียง raw id ก่อน hash ทำให้ลำดับผล query ไม่ส่งผลต่อ key
+ *    ชุดผู้รับต่างกัน (หรือ replay ที่ผล query เปลี่ยน) ได้คนละ key จึงไม่ข้ามผู้รับไปโดยเงียบ
  */
-export function broadcastRetryKey(broadcastId: string, batchIndex: number): string {
+export function broadcastRetryKey(broadcastId: string, rawIds: readonly string[]): string {
+  const material = `${RETRY_KEY_NAMESPACE}:${broadcastId}:${[...rawIds].sort().join(',')}`;
   const bytes = createHash('sha1')
-    .update(`${RETRY_KEY_NAMESPACE}:${broadcastId}:${batchIndex}`)
+    .update(material)
     .digest();
   bytes[6] = (bytes[6]! & 0x0f) | 0x50;
   bytes[8] = (bytes[8]! & 0x3f) | 0x80;
@@ -108,10 +111,10 @@ export async function sendBroadcast(broadcastId: string): Promise<SendBroadcastO
       .where(and(eq(chatBroadcasts.id, broadcastId), eq(chatBroadcasts.status, 'draft')))
       .returning({ id: chatBroadcasts.id, content: chatBroadcasts.content, target: chatBroadcasts.target });
     if (!draft) return { kind: 'skipped-not-claimable' };
-    return deliverAndRecord(db, draft.id, draft.content as LineOutgoingMessage[], parseBroadcastTarget(draft.target), [broadcastRetryKey(draft.id, 0)]);
+    return deliverAndRecord(db, draft.id, draft.content as LineOutgoingMessage[], parseBroadcastTarget(draft.target));
   }
 
-  return deliverAndRecord(db, row.id, row.content as LineOutgoingMessage[], parseBroadcastTarget(row.target), [broadcastRetryKey(row.id, 0)]);
+  return deliverAndRecord(db, row.id, row.content as LineOutgoingMessage[], parseBroadcastTarget(row.target));
 }
 
 async function deliverAndRecord(
@@ -119,10 +122,9 @@ async function deliverAndRecord(
   id: string,
   messages: LineOutgoingMessage[],
   target: BroadcastTarget,
-  retryKeys: string[],
 ): Promise<SendBroadcastOutcome> {
-  if (target.kind === 'all') return deliverAll(db, id, messages, retryKeys[0]!);
-  return deliverTargeted(db, id, messages, target.ids, retryKeys);
+  if (target.kind === 'all') return deliverAll(db, id, messages);
+  return deliverTargeted(db, id, messages, target.ids);
 }
 
 async function markFailed(db: Db, id: string, error: string, counts: { total: number; success: number; failed: number }): Promise<SendBroadcastOutcome> {
@@ -144,8 +146,9 @@ async function deliverAll(
   db: Db,
   id: string,
   messages: LineOutgoingMessage[],
-  retryKey: string,
 ): Promise<SendBroadcastOutcome> {
+  // § path 'all' ไม่มีรายชื่อผู้รับ — ใช้ marker แยกจากชุดผู้รับเพื่อไม่ให้ key ไปทับ targeted
+  const retryKey = broadcastRetryKey(id, [RETRY_KEY_ALL_MARKER]);
   let lastError: unknown = null;
   try {
     await sendWithRetry(retryKey, (key) => broadcastMessage(messages, key));
@@ -195,7 +198,6 @@ async function deliverTargeted(
   id: string,
   messages: LineOutgoingMessage[],
   internalIds: string[],
-  retryKeys: string[],
 ): Promise<SendBroadcastOutcome> {
   // raw id มีชีวิตเฉพาะในฟังก์ชันนี้ — ถอดจาก enc เพื่อยิง multicast แล้วทิ้ง ไม่ persist
   const rows = await db
@@ -221,12 +223,11 @@ async function deliverTargeted(
   let failed = 0;
   let firstError: string | null = null;
 
-  let batchIndex = 0;
   for (let start = 0; start < rawIds.length; start += MULTICAST_BATCH_SIZE) {
     const batch = rawIds.slice(start, start + MULTICAST_BATCH_SIZE);
-    // § key ต่อ batch คำนวณก่อนส่งครั้งแรก — retry ใน batch ใช้ key เดิม (LINE dedup ต่อผู้รับชุดเดียวกัน)
-    const retryKey = retryKeys[batchIndex] ?? broadcastRetryKey(id, batchIndex);
-    batchIndex++;
+    // § key ต่อชุดผู้รับจริง — retry ในชุดใช้ key เดิม (LINE dedup ต่อผู้รับชุดเดียวกัน)
+    //   ผล query สลับลำดับไม่เปลี่ยน key แต่ชุดผู้รับเปลี่ยนแล้วต้องคนละ key
+    const retryKey = broadcastRetryKey(id, batch);
     let lastError: unknown = null;
     try {
       await sendWithRetry(retryKey, (key) => multicast(batch, messages, key));

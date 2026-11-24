@@ -115,8 +115,9 @@ describe('sendBroadcast · counters/hash บนฐานจริง', () => {
     const calls = multicastMock.mock.calls;
     expect(calls[0]?.[0]).toHaveLength(MULTICAST_BATCH_SIZE);
     expect(calls[1]?.[0]).toHaveLength(1);
-    expect(calls[0]?.[2]).toBe(broadcastRetryKey(broadcastId, 0));
-    expect(calls[3]?.[2]).toBe(broadcastRetryKey(broadcastId, 1));
+    const batch1 = Array.from({ length: MULTICAST_BATCH_SIZE }, (_, i) => `U${i}`);
+    expect(calls[0]?.[2]).toBe(broadcastRetryKey(broadcastId, batch1));
+    expect(calls[3]?.[2]).toBe(broadcastRetryKey(broadcastId, [`U${MULTICAST_BATCH_SIZE}`]));
     expect(calls[0]?.[2]).not.toBe(calls[3]?.[2]);
     expect(outcome).toMatchObject({
       kind: 'failed',
