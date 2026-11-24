@@ -1,3 +1,4 @@
+import { getDb } from '@/lib/db';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // mock DB ที่รองรับทั้ง `await …where()` และ `…where().returning()` —
@@ -98,7 +99,7 @@ describe('triggerHandoff', () => {
   });
 
   it('§ broadcast mode_change หลังเปลี่ยนเป็น waiting_handoff — inbox แอดมินต้องไม่ค้าง bot_active', async () => {
-    const replies = await triggerHandoff('conv-1');
+    const replies = await triggerHandoff(await getDb(), 'conv-1');
 
     expect(dbMocks.set).toHaveBeenCalledWith(expect.objectContaining({ mode: 'waiting_handoff' }));
     expect(broadcast).toHaveBeenCalledWith({

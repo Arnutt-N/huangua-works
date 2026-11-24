@@ -1,5 +1,5 @@
 import { and, eq, inArray, sql } from 'drizzle-orm';
-import { getDb, type Db } from '@/lib/db';
+import { getDb, type Db, type DbOrTx } from '@/lib/db';
 import { chatConversations } from '@/lib/db/schema';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import type { ConversationMode } from '../chat-modes';
@@ -26,7 +26,7 @@ export interface TransferInput {
 
 export type LinkCaseResult = { ok: true } | { ok: false; reason: 'not_found' };
 
-async function findModeRow(db: Db, conversationId: string) {
+async function findModeRow(db: DbOrTx, conversationId: string) {
   return firstOrUndefined(
     db
       .select({ mode: chatConversations.mode, assignedAdminId: chatConversations.assignedAdminId })
@@ -61,6 +61,7 @@ function buildModeUpdates(to: ConversationMode, opts: ChangeModeOptions, now: Da
  * § broadcast mode_change ทุกครั้งที่เปลี่ยนจริง — เดิม handoff ลืม broadcast ทำ inbox ค้าง
  */
 export async function changeMode(
+  db: DbOrTx,
   conversationId: string,
   to: ConversationMode,
   opts: ChangeModeOptions = {},
@@ -69,7 +70,6 @@ export async function changeMode(
     throw new Error('changeMode(human_active) ต้องระบุ actorAdminId');
   }
 
-  const db = await getDb();
   const [updated] = await db
     .update(chatConversations)
     .set(buildModeUpdates(to, opts, new Date()))

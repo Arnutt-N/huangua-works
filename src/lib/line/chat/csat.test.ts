@@ -48,11 +48,11 @@ describe('csatThankYou', () => {
 
 describe('recordCsatResponse', () => {
   it('คะแนนนอก 1-5 → invalid โดยไม่แตะ DB', async () => {
-    await expect(recordCsatResponse('conv-ghost', 0, null)).resolves.toEqual({ kind: 'invalid' });
-    await expect(recordCsatResponse('conv-ghost', 6, null)).resolves.toEqual({ kind: 'invalid' });
+    await expect(recordCsatResponse({} as never, 'conv-ghost', 0, null)).resolves.toEqual({ kind: 'invalid' });
+    await expect(recordCsatResponse({} as never, 'conv-ghost', 6, null)).resolves.toEqual({ kind: 'invalid' });
   });
   it('resolvedAt null → invalid (NULL ไม่ชน unique จะไหลไม่จำกัดแถว)', async () => {
-    await expect(recordCsatResponse('conv-ghost', 5, null)).resolves.toEqual({ kind: 'invalid' });
+    await expect(recordCsatResponse({} as never, 'conv-ghost', 5, null)).resolves.toEqual({ kind: 'invalid' });
   });
 });
 

@@ -326,7 +326,7 @@ export const BOT_DISABLED_TEXT =
 // ห้าม UPDATE mode ตรง — สอง event ที่อ่าน bot_active พร้อมกันจะส่ง notice สองครั้งและทับห้องที่ admin claim แทรก
 // ตอบ notice เฉพาะผู้ที่ changeMode สำเร็จ (changed: true) คนที่แพ้ race ไม่ตอบซ้ำ
 async function routeToStaffWhileBotDisabled(db: DbOrTx, conversationId: string): Promise<LineOutgoingMessage[]> {
-  const changed = await changeMode(conversationId, 'waiting_handoff');
+  const changed = await changeMode(db, conversationId, 'waiting_handoff');
   if (!changed.ok || !changed.changed) return [];
 
   const replies: LineOutgoingMessage[] = [{ type: 'text', text: BOT_DISABLED_TEXT }];
@@ -350,7 +350,7 @@ export async function routeBotMessage(
       if (botState?.step === 'location') {
         const loc = event.message;
         const locText = loc.address ?? `${loc.latitude},${loc.longitude}`;
-        const result = await processCaseFlow(locText, botState, event.source.userId);
+        const result = await processCaseFlow(db, locText, botState, event.source.userId);
         return { replies: result.replies, state: result.state };
       }
     }
@@ -364,7 +364,7 @@ export async function routeBotMessage(
     normalized.includes('ร้องเรียน') ||
     normalized === 'แจ้ง'
   ) {
-    const { state, reply } = await startCaseFlow();
+    const { state, reply } = await startCaseFlow(db);
     return { replies: [reply], state };
   }
 
@@ -386,7 +386,7 @@ export async function routeBotMessage(
   const botState = user?.botState as CaseFlowState | null;
 
   if (botState) {
-    const result = await processCaseFlow(text, botState, event.source.userId);
+    const result = await processCaseFlow(db, text, botState, event.source.userId);
     return { replies: result.replies, state: result.state };
   }
 
@@ -398,7 +398,7 @@ export async function routeBotMessage(
     }
   }
 
-  const faqResult = await matchFaq(text);
+  const faqResult = await matchFaq(db, text);
   if (faqResult) {
     return { replies: await parseResponseText(faqResult.answer) };
   }
@@ -410,7 +410,7 @@ export async function routeBotMessage(
     if (!isWithinBusinessHours(hours, now)) {
       return { replies: [{ type: 'text', text: outsideBusinessHoursText(hours) }] };
     }
-    return { replies: await triggerHandoff(conversationId) };
+    return { replies: await triggerHandoff(db, conversationId) };
   }
 
   return { replies: [{
@@ -479,7 +479,7 @@ async function handlePostbackEvent(db: DbOrTx, event: LinePostbackEvent, convers
       .from(chatConversations)
       .where(eq(chatConversations.id, conversationId))
       .limit(1);
-    const recorded = await recordCsatResponse(conversationId, csatData.score, conv?.resolvedAt ?? null);
+    const recorded = await recordCsatResponse(db, conversationId, csatData.score, conv?.resolvedAt ?? null);
     // § กดซ้ำไม่ตอบขอบคุณซ้ำ — คะแนนแถวแรกชนะแล้ว thank-you มีในประวัติแล้ว
     if (recorded.kind === 'recorded') {
       const thanks: LineOutgoingMessage[] = [{ type: 'text', text: csatThankYou(recorded.score) }];
@@ -495,7 +495,7 @@ async function handlePostbackEvent(db: DbOrTx, event: LinePostbackEvent, convers
   const lineUser = await findLineUserByRaw(db, event.source.userId);
   const botState = (lineUser?.botState as CaseFlowState | null) ?? null;
   // § นอก confirm step (เช่น กดปุ่มซ้ำหลังส่งเรื่องแล้ว) คืน null → คง log-only ไม่ตอบซ้ำ
-  const result = await handleConfirmPostback(confirmData, botState, event.source.userId);
+  const result = await handleConfirmPostback(db, confirmData, botState, event.source.userId);
   if (!result) return [];
 
   if (lineUser) {

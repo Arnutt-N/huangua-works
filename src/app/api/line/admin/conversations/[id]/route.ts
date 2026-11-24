@@ -163,7 +163,8 @@ export async function PATCH(
 
   // § claim/คืนบอท/ปิดเรื่อง ผ่าน changeMode — guard อยู่ใน WHERE (atomic) ตามตาราง MODE_TRANSITIONS
   // กันสองแอดมินกดรับพร้อมกันแล้วคนหลังทับเงียบ ๆ
-  const result = await changeMode(id, mode, { actorAdminId: actorId, linkedCaseId });
+  const db = await getDb();
+  const result = await changeMode(db, id, mode, { actorAdminId: actorId, linkedCaseId });
   if (result.ok) {
     // § CSAT ส่งหลัง close สำเร็จเท่านั้นและ best-effort — ห้ามทำให้ response ปิดเรื่องล้ม
     // ห่อทั้งอ่าน id และส่ง (DB ล้มจุดไหนก็ต้องยังคืน ok เพราะ close เข้าแล้ว)

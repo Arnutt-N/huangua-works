@@ -90,6 +90,7 @@ describe('handleEvent · postback confirm:* dispatch', () => {
     await handleEvent(postbackEvent('confirm:ok'), transport);
 
     expect(handleConfirmPostback).toHaveBeenCalledWith(
+      mockDb,
       'confirm:ok',
       expect.objectContaining({ step: 'confirm' }),
       'U123',
@@ -111,6 +112,7 @@ describe('handleEvent · postback confirm:* dispatch', () => {
     await handleEvent(postbackEvent('confirm:edit:title'), transport);
 
     expect(handleConfirmPostback).toHaveBeenCalledWith(
+      mockDb,
       'confirm:edit:title',
       expect.objectContaining({ step: 'confirm' }),
       'U123',

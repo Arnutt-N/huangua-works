@@ -67,7 +67,7 @@ function state(step: CaseFlowState['step'], over: Partial<CaseFlowState> = {}): 
 }
 
 function flow(input: string, st: CaseFlowState | null) {
-  return processCaseFlow(input, st!, LINE_USER_ID);
+  return processCaseFlow(mockDb as never, input, st!, LINE_USER_ID);
 }
 
 function firstReplyText(result: { replies: Array<{ type: string; text?: string }> }): string {
@@ -257,7 +257,7 @@ describe('case-flow · processCaseFlow · confirm step', () => {
 
 describe('case-flow · startCaseFlow', () => {
   it('returns initial state at category step', async () => {
-    const result = await startCaseFlow();
+    const result = await startCaseFlow(mockDb as never);
     expect(result.state.step).toBe('category');
     expect(result.reply.type).toBe('flex');
   });
@@ -273,8 +273,8 @@ describe('case-flow · handleConfirmPostback · edit round-trip', () => {
     location: 'หน้าวัด ม.3',
   };
 
-  function postback(data: Parameters<typeof handleConfirmPostback>[0], st: CaseFlowState | null) {
-    return handleConfirmPostback(data, st, LINE_USER_ID);
+  function postback(data: Parameters<typeof handleConfirmPostback>[1], st: CaseFlowState | null) {
+    return handleConfirmPostback(mockDb as never, data, st, LINE_USER_ID);
   }
 
   it('confirm:ok submits (same path as typing ยืนยัน) → tracking code', async () => {
