@@ -274,6 +274,13 @@
       "when": 1795512872088,
       "tag": "0038_workable_ser_duncan",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1795582195004,
+      "tag": "0039_yielding_justice",
+      "breakpoints": true
     }
   ]
 }

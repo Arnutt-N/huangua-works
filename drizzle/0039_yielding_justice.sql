@@ -1,0 +1,1 @@
+ALTER TABLE "chat_broadcasts" ADD COLUMN "lease_owner" text;

@@ -40,7 +40,7 @@ export function broadcastRetryKey(broadcastId: string, rawIds: readonly string[]
 
 /**
  * § retry เฉพาะ error ชั่วคราว: 429/5xx, timeout, fetch ตัด (TypeError)
- * 429 เป็นการฝ่ากฎ LINE ที่แนะนำให้ backoff ตาม Retry-After — ที่นี่ retry ทันที 1s/2s เพื่อให้ broadcast เสร็จในรอบ cron
+ * 429 retry ตาม Retry-After ถ้ามี (ดู retryDelayMs) ไม่มีใช้ backoff 1s/2s เพื่อให้ broadcast เสร็จในรอบ cron
  * permanent 4xx อื่น, circuit open, Error ทั่วไป → ไม่ retry (retry ซ้ำก็จะล้มเหมือนเดิมและเปลืองโควต้า)
  */
 function isTransientError(error: unknown): boolean {
@@ -49,6 +49,14 @@ function isTransientError(error: unknown): boolean {
   if (error instanceof DOMException && error.name === 'TimeoutError') return true;
   if (error instanceof TypeError) return true;
   return false;
+}
+
+function retryDelayMs(error: unknown, attempt: number): number {
+  // § 429 ที่ LINE ส่ง Retry-After มาให้เชื่อตามระยะนั้นก่อน backoff คงที่ — retry เร็วเกินไปจะโดนปฏิเสธซ้ำ
+  if (error instanceof LineApiError && error.status === 429 && error.retryAfterMs !== undefined) {
+    return error.retryAfterMs;
+  }
+  return RETRY_DELAY_MS * attempt;
 }
 
 async function sendWithRetry(retryKey: string, send: (retryKey: string) => Promise<void>): Promise<void> {
@@ -60,7 +68,7 @@ async function sendWithRetry(retryKey: string, send: (retryKey: string) => Promi
     } catch (err) {
       lastError = err;
       if (!isTransientError(err) || attempt === MAX_ATTEMPTS) break;
-      await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * attempt));
+      await new Promise((r) => setTimeout(r, retryDelayMs(err, attempt)));
     }
   }
   throw lastError;
@@ -71,7 +79,8 @@ export async function recoverStaleSending(now: Date = new Date()): Promise<numbe
   const db = await getDb();
   const rows = await db
     .update(chatBroadcasts)
-    .set({ status: 'scheduled', scheduledAt: now, updatedAt: now })
+    // § ล้าง leaseOwner ด้วย — worker เก่าต้องหมดสิทธิ์เขียนผลทับ worker ที่รับช่วงต่อ
+    .set({ status: 'scheduled', scheduledAt: now, updatedAt: now, leaseOwner: null })
     .where(
       and(
         eq(chatBroadcasts.status, 'sending'),
@@ -96,10 +105,11 @@ function recipientHash(rawLineUserId: string): string {
 
 export async function sendBroadcast(broadcastId: string): Promise<SendBroadcastOutcome> {
   const db = await getDb();
+  const owner = generateId();
 
   const updated = await db
     .update(chatBroadcasts)
-    .set({ status: 'sending', updatedAt: new Date() })
+    .set({ status: 'sending', leaseOwner: owner, updatedAt: new Date() })
     .where(and(eq(chatBroadcasts.id, broadcastId), eq(chatBroadcasts.status, 'scheduled')))
     .returning({ id: chatBroadcasts.id, content: chatBroadcasts.content, target: chatBroadcasts.target });
 
@@ -107,14 +117,14 @@ export async function sendBroadcast(broadcastId: string): Promise<SendBroadcastO
   if (!row) {
     const [draft] = await db
       .update(chatBroadcasts)
-      .set({ status: 'sending', updatedAt: new Date() })
+      .set({ status: 'sending', leaseOwner: owner, updatedAt: new Date() })
       .where(and(eq(chatBroadcasts.id, broadcastId), eq(chatBroadcasts.status, 'draft')))
       .returning({ id: chatBroadcasts.id, content: chatBroadcasts.content, target: chatBroadcasts.target });
     if (!draft) return { kind: 'skipped-not-claimable' };
-    return deliverAndRecord(db, draft.id, draft.content as LineOutgoingMessage[], parseBroadcastTarget(draft.target));
+    return deliverAndRecord(db, draft.id, draft.content as LineOutgoingMessage[], parseBroadcastTarget(draft.target), owner);
   }
 
-  return deliverAndRecord(db, row.id, row.content as LineOutgoingMessage[], parseBroadcastTarget(row.target));
+  return deliverAndRecord(db, row.id, row.content as LineOutgoingMessage[], parseBroadcastTarget(row.target), owner);
 }
 
 async function deliverAndRecord(
@@ -122,13 +132,15 @@ async function deliverAndRecord(
   id: string,
   messages: LineOutgoingMessage[],
   target: BroadcastTarget,
+  owner: string,
 ): Promise<SendBroadcastOutcome> {
-  if (target.kind === 'all') return deliverAll(db, id, messages);
-  return deliverTargeted(db, id, messages, target.ids);
+  if (target.kind === 'all') return deliverAll(db, id, messages, owner);
+  return deliverTargeted(db, id, messages, target.ids, owner);
 }
 
-async function markFailed(db: Db, id: string, error: string, counts: { total: number; success: number; failed: number }): Promise<SendBroadcastOutcome> {
-  await db
+async function markFailed(db: Db, id: string, error: string, counts: { total: number; success: number; failed: number }, owner: string): Promise<SendBroadcastOutcome> {
+  // § เขียนผลได้เฉพาะ worker ที่ยังถือ lease — คนที่ถูก requeue แล้วต้องไม่ทับคนที่รับช่วงต่อ
+  const rows = await db
     .update(chatBroadcasts)
     .set({
       status: 'failed',
@@ -136,9 +148,12 @@ async function markFailed(db: Db, id: string, error: string, counts: { total: nu
       totalRecipients: counts.total,
       successCount: counts.success,
       failedCount: counts.failed,
+      leaseOwner: null,
       updatedAt: new Date(),
     })
-    .where(eq(chatBroadcasts.id, id));
+    .where(and(eq(chatBroadcasts.id, id), eq(chatBroadcasts.leaseOwner, owner)))
+    .returning({ id: chatBroadcasts.id });
+  if (rows.length === 0) return { kind: 'skipped-not-claimable' };
   return { kind: 'failed', totalRecipients: counts.total, successCount: counts.success, failedCount: counts.failed, error };
 }
 
@@ -146,6 +161,7 @@ async function deliverAll(
   db: Db,
   id: string,
   messages: LineOutgoingMessage[],
+  owner: string,
 ): Promise<SendBroadcastOutcome> {
   // § path 'all' ไม่มีรายชื่อผู้รับ — ใช้ marker แยกจากชุดผู้รับเพื่อไม่ให้ key ไปทับ targeted
   const retryKey = broadcastRetryKey(id, [RETRY_KEY_ALL_MARKER]);
@@ -158,7 +174,7 @@ async function deliverAll(
 
   if (lastError !== null) {
     const error = lastError instanceof Error ? lastError.message : 'unknown';
-    return markFailed(db, id, error, { total: 0, success: 0, failed: 0 });
+    return markFailed(db, id, error, { total: 0, success: 0, failed: 0 }, owner);
   }
 
   // § path 'all' ไม่มีรายชื่อผู้รับ — total เป็นค่าประมาณจาก follower count ตอนส่งสำเร็จ
@@ -168,10 +184,12 @@ async function deliverAll(
   } catch {
     total = 0;
   }
-  await db
+  const rows = await db
     .update(chatBroadcasts)
-    .set({ status: 'sent', sentAt: new Date(), totalRecipients: total, successCount: total, failedCount: 0, updatedAt: new Date() })
-    .where(eq(chatBroadcasts.id, id));
+    .set({ status: 'sent', sentAt: new Date(), totalRecipients: total, successCount: total, failedCount: 0, leaseOwner: null, updatedAt: new Date() })
+    .where(and(eq(chatBroadcasts.id, id), eq(chatBroadcasts.leaseOwner, owner)))
+    .returning({ id: chatBroadcasts.id });
+  if (rows.length === 0) return { kind: 'skipped-not-claimable' };
   return { kind: 'sent', totalRecipients: total, successCount: total, failedCount: 0 };
 }
 
@@ -198,6 +216,7 @@ async function deliverTargeted(
   id: string,
   messages: LineOutgoingMessage[],
   internalIds: string[],
+  owner: string,
 ): Promise<SendBroadcastOutcome> {
   // raw id มีชีวิตเฉพาะในฟังก์ชันนี้ — ถอดจาก enc เพื่อยิง multicast แล้วทิ้ง ไม่ persist
   const rows = await db
@@ -218,7 +237,7 @@ async function deliverTargeted(
   const total = rawIds.length;
 
   if (total === 0) {
-    return markFailed(db, id, 'ไม่พบผู้รับเป้าหมายในระบบ', { total: 0, success: 0, failed: 0 });
+    return markFailed(db, id, 'ไม่พบผู้รับเป้าหมายในระบบ', { total: 0, success: 0, failed: 0 }, owner);
   }
 
   let success = 0;
@@ -247,13 +266,15 @@ async function deliverTargeted(
   }
 
   if (failed > 0) {
-    return markFailed(db, id, firstError ?? 'ส่งบางชุดไม่สำเร็จ', { total, success, failed });
+    return markFailed(db, id, firstError ?? 'ส่งบางชุดไม่สำเร็จ', { total, success, failed }, owner);
   }
 
-  await db
+  const written = await db
     .update(chatBroadcasts)
-    .set({ status: 'sent', sentAt: new Date(), totalRecipients: total, successCount: success, failedCount: 0, updatedAt: new Date() })
-    .where(eq(chatBroadcasts.id, id));
+    .set({ status: 'sent', sentAt: new Date(), totalRecipients: total, successCount: success, failedCount: 0, leaseOwner: null, updatedAt: new Date() })
+    .where(and(eq(chatBroadcasts.id, id), eq(chatBroadcasts.leaseOwner, owner)))
+    .returning({ id: chatBroadcasts.id });
+  if (written.length === 0) return { kind: 'skipped-not-claimable' };
   return { kind: 'sent', totalRecipients: total, successCount: success, failedCount: 0 };
 }
 

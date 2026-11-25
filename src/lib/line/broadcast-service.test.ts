@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { broadcastMock, followerMock, multicastMock, LineApiErrorMock, LineCircuitOpenErrorMock } =
@@ -85,6 +86,7 @@ function dbStub(row: Row | null, rawByInternal: Record<string, string> = {}, raw
               claimCount++;
               if (row && claimCount <= 2 && v.status === 'sending') return [row];
               if (v.status === 'scheduled') return [{ id: 'stale-1' }];
+              if (v.status === 'sent' || v.status === 'failed') return [{ id: row?.id ?? 'b1' }];
               return [];
             },
           };
@@ -109,7 +111,11 @@ function dbStub(row: Row | null, rawByInternal: Record<string, string> = {}, raw
 }
 
 const transient500 = () => new LineApiError('/message/broadcast', 500, 'LINE down');
-const transient429 = () => new LineApiError('/message/broadcast', 429, 'rate limited');
+const rateLimited = (retryAfterMs?: number) => {
+  const error = new LineApiErrorMock('/message/broadcast', 429, 'rate limited') as InstanceType<typeof LineApiError> & { retryAfterMs?: number };
+  error.retryAfterMs = retryAfterMs;
+  return error;
+};
 const permanent400 = () => new LineApiError('/message/broadcast', 400, 'bad request');
 
 beforeEach(() => {
@@ -142,7 +148,7 @@ describe('sendBroadcast · all path retry', () => {
     followerMock.mockResolvedValue({ userIds: ['U1', 'U2'] });
     broadcastMock
       .mockRejectedValueOnce(transient500())
-      .mockRejectedValueOnce(transient429())
+      .mockRejectedValueOnce(new LineApiErrorMock('/message/broadcast', 429, 'rate limited'))
       .mockResolvedValueOnce(undefined);
 
     const outcome = await sendBroadcast('b1');
@@ -362,6 +368,114 @@ describe('recoverStaleSending', () => {
     await sendBroadcast('b1');
 
     expect(updates.some((u) => String(u.errorMessage ?? '').includes('ค้างสถานะกำลังส่ง'))).toBe(false);
+  });
+});
+
+describe('sendBroadcast · lease owner', () => {
+  it('429 พร้อม retryAfterMs → รอตามระยะที่ LINE บอก และ retry key เดิม', async () => {
+    vi.useFakeTimers();
+    const { db, updates } = dbStub({ id: 'b429', content: [], target: { kind: 'all' } });
+    vi.mocked(getDb).mockResolvedValue(db as never);
+    followerMock.mockResolvedValue({ userIds: [] });
+    broadcastMock
+      .mockRejectedValueOnce(rateLimited(42000))
+      .mockResolvedValueOnce(undefined);
+
+    const outcomePromise = sendBroadcast('b429');
+    await vi.advanceTimersByTimeAsync(42000);
+    const outcome = await outcomePromise;
+
+    expect(broadcastMock).toHaveBeenCalledTimes(2);
+    const keys = broadcastMock.mock.calls.map((call) => call[1]);
+    expect(keys[0]).toBe(keys[1]);
+    expect(outcome.kind).toBe('sent');
+    expect(updates.at(-1)).toMatchObject({ status: 'sent' });
+    vi.useRealTimers();
+  });
+
+  it('worker เก่าหลังถูก requeue เขียนไม่ทับ worker ใหม่ที่ส่งสำเร็จแล้ว', async () => {
+    let releaseFirst: (() => void) | undefined;
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const dialect = new PgDialect();
+    const ownerByClaim: string[] = [];
+    const terminalWrites: { set: Record<string, unknown>; sql: string; params: unknown[] }[] = [];
+    let claimCount = 0;
+    let currentStatus = 'scheduled';
+    let currentOwner: string | null = null;
+    let firstCall = true;
+
+    const db = {
+      update: () => ({
+        set: (v: Record<string, unknown>) => ({
+          where: (condition: unknown) => {
+            const query = dialect.sqlToQuery(condition as Parameters<typeof dialect.sqlToQuery>[0]);
+            if (v.status === 'sending') {
+              return {
+                returning: async () => {
+                  claimCount++;
+                  const owner = v.leaseOwner as string | undefined;
+                  if (!owner) return [];
+                  ownerByClaim.push(owner);
+                  currentStatus = 'sending';
+                  currentOwner = owner;
+                  return [{ id: 'b1', content: [], target: { kind: 'all' } }];
+                },
+              };
+            }
+            if (v.status === 'scheduled') {
+              return {
+                returning: async () => {
+                  currentStatus = 'scheduled';
+                  currentOwner = null;
+                  return [{ id: 'b1' }];
+                },
+              };
+            }
+            return {
+              returning: async () => {
+                const ownerParam = query.params.find((p) => p === currentOwner && typeof p === 'string');
+                if (currentStatus !== 'sending' || currentOwner === null || ownerParam === undefined) return [];
+                if (v.status === 'sent' || v.status === 'failed') {
+                  terminalWrites.push({ set: v, sql: query.sql, params: query.params });
+                }
+                currentStatus = v.status as string;
+                currentOwner = null;
+                return [{ id: 'b1' }];
+              },
+            };
+          },
+        }),
+      }),
+      select: () => ({ from: () => ({ where: async () => [] }) }),
+      insert: () => ({ values: () => ({ onConflictDoUpdate: async () => [] }) }),
+    };
+    vi.mocked(getDb).mockResolvedValue(db as never);
+    followerMock.mockResolvedValue({ userIds: [] });
+    broadcastMock.mockImplementation(async () => {
+      if (firstCall) {
+        firstCall = false;
+        await firstGate;
+      }
+    });
+
+    const firstPromise = sendBroadcast('b1');
+    await vi.waitFor(() => expect(ownerByClaim).toHaveLength(1));
+    await recoverStaleSending();
+    const second = await sendBroadcast('b1');
+    releaseFirst?.();
+    const first = await firstPromise;
+
+    expect(claimCount).toBe(2);
+    expect(ownerByClaim[0]).not.toBe(ownerByClaim[1]);
+    expect(second).toMatchObject({ kind: 'sent' });
+    expect(first).toMatchObject({ kind: 'skipped-not-claimable' });
+    expect(terminalWrites).toHaveLength(1);
+    const sent = terminalWrites[0]!;
+    expect(sent.set).toMatchObject({ status: 'sent', leaseOwner: null });
+    expect(sent.sql).toContain('"lease_owner" = $');
+    expect(sent.params).toContain(ownerByClaim[1]);
   });
 });
 

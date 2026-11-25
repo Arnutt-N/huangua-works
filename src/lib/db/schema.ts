@@ -1061,6 +1061,9 @@ export const chatBroadcasts = pgTable(
     failedCount: integer('failed_count').notNull().default(0),
     createdBy: text('created_by'),
     errorMessage: text('error_message'),
+    // § leaseOwner ระบุ worker ที่อ้างสิทธิ์แถว — terminal write ต้องตรวจ owner ตัวเดิม
+    //   เพื่อไม่ให้ worker เก่าที่ถูก requeue แล้วเขียนทับผลของ worker ใหม่
+    leaseOwner: text('lease_owner'),
   },
   (table) => ({
     statusIdx: index('chat_broadcasts_status_idx').on(table.status),

@@ -72,6 +72,7 @@ describe('recoverStaleSending · ฐานจริง', () => {
       content: [],
       status: 'sending',
       target: { kind: 'all' },
+      leaseOwner: 'old-owner',
       updatedAt: old,
     });
 
@@ -83,6 +84,7 @@ describe('recoverStaleSending · ฐานจริง', () => {
     expect(row?.scheduledAt?.getTime()).toBeGreaterThan(old.getTime());
     expect(row?.updatedAt.getTime()).toBeGreaterThan(old.getTime());
     expect(row?.errorMessage).toBeNull();
+    expect(row?.leaseOwner).toBeNull();
   });
 });
 
@@ -135,6 +137,7 @@ describe('sendBroadcast · counters/hash บนฐานจริง', () => {
       totalRecipients: MULTICAST_BATCH_SIZE + 1,
       successCount: MULTICAST_BATCH_SIZE,
       failedCount: 1,
+      leaseOwner: null,
     });
 
     const failed = await db
