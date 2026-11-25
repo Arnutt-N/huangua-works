@@ -54,10 +54,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'ไม่พบไฟล์ที่ต้องการอัปโหลด' }, { status: 400 });
   }
 
+  // § ปฏิเสธจาก metadata ก่อน materialize — ไฟล์ 11MB ต้องไม่ถูกอ่านเข้ามาใน memory เลย
+  if (file.size > MEDIA_MAX_SIZE_BYTES) {
+    return NextResponse.json({ error: MEDIA_SIZE_ERROR }, { status: 413 });
+  }
+
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  // ตรวจสอบขนาดไฟล์ (สูงสุด 10MB ทั้งจาก metadata และ buffer จริง)
-  if (file.size > MEDIA_MAX_SIZE_BYTES || buffer.length > MEDIA_MAX_SIZE_BYTES) {
+  // ตรวจสอบขนาด buffer จริงเป็นแนวป้องกันที่สอง (metadata อาจไม่ตรงกับเนื้อหา)
+  if (buffer.length > MEDIA_MAX_SIZE_BYTES) {
     return NextResponse.json({ error: MEDIA_SIZE_ERROR }, { status: 413 });
   }
 

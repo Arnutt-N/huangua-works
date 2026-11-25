@@ -4,7 +4,7 @@ import { closeDb, getDb } from '@/lib/db';
 import { auditLogs, caseUpdates, cases, categories, consentRecords, lineUsers, users } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import { lookupHash, pseudonymizeLineId } from '@/lib/line/identity';
-import { findTrackableCase, listMyCases } from './index';
+import { findTrackableCase, findTrackableCaseStatus, listMyCases } from './index';
 
 /**
  * findTrackableCase / listMyCases — กติกาการมองเห็นเรื่องของประชาชนชุดเดียวทุกช่องทาง
@@ -140,6 +140,31 @@ describe('findTrackableCase', () => {
   });
 });
 
+describe('findTrackableCaseStatus — projection สำหรับบอท LINE', () => {
+  test('คืน exactly สามฟิลด์ และเขียน audit ผ่าน line_bot', async () => {
+    const view = await findTrackableCaseStatus(` ${CODE_A.slice(0, 6)} ${CODE_A.slice(6)} `, {
+      channel: 'line_bot',
+    });
+
+    expect(view).toEqual({
+      trackingCode: CODE_A,
+      status: 'received',
+      title: 'ถนนพังหน้าวัด (ทดสอบ)',
+    });
+    expect(Object.keys(view!).sort()).toEqual(['status', 'title', 'trackingCode']);
+    const serialized = JSON.stringify(view);
+    expect(serialized).not.toContain('createdAt'); // ไม่มี category/updates/รูป/signed URL
+    expect(serialized).not.toContain('บ้านเลขที่ 99');
+
+    const db = await getDb();
+    const rows = await db
+      .select()
+      .from(auditLogs)
+      .where(and(eq(auditLogs.resourceId, caseAId), eq(auditLogs.action, 'view_case')));
+    expect(rows.some((r) => (r.metadata as { via?: string } | null)?.via === 'line_bot')).toBe(true);
+  });
+});
+
 describe('listMyCases', () => {
   test('เรื่องของฉัน: เฉพาะของ LINE user นี้ ที่มีเลขติดตาม เรียงที่อัปเดตล่าสุดก่อน', async () => {
     const items = await listMyCases(LINE_OWNER);
@@ -186,6 +211,7 @@ describe('§ ถอนความยินยอมแล้ว — ซ่อ�
 
     expect(await findTrackableCase(CODE_A, { channel: 'web' })).toBeNull();
     expect(await findTrackableCase(CODE_A, { channel: 'line_bot' })).toBeNull();
+    expect(await findTrackableCaseStatus(CODE_A, { channel: 'line_bot' })).toBeNull();
     expect(await listMyCases(LINE_OWNER)).toEqual([]);
   });
 

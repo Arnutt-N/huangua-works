@@ -11,8 +11,10 @@ export { resolveCitizen, type CitizenIdentity } from './identity';
 export { recordIntakeConsent, type IntakeConsentVia } from './consent-policy';
 export {
   findTrackableCase,
+  findTrackableCaseStatus,
   listMyCases,
   type MyCaseItem,
+  type TrackedCaseStatus,
   type TrackedCaseView,
   type ViewContext,
 } from './view';

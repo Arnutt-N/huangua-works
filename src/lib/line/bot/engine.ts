@@ -17,7 +17,7 @@ import { getWelcomeMessages } from './welcome';
 import { getChatSetting } from '../settings';
 import { caseStatusFlex, parseConfirmPostback } from '../messages/flex';
 import { getFaqReply } from '../messages/rich-menu';
-import { findTrackableCase } from '@/lib/cases/citizen-access';
+import { findTrackableCaseStatus } from '@/lib/cases/citizen-access';
 import { COPY } from '@/lib/copy';
 import { isWithinBusinessHours, outsideBusinessHoursText } from '../business-hours';
 import { getFollowCount, recordFriendEvent } from '../friend-events';
@@ -430,11 +430,11 @@ async function trackCase(db: Db, trackingCode: string): Promise<LineOutgoingMess
   // § normalize (เลขที่พิมพ์มีเว้นวรรค เช่น HG 4837 2915 6) + กติกาความยินยอม + audit
   // อยู่ใน citizen-access — เดิมบอทค้นตรงไม่เช็คความยินยอม เรื่องที่เจ้าของถอนแล้ว
   // ยังโชว์หัวเรื่อง+สถานะผ่านแชทได้ ทั้งที่เว็บตอบ 404
-  const view = await findTrackableCase(trackingCode, { channel: 'line_bot' }, db);
+  const view = await findTrackableCaseStatus(trackingCode, { channel: 'line_bot' }, db);
   if (!view) {
     return [{ type: 'text', text: `ไม่พบเรื่องเลข ${trackingCode} กรุณาตรวจสอบเลขติดตามอีกครั้ง` }];
   }
-  return [caseStatusFlex(view.case.trackingCode, view.case.status, view.case.title)];
+  return [caseStatusFlex(view.trackingCode, view.status, view.title)];
 }
 
 // § เขียนได้เฉพาะใน transaction ตอน commitEffects — ห้ามเรียกจาก routeBotMessage

@@ -64,6 +64,7 @@ vi.mock('../messages/flex', () => ({
 
 vi.mock('@/lib/cases/citizen-access', () => ({
   findTrackableCase: vi.fn(async () => null),
+  findTrackableCaseStatus: vi.fn(async () => null),
 }));
 
 // route import '../conversation' (index) ซึ่งดึง transport.ts → client.ts มาด้วย —
@@ -78,7 +79,7 @@ vi.stubGlobal(
 import { handleEvent, routeBotMessage } from './engine';
 import { matchFaq } from './faq-matcher';
 import { startCaseFlow } from './case-flow';
-import { findTrackableCase } from '@/lib/cases/citizen-access';
+import { findTrackableCase, findTrackableCaseStatus } from '@/lib/cases/citizen-access';
 import { createRecordingTransport } from '../conversation/recording-transport';
 import { broadcast } from '../sse/broadcaster';
 
@@ -176,24 +177,15 @@ describe('routeBotMessage — existing behavior (TDD safety net)', () => {
     it('§ ส่งเลขที่ผู้ใช้พิมพ์ให้ citizen-access ช่องทาง line_bot — กติกาความยินยอมเดียวกับเว็บ', async () => {
       const event = makeEvent('ติดตาม HG 0000 0000 0');
       await routeBotMessage(mockDb, event, 'ติดตาม HG 0000 0000 0', 'user-pk', 'conv-1');
-      expect(findTrackableCase).toHaveBeenCalledWith('HG 0000 0000 0', { channel: 'line_bot' }, mockDb);
+      expect(findTrackableCaseStatus).toHaveBeenCalledWith('HG 0000 0000 0', { channel: 'line_bot' }, mockDb);
+      expect(findTrackableCase).not.toHaveBeenCalled();
     });
 
-    it('พบเรื่องที่ติดตามได้ → ตอบเป็น flex สถานะ', async () => {
-      vi.mocked(findTrackableCase).mockResolvedValueOnce({
-        case: {
-          id: 'case-1',
-          trackingCode: 'HG123456789',
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          status: 'in_progress',
-          priority: 'normal',
-          title: 'ถนนพัง',
-          dueDate: null,
-          closedAt: null,
-        },
-        category: null,
-        updates: [],
+    it('พบเรื่องที่ติดตามได้ → ตอบเป็น flex สถานะจาก projection สามฟิลด์', async () => {
+      vi.mocked(findTrackableCaseStatus).mockResolvedValueOnce({
+        trackingCode: 'HG123456789',
+        status: 'in_progress',
+        title: 'ถนนพัง',
       });
       const event = makeEvent('ติดตาม HG123456789');
       const replies = (await routeBotMessage(mockDb, event, 'ติดตาม HG123456789', 'user-pk', 'conv-1')).replies;
@@ -201,6 +193,7 @@ describe('routeBotMessage — existing behavior (TDD safety net)', () => {
       expect(replies).toHaveLength(1);
       expect(replies[0]!.type).toBe('flex');
       expect((replies[0] as { altText: string }).altText).toBe('สถานะ HG123456789');
+      expect(findTrackableCase).not.toHaveBeenCalled();
     });
   });
 

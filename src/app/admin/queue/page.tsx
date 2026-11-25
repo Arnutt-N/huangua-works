@@ -1,23 +1,22 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { and, asc, desc, eq, gte, lt, type SQL } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
-import { queueBookings } from '@/lib/db/schema';
 import { requireStaff } from '@/lib/auth/require-staff';
 import { AdminShell } from '@/components/admin/admin-shell';
+import { Pagination } from '@/components/admin/pagination';
 import { formatThaiDateLong } from '@/lib/thai-date';
 import {
   QUEUE_BOOKING_STATUS_LABELS,
   QUEUE_CATEGORY_LABELS,
   QUEUE_CATEGORY_SHORT_LABELS,
   QUEUE_SLOT_LABELS,
-  toLocalISODate,
   type QueueBookingStatus,
   type QueueCategory,
   type QueueSlotId,
 } from '@/lib/validation';
 import { QueueRowForm } from './queue-row-form';
 import { HUA_NGUA_VILLAGES } from '@/app/queue/villages';
+import { buildQueueHref, listQueueBookings, parseQueueListParams } from './queue-list';
 
 export const metadata: Metadata = { title: 'คิวนัดหมายและนัดช่าง' };
 export const dynamic = 'force-dynamic';
@@ -38,8 +37,9 @@ const villageNameMap = new Map(HUA_NGUA_VILLAGES.map((v) => [v.id, v.name]));
 
 interface AdminQueuePageProps {
   searchParams: Promise<{
-    category?: string;
-    range?: string;
+    category?: string | string[];
+    range?: string | string[];
+    page?: string | string[];
   }>;
 }
 
@@ -47,45 +47,16 @@ export default async function AdminQueuePage({ searchParams }: AdminQueuePagePro
   const { user: staffUser } = await requireStaff();
   const db = await getDb();
 
-  const params = await searchParams;
-  const activeCategory = (params.category ?? 'all') as 'all' | QueueCategory;
-  const activeRange = (params.range ?? 'upcoming') as 'upcoming' | 'today' | 'past' | 'all';
-
-  const todayStr = toLocalISODate(new Date());
-
-  const conditions: SQL[] = [];
-
-  if (activeCategory === 'technician' || activeCategory === 'government') {
-    conditions.push(eq(queueBookings.category, activeCategory));
-  }
-
-  if (activeRange === 'today') {
-    conditions.push(eq(queueBookings.bookingDate, todayStr));
-  } else if (activeRange === 'upcoming') {
-    conditions.push(gte(queueBookings.bookingDate, todayStr));
-  } else if (activeRange === 'past') {
-    conditions.push(lt(queueBookings.bookingDate, todayStr));
-  }
-
-  const query = db
-    .select()
-    .from(queueBookings)
-    .where(conditions.length > 0 ? and(...conditions) : undefined);
-
-  if (activeRange === 'past') {
-    query.orderBy(desc(queueBookings.bookingDate), desc(queueBookings.slot));
-  } else {
-    query.orderBy(asc(queueBookings.bookingDate), asc(queueBookings.slot));
-  }
-
-  const bookings = await query.limit(100);
+  const parsedParams = parseQueueListParams(await searchParams);
+  const activeCategory = parsedParams.category;
+  const activeRange = parsedParams.range;
+  const { bookings, totalRows, totalPages, page } = await listQueueBookings(db, parsedParams);
 
   function filterHref(cat: string, rng: string) {
-    const q = new URLSearchParams();
-    if (cat !== 'all') q.set('category', cat);
-    if (rng !== 'upcoming') q.set('range', rng);
-    const qs = q.toString();
-    return `/admin/queue${qs ? `?${qs}` : ''}`;
+    return buildQueueHref(parsedParams, {
+      category: cat as typeof parsedParams.category,
+      range: rng as typeof parsedParams.range,
+    });
   }
 
   return (
@@ -138,7 +109,7 @@ export default async function AdminQueuePage({ searchParams }: AdminQueuePagePro
       </div>
 
       <p className="mb-4 text-sm text-muted">
-        รายการคิวนัดหมาย ({bookings.length} รายการ) — ยืนยัน / เสร็จสิ้น / ยกเลิกคิวเพื่อแจ้งให้ประชาชนทราบ
+        รายการคิวนัดหมาย ({totalRows} รายการ หน้า {page}/{totalPages}) — ยืนยัน / เสร็จสิ้น / ยกเลิกคิวเพื่อแจ้งให้ประชาชนทราบ
       </p>
 
       {bookings.length === 0 ? (
@@ -363,6 +334,13 @@ export default async function AdminQueuePage({ searchParams }: AdminQueuePagePro
               </tbody>
             </table>
           </div>
+
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            basePath="/admin/queue"
+            searchParams={await searchParams}
+          />
         </>
       )}
     </AdminShell>

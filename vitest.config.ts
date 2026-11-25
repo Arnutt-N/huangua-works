@@ -4,6 +4,9 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'node',
+    // § ชุดยาวใช้ Postgres/Redis ตัวเดียวกัน — รันหลาย worker พร้อมกันแล้ว timeout เป็นระยะ
+    maxWorkers: 1,
+    minWorkers: 1,
     // § default exclude ของ vitest มี node_modules — ต้องรวมไว้ด้วยหรือมันจะกวาด node_modules
     include: ['src/**/*.test.{ts,tsx}'],
     exclude: ['**/node_modules/**', '**/*.integration.test.ts'],
