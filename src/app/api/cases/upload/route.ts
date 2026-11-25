@@ -42,6 +42,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // § กัน ingress ก่อน parse multipart — req.formData() materialize ทั้ง body ขึ้น memory
+  // § chunked upload ไม่มี Content-Length จึงจำกัดได้แค่ที่ file.size/buffer.length ด้านล่าง
+  const contentLength = Number(req.headers.get('content-length') ?? '');
+  if (Number.isFinite(contentLength) && contentLength > MEDIA_MAX_SIZE_BYTES) {
+    return NextResponse.json({ error: MEDIA_SIZE_ERROR }, { status: 413 });
+  }
+
   let formData: FormData;
   try {
     formData = await req.formData();

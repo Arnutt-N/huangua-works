@@ -339,7 +339,7 @@ export default async function AdminQueuePage({ searchParams }: AdminQueuePagePro
             currentPage={page}
             totalPages={totalPages}
             basePath="/admin/queue"
-            searchParams={await searchParams}
+            searchParams={{ ...(await searchParams), page: String(page) }}
           />
         </>
       )}
