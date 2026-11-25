@@ -9,10 +9,24 @@ export class LineApiError extends Error {
     public readonly endpoint: string,
     public readonly status: number,
     detail: string,
+    // § เฉพาะ 429 ที่มี Retry-After ตอบกลับ — caller ใช้กำหนด delay แทน backoff คงที่
+    public readonly retryAfterMs?: number,
   ) {
     super(`LINE API ${endpoint} failed (${status}): ${detail}`);
     this.name = 'LineApiError';
   }
+}
+
+// § Retry-After ของ LINE เป็น delta-seconds — กัน header ผิดรูป/ใหญ่เกินไปไม่ให้ retry ค้างนาน
+const MAX_RETRY_AFTER_MS = 60000;
+
+function retryAfterFrom(res: Response, status: number): number | undefined {
+  if (status !== 429) return undefined;
+  const raw = res.headers.get('retry-after');
+  if (!raw) return undefined;
+  const seconds = Number(raw.trim());
+  if (!Number.isFinite(seconds) || seconds < 0) return undefined;
+  return Math.min(seconds * 1000, MAX_RETRY_AFTER_MS);
 }
 
 export function getHeaders(retryKey?: string): HeadersInit {
@@ -41,7 +55,7 @@ async function postLine(endpoint: string, payload: unknown, opts: PostLineOption
       // § 409 พร้อม accepted request id แปลว่า LINE รับคำขอเดิมแล้ว (retry ด้วย key เดิม) — ถือว่าสำเร็จ
       if (res.status === 409 && (res.headers.get('x-line-accepted-request-id') ?? '').trim() !== '') return;
       const detail = await res.text().catch(() => '');
-      throw new LineApiError(endpoint, res.status, detail.slice(0, 500));
+      throw new LineApiError(endpoint, res.status, detail.slice(0, 500), retryAfterFrom(res, res.status));
     }
   });
 }

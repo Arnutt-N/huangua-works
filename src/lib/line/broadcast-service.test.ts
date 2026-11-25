@@ -112,7 +112,7 @@ function dbStub(row: Row | null, rawByInternal: Record<string, string> = {}, raw
 
 const transient500 = () => new LineApiError('/message/broadcast', 500, 'LINE down');
 const rateLimited = (retryAfterMs?: number) => {
-  const error = new LineApiErrorMock('/message/broadcast', 429, 'rate limited') as LineApiError & { retryAfterMs?: number };
+  const error = new LineApiErrorMock('/message/broadcast', 429, 'rate limited') as InstanceType<typeof LineApiError> & { retryAfterMs?: number };
   error.retryAfterMs = retryAfterMs;
   return error;
 };
@@ -410,7 +410,7 @@ describe('sendBroadcast · lease owner', () => {
       update: () => ({
         set: (v: Record<string, unknown>) => ({
           where: (condition: unknown) => {
-            const query = dialect.sqlToQuery(condition);
+            const query = dialect.sqlToQuery(condition as Parameters<typeof dialect.sqlToQuery>[0]);
             if (v.status === 'sending') {
               return {
                 returning: async () => {
@@ -433,13 +433,13 @@ describe('sendBroadcast · lease owner', () => {
                 },
               };
             }
-            if (v.status === 'sent' || v.status === 'failed') {
-              terminalWrites.push({ set: v, sql: query.sql, params: query.params });
-            }
             return {
               returning: async () => {
                 const ownerParam = query.params.find((p) => p === currentOwner && typeof p === 'string');
                 if (currentStatus !== 'sending' || currentOwner === null || ownerParam === undefined) return [];
+                if (v.status === 'sent' || v.status === 'failed') {
+                  terminalWrites.push({ set: v, sql: query.sql, params: query.params });
+                }
                 currentStatus = v.status as string;
                 currentOwner = null;
                 return [{ id: 'b1' }];

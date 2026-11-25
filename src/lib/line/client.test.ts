@@ -85,3 +85,41 @@ describe('LINE client · retry key และ timeout เฉพาะ broadcast/m
     ).rejects.toMatchObject({ name: 'LineApiError', status: 409 } satisfies Partial<LineApiError>);
   });
 });
+
+describe('LineApiError · Retry-After เฉพาะ 429', () => {
+  async function failure(status: number, headers?: Record<string, string>): Promise<unknown> {
+    mockFetch(() => lineResponse(status, { headers }));
+    const { broadcastMessage } = await import('./client');
+    return broadcastMessage([{ type: 'text', text: 'สวัสดี' }], '55555555-5555-5555-8555-555555555555')
+      .then(() => null)
+      .catch((error: unknown) => error);
+  }
+
+  it('429 พร้อม Retry-After 42 วิ → retryAfterMs 42000', async () => {
+    await expect(failure(429, { 'Retry-After': '42' })).resolves.toMatchObject({
+      name: 'LineApiError',
+      status: 429,
+      retryAfterMs: 42000,
+    } satisfies Partial<LineApiError>);
+  });
+
+  it('429 พร้อม Retry-After 99999 วิ → clamp ที่ 60000 ms', async () => {
+    await expect(failure(429, { 'Retry-After': '99999' })).resolves.toMatchObject({
+      name: 'LineApiError',
+      status: 429,
+      retryAfterMs: 60000,
+    } satisfies Partial<LineApiError>);
+  });
+
+  it('429 ไม่มี Retry-After → retryAfterMs ไม่กำหนด', async () => {
+    const error = await failure(429);
+    expect(error).toBeInstanceOf(LineApiError);
+    expect((error as LineApiError).retryAfterMs).toBeUndefined();
+  });
+
+  it('500 พร้อม Retry-After → ไม่แปลงเป็น retryAfterMs', async () => {
+    const error = await failure(500, { 'Retry-After': '42' });
+    expect(error).toBeInstanceOf(LineApiError);
+    expect((error as LineApiError).retryAfterMs).toBeUndefined();
+  });
+});

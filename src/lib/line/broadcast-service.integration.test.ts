@@ -84,6 +84,7 @@ describe('recoverStaleSending · ฐานจริง', () => {
     expect(row?.scheduledAt?.getTime()).toBeGreaterThan(old.getTime());
     expect(row?.updatedAt.getTime()).toBeGreaterThan(old.getTime());
     expect(row?.errorMessage).toBeNull();
+    expect(row?.leaseOwner).toBeNull();
   });
 });
 

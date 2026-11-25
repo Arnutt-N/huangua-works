@@ -40,7 +40,7 @@ export function broadcastRetryKey(broadcastId: string, rawIds: readonly string[]
 
 /**
  * § retry เฉพาะ error ชั่วคราว: 429/5xx, timeout, fetch ตัด (TypeError)
- * 429 เป็นการฝ่ากฎ LINE ที่แนะนำให้ backoff ตาม Retry-After — ที่นี่ retry ทันที 1s/2s เพื่อให้ broadcast เสร็จในรอบ cron
+ * 429 retry ตาม Retry-After ถ้ามี (ดู retryDelayMs) ไม่มีใช้ backoff 1s/2s เพื่อให้ broadcast เสร็จในรอบ cron
  * permanent 4xx อื่น, circuit open, Error ทั่วไป → ไม่ retry (retry ซ้ำก็จะล้มเหมือนเดิมและเปลืองโควต้า)
  */
 function isTransientError(error: unknown): boolean {
@@ -49,6 +49,14 @@ function isTransientError(error: unknown): boolean {
   if (error instanceof DOMException && error.name === 'TimeoutError') return true;
   if (error instanceof TypeError) return true;
   return false;
+}
+
+function retryDelayMs(error: unknown, attempt: number): number {
+  // § 429 ที่ LINE ส่ง Retry-After มาให้เชื่อตามระยะนั้นก่อน backoff คงที่ — retry เร็วเกินไปจะโดนปฏิเสธซ้ำ
+  if (error instanceof LineApiError && error.status === 429 && error.retryAfterMs !== undefined) {
+    return error.retryAfterMs;
+  }
+  return RETRY_DELAY_MS * attempt;
 }
 
 async function sendWithRetry(retryKey: string, send: (retryKey: string) => Promise<void>): Promise<void> {
@@ -60,7 +68,7 @@ async function sendWithRetry(retryKey: string, send: (retryKey: string) => Promi
     } catch (err) {
       lastError = err;
       if (!isTransientError(err) || attempt === MAX_ATTEMPTS) break;
-      await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * attempt));
+      await new Promise((r) => setTimeout(r, retryDelayMs(err, attempt)));
     }
   }
   throw lastError;
@@ -261,12 +269,12 @@ async function deliverTargeted(
     return markFailed(db, id, firstError ?? 'ส่งบางชุดไม่สำเร็จ', { total, success, failed }, owner);
   }
 
-  const rows = await db
+  const written = await db
     .update(chatBroadcasts)
     .set({ status: 'sent', sentAt: new Date(), totalRecipients: total, successCount: success, failedCount: 0, leaseOwner: null, updatedAt: new Date() })
     .where(and(eq(chatBroadcasts.id, id), eq(chatBroadcasts.leaseOwner, owner)))
     .returning({ id: chatBroadcasts.id });
-  if (rows.length === 0) return { kind: 'skipped-not-claimable' };
+  if (written.length === 0) return { kind: 'skipped-not-claimable' };
   return { kind: 'sent', totalRecipients: total, successCount: success, failedCount: 0 };
 }
 
