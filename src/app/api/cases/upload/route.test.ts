@@ -94,7 +94,8 @@ describe('POST /api/cases/upload', () => {
   it('ตอบกลับ 413 จาก Content-Length ก่อนอ่าน formData เมื่อ header เกิน 10MB', async () => {
     const req = new NextRequest('http://localhost:3000/api/cases/upload', {
       method: 'POST',
-      headers: { 'content-length': String(MEDIA_MAX_SIZE_BYTES + 1) },
+      // § เกินเพดานรวม overhead (4KB) จึงต้องปฏิเสธแม้ยังไม่แตะ file.size
+      headers: { 'content-length': String(MEDIA_MAX_SIZE_BYTES + 4096 + 1) },
     });
     const formDataSpy = vi.spyOn(req, 'formData');
 
@@ -103,6 +104,46 @@ describe('POST /api/cases/upload', () => {
     expect((await res.json()).error).toBe(MEDIA_SIZE_ERROR);
     expect(formDataSpy).not.toHaveBeenCalled();
   });
+
+  it('ส่งคำขอไฟล์ 10MB พอดีที่ header รวม overhead ต่อไปยัง formData', async () => {
+    const pngBuffer = createPngBuffer();
+    const exactFile = new File(
+      [new Uint8Array(pngBuffer), new Uint8Array(MEDIA_MAX_SIZE_BYTES - pngBuffer.length)],
+      'exact.png',
+      { type: 'image/png' },
+    );
+    expect(exactFile.size).toBe(MEDIA_MAX_SIZE_BYTES);
+
+    const formData = new FormData();
+    formData.append('file', exactFile);
+    const req = new NextRequest('http://localhost:3000/api/cases/upload', {
+      method: 'POST',
+      body: formData,
+      headers: { 'content-length': String(MEDIA_MAX_SIZE_BYTES + 174) },
+    });
+    const formDataSpy = vi.spyOn(req, 'formData');
+
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+    expect(formDataSpy).toHaveBeenCalledTimes(1);
+    expect(uploadFile).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['abc', '-1', '1.5', '10MB'])(
+    'ตอบกลับ 400 เมื่อ Content-Length ไม่ใช่ตัวเลข (%s) ก่อนอ่าน formData',
+    async (declared) => {
+      const req = new NextRequest('http://localhost:3000/api/cases/upload', {
+        method: 'POST',
+        headers: { 'content-length': declared },
+      });
+      const formDataSpy = vi.spyOn(req, 'formData');
+
+      const res = await POST(req);
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toBe('Content-Length ไม่ถูกต้อง');
+      expect(formDataSpy).not.toHaveBeenCalled();
+    },
+  );
 
   it('ส่งคำขอที่มี Content-Length ปกติต่อไปยัง formData', async () => {
     const req = new NextRequest('http://localhost:3000/api/cases/upload', {
