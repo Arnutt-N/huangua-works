@@ -22,6 +22,9 @@ import {
 
 export { sniffImageMime };
 
+/** § เผื่อ boundary, filename, Content-Type และ CRLF ของ multipart ให้ไฟล์ 10MB พอดีผ่าน ingress */
+const MULTIPART_OVERHEAD_BYTES = 4 * 1024;
+
 export async function POST(req: NextRequest) {
   const ip = clientIpFromHeaders(req.headers);
 
@@ -41,6 +44,20 @@ export async function POST(req: NextRequest) {
       { status: 503 }
     );
   }
+
+  // § กัน ingress ก่อน parse multipart — req.formData() materialize ทั้ง body ขึ้น memory
+  // § Content-Length รวม boundary, filename, Content-Type และ CRLF ของส่วน multipart จึงต้องเผื่อ overhead
+  // § ใช้ file.size/buffer.length เป็นเกณฑ์ตัดสินจริง — header เป็นแค่ตัวกรองคร่าว ๆ ก่อนอ่าน body
+  const declared = req.headers.get('content-length');
+  if (declared !== null) {
+    if (!/^\d+$/.test(declared)) {
+      return NextResponse.json({ error: 'Content-Length ไม่ถูกต้อง' }, { status: 400 });
+    }
+    if (Number(declared) > MEDIA_MAX_SIZE_BYTES + MULTIPART_OVERHEAD_BYTES) {
+      return NextResponse.json({ error: MEDIA_SIZE_ERROR }, { status: 413 });
+    }
+  }
+  // § chunked upload ไม่มี Content-Length จึงจำกัดได้แค่ที่ file.size/buffer.length ด้านล่าง
 
   let formData: FormData;
   try {
