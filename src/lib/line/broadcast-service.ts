@@ -71,7 +71,8 @@ export async function recoverStaleSending(now: Date = new Date()): Promise<numbe
   const db = await getDb();
   const rows = await db
     .update(chatBroadcasts)
-    .set({ status: 'scheduled', scheduledAt: now, updatedAt: now })
+    // § ล้าง leaseOwner ด้วย — worker เก่าต้องหมดสิทธิ์เขียนผลทับ worker ที่รับช่วงต่อ
+    .set({ status: 'scheduled', scheduledAt: now, updatedAt: now, leaseOwner: null })
     .where(
       and(
         eq(chatBroadcasts.status, 'sending'),

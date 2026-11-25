@@ -72,6 +72,7 @@ describe('recoverStaleSending · ฐานจริง', () => {
       content: [],
       status: 'sending',
       target: { kind: 'all' },
+      leaseOwner: 'old-owner',
       updatedAt: old,
     });
 
@@ -135,6 +136,7 @@ describe('sendBroadcast · counters/hash บนฐานจริง', () => {
       totalRecipients: MULTICAST_BATCH_SIZE + 1,
       successCount: MULTICAST_BATCH_SIZE,
       failedCount: 1,
+      leaseOwner: null,
     });
 
     const failed = await db
