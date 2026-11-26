@@ -41,7 +41,7 @@ vi.stubGlobal(
   }),
 );
 
-import { BOT_DISABLED_TEXT, handleEvent, routeBotMessage } from './engine';
+import { BOT_DISABLED_TEXT, handleEvent, prepareExternalEffects, routeBotMessage, runEventEffects } from './engine';
 import { matchFaq } from './faq-matcher';
 import { broadcast } from '../sse/broadcaster';
 import { createRecordingTransport } from '../conversation/recording-transport';
@@ -113,6 +113,22 @@ describe('handleEvent — bot_enabled', () => {
     const replies = repliesOf(transport);
     expect(replies).toHaveLength(1);
     expect(replies[0]).toMatchObject({ replyToken: 'reply-token', messages: [{ type: 'text', text: BOT_DISABLED_TEXT }] });
+  });
+});
+
+describe('prepareExternalEffects — I/O อยู่นอก effects/lock', () => {
+  it('profile ที่ prepare แล้วไม่ถูกดึงซ้ำตอน runEventEffects', async () => {
+    const transport = createRecordingTransport();
+    transport.setProfile({ userId: 'U123', displayName: 'เตรียมแล้ว' });
+    const event = textEvent('สวัสดีครับ');
+    const prepared = await prepareExternalEffects(event, transport);
+
+    expect(prepared.profile?.displayName).toBe('เตรียมแล้ว');
+    expect(transport.calls.filter((c) => c.kind === 'profile')).toHaveLength(1);
+
+    await runEventEffects(mockDb, event, transport, prepared);
+
+    expect(transport.calls.filter((c) => c.kind === 'profile')).toHaveLength(1);
   });
 });
 
