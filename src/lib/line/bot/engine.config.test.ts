@@ -66,9 +66,12 @@ function textEvent(text: string) {
 }
 
 function conversationUpdatePayload(): Record<string, unknown> {
-  // set() ครั้งแรกใน handleMessageEvent คือการอัปเดต lastMessage/unreadAdmin ของ conversation
-  const call = setMock.mock.calls[0] as unknown as [Record<string, unknown>] | undefined;
-  if (!call) throw new Error('ไม่มีการอัปเดต conversation');
+  // § เลือก payload ตาม field ที่ recordInboundMessage เขียน — อย่าใช้ calls[0] เพราะ
+  // ลำดับ update อื่น (profile backfill, changeMode) อาจมาก่อนได้ตาม flow ของ engine
+  const call = (setMock.mock.calls as unknown as [Record<string, unknown>][]).find(([payload]) =>
+    Object.prototype.hasOwnProperty.call(payload, 'lastMessageText'),
+  );
+  if (!call) throw new Error('ไม่มีการอัปเดต conversation จาก recordInboundMessage');
   return call[0];
 }
 
