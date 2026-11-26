@@ -44,7 +44,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   const db = await getDb();
-  await db.delete(apiConnections).where(inArray(apiConnections.provider, ['smtp', 'line']));
+  await db.delete(apiConnections).where(inArray(apiConnections.provider, ['smtp', 'line', 'telegram']));
   await db.delete(auditLogs).where(eq(auditLogs.userId, adminId));
   await db.delete(users).where(eq(users.id, adminId));
   await closeDb();
@@ -69,8 +69,16 @@ describe('POST /api/admin/api-connections', () => {
     expect(audits.some((a) => a.action === 'api_connection_update')).toBe(true);
   });
 
-  test('rejects unknown provider with 400', async () => {
+  test('accepts telegram provider from the supported provider list', async () => {
     const res = await POST(postRequest({ provider: 'telegram' }));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { item: { provider: string; status: string } };
+    expect(body.item.provider).toBe('telegram');
+    expect(['unknown', 'connected', 'degraded', 'down']).toContain(body.item.status);
+  });
+
+  test('rejects unknown provider with 400', async () => {
+    const res = await POST(postRequest({ provider: 'not-a-provider' }));
     expect(res.status).toBe(400);
   });
 });

@@ -107,7 +107,10 @@ function dbStub(row: Row | null, rawByInternal: Record<string, string> = {}, raw
       },
     }),
   };
-  return { db, updates, failedInserts, returningRows: () => [] };
+  const withTx = Object.assign(db, {
+    transaction: async (fn: (tx: typeof db) => Promise<unknown>) => fn(db),
+  });
+  return { db: withTx, updates, failedInserts, returningRows: () => [] };
 }
 
 const transient500 = () => new LineApiError('/message/broadcast', 500, 'LINE down');
@@ -450,6 +453,7 @@ describe('sendBroadcast · lease owner', () => {
       }),
       select: () => ({ from: () => ({ where: async () => [] }) }),
       insert: () => ({ values: () => ({ onConflictDoUpdate: async () => [] }) }),
+      transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(db),
     };
     vi.mocked(getDb).mockResolvedValue(db as never);
     followerMock.mockResolvedValue({ userIds: [] });
@@ -476,6 +480,85 @@ describe('sendBroadcast · lease owner', () => {
     expect(sent.set).toMatchObject({ status: 'sent', leaseOwner: null });
     expect(sent.sql).toContain('"lease_owner" = $');
     expect(sent.params).toContain(ownerByClaim[1]);
+  });
+
+  it('lease ถูกช่วงไปแล้วไม่เขียน failed recipients', async () => {
+    const failedInserts: Record<string, unknown>[] = [];
+    const dialect = new PgDialect();
+    const db = {
+      update: () => ({
+        set: (v: Record<string, unknown>) => ({
+          where: (condition: unknown) => {
+            const query = dialect.sqlToQuery(condition as Parameters<typeof dialect.sqlToQuery>[0]);
+            return {
+              returning: async () => {
+                if (v.status === 'sending') return [{ id: 'b1', content: [], target: { kind: 'line_user_ids', ids: ['u1'] } }];
+                const ownerParam = query.params.find((p) => typeof p === 'string' && p.length > 0);
+                return ownerParam === undefined ? [{ id: 'b1' }] : [];
+              },
+            };
+          },
+        }),
+      }),
+      select: () => ({ from: () => ({ where: async () => [{ lineUserIdEnc: 'U1' }] }) }),
+      insert: () => ({
+        values: (v: Record<string, unknown>) => {
+          failedInserts.push(v);
+          return { onConflictDoUpdate: async () => [] };
+        },
+      }),
+      transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(db),
+    };
+    vi.mocked(getDb).mockResolvedValue(db as never);
+    multicastMock.mockRejectedValueOnce(permanent400());
+
+    const outcome = await sendBroadcast('b1');
+
+    expect(outcome.kind).toBe('skipped-not-claimable');
+    expect(failedInserts).toHaveLength(0);
+  });
+
+  it('insert failed recipients ล้มต้อง rollback สถานะ failed ด้วย', async () => {
+    const updates: Record<string, unknown>[] = [];
+    let inserts = 0;
+    const tx = {
+      update: () => ({
+        set: (v: Record<string, unknown>) => {
+          updates.push(v);
+          return { where: () => ({ returning: async () => [v.status === 'sending' ? { id: 'b1', content: [], target: { kind: 'line_user_ids', ids: ['u1'] } } : { id: 'b1' }] }) };
+        },
+      }),
+      select: () => ({ from: () => ({ where: async () => [{ lineUserIdEnc: 'U1' }] }) }),
+      insert: () => ({
+        values: () => {
+          inserts++;
+          return {
+            onConflictDoUpdate: async () => {
+              throw new Error('insert failed');
+            },
+          };
+        },
+      }),
+    };
+    const db = {
+      ...tx,
+      transaction: async (fn: (client: typeof tx) => Promise<unknown>) => {
+        const before = updates.length;
+        try {
+          return await fn(tx);
+        } catch (error) {
+          updates.length = before;
+          throw error;
+        }
+      },
+    };
+    vi.mocked(getDb).mockResolvedValue(db as never);
+    multicastMock.mockRejectedValueOnce(permanent400());
+
+    await expect(sendBroadcast('b1')).rejects.toThrow('insert failed');
+
+    expect(inserts).toBe(1);
+    expect(updates.some((u) => u.status === 'failed')).toBe(false);
   });
 });
 
