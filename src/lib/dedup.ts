@@ -5,9 +5,9 @@
 
 import { getDb, type DbOrTx } from './db';
 import { firstOrUndefined } from './db/query-helpers';
-import { dedupHashes } from './db/schema';
+import { cases, dedupHashes } from './db/schema';
 import { generateId } from './id';
-import { generateDedupHash, generateLegacyDedupHash } from './cid-hmac';
+import { generateDedupHash, generateLegacyDedupHash, sameDedupContent } from './cid-hmac';
 import { eq, sql, and, gt, inArray, lte } from 'drizzle-orm';
 
 const DEDUP_WINDOW_DAYS = 7;
@@ -41,6 +41,16 @@ export async function checkDuplicate(
   );
 
   if (existing) {
+    // § hash เก่าใช้ตัวคั่น `|` ที่ปรากฏในเนื้อหาได้ — ต้องเทียบ title/description ของเรื่องจริง
+    // ก่อนปฏิเสธ ไม่เช่นนั้นเรื่องคนละ tuple ที่ legacy hash ชนกันถูกตีว่าซ้ำตลอด 7 วัน
+    if (existing.hash !== hashes[0]) {
+      const stored = await firstOrUndefined(
+        _db.select({ title: cases.title, description: cases.description }).from(cases).where(eq(cases.id, existing.caseId)).limit(1),
+      );
+      if (!stored || !sameDedupContent(title, description, stored.title, stored.description)) {
+        return { isDuplicate: false };
+      }
+    }
     return { isDuplicate: true, caseId: existing.caseId };
   }
 

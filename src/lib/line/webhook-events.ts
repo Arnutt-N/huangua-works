@@ -1,8 +1,8 @@
-import { and, asc, eq, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm';
+import { aliasedTable, and, asc, eq, inArray, isNull, lt, notExists, or, sql } from 'drizzle-orm';
 import { getDb, type DbOrTx } from '@/lib/db';
 import { generateId } from '@/lib/id';
 import { createHash } from 'node:crypto';
-import { lookupHash, resolveRawLineId } from './identity';
+import { ensureLineUser, lookupHash, resolveRawLineId } from './identity';
 import { lineUsers, lineWebhookEvents } from '@/lib/db/schema';
 import type { LineOutgoingMessage, LineWebhookEvent } from './types';
 
@@ -10,6 +10,10 @@ import type { LineOutgoingMessage, LineWebhookEvent } from './types';
 // follow/unfollow/postback ที่ไม่มี id เดียวใช้ hash ของ payload แทน (กัน redelivery)
 
 export type WebhookEventStatus = 'pending' | 'processing' | 'done' | 'failed';
+export type ReplyState = 'pending' | 'none' | 'expired';
+
+// § หลัง done/failed terminal ไม่เก็บ payload ซ้ำ — ใช้โครงสร้างเดิมเพื่อให้ row อ่านแล้วไม่ parse พัง
+const CLEARED_PAYLOAD = { type: 'unfollow', timestamp: 0, source: { type: 'user', userId: '' } } as unknown as Record<string, unknown>;
 
 export interface WebhookEventRow {
   id: string;
@@ -22,6 +26,7 @@ export interface WebhookEventRow {
   status: WebhookEventStatus;
   effectsCommittedAt: Date | null;
   pendingReplies: LineOutgoingMessage[] | null;
+  replyState: ReplyState;
   attempts: number;
   leaseUntil: Date | null;
   leaseOwner: string | null;
@@ -54,6 +59,8 @@ export interface EnqueueResult {
 
 export async function enqueueWebhookEvent(event: LineWebhookEvent): Promise<EnqueueResult> {
   const db = await getDb();
+  // § สร้าง identity ก่อน acknowledge — ถ้า worker รีสตาร์ทก่อน process ก็ยังถอด raw id กลับได้
+  await ensureLineUser(db, event.source.userId);
   const payload = sanitizeEvent(event);
   try {
     const [inserted] = await db
@@ -78,40 +85,56 @@ export async function enqueueWebhookEvent(event: LineWebhookEvent): Promise<Enqu
 
 export const CLAIM_LEASE_MS = 60_000;
 
+/**
+ * § กฎ predecessor เดียวสำหรับ claim และ commitEffects — เปรียบเทียบ (timestamp,id) แบบเข้มงวด
+ *   timestamp เท่ากันต้องตัดด้วย id เสมอ ไม่นั้นสองแถวเวลาเดียวกันจะมองกันว่าเป็น predecessor
+ *   current เป็น column ref (claim) หรือค่า row (commitEffects) — ทั้งคู่แทรกผ่าน sql template เดียวกัน
+ */
+function predecessorFilter(
+  other: typeof lineWebhookEvents,
+  current: { id: unknown; lineUserIdHash: unknown; eventTimestamp: unknown },
+) {
+  return and(
+    eq(other.lineUserIdHash, current.lineUserIdHash as never),
+    sql`${other.id} <> ${current.id}`,
+    inArray(other.status, ['pending', 'processing']),
+    isNull(other.effectsCommittedAt),
+    or(
+      lt(other.eventTimestamp, current.eventTimestamp as never),
+      and(eq(other.eventTimestamp, current.eventTimestamp as never), sql`${other.id} < ${current.id}`),
+    ),
+  );
+}
+
 /** เลือก event ตาม timestamp แล้ว id — ภายใน user เดียวต้อง process ตามลำดับ */
 export async function claimNextWebhookEvent(limit = 1): Promise<WebhookEventRow[]> {
   const db = await getDb();
   const now = new Date();
-  const rows = await db
+  const e = aliasedTable(lineWebhookEvents, 'e');
+  const p = aliasedTable(lineWebhookEvents, 'p');
+  // § กรอง eligibility + predecessor ใน SQL ก่อน loop/claim — แถวที่ถูกบล็อกห้ามบัง event
+  //   ของ user อื่นที่พร้อมแล้ว (ต้องไม่ limit ก่อนกรอง)
+  const candidates = await db
     .select()
-    .from(lineWebhookEvents)
-    .where(or(
-      eq(lineWebhookEvents.status, 'pending'),
-      and(eq(lineWebhookEvents.status, 'processing'), lt(lineWebhookEvents.leaseUntil, now)),
+    .from(e)
+    .where(and(
+      or(
+        eq(e.status, 'pending'),
+        and(eq(e.status, 'processing'), lt(e.leaseUntil, now)),
+      ),
+      notExists(db.select({ one: sql`1` }).from(p).where(predecessorFilter(p, {
+        id: sql`${e.id}`,
+        lineUserIdHash: e.lineUserIdHash,
+        eventTimestamp: e.eventTimestamp,
+      }))),
     ))
-    .orderBy(asc(lineWebhookEvents.eventTimestamp), asc(lineWebhookEvents.id))
-    .limit(limit * 3);
-  if (rows.length === 0) return [];
+    .orderBy(asc(e.eventTimestamp), asc(e.id));
+  if (candidates.length === 0) return [];
 
   const claimed: WebhookEventRow[] = [];
-  for (const row of rows) {
+  for (const row of candidates) {
     // § backoff คำนวณจาก updatedAt (ตอน claim ล่าสุด) — ไม่ต้องพึ่ง Redis ที่อาจหายตอน restart
-    // (eventTimestamp ยังเป็นตัวจัดลำดับเสมอ)
-    if (row.attempts > 0 && Date.now() - row.updatedAt.getTime() < backoffMsFor(row.attempts)) continue;
-
-    // § กันข้ามลำดับ: ถ้ามี event ก่อนหน้าของ user เดียวกันยังไม่ commit effects ให้รอ
-    const earlier = await db
-      .select({ id: lineWebhookEvents.id })
-      .from(lineWebhookEvents)
-      .where(and(
-        eq(lineWebhookEvents.lineUserIdHash, row.lineUserIdHash),
-        inArray(lineWebhookEvents.status, ['pending', 'processing']),
-        lte(lineWebhookEvents.eventTimestamp, row.eventTimestamp),
-        sql`${lineWebhookEvents.id} <> ${row.id}`,
-        isNull(lineWebhookEvents.effectsCommittedAt),
-      ))
-      .limit(1);
-    if (earlier.length > 0) continue;
+    if (row.attempts > 0 && now.getTime() - row.updatedAt.getTime() < backoffMsFor(row.attempts)) continue;
 
     // § claim แบบ condition update — คู่แข่งที่ claim พร้อมกันมีแถวเดียวชนะ
     const leaseUntil = new Date(Date.now() + CLAIM_LEASE_MS);
@@ -133,15 +156,11 @@ export async function claimNextWebhookEvent(limit = 1): Promise<WebhookEventRow[
           and(eq(lineWebhookEvents.status, 'processing'), lt(lineWebhookEvents.leaseUntil, now)),
         ),
       ))
-      .returning({ id: lineWebhookEvents.id });
+      .returning();
     if (!won) continue;
     claimed.push({
-      ...(row as WebhookEventRow),
-      status: 'processing',
+      ...(won as WebhookEventRow),
       attempts: row.attempts + 1,
-      updatedAt: now,
-      leaseUntil,
-      leaseOwner: owner,
     });
     if (claimed.length >= limit) break;
   }
@@ -170,42 +189,50 @@ export async function commitEffects(
     .limit(1);
   if (fresh?.effectsCommittedAt) return { replies: [], state: undefined };
 
+  const p = aliasedTable(lineWebhookEvents, 'p');
   const earlier = await tx
-    .select({ id: lineWebhookEvents.id })
-    .from(lineWebhookEvents)
-    .where(and(
-      eq(lineWebhookEvents.lineUserIdHash, row.lineUserIdHash),
-      lte(lineWebhookEvents.eventTimestamp, row.eventTimestamp),
-      sql`${lineWebhookEvents.id} <> ${row.id}`,
-      isNull(lineWebhookEvents.effectsCommittedAt),
-      inArray(lineWebhookEvents.status, ['pending', 'processing']),
-    ))
+    .select({ id: p.id })
+    .from(p)
+    .where(predecessorFilter(p, row))
     .limit(1);
   if (earlier.length > 0) throw new BarrierDeferred('earlier event for same user not committed');
 
   const result = await effects();
   const now = new Date();
+  const replies = result.replies ?? [];
+  // § แยก effects กับการส่ง reply — [] แปลว่าไม่มี reply ที่ต้องส่ง (ไม่ใช่งานค้างให้ cron รี retry)
   await tx
     .update(lineWebhookEvents)
-    .set({ effectsCommittedAt: now, pendingReplies: result.replies ?? null, updatedAt: now })
+    .set({
+      effectsCommittedAt: now,
+      pendingReplies: replies.length > 0 ? replies : null,
+      replyState: replies.length > 0 ? 'pending' : 'none',
+      updatedAt: now,
+    })
     .where(eq(lineWebhookEvents.id, row.id));
-  return { replies: result.replies ?? [], state: result.state };
+  return { replies, state: result.state };
 }
 
-/** § done หลังส่ง reply สำเร็จ — pendingReplies ถูกล้างเพื่อไม่ส่งซ้ำตอน recovery */
-/** § เฉพาะ owner ของ claim ปัจจุบันเท่านั้นที่ปิด event ได้ — worker เก่าที่ lease หมดต้องไม่ทับ */
-export async function markDone(id: string, owner: string): Promise<void> {
+/** § ปิด event เฉพาะ owner ของ claim ปัจจุบัน — worker เก่าที่ lease หมดต้องไม่ทับ */
+/** § reply_state กำหนดว่ามี reply ให้ส่งหรือไม่ — 'none' ปิดงานโดยไม่ยิง transport */
+export async function markDone(id: string, owner: string, replyState: ReplyState = 'none'): Promise<boolean> {
   const db = await getDb();
-  await db
+  const rows = await db
     .update(lineWebhookEvents)
     .set({
       status: 'done',
       pendingReplies: null,
+      replyState,
+      // § หลังตอบแล้วไม่ต้องเก็บข้อความ/token ซ้ำ — คง dedupKey กับ timestamp ไว้กัน redelivery
+      payload: CLEARED_PAYLOAD,
+      replyToken: null,
       leaseUntil: null,
       leaseOwner: null,
       updatedAt: new Date(),
     })
-    .where(and(eq(lineWebhookEvents.id, id), eq(lineWebhookEvents.leaseOwner, owner)));
+    .where(and(eq(lineWebhookEvents.id, id), eq(lineWebhookEvents.leaseOwner, owner)))
+    .returning({ id: lineWebhookEvents.id });
+  return rows.length > 0;
 }
 
 /** § ต่ออายุ lease เฉพาะ owner เดิม — ใช้ก่อน 작업ที่อาจนานกว่าหน้าต่าง claim */
@@ -232,25 +259,54 @@ export function backoffMsFor(attempts: number): number {
 }
 
 /** § error หลัง commit ต้องยังเห็น pendingReplies — เปลี่ยนสถานะอย่างเดียว ห้ามแตะ effects */
-export async function markFailed(id: string, attempts: number): Promise<void> {
+/** § owner บังคับ — worker ที่ lease หมดแล้วห้ามเปลี่ยนสถานะของแถวที่คนอื่นรับช่วงไปแล้ว */
+export async function markFailed(id: string, attempts: number, owner: string): Promise<boolean> {
   const db = await getDb();
   const terminal = attempts >= MAX_ATTEMPTS;
-  await db
+  const rows = await db
     .update(lineWebhookEvents)
     .set({
       status: terminal ? 'failed' : 'pending',
+      // § failed เป็น terminal — ล้าง payload/token เหมือน done, คง dedupKey กัน redelivery
+      ...(terminal ? { payload: CLEARED_PAYLOAD, replyToken: null, pendingReplies: null, replyState: 'expired' as const } : {}),
       leaseUntil: null,
+      leaseOwner: null,
       updatedAt: new Date(),
     })
-    .where(eq(lineWebhookEvents.id, id));
+    .where(and(eq(lineWebhookEvents.id, id), eq(lineWebhookEvents.leaseOwner, owner)))
+    .returning({ id: lineWebhookEvents.id });
+  return rows.length > 0;
 }
 
-/** § payload เก็บ hash แทน raw id — ถอดกลับจาก line_users ที่ engine สร้าง/updating อยู่แล้ว */
+/** § หมดอายุ reply token หรือส่งไม่ได้ถาวร → terminal ไม่ให้ cron รี retry token เดิมไม่จบ */
+export async function expireReply(id: string, owner: string): Promise<boolean> {
+  const db = await getDb();
+  const rows = await db
+    .update(lineWebhookEvents)
+    .set({
+      status: 'failed',
+      replyState: 'expired',
+      pendingReplies: null,
+      payload: CLEARED_PAYLOAD,
+      replyToken: null,
+      leaseUntil: null,
+      leaseOwner: null,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(lineWebhookEvents.id, id), eq(lineWebhookEvents.leaseOwner, owner)))
+    .returning({ id: lineWebhookEvents.id });
+  return rows.length > 0;
+}
+
+/** § ถอด raw ไม่ได้ต้อง fail ชัดเจน — การคืน payload ที่ source.userId เป็น hash ทำให้ engine สร้าง hash-of-hash */
+export class MissingLineIdentity extends Error {}
+
+/** § payload เก็บ hash แทน raw id — ถอดกลับจาก canonical line_users ที่ ingress สร้างไว้ */
 export async function restoreEvent(db: DbOrTx, row: WebhookEventRow): Promise<LineWebhookEvent> {
   const payload = { ...row.payload } as LineWebhookEvent;
   const user = await findLineUserByHash(db, row.lineUserIdHash);
   const raw = user ? await resolveRawLineId(db, user.id) : null;
-  if (!raw) return payload;
+  if (!raw) throw new MissingLineIdentity(`cannot restore LINE identity for event ${row.id}`);
   return {
     ...payload,
     source: { ...payload.source, userId: raw },

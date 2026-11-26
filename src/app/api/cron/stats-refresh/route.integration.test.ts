@@ -1,10 +1,10 @@
-import { count, eq, inArray } from 'drizzle-orm';
+import { count, eq, inArray, sql } from 'drizzle-orm';
 import { NextRequest } from 'next/server';
-import { afterAll, describe, expect, test } from 'vitest';
+import { afterAll, describe, expect, it, test } from 'vitest';
 import { closeDb, getDb } from '@/lib/db';
 import { cases, caseStatsDaily } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
-import { totalCasesFromSnapshot } from '@/lib/cases/stats';
+import { bangkokDateKey, statusCountsFromSnapshot, totalCasesFromSnapshot } from '@/lib/cases/stats';
 import { GET } from './route';
 
 /**
@@ -29,7 +29,96 @@ afterAll(async () => {
 });
 
 describe('cron/stats-refresh · มาตรฐานสถานะ', () => {
-  test('นับทุกสถานะเป็นยอดรับทั้งหมด และเฉลี่ยจากแถวที่มีวันปิด', async () => {
+  test('ยอดรายวันนับตามวันกรุงเทพ ไม่ใช่ UTC และแยก arrival/closure ตาม timestamp', async () => {
+    const db = await getDb();
+    const secret = process.env.CRON_SECRET;
+    expect(secret && secret.length >= 16).toBe(true);
+
+    const today = bangkokDateKey(new Date());
+    const bangkokMidnightUtc = Date.parse(`${today}T00:00:00Z`) - 7 * 3600_000;
+    const justAfterMidnight = new Date(bangkokMidnightUtc + 60 * 60_000);
+    const justBeforeMidnight = new Date(bangkokMidnightUtc - 60 * 60_000);
+    const arrivalId = generateId();
+    const closureId = generateId();
+    await db.insert(cases).values([
+      {
+        id: arrivalId,
+        status: 'pending',
+        title: `it-stats-arrival-${RUN}`,
+        description: 'ข้อมูลสมมติ',
+        location: '',
+        categoryId: `it-stats-cat-${RUN}`,
+        submittedBy: `it-stats-user-${RUN}`,
+        createdAt: justAfterMidnight,
+        updatedAt: justAfterMidnight,
+      },
+      {
+        id: closureId,
+        status: 'closed',
+        title: `it-stats-closure-${RUN}`,
+        description: 'ข้อมูลสมมติ',
+        location: '',
+        categoryId: `it-stats-cat-${RUN}`,
+        submittedBy: `it-stats-user-${RUN}`,
+        createdAt: justBeforeMidnight,
+        updatedAt: justAfterMidnight,
+        closedAt: justAfterMidnight,
+      },
+    ]);
+    createdCaseIds.push(arrivalId, closureId);
+
+    const expected = await db.execute<{ arrivals: number; closures: number }>(
+      // § ใช้ขอบเขตเดียวกับ cron — 23:00 UTC ของวันก่อนหน้าคือ 06:00 น. ในกรุงเทพ
+      sql`
+        SELECT
+          count(*) FILTER (WHERE created_at >= ${today}::date AT TIME ZONE 'Asia/Bangkok'
+                             AND created_at < (${today}::date + 1) AT TIME ZONE 'Asia/Bangkok')::int AS arrivals,
+          count(*) FILTER (WHERE closed_at >= ${today}::date AT TIME ZONE 'Asia/Bangkok'
+                             AND closed_at < (${today}::date + 1) AT TIME ZONE 'Asia/Bangkok')::int AS closures
+        FROM cases
+      `,
+    );
+    const expectedRow = expected[0] as { arrivals: number; closures: number };
+
+    const res = await GET(
+      new NextRequest('http://localhost/api/cron/stats-refresh', {
+        headers: { authorization: `Bearer ${secret}` },
+      }),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      stats: { dailyArrivals: number; dailyClosures: number; totalCases: number };
+    };
+    expect(body.stats.dailyArrivals).toBe(Number(expectedRow.arrivals));
+    expect(body.stats.dailyClosures).toBe(Number(expectedRow.closures));
+
+    const snapshotDate = bangkokDateKey(new Date());
+    createdSnapshotDate = snapshotDate;
+    const [snapshot] = await db.select().from(caseStatsDaily).where(eq(caseStatsDaily.date, snapshotDate));
+    expect(snapshot?.totalReceived).toBe(body.stats.dailyArrivals);
+    expect(snapshot?.totalClosed).toBe(body.stats.dailyClosures);
+    expect(totalCasesFromSnapshot(snapshot!.metadata)).toBe(body.stats.totalCases);
+    expect(statusCountsFromSnapshot(snapshot!.metadata)).not.toBeNull();
+  });
+
+  test(' refresh พร้อมกันสองครั้ง → upsert เดียว ไม่ unique violation', async () => {
+    const secret = process.env.CRON_SECRET;
+    expect(secret && secret.length >= 16).toBe(true);
+    const req = () =>
+      new NextRequest('http://localhost/api/cron/stats-refresh', {
+        headers: { authorization: `Bearer ${secret}` },
+      });
+
+    const results = await Promise.allSettled([GET(req()), GET(req())]);
+    expect(results.map((r) => r.status)).toEqual(['fulfilled', 'fulfilled']);
+    if (results[0]!.status === 'rejected') throw results[0]!.reason;
+    if (results[1]!.status === 'rejected') throw results[1]!.reason;
+    expect(results[0]!.value.status).toBe(200);
+    expect(results[1]!.value.status).toBe(200);
+    createdSnapshotDate = bangkokDateKey(new Date());
+  });
+
+  it('นับทุกสถานะเป็นยอดรับทั้งหมด และเฉลี่ยจากแถวที่มีวันปิด', async () => {
     const db = await getDb();
     const [before] = await db.select({ c: count() }).from(cases);
     const baseline = Number(before?.c ?? 0);

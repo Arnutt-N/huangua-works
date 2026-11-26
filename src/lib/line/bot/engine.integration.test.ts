@@ -1,8 +1,8 @@
-import { eq } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import { NextRequest } from 'next/server';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { closeDb, getDb } from '@/lib/db';
-import { lineWebhookEvents } from '@/lib/db/schema';
+import { lineUsers, lineWebhookEvents } from '@/lib/db/schema';
 import { GET } from '@/app/api/cron/ping/route';
 import {
   BarrierDeferred,
@@ -10,7 +10,9 @@ import {
   commitEffects,
   enqueueWebhookEvent,
   markFailed,
+  restoreEvent,
 } from '../webhook-events';
+import { lookupHash } from '../identity';
 import { createRecordingTransport } from '../conversation/recording-transport';
 import { processWebhookEvents } from './engine';
 import type { LineWebhookEvent } from '../types';
@@ -19,43 +21,60 @@ import type { LineWebhookEvent } from '../types';
 vi.setConfig({ testTimeout: 30_000 });
 
 type EventRow = typeof lineWebhookEvents.$inferSelect;
-let snapshot: EventRow[] = [];
+
+// § ห้ามลบทั้งตารางบน DB Shared — เฉพาะ fixture prefix ของ suite นี้เท่านั้น และ fail fast
+//   ถ้าเจอ row ที่ไม่ใช่ fixture (เช่น event จริงจาก webhook) ให้หยุดก่อนแตะข้อมูล
+const FIXTURE_PREFIX = `it-eng-${Date.now()}-`;
+const OWNED_DEDUP_KEYS: string[] = [];
+const OWNED_EVENT_IDS: string[] = [];
+
+async function assertCleanTarget(db: Awaited<ReturnType<typeof getDb>>) {
+  const foreign = await db.select({ id: lineWebhookEvents.id }).from(lineWebhookEvents)
+    .where(sql`${lineWebhookEvents.id} not like ${`${FIXTURE_PREFIX}%`}`)
+    .limit(1);
+  if (foreign.length > 0) {
+    throw new Error('engine.integration: shared line_webhook_events detected — use a disposable test database');
+  }
+}
 
 beforeAll(async () => {
   const db = await getDb();
-  snapshot = await db.select().from(lineWebhookEvents);
-  await db.delete(lineWebhookEvents);
+  await assertCleanTarget(db);
 });
 
 afterAll(async () => {
   const db = await getDb();
-  await db.delete(lineWebhookEvents);
-  if (snapshot.length > 0) await db.insert(lineWebhookEvents).values(snapshot);
+  if (OWNED_EVENT_IDS.length > 0) {
+    await db.delete(lineWebhookEvents).where(inArray(lineWebhookEvents.id, OWNED_EVENT_IDS));
+  }
   await closeDb();
 });
 
 let seq = 0;
-function messageEvent(userId: string, timestamp: number): LineWebhookEvent {
+const BASE_TS = Date.now(); // § timestamp จริงแบบ Unix ms (13 ตัว) — ไม่ใช้ 1000/2000 ที่ผ่าน int4 ได้
+function messageEvent(userId: string, offsetMs: number): LineWebhookEvent {
   seq++;
   return {
     type: 'message',
     replyToken: `reply-${seq}`,
-    timestamp,
+    timestamp: BASE_TS + offsetMs,
     mode: 'active',
-    webhookEventId: `it-webhook-${Date.now()}-${seq}`,
+    webhookEventId: `${FIXTURE_PREFIX}webhook-${seq}`,
     source: { type: 'user', userId },
-    message: { type: 'text', id: `it-msg-${Date.now()}-${seq}`, text: 'สวัสดี' },
+    message: { type: 'text', id: `${FIXTURE_PREFIX}msg-${seq}`, text: 'สวัสดี' },
   } as LineWebhookEvent;
 }
 
 async function insertRaw(overrides: Partial<EventRow> & { dedupKey: string; lineUserIdHash: string }): Promise<EventRow> {
   const db = await getDb();
+  const id = `${FIXTURE_PREFIX}${overrides.dedupKey}`;
+  OWNED_EVENT_IDS.push(id);
   const [row] = await db.insert(lineWebhookEvents).values({
-    id: `it-${overrides.dedupKey}`,
+    id,
     createdAt: new Date(),
     updatedAt: new Date(),
     eventType: 'message',
-    eventTimestamp: 1000,
+    eventTimestamp: BASE_TS,
     payload: {},
     ...overrides,
   }).returning();
@@ -71,11 +90,14 @@ async function rowOf(id: string) {
 
 describe('durable LINE webhook events · integration', () => {
   test('failure ก่อน inbound → แถวยัง pending และไม่มี effects committed', async () => {
-    const event = messageEvent('U-before', 1000);
+    const event = messageEvent('U-before', 0);
     const { id } = await enqueueWebhookEvent(event);
     expect(id).toBeTruthy();
+    OWNED_EVENT_IDS.push(id!);
+    const db = await getDb();
+    await db.update(lineWebhookEvents).set({ leaseOwner: 'it-owner' }).where(eq(lineWebhookEvents.id, id!));
 
-    await markFailed(id!, 1);
+    await markFailed(id!, 1, 'it-owner');
     const row = await rowOf(id!);
     expect(row.status).toBe('pending');
     expect(row.effectsCommittedAt).toBeNull();
@@ -83,9 +105,10 @@ describe('durable LINE webhook events · integration', () => {
   });
 
   test('retry ไม่ duplicate inbound — ON CONFLICT DO NOTHING', async () => {
-    const event = messageEvent('U-dedup', 2000);
+    const event = messageEvent('U-dedup', 10);
     const first = await enqueueWebhookEvent(event);
     const second = await enqueueWebhookEvent(event);
+    if (first.id) OWNED_EVENT_IDS.push(first.id);
     expect(first.ok).toBe(true);
     expect(second.ok).toBe(true);
     expect(second.id).toBeUndefined();
@@ -97,8 +120,9 @@ describe('durable LINE webhook events · integration', () => {
   });
 
   test('failure หลัง effects commit → pendingReplies อยู่, retry ส่ง reply โดยไม่ทำ effects ซ้ำ', async () => {
-    const event = messageEvent('U-after', 3000);
+    const event = messageEvent('U-after', 20);
     const { id } = await enqueueWebhookEvent(event);
+    OWNED_EVENT_IDS.push(id!);
     const db = await getDb();
     await db.update(lineWebhookEvents)
       .set({ status: 'processing', leaseUntil: new Date(Date.now() + 60_000), attempts: 1 })
@@ -141,14 +165,14 @@ describe('durable LINE webhook events · integration', () => {
     const earlier = await insertRaw({
       dedupKey: `barrier-${Date.now()}-1`,
       lineUserIdHash: hash,
-      eventTimestamp: 1000,
+      eventTimestamp: BASE_TS,
       status: 'processing',
       effectsCommittedAt: null,
     });
     const later = await insertRaw({
       dedupKey: `barrier-${Date.now()}-2`,
       lineUserIdHash: hash,
-      eventTimestamp: 2000,
+      eventTimestamp: BASE_TS + 10,
       status: 'processing',
       effectsCommittedAt: null,
     });
@@ -188,8 +212,9 @@ describe('durable LINE webhook events · integration', () => {
       lineUserIdHash: 'terminal-user',
       status: 'processing',
       attempts: 4,
+      leaseOwner: 'it-owner',
     });
-    await markFailed(row.id, 5);
+    await markFailed(row.id, 5, 'it-owner');
     expect((await rowOf(row.id)).status).toBe('failed');
   });
 
@@ -198,30 +223,87 @@ describe('durable LINE webhook events · integration', () => {
     const first = await insertRaw({
       dedupKey: `order-a-${Date.now()}`,
       lineUserIdHash: hash,
-      eventTimestamp: 1000,
+      eventTimestamp: BASE_TS,
     });
     const second = await insertRaw({
       dedupKey: `order-b-${Date.now()}`,
       lineUserIdHash: hash,
-      eventTimestamp: 2000,
+      eventTimestamp: BASE_TS + 10,
     });
     const [claimed] = await claimNextWebhookEvent(1);
     expect(claimed?.id).toBe(first.id);
     expect(second.id).not.toBe(claimed?.id);
   });
 
+
+  test('first-contact: sender ไม่มีใน line_users → ingress สร้าง identity เดียวกับที่ restore ใช้', async () => {
+    const db = await getDb();
+    const raw = `${FIXTURE_PREFIX}U-first`;
+    const [before] = await db.select({ id: lineUsers.id }).from(lineUsers)
+      .where(eq(lineUsers.lineUserIdHash, lookupHash(raw))).limit(1);
+    expect(before).toBeUndefined();
+
+    const event = messageEvent(raw, 50);
+    const { id } = await enqueueWebhookEvent(event);
+    OWNED_EVENT_IDS.push(id!);
+    const [user] = await db.select({ id: lineUsers.id }).from(lineUsers)
+      .where(eq(lineUsers.lineUserIdHash, lookupHash(raw))).limit(1);
+    expect(user).toBeTruthy();
+
+    const [row] = await db.select().from(lineWebhookEvents).where(eq(lineWebhookEvents.id, id!)).limit(1);
+    const restored = await restoreEvent(db, row as never);
+    expect(restored.source.userId).toBe(raw);
+    await db.delete(lineUsers).where(eq(lineUsers.id, user!.id));
+  });
+
+  test('เท่ากัน timestamp สองแถว: commitEffects ไม่มองตัวอื่นเป็น predecessor', async () => {
+    const db = await getDb();
+    const hash = `${FIXTURE_PREFIX}equal-user`;
+    const first = await insertRaw({
+      dedupKey: 'equal-a', lineUserIdHash: hash, eventTimestamp: BASE_TS + 100, status: 'pending',
+    });
+    const second = await insertRaw({
+      dedupKey: 'equal-b', lineUserIdHash: hash, eventTimestamp: BASE_TS + 100, status: 'pending',
+    });
+
+    // § ทั้งสอง timestamp เท่ากัน — ต้องไม่มีใครบล็อกอีกตัว (ลำดับตัดด้วย id)
+    await db.transaction((tx) => commitEffects(tx, first as never, async () => ({ replies: [] })));
+    await db.transaction((tx) => commitEffects(tx, second as never, async () => ({ replies: [] })));
+    const rows = await db.select({ id: lineWebhookEvents.id, committed: lineWebhookEvents.effectsCommittedAt })
+      .from(lineWebhookEvents).where(inArray(lineWebhookEvents.id, [first.id, second.id]));
+    expect(rows).toHaveLength(2);
+    expect(rows.every((r) => r.committed !== null)).toBe(true);
+  });
+
+  test('empty replies → markDone โดยไม่ยิง transport (reply_state=none)', async () => {
+    const db = await getDb();
+    const hash = `${FIXTURE_PREFIX}no-reply-user`;
+    const row = await insertRaw({
+      dedupKey: 'no-reply', lineUserIdHash: hash,
+      eventTimestamp: BASE_TS + 200, status: 'processing',
+      effectsCommittedAt: new Date(), pendingReplies: null, replyState: 'none',
+      leaseOwner: 'it-owner', leaseUntil: new Date(Date.now() - 1000),
+    });
+    const transport = createRecordingTransport();
+    await processWebhookEvents(50, transport);
+    expect(transport.calls.filter((c) => c.kind === 'reply')).toHaveLength(0);
+    expect((await rowOf(row.id)).status).toBe('done');
+  });
+
   test('batch store อีก event เมื่อตัวหนึ่ง insert ไม่ได้ (dedupKey ซ้ำ)', async () => {
-    const first = messageEvent('U-batch', 5000);
+    const first = messageEvent('U-batch', 30);
     const stored = await enqueueWebhookEvent(first);
+    if (stored.id) OWNED_EVENT_IDS.push(stored.id);
     const dup = { ...first, message: { type: 'text' as const, id: 'different-message', text: 'อื่น' } };
     const [a, b] = await Promise.all([
       enqueueWebhookEvent(dup),
-      enqueueWebhookEvent(messageEvent('U-batch-2', 6000)),
+      enqueueWebhookEvent(messageEvent('U-batch-2', 40)),
     ]);
     expect(a.ok).toBe(true);
     expect(a.id).toBeUndefined();
     expect(b.ok).toBe(true);
     expect(b.id).toBeTruthy();
+    if (b.id) OWNED_EVENT_IDS.push(b.id);
     expect(stored.id).toBeTruthy();
   });
 });

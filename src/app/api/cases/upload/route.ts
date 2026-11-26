@@ -22,8 +22,56 @@ import {
 
 export { sniffImageMime };
 
-/** § เผื่อ boundary, filename, Content-Type และ CRLF ของ multipart ให้ไฟล์ 10MB พอดีผ่าน ingress */
+/** § เผื่อ boundary, filename, Content-Type และ CRLF ของ multipart ให้ไฟล์ที่เพดานพอดีผ่าน ingress */
 const MULTIPART_OVERHEAD_BYTES = 4 * 1024;
+/** § part จำนวนมากทำให้ parsing ใช้ memory ทั้งที่ต้องการจริงแค่ file part เดียว */
+const MAX_FORM_PARTS = 4;
+
+function tooLarge(): NextResponse {
+  return NextResponse.json({ error: MEDIA_SIZE_ERROR }, { status: 413 });
+}
+
+/** § อ่าน body จริงก่อน parse — header เป็นตัวกรองคร่าวๆ แต่ chunked upload ไม่มี header */
+async function readBoundedBody(
+  req: NextRequest,
+): Promise<{ ok: true; bytes: Uint8Array } | { ok: false; response: NextResponse }> {
+  const limit = MEDIA_MAX_SIZE_BYTES + MULTIPART_OVERHEAD_BYTES;
+  const declared = req.headers.get('content-length');
+  if (declared !== null) {
+    if (!/^\d+$/.test(declared)) {
+      return {
+        ok: false,
+        response: NextResponse.json({ error: 'Content-Length ไม่ถูกต้อง' }, { status: 400 }),
+      };
+    }
+    if (Number(declared) > limit) return { ok: false, response: tooLarge() };
+  }
+
+  const reader = req.body?.getReader();
+  if (!reader) return { ok: true, bytes: new Uint8Array() };
+
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value) continue;
+    total += value.byteLength;
+    if (total > limit) {
+      await reader.cancel();
+      return { ok: false, response: tooLarge() };
+    }
+    chunks.push(value);
+  }
+
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return { ok: true, bytes };
+}
 
 export async function POST(req: NextRequest) {
   const ip = clientIpFromHeaders(req.headers);
@@ -45,25 +93,24 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // § กัน ingress ก่อน parse multipart — req.formData() materialize ทั้ง body ขึ้น memory
-  // § Content-Length รวม boundary, filename, Content-Type และ CRLF ของส่วน multipart จึงต้องเผื่อ overhead
-  // § ใช้ file.size/buffer.length เป็นเกณฑ์ตัดสินจริง — header เป็นแค่ตัวกรองคร่าว ๆ ก่อนอ่าน body
-  const declared = req.headers.get('content-length');
-  if (declared !== null) {
-    if (!/^\d+$/.test(declared)) {
-      return NextResponse.json({ error: 'Content-Length ไม่ถูกต้อง' }, { status: 400 });
-    }
-    if (Number(declared) > MEDIA_MAX_SIZE_BYTES + MULTIPART_OVERHEAD_BYTES) {
-      return NextResponse.json({ error: MEDIA_SIZE_ERROR }, { status: 413 });
-    }
-  }
-  // § chunked upload ไม่มี Content-Length จึงจำกัดได้แค่ที่ file.size/buffer.length ด้านล่าง
+  const body = await readBoundedBody(req);
+  if (!body.ok) return body.response;
 
   let formData: FormData;
   try {
-    formData = await req.formData();
+    // § parse จาก bytes ที่จำกัดขนาดแล้ว ไม่ใช่ stream ดิบ — ป้องกัน chunked ที่โกหก header
+    const bounded = new Request(req.url, {
+      method: 'POST',
+      headers: { 'content-type': req.headers.get('content-type') ?? '' },
+      body: new Blob([new Uint8Array(body.bytes).buffer as ArrayBuffer]),
+    });
+    formData = await bounded.formData();
   } catch {
     return NextResponse.json({ error: 'ข้อมูลฟอร์มไม่ถูกต้อง' }, { status: 400 });
+  }
+
+  if ([...formData.keys()].length > MAX_FORM_PARTS) {
+    return NextResponse.json({ error: 'ข้อมูลฟอร์มมีส่วนเกินกำหนด' }, { status: 400 });
   }
 
   const file = formData.get('file');

@@ -31,6 +31,30 @@ function createWebpBuffer(): Buffer {
   return buf;
 }
 
+async function multipartBytes(form: FormData): Promise<{ bytes: Uint8Array; contentType: string }> {
+  const req = new Request('http://localhost/api/cases/upload', { method: 'POST', body: form });
+  return {
+    bytes: new Uint8Array(await req.arrayBuffer()),
+    contentType: req.headers.get('content-type') ?? '',
+  };
+}
+
+function streamedRequest(bytes: Uint8Array, contentType: string, chunkSize = 64 * 1024): NextRequest {
+  // § chunked upload ไม่มี Content-Length — ต้องทดสอบเส้นทางที่อ่าน stream จริง
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (let i = 0; i < bytes.length; i += chunkSize) controller.enqueue(bytes.slice(i, i + chunkSize));
+      controller.close();
+    },
+  });
+  return new NextRequest('http://localhost:3000/api/cases/upload', {
+    method: 'POST',
+    headers: { 'content-type': contentType },
+    body: stream,
+    duplex: 'half',
+  } as never);
+}
+
 describe('sniffImageMime', () => {
   it('ตรวจจับไฟล์ JPEG ได้ถูกต้อง', () => {
     const result = sniffImageMime(createJpegBuffer());
@@ -91,21 +115,22 @@ describe('POST /api/cases/upload', () => {
     expect(body.error).toContain('ไม่พบไฟล์');
   });
 
-  it('ตอบกลับ 413 จาก Content-Length ก่อนอ่าน formData เมื่อ header เกิน 10MB', async () => {
+  it('ตอบกลับ 413 จาก Content-Length ก่อน parse multipart เมื่อ header เกินเพดาน', async () => {
     const req = new NextRequest('http://localhost:3000/api/cases/upload', {
       method: 'POST',
       // § เกินเพดานรวม overhead (4KB) จึงต้องปฏิเสธแม้ยังไม่แตะ file.size
       headers: { 'content-length': String(MEDIA_MAX_SIZE_BYTES + 4096 + 1) },
     });
-    const formDataSpy = vi.spyOn(req, 'formData');
+    const formDataSpy = vi.spyOn(Request.prototype, 'formData');
 
     const res = await POST(req);
     expect(res.status).toBe(413);
     expect((await res.json()).error).toBe(MEDIA_SIZE_ERROR);
     expect(formDataSpy).not.toHaveBeenCalled();
+    formDataSpy.mockRestore();
   });
 
-  it('ส่งคำขอไฟล์ 10MB พอดีที่ header รวม overhead ต่อไปยัง formData', async () => {
+  it('ส่งคำขอไฟล์ที่เพดานพอดีที่ header รวม overhead ต่อไปยัง formData', async () => {
     const pngBuffer = createPngBuffer();
     const exactFile = new File(
       [new Uint8Array(pngBuffer), new Uint8Array(MEDIA_MAX_SIZE_BYTES - pngBuffer.length)],
@@ -121,12 +146,48 @@ describe('POST /api/cases/upload', () => {
       body: formData,
       headers: { 'content-length': String(MEDIA_MAX_SIZE_BYTES + 174) },
     });
-    const formDataSpy = vi.spyOn(req, 'formData');
+    const formDataSpy = vi.spyOn(Request.prototype, 'formData');
 
     const res = await POST(req);
     expect(res.status).toBe(201);
     expect(formDataSpy).toHaveBeenCalledTimes(1);
     expect(uploadFile).toHaveBeenCalledTimes(1);
+    formDataSpy.mockRestore();
+  });
+
+  it('ไม่มี Content-Length → ปฏิเสธ stream ที่เกินเพดานทันทีที่อ่านครบ ไม่เข้า formData', async () => {
+    const oversized = new Uint8Array(MEDIA_MAX_SIZE_BYTES + 4096 + 2);
+    const req = streamedRequest(oversized, 'multipart/form-data; boundary=x');
+    const formDataSpy = vi.spyOn(NextRequest.prototype, 'formData');
+
+    const res = await POST(req);
+    expect(res.status).toBe(413);
+    expect((await res.json()).error).toBe(MEDIA_SIZE_ERROR);
+    expect(formDataSpy).not.toHaveBeenCalled();
+    formDataSpy.mockRestore();
+  });
+
+  it('ไม่มี Content-Length → อ่าน stream ที่อยู่ในเพดานแล้วอัปโหลดได้', async () => {
+    const form = new FormData();
+    form.append('file', new File([new Uint8Array(createPngBuffer())], 'stream.png', { type: 'image/png' }));
+    const { bytes, contentType } = await multipartBytes(form);
+    const req = streamedRequest(bytes, contentType);
+
+    const res = await POST(req);
+    expect(res.status).toBe(201);
+    expect(uploadFile).toHaveBeenCalledTimes(1);
+  });
+
+  it('ปฏิเสธ multipart ที่มี part เกินจำนวนที่อนุญาต', async () => {
+    const form = new FormData();
+    form.append('file', new File([new Uint8Array(createPngBuffer())], 'photo.png', { type: 'image/png' }));
+    for (let i = 0; i < 4; i++) form.append(`extra-${i}`, 'x');
+    const { bytes, contentType } = await multipartBytes(form);
+    const req = streamedRequest(bytes, contentType);
+
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(uploadFile).not.toHaveBeenCalled();
   });
 
   it.each(['abc', '-1', '1.5', '10MB'])(
@@ -136,12 +197,13 @@ describe('POST /api/cases/upload', () => {
         method: 'POST',
         headers: { 'content-length': declared },
       });
-      const formDataSpy = vi.spyOn(req, 'formData');
+      const formDataSpy = vi.spyOn(Request.prototype, 'formData');
 
       const res = await POST(req);
       expect(res.status).toBe(400);
       expect((await res.json()).error).toBe('Content-Length ไม่ถูกต้อง');
       expect(formDataSpy).not.toHaveBeenCalled();
+      formDataSpy.mockRestore();
     },
   );
 
@@ -150,17 +212,16 @@ describe('POST /api/cases/upload', () => {
       method: 'POST',
       headers: { 'content-length': '1' },
     });
-    const formDataSpy = vi
-      .spyOn(req, 'formData')
-      .mockResolvedValue(new FormData() as Awaited<ReturnType<NextRequest['formData']>>);
+    const formDataSpy = vi.spyOn(Request.prototype, 'formData');
 
     const res = await POST(req);
     expect(res.status).toBe(400);
     expect(formDataSpy).toHaveBeenCalledTimes(1);
+    formDataSpy.mockRestore();
   });
 
-  it('ตอบกลับ 413 เมื่อไฟล์มีขนาดเกิน 10MB', async () => {
-    const bigBuffer = Buffer.alloc(11 * 1024 * 1024);
+  it('ตอบกลับ 413 เมื่อไฟล์มีขนาดเกินเพดาน', async () => {
+    const bigBuffer = Buffer.alloc(MEDIA_MAX_SIZE_BYTES + 1024);
     createPngBuffer().copy(bigBuffer);
     const bigFile = new File([new Uint8Array(bigBuffer)], 'big.png', { type: 'image/png' });
 

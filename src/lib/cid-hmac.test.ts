@@ -66,11 +66,19 @@ describe('generateDedupHash', () => {
     const b = generateDedupHash('1101200563040', 'ถนน ชำรุด', 'มีหลุม บ่อ');
     expect(a).toBe(b);
   });
+
+  test('tuple ที่แยกช่องต่างกันแต่ต่อกันแล้วเหมือนเดิมต้องไม่ชนกัน', () => {
+    // § สูตรเก่า `cid|title|description` กับตัวคั่น `|` ภายใน field ทำให้สองเรื่องคนละ tuple ได้ payload เดียวกัน
+    const a = generateDedupHash('a|b', 'c', 'd');
+    const b = generateDedupHash('a', 'b|c', 'd');
+    expect(a).not.toBe(b);
+    expect(generateLegacyDedupHash('a|b', 'c', 'd')).toBe(generateLegacyDedupHash('a', 'b|c', 'd'));
+  });
 });
 
 describe('normalizeDedupPayload', () => {
-  test('lowercases + ยุบ whitespace + trim', () => {
-    expect(normalizeDedupPayload('CID', '  ถนน\n\nชำรุด  ', 'A  B')).toBe('cid|ถนน ชำรุด|a b');
+  test('lowercases + ยุบ whitespace + trim แล้วเขียนเป็น tuple v2 ที่ไม่กำกวม', () => {
+    expect(normalizeDedupPayload('CID', '  ถนน\n\nชำรุด  ', 'A  B')).toBe('v2|["cid","ถนน ชำรุด","a b"]');
   });
 });
 

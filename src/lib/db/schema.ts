@@ -3,6 +3,7 @@ import {
   text,
   timestamp,
   boolean,
+  bigint,
   integer,
   jsonb,
   date,
@@ -640,12 +641,16 @@ export const lineWebhookEvents = pgTable(
     dedupKey: text('dedup_key').notNull().unique(),
     eventType: text('event_type').notNull(),
     lineUserIdHash: text('line_user_id_hash').notNull(),
-    eventTimestamp: integer('event_timestamp').notNull(),
+    // § LINE ส่ง timestamp เป็น Unix milliseconds (13 ตัว) — integer(int4) รับไม่ไหว
+    eventTimestamp: bigint('event_timestamp', { mode: 'number' }).notNull(),
     replyToken: text('reply_token'),
     payload: jsonb('payload').notNull(),
     status: text('status').notNull().default('pending'),
     effectsCommittedAt: timestamp('effects_committed_at', { mode: 'date' }),
     pendingReplies: jsonb('pending_replies'),
+    // § แยกสถานะการส่ง reply ออกจาก effects — 'none'=ไม่มี reply, 'pending'=รอส่ง,
+    //   'expired'=token ใช้ไม่ได้แล้ว (terminal) กัน cron รีสตาร์ทแล้วส่งซ้ำไม่จบ
+    replyState: text('reply_state', { enum: ['pending', 'none', 'expired'] }).notNull().default('pending'),
     attempts: integer('attempts').notNull().default(0),
     leaseUntil: timestamp('lease_until', { mode: 'date' }),
     // § § lease owner กัน worker เก่าที่ lease หมดแล้วกลับมา markDone/reclaim ของคนอื่น
@@ -1091,6 +1096,54 @@ export const chatBroadcastFailedRecipients = pgTable(
       table.recipientHash
     ),
     broadcastIdx: index('chat_broadcast_failed_recipients_broadcast_id_idx').on(table.broadcastId),
+  })
+);
+
+// § durable outbox — ต้อง insert ใน tx เดียวกับเรื่องเพื่อให้ rollback/replay ไม่ส่งแจ้งเตือนซ้ำ
+export const caseNotifications = pgTable(
+  'case_notifications',
+  {
+    id: text('id').primaryKey(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+    caseId: text('case_id').notNull().references(() => cases.id, { onDelete: 'cascade' }),
+    trackingCode: text('tracking_code').notNull(),
+    title: text('title').notNull(),
+    categoryName: text('category_name').notNull(),
+    channel: text('channel').notNull(),
+    location: text('location'),
+    status: text('status').notNull().default('pending'),
+    attempts: integer('attempts').notNull().default(0),
+    lastError: text('last_error'),
+  },
+  (table) => ({
+    caseUnique: unique('case_notifications_case_uid').on(table.caseId),
+    statusIdx: index('case_notifications_status_idx').on(table.status),
+  })
+);
+
+// § checkpoint ต่อชุด multicast — เก็บสมาชิก/retry key ตอนเตรียมส่ง จะได้ไม่คำนวณใหม่ตอน recovery
+//   (raw id เก็บในรูป encrypt เหมือน line_users — ห้ามลง DB เป็น plaintext)
+export const chatBroadcastBatches = pgTable(
+  'chat_broadcast_batches',
+  {
+    id: text('id').primaryKey(),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+    broadcastId: text('broadcast_id').notNull().references(() => chatBroadcasts.id, { onDelete: 'cascade' }),
+    batchIndex: integer('batch_index').notNull(),
+    recipientIds: jsonb('recipient_ids').$type<string[]>(),
+    recipientHashes: jsonb('recipient_hashes').$type<string[]>().notNull(),
+    retryKey: text('retry_key').notNull(),
+    status: text('status').notNull().default('pending'),
+    attempts: integer('attempts').notNull().default(0),
+    nextAttemptAt: timestamp('next_attempt_at', { mode: 'date' }),
+    lastError: text('last_error'),
+  },
+  (table) => ({
+    broadcastBatchUnique: unique('chat_broadcast_batches_broadcast_batch_uid').on(table.broadcastId, table.batchIndex),
+    broadcastIdx: index('chat_broadcast_batches_broadcast_id_idx').on(table.broadcastId),
+    dueIdx: index('chat_broadcast_batches_due_idx').on(table.status, table.nextAttemptAt),
   })
 );
 

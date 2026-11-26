@@ -5,7 +5,7 @@ import { enqueueWebhookEvent } from '@/lib/line/webhook-events';
 import { enforceRateLimit } from '@/lib/rate-limit/enforce';
 import { formatReset } from '@/lib/rate-limit/format-reset';
 import { clientIpFromHeaders } from '@/lib/rate-limit/client-ip';
-import type { LineWebhookEvent, LineWebhookRequestBody } from '@/lib/line/types';
+import { parseWebhookEvent, type LineWebhookRequestBody } from '@/lib/line/types';
 
 export const runtime = 'nodejs';
 
@@ -98,13 +98,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Invalid webhook payload' }, { status: 400 });
   }
 
-  // § เก็บทุก event ก่อนประมวลผล — insert ตัวใดพังให้ 500 เพื่อให้ LINE redeliver ทั้งชุด
-  // (ON CONFLICT DO NOTHING กัน redelivery ซ้ำ; อีกตัวในชุดยังเข้า DB ครบ)
+  // § กรองที่ขอบเขตก่อน insert — event นอกขอบเขต (group/room, ต่าง type, timestamp พัง)
+  // ต้องไม่ทำให้ทั้ง batch 500; นับแยกอีก counter ให้เห็นว่ามี event ถูกข้าม
+  const supported: Parameters<typeof enqueueWebhookEvent>[0][] = [];
+  const ignored: Record<string, number> = {};
+  for (const raw of parsed.events) {
+    const result = parseWebhookEvent(raw);
+    if (result.kind === 'supported') {
+      supported.push(result.event);
+    } else {
+      ignored[result.reason] = (ignored[result.reason] ?? 0) + 1;
+    }
+  }
+  const ignoredCount = Object.values(ignored).reduce((sum, n) => sum + n, 0);
+  if (ignoredCount > 0) {
+    // § log แบบ bounded: แจ้งเหตุผล+จำนวน ไม่ log payload (ข้อความร้องเรียน/PII)
+    console.warn('[line-webhook] ignored events', { count: ignoredCount, reasons: ignored });
+  }
+
+  // § เฉพาะ event ที่รองรับเท่านั้นที่ persistence failure → 500 ให้ LINE redeliver
   const results = await Promise.all(
-    parsed.events.map(async (event) => {
-      if (!event || typeof event !== 'object') return { ok: true };
+    supported.map(async (event) => {
       try {
-        return await enqueueWebhookEvent(event as LineWebhookEvent);
+        return await enqueueWebhookEvent(event);
       } catch (error) {
         return { ok: false, error };
       }
@@ -112,11 +128,11 @@ export async function POST(request: Request) {
   );
   const failures = results.filter((r) => !r.ok);
   if (failures.length > 0) {
-    console.error('[line-webhook] enqueue failed', failures);
+    console.error('[line-webhook] enqueue failed', { count: failures.length });
     return NextResponse.json({ message: 'Failed to store webhook events' }, { status: 500 });
   }
 
   // § inline processing ตาม timestamp แล้ว id (processWebhookEvents จัดลำดับให้)
-  const outcome = await processWebhookEvents(parsed.events.length || 20);
-  return NextResponse.json({ ok: true, ...outcome });
+  const outcome = supported.length > 0 ? await processWebhookEvents(supported.length) : null;
+  return NextResponse.json({ ok: true, ignored: ignoredCount, ...outcome });
 }

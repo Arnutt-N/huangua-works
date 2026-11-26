@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { closeDb, getDb } from '@/lib/db';
-import { chatBroadcasts, chatBroadcastFailedRecipients, lineUsers } from '@/lib/db/schema';
+import { chatBroadcasts, chatBroadcastBatches, chatBroadcastFailedRecipients, lineUsers } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import {
   broadcastRetryKey,
@@ -53,6 +53,9 @@ afterAll(async () => {
     await db
       .delete(chatBroadcastFailedRecipients)
       .where(inArray(chatBroadcastFailedRecipients.broadcastId, createdBroadcastIds));
+    await db
+      .delete(chatBroadcastBatches)
+      .where(inArray(chatBroadcastBatches.broadcastId, createdBroadcastIds));
     await db.delete(chatBroadcasts).where(inArray(chatBroadcasts.id, createdBroadcastIds));
   }
   if (createdUserIds.length > 0) {
@@ -151,5 +154,94 @@ describe('sendBroadcast · counters/hash บนฐานจริง', () => {
       attempts: 3,
     });
     expect(JSON.stringify(failed)).not.toContain(rawLast);
-  }, 30_000);
+
+    // § recovery กับ target ที่เปลี่ยน — ชุดที่ LINE รับแล้วต้องไม่ยิงซ้ำ
+    const callsBeforeReplay = multicastMock.mock.calls.length;
+    await db
+      .update(chatBroadcasts)
+      .set({ status: 'scheduled', leaseOwner: null })
+      .where(eq(chatBroadcasts.id, broadcastId));
+    await db
+      .update(chatBroadcasts)
+      .set({ target: { kind: 'line_user_ids', ids: ids.slice(1) } })
+      .where(eq(chatBroadcasts.id, broadcastId));
+
+    await sendBroadcast(broadcastId);
+
+    const replayCalls = multicastMock.mock.calls.slice(callsBeforeReplay);
+    expect(replayCalls).toHaveLength(3);
+    expect(replayCalls.every((call) => (call[0] as string[]).length === 1)).toBe(true);
+    expect(replayCalls.every((call) => call[2] === calls[3]?.[2])).toBe(true);
+
+    const persisted = await db
+      .select()
+      .from(chatBroadcastBatches)
+      .where(eq(chatBroadcastBatches.broadcastId, broadcastId));
+    expect(persisted).toHaveLength(2);
+    const statusesByIndex = new Map(persisted.map((b) => [b.batchIndex, b.status]));
+    expect(statusesByIndex.get(0)).toBe('accepted');
+    expect(statusesByIndex.get(1)).toBe('pending');
+  }, 60_000);
+
+  it('error ถาวร → บันทึก attempts จริง = 1 ไม่ใช่ค่ากำหนดสูงสุด', async () => {
+    const db = await getDb();
+    const id = generateId();
+    createdUserIds.push(id);
+    await db.insert(lineUsers).values({ id, lineUserIdHash: `perm-hash-${Date.now()}-${id}`, lineUserIdEnc: 'U-perm' });
+    const broadcastId = generateId();
+    createdBroadcastIds.push(broadcastId);
+    await db.insert(chatBroadcasts).values({
+      id: broadcastId,
+      content: [],
+      status: 'scheduled',
+      target: { kind: 'line_user_ids', ids: [id] },
+    });
+    multicastMock.mockReset();
+    multicastMock.mockRejectedValue(new LineApiErrorMock('/message/multicast', 400, 'permanent'));
+
+    const outcome = await sendBroadcast(broadcastId);
+    expect(outcome.kind).toBe('failed');
+    expect(multicastMock).toHaveBeenCalledTimes(1);
+
+    const failed = await db
+      .select()
+      .from(chatBroadcastFailedRecipients)
+      .where(eq(chatBroadcastFailedRecipients.broadcastId, broadcastId));
+    expect(failed).toHaveLength(1);
+    expect(failed[0]?.attempts).toBe(1);
+  });
+
+  it('lease ถูกช่วงกลางส่ง → ไม่เขียน failed recipients กับฐานจริง', async () => {
+    const db = await getDb();
+    const id = generateId();
+    createdUserIds.push(id);
+    await db.insert(lineUsers).values({ id, lineUserIdHash: `stolen-hash-${Date.now()}-${id}`, lineUserIdEnc: 'U-stolen' });
+    const broadcastId = generateId();
+    createdBroadcastIds.push(broadcastId);
+    await db.insert(chatBroadcasts).values({
+      id: broadcastId,
+      content: [],
+      status: 'scheduled',
+      target: { kind: 'line_user_ids', ids: [id] },
+    });
+    multicastMock.mockReset();
+    multicastMock.mockImplementationOnce(async () => {
+      await db
+        .update(chatBroadcasts)
+        .set({ leaseOwner: 'stolen-owner', updatedAt: new Date() })
+        .where(eq(chatBroadcasts.id, broadcastId));
+      throw new LineApiErrorMock('/message/multicast', 400, 'permanent');
+    });
+
+    const outcome = await sendBroadcast(broadcastId);
+    expect(outcome.kind).toBe('skipped-not-claimable');
+
+    const failed = await db
+      .select()
+      .from(chatBroadcastFailedRecipients)
+      .where(eq(chatBroadcastFailedRecipients.broadcastId, broadcastId));
+    expect(failed).toHaveLength(0);
+    const [row] = await db.select().from(chatBroadcasts).where(eq(chatBroadcasts.id, broadcastId));
+    expect(row?.leaseOwner).toBe('stolen-owner');
+  });
 });

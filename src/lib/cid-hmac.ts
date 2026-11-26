@@ -69,7 +69,15 @@ export function generateCidHash(cid: string): string {
 export function normalizeDedupPayload(cid: string, title: string, description: string): string {
   // § normalize ราย field (ไม่ใช่ทั้งก้อน): trim+ยุบ whitespace กลางทีละช่อง
   const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
-  return `${norm(cid)}|${norm(title)}|${norm(description)}`;
+  // § v2 + JSON tuple: ตัวคั่น `|` ใน title/description ทำให้ tuple คนละชุดชนกันได้ในสูตรเก่า
+  // JSON quadrant escape ทุกตัวอักษร จึงไม่มี payload สอง tuple ที่เหมือนกันโดยบังเอิญ
+  return `v2|${JSON.stringify([norm(cid), norm(title), norm(description)])}`;
+}
+
+/** § เปรียบเทียบเฉพาะ title/description แบบ normalize — ใช้ตรวจ hash เก่าที่อาจชนข้าม field */
+export function sameDedupContent(titleA: string, descriptionA: string, titleB: string, descriptionB: string): boolean {
+  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
+  return norm(titleA) === norm(titleB) && norm(descriptionA) === norm(descriptionB);
 }
 
 /**

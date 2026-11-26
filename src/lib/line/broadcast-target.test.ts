@@ -1,33 +1,35 @@
 import { describe, expect, it } from 'vitest';
-import { broadcastTargetSchema, parseBroadcastTarget } from './broadcast-target';
+import { parseBroadcastTarget } from './broadcast-target';
 
-describe('parseBroadcastTarget', () => {
-  it('all object ผ่านตรง', () => {
+describe('parseBroadcastTarget · fail closed', () => {
+  it('ยอมรับ explicit all', () => {
     expect(parseBroadcastTarget({ kind: 'all' })).toEqual({ kind: 'all' });
   });
 
-  it('line_user_ids dedupe และตัดค่าที่ไม่ใช่ string', () => {
-    expect(parseBroadcastTarget({ kind: 'line_user_ids', ids: ['a', 'a', 'b', 1, ''] })).toEqual({
-      kind: 'line_user_ids',
-      ids: ['a', 'b'],
-    });
-  });
-
-  it('legacy text และค่าเพี้ยน fallback เป็น all', () => {
+  it('ยอมรับ legacy text all', () => {
     expect(parseBroadcastTarget('all')).toEqual({ kind: 'all' });
-    expect(parseBroadcastTarget(null)).toEqual({ kind: 'all' });
-    expect(parseBroadcastTarget({ kind: 'line_user_ids', ids: [] })).toEqual({ kind: 'all' });
-    expect(parseBroadcastTarget({ kind: 'bogus' })).toEqual({ kind: 'all' });
   });
-});
 
-describe('broadcastTargetSchema (API boundary)', () => {
-  it('รับรูปแบบที่ถูกต้อง ปฏิเสธ ids ว่าง', () => {
-    expect(broadcastTargetSchema.parse({ kind: 'line_user_ids', ids: ['pk-1'] })).toEqual({
+  it('ยอมรับ targeted ids ที่ถูกต้อง', () => {
+    expect(parseBroadcastTarget({ kind: 'line_user_ids', ids: ['pk-1', 'pk-2'] })).toEqual({
       kind: 'line_user_ids',
-      ids: ['pk-1'],
+      ids: ['pk-1', 'pk-2'],
     });
-    expect(broadcastTargetSchema.safeParse({ kind: 'line_user_ids', ids: [] }).success).toBe(false);
-    expect(broadcastTargetSchema.safeParse({ kind: 'raw', ids: ['U1'] }).success).toBe(false);
+  });
+
+  it('รูปแบบวัตถุที่ไม่รู้จักต้อง invalid ไม่ใช่ all', () => {
+    expect(parseBroadcastTarget({ kind: 'unknown' })).toBeNull();
+    expect(parseBroadcastTarget({})).toBeNull();
+    expect(parseBroadcastTarget({ kind: 'line_user_ids', ids: [] })).toBeNull();
+    expect(parseBroadcastTarget({ kind: 'line_user_ids', ids: [''] })).toBeNull();
+    expect(parseBroadcastTarget({ kind: 'line_user_ids', ids: 'pk-1' })).toBeNull();
+  });
+
+  it('ค่าเปล่า/ผิดชนิดต้อง invalid', () => {
+    expect(parseBroadcastTarget('')).toBeNull();
+    expect(parseBroadcastTarget(null)).toBeNull();
+    expect(parseBroadcastTarget(undefined)).toBeNull();
+    expect(parseBroadcastTarget(42)).toBeNull();
+    expect(parseBroadcastTarget([])).toBeNull();
   });
 });

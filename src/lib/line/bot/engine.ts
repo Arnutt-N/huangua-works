@@ -9,7 +9,7 @@ import { matchFaq } from './faq-matcher';
 import { ingestLineMedia } from '../media-ingest';
 import { csatThankYou, parseCsatPostback, recordCsatResponse } from '../chat/csat';
 import { matchIntent } from './intent-matcher';
-import { pseudonymizeLineId, findLineUserByRaw, lookupHash } from '../identity';
+import { ensureLineUser, findLineUserByRaw, lookupHash } from '../identity';
 import { parseResponseText } from './response-parser';
 import { startCaseFlow, processCaseFlow, handleConfirmPostback, type CaseFlowState } from './case-flow';
 import { isHandoffRequest, triggerHandoff } from './handoff';
@@ -24,6 +24,7 @@ import { getFollowCount, recordFriendEvent } from '../friend-events';
 import {
   claimNextWebhookEvent,
   commitEffects,
+  expireReply,
   markDone,
   markFailed,
   renewLease,
@@ -122,17 +123,25 @@ export async function processWebhookEvents(
   const rows = await claimNextWebhookEvent(limit);
   for (const row of rows) {
     result.attempted++;
+    // § claim ต้องมี owner — ไม่มี owner ห้ามแตะแถวหรือเปลี่ยนสถานะใด ๆ
+    if (!row.leaseOwner) {
+      result.deferred++;
+      continue;
+    }
     try {
-      await processOne(row, transport);
+      await processOne(row, row.leaseOwner, transport);
       result.done++;
     } catch (error) {
-      if (error instanceof BarrierDeferred) {
+      if (!await renewLease(row.id, row.leaseOwner)) {
+        // § เสีย lease ระหว่างทาง → คนอื่นรับช่วงไปแล้ว ห้ามมาเขียนสถานะ/ reply ทับ
+        result.deferred++;
+      } else if (error instanceof BarrierDeferred) {
         // § event เก่ายังไม่ commit — คืน pending โดยไม่เพิ่ม attempts (cron รอบหน้าลองใหม่)
         result.deferred++;
         await releaseLease(row.id, row.leaseOwner);
       } else {
         console.error('[line-webhook] event failed', { id: row.id, error });
-        await markFailed(row.id, row.attempts);
+        await markFailed(row.id, row.attempts, row.leaseOwner);
         if (row.attempts >= 5) result.failed++;
         else result.retried++;
       }
@@ -141,28 +150,44 @@ export async function processWebhookEvents(
   return result;
 }
 
-async function releaseLease(id: string, owner: string | null): Promise<void> {
-  if (!owner) return;
+async function releaseLease(id: string, owner: string): Promise<boolean> {
   const db = await getDb();
-  await db.update(lineWebhookEvents)
+  const rows = await db.update(lineWebhookEvents)
     .set({ status: 'pending', leaseUntil: null, leaseOwner: null, updatedAt: new Date() })
-    .where(and(eq(lineWebhookEvents.id, id), eq(lineWebhookEvents.leaseOwner, owner)));
+    .where(and(eq(lineWebhookEvents.id, id), eq(lineWebhookEvents.leaseOwner, owner)))
+    .returning({ id: lineWebhookEvents.id });
+  return rows.length > 0;
 }
 
-async function processOne(row: WebhookEventRow, transport: LineTransport): Promise<void> {
+async function processOne(row: WebhookEventRow, owner: string, transport: LineTransport): Promise<void> {
   const db = await getDb();
 
-  // § failure หลัง effects commit — ส่ง pendingReplies ซ้ำโดยไม่แตะ effects
-  // § owner ต้องตรงกับ claim ปัจจุบัน — ถ้า lease หมดแล้วคนอื่น claim ต่อ ห้ามมาปิดทับ
-  const owner = row.leaseOwner;
-  if (row.pendingReplies) {
-    await transport.reply(row.replyToken ?? '', row.pendingReplies.slice(0, 5));
-    if (owner) await markDone(row.id, owner);
+  // § ต่ออายุ lease ก่อนแตะแถว — ownership เป็น capability ที่ต้องมีทุกขั้นตอน ไม่ใช่แค่ตอน claim
+  if (!await renewLease(row.id, owner)) return;
+
+  // § recovery หลัง effects commit — ส่ง pendingReplies ซ้ำโดยไม่ทำ effects อีก
+  if (row.replyState === 'none' && row.effectsCommittedAt) {
+    if (!await markDone(row.id, owner, 'none')) return;
+    return;
+  }
+  if (row.replyState === 'expired') {
+    // § token หมดอายุ/ใช้ไปแล้ว — terminal ทันที ไม่ยิง transport และไม่ให้ cron รี retry
+    await expireReply(row.id, owner);
+    return;
+  }
+  if (row.pendingReplies && row.pendingReplies.length > 0) {
+    if (!row.replyToken) {
+      await expireReply(row.id, owner);
+      return;
+    }
+    if (!await renewLease(row.id, owner)) return;
+    await transport.reply(row.replyToken, row.pendingReplies.slice(0, 5));
+    await markDone(row.id, owner, 'pending');
     return;
   }
 
-  // § ต่ออายุ lease ก่อนเข้า effects ที่อาจใช้เวลานานกว่า 60s (เฉพาะ owner เดิม)
-  if (owner) await renewLease(row.id, owner);
+  // § ต่ออายุอีกครั้งหลัง network I/O ของ reply ก่อนเข้า effects transaction
+  if (!await renewLease(row.id, owner)) return;
 
   let replies: LineOutgoingMessage[] = [];
   await db.transaction(async (tx) => {
@@ -174,11 +199,15 @@ async function processOne(row: WebhookEventRow, transport: LineTransport): Promi
     });
     replies = outcome?.replies ?? [];
   });
+  if (!await renewLease(row.id, owner)) return;
 
-  if (replies.length > 0) {
-    await transport.reply(row.replyToken ?? '', replies.slice(0, 5));
+  if (replies.length > 0 && row.replyToken) {
+    await transport.reply(row.replyToken, replies.slice(0, 5));
+    await markDone(row.id, owner, 'pending');
+    return;
   }
-  if (owner) await markDone(row.id, owner);
+  // § ไม่มี replies หรือไม่มี token (unfollow) → ปิดงานโดยไม่ยิง transport
+  await markDone(row.id, owner, replies.length > 0 ? 'expired' : 'none');
 }
 
 const PROFILE_RETRY_MS = 24 * 60 * 60 * 1000; // ลองดึงโปรไฟล์ที่พลาดซ้ำได้วันละครั้ง
@@ -207,25 +236,21 @@ async function getOrCreateLineUser(db: DbOrTx, lineUserId: string, transport: Li
     return existing;
   }
 
-  const id = generateId();
-  const profile = await transport.getProfile(lineUserId).catch(() => null);
-  const p = pseudonymizeLineId(lineUserId);
-  // § webhook race (follow+message, LINE retry) ชน unique hash ได้ — ON CONFLICT แล้วอ่านแถวผู้ชนะ
-  // แพทเทิร์นเดียวกับ linkLineRow ใน citizen-access/identity.ts
-  const inserted = await db.insert(lineUsers).values({
-    id,
-    lineUserIdHash: p.hash,
-    lineUserIdEnc: p.enc,
-    lineUserIdHashV: p.v,
-    displayName: profile?.displayName ?? null,
-    pictureUrl: profile?.pictureUrl ?? null,
-    metadata: { profileCheckedAt: new Date().toISOString() },
-  })
-    .onConflictDoNothing({ target: lineUsers.lineUserIdHash })
-    .returning({ id: lineUsers.id });
-  const winnerId = inserted[0]?.id ?? (await findLineUserByRaw(db, lineUserId))?.id ?? id;
-  const [winner] = await db.select().from(lineUsers).where(eq(lineUsers.id, winnerId)).limit(1);
-  return { id: winnerId, botState: winner?.botState ?? null };
+  // § identity ต้องผ่าน ensureLineUser ตัวเดียวกับ ingress — ห้าม pseudonymize ซ้ำที่นี่
+  const user = await ensureLineUser(db, lineUserId);
+  // § กันยิง getProfile ซ้ำทุกข้อความเมื่อ ingress สร้าง user ไว้แล้วแต่ยังไม่มีชื่อ
+  const meta = (user.metadata as { profileCheckedAt?: string } | null) ?? null;
+  const due = !user.displayName && Date.now() - (meta?.profileCheckedAt ? Date.parse(meta.profileCheckedAt) : 0) > PROFILE_RETRY_MS;
+  if (due) {
+    const profile = await transport.getProfile(lineUserId).catch(() => null);
+    await db.update(lineUsers)
+      .set({
+        ...(profile ? { displayName: profile.displayName, pictureUrl: profile.pictureUrl ?? null } : {}),
+        metadata: { ...meta, profileCheckedAt: new Date().toISOString() },
+      })
+      .where(eq(lineUsers.id, user.id));
+  }
+  return { id: user.id, botState: user.botState ?? null };
 }
 
 async function getOrCreateConversation(db: DbOrTx, lineUserId: string) {

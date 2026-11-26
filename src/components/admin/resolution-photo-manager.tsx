@@ -10,7 +10,7 @@ import {
   deleteResolutionPhotoAction,
 } from '@/app/admin/actions/cases';
 import type { ResolutionPhoto, ResolutionPhotoTag } from '@/lib/cases/resolution-photos';
-import { MEDIA_MAX_SIZE_BYTES, MEDIA_SIZE_ERROR } from '@/lib/media-upload-rules';
+import { MEDIA_MAX_SIZE_BYTES, MEDIA_MAX_SIZE_MB, MEDIA_SIZE_ERROR } from '@/lib/media-upload-rules';
 import { formatThaiDateTimeShort } from '@/lib/thai-date';
 import { cn } from '@/lib/cn';
 
@@ -176,7 +176,7 @@ export function ResolutionPhotoManager({
 
           {/* ช่องเลือกไฟล์ */}
           <div>
-            <Label htmlFor="resolution-file">ไฟล์ภาพถ่าย (PNG, JPEG, WebP ขนาดไม่เกิน 10MB)</Label>
+            <Label htmlFor="resolution-file">ไฟล์ภาพถ่าย (PNG, JPEG, WebP ขนาดไม่เกิน {MEDIA_MAX_SIZE_MB}MB)</Label>
             <input
               ref={fileInputRef}
               id="resolution-file"

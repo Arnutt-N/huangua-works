@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { deriveStatusStats, totalCasesFromSnapshot } from './stats';
+import {
+  bangkokDateKey,
+  dailyCountsFromSnapshot,
+  deriveStatusStats,
+  statusCountsFromSnapshot,
+  totalCasesFromSnapshot,
+} from './stats';
 
 describe('deriveStatusStats · มาตรฐานจาก Excel และ state machine', () => {
   it('ยอดทั้งหมด = ทุกสถานะ ไม่ใช่เฉพาะ received', () => {
@@ -51,5 +57,39 @@ describe('totalCasesFromSnapshot', () => {
 
   it('snapshot เก่าที่ไม่มี totalCases → null', () => {
     expect(totalCasesFromSnapshot({ refreshedAt: 'x' })).toBeNull();
+  });
+});
+
+describe('bangkokDateKey', () => {
+  it('23:30 UTC คือวันถัดไปในกรุงเทพ', () => {
+    expect(bangkokDateKey(new Date('2026-11-25T17:30:00Z'))).toBe('2026-11-26');
+  });
+
+  it('00:30 UTC ยังเป็นวันเดิมในกรุงเทพ', () => {
+    expect(bangkokDateKey(new Date('2026-11-25T00:30:00Z'))).toBe('2026-11-25');
+  });
+});
+
+describe('statusCountsFromSnapshot', () => {
+  it('อ่านยอดสะสมจาก metadata รุ่นใหม่', () => {
+    expect(statusCountsFromSnapshot({ statusCounts: { received: 3, closed: 4 } })).toEqual({ received: 3, closed: 4 });
+  });
+
+  it('snapshot เก่าไม่มี statusCounts → null เพื่อให้ caller ใช้คอลัมน์เดิม', () => {
+    expect(statusCountsFromSnapshot({ totalCases: 10 })).toBeNull();
+  });
+});
+
+describe('dailyCountsFromSnapshot', () => {
+  it('อ่านยอดรับ/ปิดรายวันจากคอลัมน์ของ snapshot', () => {
+    expect(
+      dailyCountsFromSnapshot({ totalReceived: 3, totalClosed: 2 }),
+    ).toEqual({ arrivals: 3, closures: 2 });
+  });
+
+  it('คอลัมน์เป็น string จาก driver → แปลงเป็น number', () => {
+    expect(
+      dailyCountsFromSnapshot({ totalReceived: '3', totalClosed: '2' }),
+    ).toEqual({ arrivals: 3, closures: 2 });
   });
 });

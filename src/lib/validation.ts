@@ -3,6 +3,7 @@ import { ALL_STATUSES } from './cases/state-machine';
 import { ALL_BUDGET_STATUSES } from './cases/budget';
 import { STAFF_ROLES } from './auth/roles';
 import { CONVERSATION_MODES } from './line/chat-modes';
+import { MEDIA_MAX_SIZE_BYTES } from './media-upload-rules';
 import {
   ALL_QUEUE_CATEGORIES,
   type QueueCategory,
@@ -168,7 +169,7 @@ export const submitCaseSchema = z.object({
           .url({ protocol: /^https?$/ })
           .max(2048),
         type: z.string().max(100),
-        size: z.number().int().min(0).max(10_000_000), // 10MB max
+        size: z.number().int().min(0).max(Math.ceil(MEDIA_MAX_SIZE_BYTES)), // เพดานเดียวกับการอัปโหลดจริง
       }),
     )
     .max(5, 'แนบไฟล์ได้สูงสุด 5 ไฟล์')

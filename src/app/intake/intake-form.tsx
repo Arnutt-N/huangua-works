@@ -30,7 +30,7 @@ import { HONEYPOT_FIELD, MIN_SUBMIT_MS } from '../../lib/anti-spam';
 import { useLiff } from '../../components/liff/liff-provider';
 import { clearIntakeDraft, readIntakeDraft, saveIntakeDraft } from '../../components/forms/non-pii-draft';
 import { generateId } from '../../lib/id';
-import { MEDIA_ACCEPT_ATTR, MEDIA_MAX_SIZE_BYTES, validateMediaFile } from '../../lib/media-upload-rules';
+import { MEDIA_ACCEPT_ATTR, MEDIA_MAX_SIZE_BYTES, MEDIA_MAX_SIZE_MB, validateMediaFile } from '../../lib/media-upload-rules';
 
 export interface IntakeCategory {
   id: string;
@@ -992,7 +992,7 @@ export function IntakeForm({
         <SectionHeading icon={Camera}>ภาพถ่ายหรือเอกสารประกอบ (ไม่จำเป็น)</SectionHeading>
         <div className="mt-5 flex flex-col gap-4">
           <p className="text-sm text-muted">
-            แนบภาพถ่ายจุดเกิดเหตุ ป้ายบอกทาง หรือความเสียหายเพื่อประกอบการพิจารณา สูงสุด 5 รูป (ไฟล์ JPG, PNG, WebP ขนาดไม่เกิน 10MB ต่อรูป)
+            แนบภาพถ่ายจุดเกิดเหตุ ป้ายบอกทาง หรือความเสียหายเพื่อประกอบการพิจารณา สูงสุด 5 รูป (ไฟล์ JPG, PNG, WebP ขนาดไม่เกิน {MEDIA_MAX_SIZE_MB}MB ต่อรูป)
           </p>
 
           <div>
