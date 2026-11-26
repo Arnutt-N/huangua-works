@@ -129,6 +129,10 @@ describe('prepareExternalEffects — I/O อยู่นอก effects/lock', ()
     await runEventEffects(mockDb, event, transport, prepared);
 
     expect(transport.calls.filter((c) => c.kind === 'profile')).toHaveLength(1);
+
+    // § timeout ได้ profile=null ก็ต้องไม่กลับไปยิง LINE ใน tx
+    await runEventEffects(mockDb, event, transport, { botEnabled: true, profile: undefined });
+    expect(transport.calls.filter((c) => c.kind === 'profile')).toHaveLength(1);
   });
 });
 

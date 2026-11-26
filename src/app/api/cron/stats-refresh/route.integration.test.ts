@@ -14,6 +14,17 @@ import { GET } from './route';
  */
 
 const RUN = Date.now();
+
+// § กันลบ snapshot ที่มีอยู่ก่อนหน้า (route ใช้ upsert ตามวัน → id เดิมอยู่รอด)
+// ถ้า DB ไม่สะอาดให้หยุด suite แทนที่จะไปลบข้อมูลจริงตอน afterAll
+async function assertCleanSnapshotTarget(db: Awaited<ReturnType<typeof getDb>>, date: string) {
+  const existing = await db.select({ id: caseStatsDaily.id }).from(caseStatsDaily)
+    .where(eq(caseStatsDaily.date, date)).limit(1);
+  if (existing.length > 0) {
+    throw new Error('stats-refresh integration: snapshot ของวันนี้มีอยู่แล้ว — ใช้ disposable test database');
+  }
+}
+
 const createdCaseIds: string[] = [];
 const createdSnapshotIds: string[] = [];
 let createdSnapshotDate: string | null = null;
@@ -84,6 +95,7 @@ describe('cron/stats-refresh · มาตรฐานสถานะ', () => {
       `,
     );
     const expectedRow = expected[0] as { arrivals: number; closures: number };
+    await assertCleanSnapshotTarget(db, today);
 
     const res = await GET(
       new NextRequest('http://localhost/api/cron/stats-refresh', {

@@ -71,7 +71,8 @@ export async function handleEvent(event: LineWebhookEvent, transport: LineTransp
 
 export interface PreparedExternalEffects {
   botEnabled: boolean;
-  profile: LineProfile | null;
+  // § undefined = prepare แล้วแต่ LINE ไม่ตอบ/timeout — ห้ามกลับเข้า tx ไปดึงอีก (critical)
+  profile: LineProfile | null | undefined;
 }
 
 const EXTERNAL_TIMEOUT_MS = 5_000;
@@ -103,7 +104,7 @@ export async function prepareExternalEffects(
   }
   const profile = event.source.userId
     ? await withTimeout(transport.getProfile(event.source.userId), 'getProfile')
-    : null;
+    : undefined;
   return { botEnabled, profile };
 }
 
@@ -129,7 +130,7 @@ export async function runEventEffects(
     }
   }
 
-  const lineUser = await getOrCreateLineUser(db, userId, transport, prepared?.profile);
+  const lineUser = await getOrCreateLineUser(db, userId, transport, prepared);
   const conversation = await getOrCreateConversation(db, userId);
 
   switch (event.type) {
@@ -137,7 +138,7 @@ export async function runEventEffects(
       return handleMessageEvent(db, event, lineUser.id, conversation.id, conversation.mode);
     }
     case 'follow':
-      return handleFollowEvent(db, event, lineUser.id, conversation.id, transport, prepared?.profile);
+      return handleFollowEvent(db, event, lineUser.id, conversation.id, transport, prepared);
     case 'postback':
       return handlePostbackEvent(db, event, conversation.id);
     case 'unfollow':
@@ -264,11 +265,13 @@ async function getOrCreateLineUser(
   db: DbOrTx,
   lineUserId: string,
   transport: LineTransport,
-  prefetched?: LineProfile | null,
+  prepared?: PreparedExternalEffects,
 ) {
   const existing = await findLineUserByRaw(db, lineUserId);
-  // § profile ที่ prepare ล่วงหน้าอยู่นอก tx แล้ว — ห้ามยิง LINE ซ้ำใน lock
-  const getProfile = async () => prefetched ?? await transport.getProfile(lineUserId).catch(() => null);
+  // § prepare แล้วต้องไม่ยิง LINE ซ้ำใน lock แม้ได้ null (timeout) — ใช้ prepared object แยก state
+  const getProfile = async () => prepared
+    ? prepared.profile ?? null
+    : await transport.getProfile(lineUserId).catch(() => null);
 
   if (existing) {
     // backfill โปรไฟล์ให้ user เก่าที่ยังไม่มีชื่อ (best-effort — พังไม่ล้ม flow)
@@ -531,13 +534,15 @@ async function handleFollowEvent(
   lineUserPk: string,
   conversationId: string,
   transport: LineTransport,
-  prefetched?: LineProfile | null,
+  prepared?: PreparedExternalEffects,
 ): Promise<LineOutgoingMessage[]> {
   // § บันทึก friend event ก่อน (best-effort) เพื่อให้ {follow_count} รวมครั้งนี้ — พังห้ามล้ม welcome
   await recordFriendEvent(db, lineUserPk, 'follow', event.webhookEventId).catch(() => false);
   const followCount = await getFollowCount(db, lineUserPk).catch(() => null);
   // § โปรไฟล์ดึงแบบ best-effort — พังหรือไม่มียังต้องส่ง welcome ต่อ (display_name ว่าง)
-  const profile = prefetched ?? await transport.getProfile(event.source.userId).catch(() => null);
+  const profile = prepared
+    ? prepared.profile ?? null
+    : await transport.getProfile(event.source.userId).catch(() => null);
   const replies = await getWelcomeMessages({ displayName: profile?.displayName ?? null, followCount });
 
   // คงพฤติกรรมเดิม: บันทึกแค่ข้อความแรกเป็น text
