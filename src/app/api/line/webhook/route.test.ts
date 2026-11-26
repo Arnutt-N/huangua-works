@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockEnforce, mockVerify, mockProcess, mockEnqueue } = vi.hoisted(() => ({
+const { mockEnforce, mockVerify, mockProcess, mockEnqueue, mockWarn } = vi.hoisted(() => ({
+  mockWarn: vi.fn(),
   mockEnforce: vi.fn(),
   mockVerify: vi.fn(),
   mockProcess: vi.fn(),
@@ -33,10 +34,19 @@ function webhookRequest(body: unknown, ip = '203.0.113.5'): Request {
   });
 }
 
-const BODY = { destination: 'U1', events: [{ type: 'follow', webhookEventId: 'w1' }] };
+const NOW_MS = 1_795_651_200_000;
+const followEvent = (id: string) => ({
+  type: 'follow',
+  webhookEventId: id,
+  timestamp: NOW_MS,
+  mode: 'active',
+  source: { type: 'user', userId: 'U123' },
+});
+const BODY = { destination: 'U1', events: [followEvent('w1')] };
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.spyOn(console, 'warn').mockImplementation(mockWarn);
   mockVerify.mockReturnValue(true);
   mockEnqueue.mockResolvedValue({ ok: true });
   mockProcess.mockResolvedValue({ attempted: 0, done: 0, retried: 0, failed: 0, deferred: 0 });
@@ -141,25 +151,70 @@ describe('POST /api/line/webhook · rate limit', () => {
     expect(mockEnqueue).not.toHaveBeenCalled();
   });
 
-  it('event null ปนใน batch → ข้ามตัวนั้น ตัวอื่นยังประมวลผล (200)', async () => {
+  it('event นอกขอบเขตปนกับของจริง → 200, เก็บ/ประมวลผลตัวจริงตัวเดียว, นับ ignored', async () => {
     mockEnforce.mockResolvedValue({ allowed: true, remaining: 59, reset: 60 });
-    const follow = { type: 'follow', webhookEventId: 'w-mixed-ok' };
+    const supported = followEvent('w-mixed-ok');
+    const unsupported = [
+      null,
+      { type: 'memberJoined', webhookEventId: 'w-join', timestamp: NOW_MS, source: { type: 'group', groupId: 'G1' } },
+      { ...followEvent('w-no-user'), source: { type: 'user' } },
+      { ...followEvent('w-bad-ts'), timestamp: 1.5 },
+    ];
 
-    const res = await POST(webhookRequest({ destination: 'U1', events: [null, follow] }));
+    const res = await POST(webhookRequest({ destination: 'U1', events: [unsupported[0], supported, ...unsupported.slice(1)] }));
 
     expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, ignored: unsupported.length });
     expect(mockEnqueue).toHaveBeenCalledTimes(1);
-    expect(mockEnqueue).toHaveBeenCalledWith(follow);
+    expect(mockEnqueue).toHaveBeenCalledWith(supported);
+    expect(mockProcess).toHaveBeenCalledWith(1);
+    // § counter ต้อง bounded: ไม่ log payload (ข้อความร้องเรียน/PII)
+    expect(JSON.stringify(mockWarn.mock.calls)).not.toContain('U123');
   });
 
-  it('message event ไม่มี .message → 200 ไม่ลามทั้ง batch', async () => {
+  it('timestamp millisecond จริง (13 ตัว) ผ่าน boundary → ส่งเข้า enqueue', async () => {
     mockEnforce.mockResolvedValue({ allowed: true, remaining: 59, reset: 60 });
-    mockEnqueue.mockRejectedValueOnce(new Error('malformed'));
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const event = followEvent('w-real-ts');
 
-    const res = await POST(webhookRequest({ destination: 'U1', events: [{ type: 'message', webhookEventId: 'w-no-msg' }] }));
+    const res = await POST(webhookRequest({ destination: 'U1', events: [event] }));
 
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(200);
+    expect(mockEnqueue).toHaveBeenCalledWith(expect.objectContaining({ timestamp: NOW_MS }));
+  });
+
+  it('message ที่มี webhookEventId เป็นตัวเลข → ignored (ไม่ให้ dedup key กลายเป็น w:42)', async () => {
+    mockEnforce.mockResolvedValue({ allowed: true, remaining: 59, reset: 60 });
+    const bad = {
+      type: 'message',
+      webhookEventId: 42,
+      timestamp: NOW_MS,
+      mode: 'active',
+      source: { type: 'user', userId: 'U123' },
+      message: { type: 'text', id: 'm-1', text: 'สวัสดี' },
+    };
+
+    const res = await POST(webhookRequest({ destination: 'U1', events: [bad] }));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, ignored: 1 });
+    expect(mockEnqueue).not.toHaveBeenCalled();
+  });
+
+  it('message text ไม่มี id → ignored (engine ต้องการ id ทุก subtype)', async () => {
+    mockEnforce.mockResolvedValue({ allowed: true, remaining: 59, reset: 60 });
+    const bad = {
+      type: 'message',
+      timestamp: NOW_MS,
+      mode: 'active',
+      source: { type: 'user', userId: 'U123' },
+      message: { type: 'text', text: 'สวัสดี' },
+    };
+
+    const res = await POST(webhookRequest({ destination: 'U1', events: [bad] }));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, ignored: 1 });
+    expect(mockEnqueue).not.toHaveBeenCalled();
   });
 
   it('payload ไม่มี events array → 400', async () => {
@@ -173,17 +228,14 @@ describe('POST /api/line/webhook · rate limit', () => {
 });
 
 describe('POST /api/line/webhook · enqueue', () => {
-  it('insert event ใดพัง → 500 (LINE จะ redeliver ทั้งชุด)', async () => {
+  it('insert event ที่รองรับพัง → 500 (LINE จะ redeliver ทั้งชุด)', async () => {
     mockEnforce.mockResolvedValue({ allowed: true, remaining: 59, reset: 60 });
     mockEnqueue.mockResolvedValueOnce({ ok: true }).mockResolvedValueOnce({ ok: false, error: new Error('db down') });
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
     const res = await POST(webhookRequest({
       destination: 'U1',
-      events: [
-        { type: 'follow', webhookEventId: 'ok-1' },
-        { type: 'follow', webhookEventId: 'bad-1' },
-      ],
+      events: [followEvent('ok-1'), followEvent('bad-1')],
     }));
 
     expect(res.status).toBe(500);
@@ -194,10 +246,7 @@ describe('POST /api/line/webhook · enqueue', () => {
 
     const res = await POST(webhookRequest({
       destination: 'U1',
-      events: [
-        { type: 'follow', webhookEventId: 'ok-1' },
-        { type: 'follow', webhookEventId: 'ok-2' },
-      ],
+      events: [followEvent('ok-1'), followEvent('ok-2')],
     }));
 
     expect(res.status).toBe(200);

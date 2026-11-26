@@ -20,7 +20,12 @@ import {
   type CaseStatus,
 } from '@/lib/cases/state-machine';
 import { formatThaiDateLong, THAI_MONTHS_SHORT } from '@/lib/thai-date';
-import { deriveStatusStats, totalCasesFromSnapshot } from '@/lib/cases/stats';
+import {
+  dailyCountsFromSnapshot,
+  deriveStatusStats,
+  statusCountsFromSnapshot,
+  totalCasesFromSnapshot,
+} from '@/lib/cases/stats';
 
 export const metadata: Metadata = { title: 'แดชบอร์ดเจ้าหน้าที่' };
 export const dynamic = 'force-dynamic';
@@ -95,51 +100,39 @@ export default async function AdminDashboardPage() {
   // ถ้า snapshot ยังไม่มี (cron ยังไม่รัน) ให้ derive จาก status counts แบบ live
   const liveStats = deriveStatusStats(Object.fromEntries(statusMap), []);
   // § KPI เรื่องรับทั้งหมด = ยอดทั้งหมดตาม Excel — เก็บใน metadata เพราะคอลัมน์เดิม
-  // total_received ยังใช้เป็นยอดตามสถานะ received สำหรับกราฟแนวโน้ม
+  // snapshot ใหม่เก็บยอดสะสมแยกจากยอดรายวันในคอลัมน์ (รับ/ปิดรายวันใช้สำหรับกราฟ)
   const snapshotTotalCases = latest ? totalCasesFromSnapshot(latest.metadata) : null;
-  const totalReceived = snapshotTotalCases ?? (latest ? latest.totalReceived : liveStats.totalCases);
-  const totalInProgress = latest?.totalInProgress ?? liveStats.totalInProgress;
-  const totalClosed = latest?.totalClosed ?? liveStats.totalClosed;
+  const snapshotCounts = latest ? statusCountsFromSnapshot(latest.metadata) : null;
+  const totalReceived =
+    snapshotTotalCases ?? snapshotCounts?.received ?? (latest ? latest.totalReceived : liveStats.totalCases);
+  const totalInProgress = snapshotCounts?.inProgress ?? latest?.totalInProgress ?? liveStats.totalInProgress;
+  const totalClosed = snapshotCounts?.closed ?? latest?.totalClosed ?? liveStats.totalClosed;
   const avgResolutionDays = latest?.avgResolutionDays ?? null;
   const resolutionRate = totalReceived > 0 ? Math.round((totalClosed / totalReceived) * 100) : 0;
 
-  // § จัดการ trend points อย่างปลอดภัย (รองรับทั้ง DB จริงและ test mock)
-  let trendPoints: DailyTrendPoint[] = [];
+  // § trend มาจากยอดรับ/ปิดรายวันที่ cron เก็บตามวันกรุงเทพ — ไม่แต่งจุดจากยอดรวม
+  const trendPoints: DailyTrendPoint[] = [];
 
   if (Array.isArray(dailyRows)) {
-    trendPoints = dailyRows
-      .filter((r) => r && typeof r.date === 'string' && r.date.length >= 8)
-      .reverse()
-      .map((r) => {
-        const d = new Date(r.date);
-        const day = d.getDate();
-        const monthShort = THAI_MONTHS_SHORT[d.getMonth()] ?? '';
-        return {
-          date: r.date,
-          label: `${day} ${monthShort}`,
-          received: Number(r.totalReceived ?? 0),
-          closed: Number(r.totalClosed ?? 0),
-        };
-      });
+    trendPoints.push(
+      ...dailyRows
+        .filter((r) => r && typeof r.date === 'string' && r.date.length >= 8)
+        .reverse()
+        .map((r) => {
+          const d = new Date(r.date);
+          const day = d.getDate();
+          const monthShort = THAI_MONTHS_SHORT[d.getMonth()] ?? '';
+          const daily = dailyCountsFromSnapshot(r);
+          return {
+            date: r.date,
+            label: `${day} ${monthShort}`,
+            received: daily.arrivals,
+            closed: daily.closures,
+          };
+        }),
+    );
   }
-
-  // Fallback สร้างจุดแนวโน้มถ้ายังไม่มีข้อมูลใน caseStatsDaily (เช่น รันเทสต์ หรือเพิ่งเริ่มต้นระบบ)
-  if (trendPoints.length === 0) {
-    const today = new Date();
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(today.getDate() - i);
-      const iso = d.toISOString().slice(0, 10);
-      const day = d.getDate();
-      const monthShort = THAI_MONTHS_SHORT[d.getMonth()] ?? '';
-      trendPoints.push({
-        date: iso,
-        label: `${day} ${monthShort}`,
-        received: Math.max(0, Math.round(totalReceived / 7)),
-        closed: Math.max(0, Math.round(totalClosed / 7)),
-      });
-    }
-  }
+  const hasDailyTrend = trendPoints.length > 0;
 
   // คำนวณปริมาณรับเข้าใน 7 วันล่าสุด
   const recent7Days = trendPoints.slice(-7);
@@ -216,6 +209,11 @@ export default async function AdminDashboardPage() {
 
   return (
     <AdminShell user={staffUser} active="dashboard" title="แดชบอร์ดเจ้าหน้าที่">
+      {!hasDailyTrend && (
+        <p className="mb-4 text-sm text-muted">
+          ยังไม่มีข้อมูลแนวโน้มรายวัน — รอให้ cron สรุปสถิติอย่างน้อยหนึ่งวันก่อน แทนการแสดงยอดรวมเฉลี่ยรายวัน
+        </p>
+      )}
       <AdminDashboardView
         metrics={metrics}
         trendPoints={trendPoints}

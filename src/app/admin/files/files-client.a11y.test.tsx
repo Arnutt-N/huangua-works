@@ -55,7 +55,7 @@ describe('FORM-04 ตัวเลือกไฟล์ตรงกับข้�
     await screen.findByText('a.png');
     const input = screen.getByLabelText('อัปโหลดไฟล์สื่อ');
     expect(input).toHaveAttribute('accept', 'image/png,image/jpeg,image/webp');
-    expect(screen.getByText(/รองรับไฟล์ภาพ PNG, JPEG, WebP ขนาดไม่เกิน 10MB/)).toBeInTheDocument();
+    expect(screen.getByText(/รองรับไฟล์ภาพ PNG, JPEG, WebP ขนาดไม่เกิน 4\.5MB/)).toBeInTheDocument();
   });
 
   it('ไฟล์ PDF → แจ้งข้อผิดพลาดทันที ไม่ยิง API', async () => {
@@ -78,15 +78,15 @@ describe('FORM-04 ตัวเลือกไฟล์ตรงกับข้�
     expect(mocks.uploadMedia).not.toHaveBeenCalled();
   });
 
-  it('ไฟล์ภาพเกิน 10MB → ถูกปฏิเสธก่อนส่ง', async () => {
+  it('ไฟล์ภาพเกิน 4.5MB → ถูกปฏิเสธก่อนส่ง', async () => {
     render(<FilesClient />);
     await screen.findByText('a.png');
     const input = screen.getByLabelText('อัปโหลดไฟล์สื่อ');
     const big = new File(['x'], 'big.png', { type: 'image/png' });
-    Object.defineProperty(big, 'size', { value: 10 * 1024 * 1024 + 1 });
+    Object.defineProperty(big, 'size', { value: 4.5 * 1024 * 1024 + 1 });
     fireEvent.change(input, { target: { files: [big] } });
 
-    expect(await screen.findByText('ไฟล์ใหญ่เกิน 10MB')).toBeInTheDocument();
+    expect(await screen.findByText('ไฟล์ใหญ่เกิน 4.5MB')).toBeInTheDocument();
     expect(mocks.uploadMedia).not.toHaveBeenCalled();
   });
 

@@ -2,7 +2,7 @@ import { desc } from 'drizzle-orm';
 import { getDb } from '@/lib/db';
 import { caseStatsDaily } from '@/lib/db/schema';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
-import { totalCasesFromSnapshot } from '@/lib/cases/stats';
+import { statusCountsFromSnapshot, totalCasesFromSnapshot } from '@/lib/cases/stats';
 import { StatsClient, type StatItem } from './stats-client';
 
 /**
@@ -35,11 +35,13 @@ export async function Stats() {
   }
 
   const hasData = !!latest;
+  // § snapshot ใหม่เก็บยอดสะสมใน metadata — คอลัมน์ totalClosed คือยอดปิด "วันนั้น" สำหรับกราฟ
+  const cumulative = latest ? statusCountsFromSnapshot(latest.metadata) : null;
 
   const stats: StatItem[] = [
     {
       label: 'เรื่องดำเนินการ',
-      value: hasData ? formatNumber(latest!.totalInProgress) : '—',
+      value: hasData ? formatNumber(cumulative?.inProgress ?? latest!.totalInProgress) : '—',
       // change% ไม่แสดงเพราะต้องเทียบกับวันก่อนหน้า (เก็บไว้ทำใน PR #3 reports)
       change: null,
       icon: 'TrendingUp',
@@ -66,7 +68,7 @@ export async function Stats() {
     },
     {
       label: 'เรื่องปิดสำเร็จ',
-      value: hasData ? formatNumber(latest!.totalClosed) : '—',
+      value: hasData ? formatNumber(cumulative?.closed ?? latest!.totalClosed) : '—',
       change: null,
       icon: 'CheckCircle2',
       colorClass: 'text-accent',

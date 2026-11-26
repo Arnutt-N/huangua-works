@@ -5,106 +5,135 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
-import { firstOrUndefined } from '@/lib/db/query-helpers';
-import { cases, caseStatsDaily } from '@/lib/db/schema';
+import { caseStatsDaily } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
-import { sql, and, eq, isNotNull } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import { requireCron } from '@/lib/cron-auth';
-import { deriveStatusStats } from '@/lib/cases/stats';
-import type { CaseStatus } from '@/lib/cases/state-machine';
+import { bangkokDateKey } from '@/lib/cases/stats';
+import { OPEN_STATUSES, type CaseStatus } from '@/lib/cases/state-machine';
+
+interface AggregateRow {
+  [key: string]: unknown;
+  statuses: Record<string, string | number> | null;
+  avgResolutionDays: string | number | null;
+  byDepartment: Record<string, string | number> | null;
+  byCategory: Record<string, string | number> | null;
+  dailyArrivals: string | number;
+  dailyClosures: string | number;
+}
+
+function numberFrom(value: unknown): number {
+  const n = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN;
+  return Number.isFinite(n) ? n : 0;
+}
 
 export async function GET(req: NextRequest) {
   const auth = requireCron(req);
   if (!auth.ok) return auth.response;
 
   const db = await getDb();
-  const today: string = new Date().toISOString().split('T')[0]!; // YYYY-MM-DD
+  // § วันที่ต้องตรงกับเขตเวลากรุงเทพ — new Date().toISOString() ผิดหลัง 17:00 น.
+  const today = bangkokDateKey(new Date());
 
-  // § Count cases by status (1 GROUP BY query แทน 4 query แยกตาม status)
-  const statusCounts = await db
-    .select({ status: cases.status, count: sql<number>`count(*)` })
-    .from(cases)
-    .groupBy(cases.status);
+  // § รวมทุก aggregator ใน query เดียวจาก snapshot เดียวกัน: ไม่ transfer description/attachments
+  // และไม่ให้ status/duration/group ต่าง database state
+  const rows = await db.execute<AggregateRow>(sql`
+    WITH status_counts AS (
+      SELECT status, count(*)::int AS c FROM cases GROUP BY status
+    ),
+    durations AS (
+      -- § floor รายเรื่องก่อนเฉลี่ย (legacy null treatment) แล้วปัดผลรวมเหมือน Math.round เดิม
+      SELECT round(avg(floor(extract(epoch FROM (closed_at - created_at)) / 86400)))::int AS avg_days
+      FROM cases
+      WHERE status = 'closed' AND closed_at IS NOT NULL
+    ),
+    dept_counts AS (
+      SELECT department_id, count(*)::int AS c FROM cases
+      WHERE department_id IS NOT NULL GROUP BY department_id
+    ),
+    cat_counts AS (
+      SELECT category_id, count(*)::int AS c FROM cases GROUP BY category_id
+    )
+    SELECT
+      (SELECT coalesce(jsonb_object_agg(status, c), '{}'::jsonb) FROM status_counts) AS statuses,
+      (SELECT avg_days FROM durations) AS "avgResolutionDays",
+      (SELECT coalesce(jsonb_object_agg(department_id, c), '{}'::jsonb) FROM dept_counts) AS "byDepartment",
+      (SELECT coalesce(jsonb_object_agg(category_id, c), '{}'::jsonb) FROM cat_counts) AS "byCategory",
+      (SELECT count(*)::int FROM cases WHERE created_at >= ${today}::date AT TIME ZONE 'Asia/Bangkok'
+        AND created_at < (${today}::date + 1) AT TIME ZONE 'Asia/Bangkok') AS "dailyArrivals",
+      (SELECT count(*)::int FROM cases WHERE closed_at >= ${today}::date AT TIME ZONE 'Asia/Bangkok'
+        AND closed_at < (${today}::date + 1) AT TIME ZONE 'Asia/Bangkok') AS "dailyClosures"
+  `);
+  const row = rows[0];
+  if (!row) throw new Error('stats aggregation returned no row');
 
   const countByStatus: Partial<Record<CaseStatus, number>> = {};
-  for (const row of statusCounts) {
-    // count(*) จาก postgres-js คืนเป็น string (bigint) โดย default — ต้อง Number() ก่อนบวกรวม
-    countByStatus[row.status] = Number(row.count);
+  for (const [status, value] of Object.entries(row.statuses ?? {})) {
+    countByStatus[status as CaseStatus] = numberFrom(value);
   }
+  const totalCases = Object.values(countByStatus).reduce((sum, n) => sum + (n ?? 0), 0);
+  const closedCount = countByStatus.closed ?? 0;
+  const rejectedCount = countByStatus.rejected ?? 0;
+  const inProgressCount = OPEN_STATUSES.reduce((sum, status) => sum + (countByStatus[status] ?? 0), 0);
+  const avgResolutionDays = row.avgResolutionDays === null ? null : numberFrom(row.avgResolutionDays);
+  const dailyArrivals = numberFrom(row.dailyArrivals);
+  const dailyClosures = numberFrom(row.dailyClosures);
+  const toCounts = (value: Record<string, string | number> | null): Record<string, number> =>
+    Object.fromEntries(Object.entries(value ?? {}).map(([key, n]) => [key, numberFrom(n)]));
 
-  // § เฉลี่ยวันปิดหารเฉพาะแถวที่มี closedAt จริง — เรื่อง closed ที่ไม่มีวันปิด
-  // (ข้อมูลนำเข้าเก่า) ต้องไม่ไปลดค่าเฉลี่ย
-  const closedCases = await db
-    .select({ createdAt: cases.createdAt, closedAt: cases.closedAt })
-    .from(cases)
-    .where(and(eq(cases.status, 'closed'), isNotNull(cases.closedAt)));
-  const closedDurationsDays = closedCases.map((c) =>
-    Math.floor((new Date(c.closedAt!).getTime() - new Date(c.createdAt).getTime()) / 86400000),
-  );
+  const metadata = {
+    refreshedAt: new Date().toISOString(),
+    totalCases,
+    // § ยอดสะสมแยกจากยอดรายวันในคอลัมน์ — snapshot เก่าไม่มี field นี้ caller ต้อง fallback
+    statusCounts: {
+      received: countByStatus.received ?? 0,
+      closed: closedCount,
+      rejected: rejectedCount,
+      inProgress: inProgressCount,
+    },
+  };
 
-  const stats = deriveStatusStats(countByStatus, closedDurationsDays);
-  const receivedCount = stats.totalReceived;
-  const closedCount = stats.totalClosed;
-  const rejectedCount = stats.totalRejected;
-  const inProgressCount = stats.totalInProgress;
-  const avgResolutionDays = stats.avgResolutionDays;
-
-  // § Group by department (คำนวณแบบง่าย — ใช้ in-memory)
-  const allCases = await db.select().from(cases);
-  const byDepartment: Record<string, number> = {};
-  const byCategory: Record<string, number> = {};
-
-  for (const c of allCases) {
-    if (c.departmentId) {
-      byDepartment[c.departmentId] = (byDepartment[c.departmentId] || 0) + 1;
-    }
-    byCategory[c.categoryId] = (byCategory[c.categoryId] || 0) + 1;
-  }
-
-  // § Upsert stats
-  const existing = await firstOrUndefined(
-    db.select().from(caseStatsDaily).where(eq(caseStatsDaily.date, today))
-  );
-
-  if (existing) {
-    await db
-      .update(caseStatsDaily)
-      .set({
-        totalReceived: receivedCount,
-        totalClosed: closedCount,
-        totalRejected: rejectedCount,
-        totalInProgress: inProgressCount,
-        avgResolutionDays,
-        byDepartment: JSON.stringify(byDepartment),
-        byCategory: JSON.stringify(byCategory),
-        metadata: JSON.stringify({ refreshedAt: new Date().toISOString(), totalCases: stats.totalCases }),
-      })
-      .where(eq(caseStatsDaily.date, today));
-  } else {
-    await db.insert(caseStatsDaily).values({
+  // § atomic upsert — สอง cron ที่ทับกันต้องจบที่แถวเดียวโดยไม่ unique violation
+  await db
+    .insert(caseStatsDaily)
+    .values({
       id: generateId(),
       date: today,
-      totalReceived: receivedCount,
-      totalClosed: closedCount,
+      totalReceived: dailyArrivals,
+      totalClosed: dailyClosures,
       totalRejected: rejectedCount,
       totalInProgress: inProgressCount,
       avgResolutionDays,
-      byDepartment: JSON.stringify(byDepartment),
-      byCategory: JSON.stringify(byCategory),
-      metadata: JSON.stringify({ refreshedAt: new Date().toISOString(), totalCases: stats.totalCases }),
+      byDepartment: toCounts(row.byDepartment),
+      byCategory: toCounts(row.byCategory),
+      metadata,
+    })
+    .onConflictDoUpdate({
+      target: caseStatsDaily.date,
+      set: {
+        totalReceived: dailyArrivals,
+        totalClosed: dailyClosures,
+        totalRejected: rejectedCount,
+        totalInProgress: inProgressCount,
+        avgResolutionDays,
+        byDepartment: toCounts(row.byDepartment),
+        byCategory: toCounts(row.byCategory),
+        metadata,
+      },
     });
-  }
 
   return NextResponse.json({
     success: true,
     date: today,
     stats: {
-      totalCases: stats.totalCases,
-      totalReceived: receivedCount,
+      totalCases,
+      totalReceived: countByStatus.received ?? 0,
       totalClosed: closedCount,
       totalRejected: rejectedCount,
       totalInProgress: inProgressCount,
       avgResolutionDays,
+      dailyArrivals,
+      dailyClosures,
     },
   });
 }

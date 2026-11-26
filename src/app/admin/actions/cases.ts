@@ -289,7 +289,7 @@ export async function addUpdate(
  * § ความปลอดภัยและการทำงาน:
  * - ตรวจสอบสิทธิ์เจ้าหน้าที่ผ่าน requireStaff()
  * - ตรวจสอบความพร้อมของระบบ S3 Storage
- * - ตรวจสอบขนาดไม่เกิน 10MB และ Magic bytes จริง (JPEG, PNG, WebP)
+ * - ตรวจสอบขนาดไม่เกินเพดาน Media ร่วม (4.5MB) และ Magic bytes จริง (JPEG, PNG, WebP)
  * - ดำเนินการผ่าน Database Transaction ร่วมกับ `SELECT ... FOR UPDATE` บนเคส
  *   เพื่อป้องกัน Lost Updates จากการแก้ไข metadata พร้อมกัน
  * - บันทึกประวัติใน caseUpdates (updateType: 'attachment', isPublic: true)

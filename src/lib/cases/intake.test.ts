@@ -120,6 +120,14 @@ const { mockState, mockDb } = vi.hoisted(() => {
   const mockDb = {
     select: vi.fn(() => makeSelect()),
     insert: vi.fn((table: unknown) => makeInsert(table)),
+    update: vi.fn(() => ({
+      set: () => ({
+        where: () => ({
+          returning: async () => [],
+          then: (resolve: (v: unknown) => unknown) => Promise.resolve([]).then(resolve),
+        }),
+      }),
+    })),
     // § mock ใช้ db ตัวเดียวเป็น tx เพื่อให้ unit tests ตรวจพฤติกรรม intake เดิม
     transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(mockDb)),
   };

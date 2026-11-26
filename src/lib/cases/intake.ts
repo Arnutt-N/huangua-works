@@ -1,8 +1,8 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { isUniqueViolation } from '../db/errors';
 import { getDb, type DbOrTx } from '../db';
 import { firstOrUndefined } from '../db/query-helpers';
-import { cases, categories } from '../db/schema';
+import { cases, categories, caseNotifications } from '../db/schema';
 import { generateId } from '../id';
 import { generateTrackingCode } from '../case-tracking';
 import { checkDuplicate, claimDedupHash } from '../dedup';
@@ -65,7 +65,8 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
   } catch (error) {
     result = intakeFailureFrom(error);
   }
-  return notifyOnResult(result, input);
+  if (result.ok) await dispatchCaseNotification(result.caseId);
+  return result;
 }
 
 /** § เรียกจาก effects tx ได้โดยไม่เปิด transaction ซ้อน — ทุก write อยู่ใน tx เดียวกับ caller */
@@ -231,6 +232,18 @@ export async function createCaseInTx(db: DbOrTx, input: CaseIntakeInput): Promis
         metadata: { categoryId: input.categoryId, fiscalYear, channel: input.channel },
       }, tx);
 
+    // § outbox อยู่ใน tx เดียวกับเรื่อง — rollback ไม่ทิ้งแจ้งเตือน, replay โดน unique(case_id) กัน
+    //   ใช้ categoryName ที่อ่านไปแล้ว ไม่ต้อง query ซ้ำตอนส่ง
+    await tx.insert(caseNotifications).values({
+      id: generateId(),
+      caseId,
+      trackingCode: issuedTrackingCode,
+      title: input.title,
+      categoryName: category.name,
+      channel: input.channel,
+      location: input.location ?? null,
+    }).onConflictDoNothing();
+
     return { ok: true, caseId, trackingCode: issuedTrackingCode, estimatedDays };
 }
 
@@ -250,26 +263,62 @@ function intakeFailureFrom(error: unknown): CaseIntakeResult {
   throw error;
 }
 
-/** § แจ้งเจ้าหน้าที่หลัง commit สำเร็จเท่านั้น — fail-open สองชั้น (notifyNewCase สัญญา
- * ไม่ throw อยู่แล้ว + try/catch นี้กันของใหม่ในอนาคต) เพราะเคสถูกบันทึกไปแล้ว
- * การแจ้งเตือนพังต้องไม่ลอยขึ้นไปทำให้ผู้แจ้งได้ error ทั้งที่เรื่องถูกรับไว้แล้ว */
-async function notifyOnResult(result: CaseIntakeResult, input: CaseIntakeInput): Promise<CaseIntakeResult> {
-  if (result.ok) {
+/** § ส่งหลัง commit เท่านั้น — atomic claim ทำให้ web/LIFF/bot/Replay ส่งได้ครั้งเดียวต่อ case */
+export async function dispatchPendingCaseNotifications(limit = 20): Promise<{ sent: number; failed: number }> {
+  const db = await getDb();
+  const candidates = db
+    .select({ id: caseNotifications.id })
+    .from(caseNotifications)
+    .where(eq(caseNotifications.status, 'pending'))
+    .limit(limit);
+  const claimed = await db
+    .update(caseNotifications)
+    .set({ status: 'sending', updatedAt: new Date() })
+    .where(and(eq(caseNotifications.status, 'pending'), inArray(caseNotifications.id, candidates)))
+    .returning();
+  return dispatchClaimed(db, claimed);
+}
+
+async function dispatchCaseNotification(caseId: string): Promise<void> {
+  const db = await getDb();
+  const claimed = await db
+    .update(caseNotifications)
+    .set({ status: 'sending', updatedAt: new Date() })
+    .where(and(eq(caseNotifications.caseId, caseId), eq(caseNotifications.status, 'pending')))
+    .returning();
+  await dispatchClaimed(db, claimed);
+}
+
+async function dispatchClaimed(db: Awaited<ReturnType<typeof getDb>>, rows: (typeof caseNotifications.$inferSelect)[]): Promise<{ sent: number; failed: number }> {
+  let sent = 0;
+  let failed = 0;
+  // § notifyNewCase ไม่ throw อยู่แล้ว — try/catch กันของใหม่ในอนาคตเพราะเรื่อง commit ไปแล้ว
+  for (const row of rows) {
     try {
-      const db = await getDb();
-      const category = await firstOrUndefined(db.select().from(categories).where(eq(categories.id, input.categoryId)).limit(1));
       await notifyNewCase({
-        trackingCode: result.trackingCode,
-        title: input.title,
-        categoryName: category?.name ?? '',
-        channel: input.channel,
-        location: input.location,
+        trackingCode: row.trackingCode,
+        title: row.title,
+        categoryName: row.categoryName,
+        channel: row.channel as 'web' | 'line',
+        location: row.location ?? undefined,
       });
+      await markNotification(db, row.id, 'sent');
+      sent++;
     } catch (error) {
-      console.warn('[notify] new-case notice failed', error);
+      await markNotification(db, row.id, 'failed', error instanceof Error ? error.message : String(error));
+      failed++;
     }
   }
-  return result;
+  return { sent, failed };
+}
+
+async function markNotification(db: Awaited<ReturnType<typeof getDb>>, id: string, status: 'sent' | 'failed', error?: string): Promise<void> {
+  await db.update(caseNotifications).set({
+    status,
+    attempts: sql`${caseNotifications.attempts} + 1`,
+    lastError: error?.slice(0, 500) ?? null,
+    updatedAt: new Date(),
+  }).where(eq(caseNotifications.id, id));
 }
 
 /**

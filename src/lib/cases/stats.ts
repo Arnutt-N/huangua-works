@@ -49,3 +49,56 @@ export function totalCasesFromSnapshot(metadata: unknown): number | null {
   const value = (metadata as { totalCases: unknown }).totalCases;
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
+
+const bangkokDateFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Bangkok',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+/** § วันที่ต้องเป็นเวลากรุงเทพ — UTC date ผิดหลัง 17:00 น. ของทุกวัน */
+export function bangkokDateKey(date: Date): string {
+  return bangkokDateFormatter.format(date);
+}
+
+export interface SnapshotStatusCounts {
+  received?: number;
+  closed?: number;
+  rejected?: number;
+  inProgress?: number;
+}
+
+/** § snapshot รุ่นใหม่เก็บยอดสะสมแยกจากยอดรายวันในคอลัมน์ — เก่าให้ caller fallback ไปคอลัมน์เดิม */
+export function statusCountsFromSnapshot(metadata: unknown): SnapshotStatusCounts | null {
+  if (typeof metadata !== 'object' || metadata === null || !('statusCounts' in metadata)) return null;
+  const value = (metadata as { statusCounts: unknown }).statusCounts;
+  if (typeof value !== 'object' || value === null) return null;
+  return pickCounts(value as Record<string, unknown>);
+}
+
+function pickCounts(value: Record<string, unknown>): SnapshotStatusCounts | null {
+  const read = (key: string): number | undefined => {
+    const raw = value[key];
+    const n = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw) : NaN;
+    return Number.isFinite(n) ? n : undefined;
+  };
+  const result: SnapshotStatusCounts = {};
+  for (const key of ['received', 'closed', 'rejected', 'inProgress'] as const) {
+    const n = read(key);
+    if (n !== undefined) result[key] = n;
+  }
+  return Object.keys(result).length ? result : null;
+}
+
+/** ยอดรับ/ปิดรายวันของ snapshot แถวเดียว (คอลัมน์เดิมเปลี่ยนความหมายตามวันที่กรุงเทพ) */
+export function dailyCountsFromSnapshot(row: { totalReceived: unknown; totalClosed: unknown }): {
+  arrivals: number;
+  closures: number;
+} {
+  const toNumber = (value: unknown): number => {
+    const n = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN;
+    return Number.isFinite(n) ? n : 0;
+  };
+  return { arrivals: toNumber(row.totalReceived), closures: toNumber(row.totalClosed) };
+}

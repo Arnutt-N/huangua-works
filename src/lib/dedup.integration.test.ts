@@ -1,7 +1,7 @@
 import { inArray } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import { closeDb, getDb } from '@/lib/db';
-import { dedupHashes } from '@/lib/db/schema';
+import { cases, dedupHashes } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import { generateDedupHash, generateLegacyDedupHash } from '@/lib/cid-hmac';
 import { checkDuplicate, claimDedupHash } from './dedup';
@@ -13,6 +13,7 @@ import { checkDuplicate, claimDedupHash } from './dedup';
 
 const RUN = Date.now();
 const insertedIds: string[] = [];
+const insertedCaseIds: string[] = [];
 
 async function insertRow(hash: string, expiresInMs: number): Promise<string> {
   const db = await getDb();
@@ -23,18 +24,48 @@ async function insertRow(hash: string, expiresInMs: number): Promise<string> {
   return caseId;
 }
 
+/** § แถว hash เก่าต้องมีเรื่องจริงให้เทียบ field — ไม่เช่นนั้นตรวจ ambiguity ไม่ได้ */
+async function insertLegacyCase(title: string, description: string, hash: string): Promise<string> {
+  const db = await getDb();
+  const caseId = await insertRow(hash, 24 * 60 * 60 * 1000);
+  await db.insert(cases).values({
+    id: caseId,
+    status: 'pending',
+    title,
+    description,
+    location: '',
+    categoryId: `it-dedup-cat-${RUN}`,
+    submittedBy: `it-dedup-submitter-${RUN}`,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+  insertedCaseIds.push(caseId);
+  return caseId;
+}
+
 afterAll(async () => {
   const db = await getDb();
   if (insertedIds.length) await db.delete(dedupHashes).where(inArray(dedupHashes.id, insertedIds));
+  if (insertedCaseIds.length) await db.delete(cases).where(inArray(cases.id, insertedCaseIds));
   await closeDb();
 });
 
 describe('checkDuplicate · legacy hash', () => {
   test('แถว hash สูตรเก่าที่ยังไม่หมดอายุ → จับซ้ำได้ (input มีช่องว่างคู่ จึงพิสูจน์ทาง legacy)', async () => {
     const cid = `it-dedup-legacy-${RUN}`;
-    const caseId = await insertRow(generateLegacyDedupHash(cid, 'ถนน  ชำรุด', 'x'), 24 * 60 * 60 * 1000);
+    const title = 'ถนน  ชำรุด';
+    const caseId = await insertLegacyCase(title, 'x', generateLegacyDedupHash(cid, title, 'x'));
 
-    expect(await checkDuplicate(cid, 'ถนน  ชำรุด', 'x')).toEqual({ isDuplicate: true, caseId });
+    expect(await checkDuplicate(cid, title, 'x')).toEqual({ isDuplicate: true, caseId });
+  });
+
+  test('hash เก่าที่ชนกันจากคนละ tuple → เทียบ field จริงแล้วไม่ปฏิเสธเรื่องใหม่', async () => {
+    const cid = `it-dedup-ambiguous-${RUN}`;
+    const storedTitle = 'b|c';
+    await insertLegacyCase(storedTitle, 'd', generateLegacyDedupHash(cid, storedTitle, 'd'));
+
+    // § เรื่องใหม่มี title='b' แต่ legacy payload รวมกับ cid='a|b' แล้วชนแถวเดิม
+    expect(await checkDuplicate('a|b', 'c', 'd')).toEqual({ isDuplicate: false });
   });
 
   test('แถว hash สูตรเก่าที่หมดอายุแล้ว → ไม่ซ้ำ', async () => {

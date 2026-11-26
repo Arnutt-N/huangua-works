@@ -2,6 +2,7 @@ import { createHmac, hkdfSync, createCipheriv, createDecipheriv, randomBytes } f
 import { eq } from 'drizzle-orm';
 import { lineUsers } from '@/lib/db/schema';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
+import { generateId } from '@/lib/id';
 import type { DbOrTx } from '@/lib/db';
 
 // § เจ้าของ pseudonym ของ LINE id ตัวเดียวใน repo — ที่อื่นห้ามสร้าง hash/enc เอง
@@ -73,6 +74,30 @@ export async function findLineUserByRaw(db: DbOrTx, rawLineUserId: string) {
   return firstOrUndefined(
     db.select().from(lineUsers).where(eq(lineUsers.lineUserIdHash, hash)).limit(1),
   );
+}
+
+/**
+ * § upsert identity แบบเดียวสำหรับ ingress และ engine — ทุก raw id ต้องผ่าน helper นี้
+ * (ถ้า engine สร้างเองจาก payload ที่เป็น hash จะได้ hash-of-hash และส่งออกไม่ได้)
+ * ON CONFLICT แล้วอ่านแถวผู้ชนะ กัน race follow+message/redelivery
+ */
+export async function ensureLineUser(db: DbOrTx, rawLineUserId: string) {
+  const existing = await findLineUserByRaw(db, rawLineUserId);
+  if (existing) return existing;
+
+  const p = pseudonymizeLineId(rawLineUserId);
+  // § ใช้แถวจาก RETURNING ก่อน — ไม่บังคับ read-back รอบสอง (transaction/mock ที่อ่านทันที
+  //   อาจยังไม่เห็นแถวใหม่) ถ้า conflict กับคนอื่นค่อยอ่านแถวที่ชนะจริง
+  const inserted = await db.insert(lineUsers).values({
+    id: generateId(),
+    lineUserIdHash: p.hash,
+    lineUserIdEnc: p.enc,
+    lineUserIdHashV: p.v,
+  }).onConflictDoNothing({ target: lineUsers.lineUserIdHash }).returning();
+  if (inserted[0]) return inserted[0];
+  const winner = await findLineUserByRaw(db, rawLineUserId);
+  if (!winner) throw new Error('[line-identity] upsert failed');
+  return winner;
 }
 
 /** ถอด raw LINE id จาก enc — เรียกเฉพาะตอนส่งออก boundary (push/multicast/getProfile) */

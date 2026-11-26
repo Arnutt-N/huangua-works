@@ -12,13 +12,16 @@ export const MEDIA_ALLOWED_MIME: Readonly<Record<string, string>> = {
   'image/webp': 'webp',
 };
 
-export const MEDIA_MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+// § Vercel function request cap เริ่มต้น 4.5MB — ถ้าเกินนี้ request ถูกปฏิเสธก่อนถึง route
+// (vercel.json ไม่ได้เปิด opt-in 20MiB) จึงต้องจำกัดไฟล์ให้ต่ำกว่าเพดานที่ deployed ใช้จริง
+export const MEDIA_MAX_SIZE_MB = 4.5;
+export const MEDIA_MAX_SIZE_BYTES = MEDIA_MAX_SIZE_MB * 1024 * 1024;
 
 /** ค่าสำหรับ `<input accept>` */
 export const MEDIA_ACCEPT_ATTR = Object.keys(MEDIA_ALLOWED_MIME).join(',');
 
 export const MEDIA_TYPE_ERROR = 'รองรับเฉพาะไฟล์ภาพ PNG, JPEG, WebP';
-export const MEDIA_SIZE_ERROR = 'ไฟล์ใหญ่เกิน 10MB';
+export const MEDIA_SIZE_ERROR = `ไฟล์ใหญ่เกิน ${MEDIA_MAX_SIZE_MB}MB`;
 
 /** คืนข้อความผิดพลาดภาษาไทย หรือ null เมื่อไฟล์ผ่านกติกา */
 export function validateMediaFile(file: { type: string; size: number }): string | null {

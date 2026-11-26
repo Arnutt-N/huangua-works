@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { getTableName } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -66,51 +67,75 @@ interface StubResult {
   db: unknown;
   updates: Record<string, unknown>[];
   failedInserts: Record<string, unknown>[];
-  returningRows: (v: Record<string, unknown>) => Row[];
+  failedInsertBatches: Record<string, unknown>[][];
+  batchInserts: Record<string, unknown>[];
+  batches: Record<string, unknown>[];
 }
 
 function dbStub(row: Row | null, rawByInternal: Record<string, string> = {}, rawOrder?: string[]): StubResult {
   const updates: Record<string, unknown>[] = [];
   const failedInserts: Record<string, unknown>[] = [];
+  const failedInsertBatches: Record<string, unknown>[][] = [];
+  const batchInserts: Record<string, unknown>[] = [];
+  const batches: Record<string, unknown>[] = [];
   let claimCount = 0;
-  const orderedValues = (rawOrder ?? Object.keys(rawByInternal)).map((id) => ({ lineUserIdEnc: rawByInternal[id]! }));
+  const orderedValues = (rawOrder ?? Object.keys(rawByInternal)).map((id) => ({ lineUserIdEnc: rawByInternal[id]!, id }));
 
   const db = {
-    update: () => ({
-      set: (v: Record<string, unknown>) => {
-        updates.push(v);
-        const buildWhere = () => {
-          const where = {
-            then: (resolve: (x: unknown) => void) => resolve([]),
+    update: (table: unknown) => {
+      const name = getTableName(table as Parameters<typeof getTableName>[0]);
+      return {
+        set: (v: Record<string, unknown>) => {
+          if (name === 'chat_broadcasts') updates.push(v);
+          return {
+          where: () => ({
             returning: async () => {
+              if (name === 'chat_broadcast_batches') {
+                batches.forEach((b) => {
+                  if ((v.status === 'accepted' || v.attempts !== undefined) && b.id !== v.id) return;
+                  Object.assign(b, v);
+                });
+                return [{}];
+              }
               claimCount++;
               if (row && claimCount <= 2 && v.status === 'sending') return [row];
               if (v.status === 'scheduled') return [{ id: 'stale-1' }];
               if (v.status === 'sent' || v.status === 'failed') return [{ id: row?.id ?? 'b1' }];
               return [];
             },
+            then: (resolve: (x: unknown) => void) => resolve([]),
+          }),
           };
-          return where;
-        };
-        return { where: buildWhere };
-      },
-    }),
+        },
+      };
+    },
     select: () => ({
-      from: () => ({
-        where: async () => orderedValues,
-      }),
-    }),
-    insert: () => ({
-      values: (v: Record<string, unknown>) => {
-        failedInserts.push(v);
-        return { onConflictDoUpdate: async () => [] };
+      from: (table: unknown) => {
+        const name = getTableName(table as Parameters<typeof getTableName>[0]);
+        return { where: async () => name === 'chat_broadcast_batches' ? batches : name === 'line_users' ? orderedValues : [] };
       },
     }),
+    insert: (table: unknown) => {
+      const name = getTableName(table as Parameters<typeof getTableName>[0]);
+      return {
+        values: (v: Record<string, unknown> | Record<string, unknown>[]) => {
+          const list = Array.isArray(v) ? v : [v];
+          if (name === 'chat_broadcast_batches') {
+            batchInserts.push(...list);
+            batches.push(...list.map((item) => ({ ...item })));
+          } else {
+            failedInserts.push(...list);
+            failedInsertBatches.push(list);
+          }
+          return { onConflictDoUpdate: async () => [] };
+        },
+      };
+    },
   };
   const withTx = Object.assign(db, {
     transaction: async (fn: (tx: typeof db) => Promise<unknown>) => fn(db),
   });
-  return { db: withTx, updates, failedInserts, returningRows: () => [] };
+  return { db: withTx, updates, failedInserts, failedInsertBatches, batchInserts, batches };
 }
 
 const transient500 = () => new LineApiError('/message/broadcast', 500, 'LINE down');
@@ -141,6 +166,31 @@ describe('broadcastRetryKey', () => {
   it('ลำดับผล query ที่สลับกันได้ key เดิม แต่ชุดผู้รับต่างกันได้ key ต่างกัน', () => {
     expect(broadcastRetryKey('b1', ['U2', 'U1'])).toBe(broadcastRetryKey('b1', ['U1', 'U2']));
     expect(broadcastRetryKey('b1', ['U1', 'U3'])).not.toBe(broadcastRetryKey('b1', ['U1', 'U2']));
+  });
+});
+
+describe('sendBroadcast · malformed stored target', () => {
+  it('target ที่เพี้ยน → ไม่ยิง LINE และปิดงานเป็น failed', async () => {
+    const { db, updates } = dbStub({ id: 'bad-1', content: [], target: { kind: 'unknown' } });
+    vi.mocked(getDb).mockResolvedValue(db as never);
+
+    const outcome = await sendBroadcast('bad-1');
+
+    expect(outcome.kind).toBe('skipped-invalid-target');
+    expect(broadcastMock).not.toHaveBeenCalled();
+    expect(multicastMock).not.toHaveBeenCalled();
+    expect(updates.at(-1)).toMatchObject({ status: 'failed', leaseOwner: null });
+  });
+
+  it('empty ids → ไม่ยิง LINE และปิดงานเป็น failed', async () => {
+    const { db } = dbStub({ id: 'bad-2', content: [], target: { kind: 'line_user_ids', ids: [] } });
+    vi.mocked(getDb).mockResolvedValue(db as never);
+
+    const outcome = await sendBroadcast('bad-2');
+
+    expect(outcome.kind).toBe('skipped-invalid-target');
+    expect(broadcastMock).not.toHaveBeenCalled();
+    expect(multicastMock).not.toHaveBeenCalled();
   });
 });
 
@@ -299,6 +349,25 @@ describe('sendBroadcast · targeted multicast', () => {
     expect(JSON.stringify(failedInserts)).not.toContain(lastRecipient);
   }, 15000);
 
+  it('500 ผู้รับล้มถาวร → upsert ครั้งเดียวต่อชุด และ attempts = 1', async () => {
+    const ids = Array.from({ length: 500 }, (_, i) => `pk-${i}`);
+    const rawByInternal = Object.fromEntries(ids.map((id, i) => [id, `U${i}`]));
+    const { db, failedInsertBatches, batchInserts } = dbStub(
+      { id: 'bp2', content: [], target: { kind: 'line_user_ids', ids } },
+      rawByInternal,
+    );
+    vi.mocked(getDb).mockResolvedValue(db as never);
+    multicastMock.mockRejectedValue(permanent400());
+
+    const outcome = await sendBroadcast('bp2');
+
+    expect(outcome.kind).toBe('failed');
+    expect(batchInserts).toHaveLength(1);
+    expect(failedInsertBatches).toHaveLength(1);
+    expect(failedInsertBatches[0]).toHaveLength(500);
+    expect(failedInsertBatches[0]?.[0]).toMatchObject({ attempts: 1 });
+  });
+
   it('ผล query สลับลำดับ → key เดิม; ผู้รับเปลี่ยน → key เปลี่ยน (header ที่ LINE เห็น)', async () => {
     const rawByInternal = { 'pk-1': 'U1', 'pk-2': 'U2' };
     const target = { kind: 'line_user_ids' as const, ids: ['pk-1', 'pk-2'] };
@@ -375,25 +444,19 @@ describe('recoverStaleSending', () => {
 });
 
 describe('sendBroadcast · lease owner', () => {
-  it('429 พร้อม retryAfterMs → รอตามระยะที่ LINE บอก และ retry key เดิม', async () => {
-    vi.useFakeTimers();
+  it('429 Retry-After ยาว → defer พร้อม next_attempt ไม่ครอง worker', async () => {
     const { db, updates } = dbStub({ id: 'b429', content: [], target: { kind: 'all' } });
     vi.mocked(getDb).mockResolvedValue(db as never);
     followerMock.mockResolvedValue({ userIds: [] });
-    broadcastMock
-      .mockRejectedValueOnce(rateLimited(42000))
-      .mockResolvedValueOnce(undefined);
+    broadcastMock.mockRejectedValueOnce(rateLimited(42000));
 
-    const outcomePromise = sendBroadcast('b429');
-    await vi.advanceTimersByTimeAsync(42000);
-    const outcome = await outcomePromise;
+    const outcome = await sendBroadcast('b429');
 
-    expect(broadcastMock).toHaveBeenCalledTimes(2);
-    const keys = broadcastMock.mock.calls.map((call) => call[1]);
-    expect(keys[0]).toBe(keys[1]);
-    expect(outcome.kind).toBe('sent');
-    expect(updates.at(-1)).toMatchObject({ status: 'sent' });
-    vi.useRealTimers();
+    expect(broadcastMock).toHaveBeenCalledTimes(1);
+    expect(outcome.kind).toBe('deferred');
+    if (outcome.kind !== 'deferred') return;
+    expect(outcome.nextAttemptAt.getTime() - Date.now()).toBeGreaterThan(40000);
+    expect(updates.at(-1)).toMatchObject({ status: 'scheduled', leaseOwner: null });
   });
 
   it('worker เก่าหลังถูก requeue เขียนไม่ทับ worker ใหม่ที่ส่งสำเร็จแล้ว', async () => {
@@ -408,12 +471,17 @@ describe('sendBroadcast · lease owner', () => {
     let currentStatus = 'scheduled';
     let currentOwner: string | null = null;
     let firstCall = true;
+    const batches: Record<string, unknown>[] = [];
 
     const db = {
       update: () => ({
         set: (v: Record<string, unknown>) => ({
           where: (condition: unknown) => {
             const query = dialect.sqlToQuery(condition as Parameters<typeof dialect.sqlToQuery>[0]);
+            if (v.status === 'accepted') {
+              batches.forEach((b) => { if (b.id === v.id) b.status = 'accepted'; });
+              return { returning: async () => [{}] };
+            }
             if (v.status === 'sending') {
               return {
                 returning: async () => {
@@ -451,8 +519,11 @@ describe('sendBroadcast · lease owner', () => {
           },
         }),
       }),
-      select: () => ({ from: () => ({ where: async () => [] }) }),
-      insert: () => ({ values: () => ({ onConflictDoUpdate: async () => [] }) }),
+      select: () => ({ from: (table: unknown) => ({ where: async () => getTableName(table as Parameters<typeof getTableName>[0]) === 'chat_broadcast_batches' ? batches : [] }) }),
+      insert: (table: unknown) => ({ values: (v: Record<string, unknown>) => {
+        if (getTableName(table as Parameters<typeof getTableName>[0]) === 'chat_broadcast_batches') batches.push({ ...v, status: 'pending' });
+        return { onConflictDoUpdate: async () => [] };
+      } }),
       transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(db),
     };
     vi.mocked(getDb).mockResolvedValue(db as never);
@@ -485,13 +556,15 @@ describe('sendBroadcast · lease owner', () => {
   it('lease ถูกช่วงไปแล้วไม่เขียน failed recipients', async () => {
     const failedInserts: Record<string, unknown>[] = [];
     const dialect = new PgDialect();
+    const batches: Record<string, unknown>[] = [];
     const db = {
-      update: () => ({
+      update: (table: unknown) => ({
         set: (v: Record<string, unknown>) => ({
           where: (condition: unknown) => {
             const query = dialect.sqlToQuery(condition as Parameters<typeof dialect.sqlToQuery>[0]);
             return {
               returning: async () => {
+                if (getTableName(table as Parameters<typeof getTableName>[0]) === 'chat_broadcast_batches') return [{}];
                 if (v.status === 'sending') return [{ id: 'b1', content: [], target: { kind: 'line_user_ids', ids: ['u1'] } }];
                 const ownerParam = query.params.find((p) => typeof p === 'string' && p.length > 0);
                 return ownerParam === undefined ? [{ id: 'b1' }] : [];
@@ -500,10 +573,15 @@ describe('sendBroadcast · lease owner', () => {
           },
         }),
       }),
-      select: () => ({ from: () => ({ where: async () => [{ lineUserIdEnc: 'U1' }] }) }),
-      insert: () => ({
-        values: (v: Record<string, unknown>) => {
-          failedInserts.push(v);
+      select: () => ({ from: (table: unknown) => ({ where: async () => getTableName(table as Parameters<typeof getTableName>[0]) === 'chat_broadcast_batches' ? batches : [{ id: 'pk-1', lineUserIdEnc: 'U1' }] }) }),
+      insert: (table: unknown) => ({
+        values: (v: Record<string, unknown> | Record<string, unknown>[]) => {
+          const list = Array.isArray(v) ? v : [v];
+          if (getTableName(table as Parameters<typeof getTableName>[0]) === 'chat_broadcast_batches') {
+            batches.push(...list.map((item) => ({ ...item, status: 'pending' })));
+          } else {
+            failedInserts.push(...list);
+          }
           return { onConflictDoUpdate: async () => [] };
         },
       }),
@@ -521,16 +599,26 @@ describe('sendBroadcast · lease owner', () => {
   it('insert failed recipients ล้มต้อง rollback สถานะ failed ด้วย', async () => {
     const updates: Record<string, unknown>[] = [];
     let inserts = 0;
+    const batches: Record<string, unknown>[] = [];
     const tx = {
-      update: () => ({
+      update: (table: unknown) => ({
         set: (v: Record<string, unknown>) => {
+          if (getTableName(table as Parameters<typeof getTableName>[0]) === 'chat_broadcast_batches') {
+            batches.forEach((b) => { if (b.id === v.id) Object.assign(b, v); });
+            return { where: () => ({ returning: async () => [{}] }) };
+          }
           updates.push(v);
           return { where: () => ({ returning: async () => [v.status === 'sending' ? { id: 'b1', content: [], target: { kind: 'line_user_ids', ids: ['u1'] } } : { id: 'b1' }] }) };
         },
       }),
-      select: () => ({ from: () => ({ where: async () => [{ lineUserIdEnc: 'U1' }] }) }),
-      insert: () => ({
-        values: () => {
+      select: () => ({ from: (table: unknown) => ({ where: async () => getTableName(table as Parameters<typeof getTableName>[0]) === 'chat_broadcast_batches' ? batches : [{ id: 'pk-1', lineUserIdEnc: 'U1' }] }) }),
+      insert: (table: unknown) => ({
+        values: (v: Record<string, unknown> | Record<string, unknown>[]) => {
+          const list = Array.isArray(v) ? v : [v];
+          if (getTableName(table as Parameters<typeof getTableName>[0]) === 'chat_broadcast_batches') {
+            batches.push(...list.map((item) => ({ ...item, status: 'pending' })));
+            return { onConflictDoUpdate: async () => [] };
+          }
           inserts++;
           return {
             onConflictDoUpdate: async () => {

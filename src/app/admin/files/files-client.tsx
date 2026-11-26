@@ -9,7 +9,7 @@ import { AdminCard, AdminCardTitle } from '@/components/admin/admin-card';
 import { AdminErrorState } from '@/components/admin/admin-error-state';
 import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/components/admin/use-confirm';
-import { MEDIA_ACCEPT_ATTR, validateMediaFile } from '@/lib/media-upload-rules';
+import { MEDIA_ACCEPT_ATTR, MEDIA_MAX_SIZE_MB, validateMediaFile } from '@/lib/media-upload-rules';
 import { useMediaItemReadUrl } from './use-media-item-read-url';
 import { useInView } from './use-in-view';
 
@@ -149,7 +149,7 @@ export function FilesClient() {
           ไฟล์สื่อ ({items.length})
         </AdminCardTitle>
 
-        <p className="mb-3 text-xs text-muted">รองรับไฟล์ภาพ PNG, JPEG, WebP ขนาดไม่เกิน 10MB</p>
+        <p className="mb-3 text-xs text-muted">รองรับไฟล์ภาพ PNG, JPEG, WebP ขนาดไม่เกิน {MEDIA_MAX_SIZE_MB}MB</p>
 
         {loading ? (
           <div className="py-12 text-center text-muted">กำลังโหลด...</div>

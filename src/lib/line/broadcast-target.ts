@@ -15,16 +15,9 @@ export const broadcastTargetSchema = z.discriminatedUnion('kind', [
   }),
 ]);
 
-/** อ่าน target จาก DB/legacy อย่าง defensive — ค่าไม่รู้จักหรือรูปเพี้ยนถือเป็นส่งทุกคน */
-export function parseBroadcastTarget(raw: unknown): BroadcastTarget {
-  if (raw && typeof raw === 'object') {
-    const obj = raw as { kind?: unknown; ids?: unknown };
-    if (obj.kind === 'line_user_ids' && Array.isArray(obj.ids)) {
-      const ids = obj.ids.filter((x): x is string => typeof x === 'string' && x.length > 0);
-      if (ids.length > 0) return { kind: 'line_user_ids', ids: [...new Set(ids)] };
-    }
-    if (obj.kind === 'all') return { kind: 'all' };
-  }
-  // legacy text 'all' หรือค่าอื่นที่ service เดิมไม่เคยอ่าน
-  return { kind: 'all' };
+/** § อ่าน target จาก DB/legacy เฉพาะรูปที่รู้จัก — ค่าเพี้ยนต้อง invalidate ไม่ใช่ขยายเป็นส่งทุกคน */
+export function parseBroadcastTarget(raw: unknown): BroadcastTarget | null {
+  if (raw === 'all') return { kind: 'all' };
+  const parsed = broadcastTargetSchema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
 }

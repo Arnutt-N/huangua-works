@@ -2,6 +2,7 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { firstOrUndefined } from '@/lib/db/query-helpers';
 import AdminDashboardPage from './page';
 
 vi.mock('@/lib/auth/require-staff', () => ({
@@ -54,6 +55,14 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
 });
+
+async function renderWithSnapshot(row: Record<string, unknown>) {
+  // § first call = latest snapshot, second call = SLA aggregate
+  vi.mocked(firstOrUndefined)
+    .mockResolvedValueOnce(row as never)
+    .mockResolvedValueOnce({ c: 2 } as never);
+  render(await AdminDashboardPage());
+}
 
 describe('AdminDashboardPage (admin/page)', () => {
   it('เมื่อมีเคสตกค้าง SLA จะเรนเดอร์แบนเนอร์แจ้งเตือนเป็น Link ไปยัง /admin/reports?overdue=1', async () => {
@@ -122,10 +131,8 @@ describe('AdminDashboardPage (admin/page)', () => {
     expect(donutImg).toBeInTheDocument();
 
     // 2. Trend Area Chart พร้อมช่วงเวลา 7 วัน / 30 วัน / 90 วัน
-    const trendImg = screen.getByRole('img', {
-      name: /กราฟแนวโน้ม/,
-    });
-    expect(trendImg).toBeInTheDocument();
+    // mock ไม่มี snapshot รายวันจริง → ต้องแจ้งว่ายังไม่มีแนวโน้ม แทนกราฟที่แต่งขึ้นจากยอดรวม
+    expect(screen.getByText(/ยังไม่มีข้อมูลแนวโน้มรายวัน/)).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: '7 วัน' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: '30 วัน' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: '90 วัน' })).toBeInTheDocument();
@@ -165,5 +172,25 @@ describe('AdminDashboardPage (admin/page)', () => {
     expect(
       screen.getByRole('table', { name: /สถิติแนวโน้มการรับเรื่องและปิดงานรายวัน/ }),
     ).toBeInTheDocument();
+  });
+
+  it('ไม่มี snapshot รายวัน → แจ้งว่ายังไม่มีแนวโน้ม แทนการแต่งจุดกราฟจากยอดรวม', async () => {
+    await renderWithSnapshot({ c: 2, date: new Date('2026-11-26') });
+    expect(screen.getByText(/ยังไม่มีข้อมูลแนวโน้มรายวัน/)).toBeInTheDocument();
+  });
+
+  it('อ่านยอดสะสมจาก metadata รุ่นใหม่ แยกจากยอดรับ/ปิดรายวันในคอลัมน์', async () => {
+    await renderWithSnapshot({
+      c: 2,
+      date: new Date('2026-11-26'),
+      totalReceived: 2,
+      totalClosed: 1,
+      totalInProgress: 5,
+      avgResolutionDays: 3,
+      metadata: { totalCases: 42, statusCounts: { received: 4, closed: 9, inProgress: 5 } },
+    });
+
+    expect(screen.getByRole('link', { name: /เรื่องรับทั้งหมด 42 คลิกเพื่อดูรายการ/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /ปิดสำเร็จ 9 คลิกเพื่อดูรายการ/ })).toBeInTheDocument();
   });
 });

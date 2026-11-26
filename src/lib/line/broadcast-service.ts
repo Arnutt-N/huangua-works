@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
-import { eq, and, sql, inArray, lt } from 'drizzle-orm';
+import { eq, and, sql, inArray, lt, lte } from 'drizzle-orm';
 import { getDb, type DbOrTx } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
-import { chatBroadcasts, chatBroadcastFailedRecipients, lineUsers } from '@/lib/db/schema';
+import { chatBroadcasts, chatBroadcastBatches, chatBroadcastFailedRecipients, lineUsers } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
 import { broadcastMessage, getFollowerIds, multicast, LineApiError } from './client';
 import { LineCircuitOpenError } from './circuit-breaker';
@@ -21,6 +21,8 @@ export const STALE_SENDING_MS = 30 * 60 * 1000;
 
 const RETRY_KEY_NAMESPACE = 'huangua-line-broadcast';
 const RETRY_KEY_ALL_MARKER = 'all';
+// § Retry-After นานกว่านี้ไม่ควรครอง cron ไว้ — บันทึก next_attempt แล้วปล่อย lease ให้งานอื่นก่อน
+const DEFER_THRESHOLD_MS = 30_000;
 
 /**
  * retry key ต่อ (broadcastId, ชุดผู้รับ) — ใช้ SHA-1 แล้วเซ็ต v5 version/variant ให้เป็น UUID v5
@@ -59,19 +61,37 @@ function retryDelayMs(error: unknown, attempt: number): number {
   return RETRY_DELAY_MS * attempt;
 }
 
+class BroadcastSendError extends Error {
+  constructor(readonly originalError: unknown, readonly attempts: number) {
+    super(originalError instanceof Error ? originalError.message : 'unknown');
+  }
+}
+
+class BroadcastDeferredError extends Error {
+  constructor(readonly delayMs: number) {
+    super('defer broadcast until Retry-After');
+  }
+}
+
 async function sendWithRetry(retryKey: string, send: (retryKey: string) => Promise<void>): Promise<void> {
   let lastError: unknown = null;
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+  let attempts = 0;
+  for (attempts = 1; attempts <= MAX_ATTEMPTS; attempts++) {
     try {
       await send(retryKey);
       return;
     } catch (err) {
       lastError = err;
-      if (!isTransientError(err) || attempt === MAX_ATTEMPTS) break;
-      await new Promise((r) => setTimeout(r, retryDelayMs(err, attempt)));
+      if (!isTransientError(err) || attempts === MAX_ATTEMPTS) break;
+      const delay = retryDelayMs(err, attempts);
+      // § 429 Retry-After ยาว → คืน lease ให้ cron รอบอื่น แทนการนอนครอง worker เดียว
+      if (delay > DEFER_THRESHOLD_MS && err instanceof LineApiError && err.status === 429) {
+        throw new BroadcastDeferredError(delay);
+      }
+      await new Promise((r) => setTimeout(r, delay));
     }
   }
-  throw lastError;
+  throw new BroadcastSendError(lastError, attempts);
 }
 
 /** requeue แถว sending ค้างให้ scheduled ใหม่ — เรียกทุกรอบ cron ก่อนหางาน ส่วน sendBroadcast ไม่แตะ stale อีก */
@@ -94,9 +114,12 @@ export async function recoverStaleSending(now: Date = new Date()): Promise<numbe
 export type SendBroadcastOutcome =
   | { kind: 'sent'; totalRecipients: number; successCount: number; failedCount: number }
   | { kind: 'failed'; totalRecipients: number; successCount: number; failedCount: number; error: string }
+  | { kind: 'deferred'; nextAttemptAt: Date }
+  | { kind: 'skipped-invalid-target' }
   | { kind: 'skipped-not-claimable' };
 
 type Db = Awaited<ReturnType<typeof getDb>>;
+type BatchRow = typeof chatBroadcastBatches.$inferSelect;
 
 function recipientHash(rawLineUserId: string): string {
   // § เก็บเฉพาะ hash ของ raw id ในตาราง failed — raw id ห้ามลง DB (สอดคล้อง T5)
@@ -131,11 +154,64 @@ async function deliverAndRecord(
   db: Db,
   id: string,
   messages: LineOutgoingMessage[],
-  target: BroadcastTarget,
+  target: BroadcastTarget | null,
   owner: string,
 ): Promise<SendBroadcastOutcome> {
-  if (target.kind === 'all') return deliverAll(db, id, messages, owner);
-  return deliverTargeted(db, id, messages, target.ids, owner);
+  // § stored target เพี้ยน = อย่าส่งต่อ (มิเช่นนั้น fallback 'all' จะขยายผู้รับทั้งระบบ)
+  if (target === null) {
+    const outcome = await markFailed(db, id, 'เป้าหมาย broadcast ไม่ถูกต้อง', { total: 0, success: 0, failed: 0 }, owner);
+    return outcome.kind === 'skipped-not-claimable' ? outcome : { kind: 'skipped-invalid-target' };
+  }
+  const batches = await prepareBatches(db, id, target);
+  if (target.kind === 'line_user_ids' && batches.length === 0) {
+    return markFailed(db, id, 'ไม่พบผู้รับเป้าหมายในระบบ', { total: 0, success: 0, failed: 0 }, owner);
+  }
+  return deliverPreparedBatches(db, id, messages, owner, batches);
+}
+
+async function prepareBatches(db: Db, id: string, target: BroadcastTarget): Promise<BatchRow[]> {
+  const existing = await db.select().from(chatBroadcastBatches).where(eq(chatBroadcastBatches.broadcastId, id));
+  if (existing.length > 0) return existing.sort((a, b) => a.batchIndex - b.batchIndex);
+
+  // § membership/retry key ถูกตรึงก่อนยิง LINE ครั้งแรก — recovery ใช้แถวเดิม ไม่คำนวณจาก target ปัจจุบัน
+  if (target.kind === 'all') {
+    await db.insert(chatBroadcastBatches).values({
+      id: generateId(),
+      broadcastId: id,
+      batchIndex: 0,
+      recipientIds: null,
+      recipientHashes: [RETRY_KEY_ALL_MARKER],
+      retryKey: broadcastRetryKey(id, [RETRY_KEY_ALL_MARKER]),
+    });
+  } else {
+    const rows = await db
+      .select({ id: lineUsers.id, lineUserIdEnc: lineUsers.lineUserIdEnc })
+      .from(lineUsers)
+      .where(inArray(lineUsers.id, target.ids));
+    const pairs: { internalId: string; rawId: string }[] = [];
+    for (const r of rows) {
+      if (!r.lineUserIdEnc) continue;
+      try { pairs.push({ internalId: r.id, rawId: decryptLineId(r.lineUserIdEnc) }); } catch { /* ข้ามผู้รับที่ถอดรหัสไม่ได้ */ }
+    }
+    // § ใช้ลำดับ string ปกติให้ตรงกับ broadcastRetryKey (Array#sort) — localeCompare จัดลำดับต่างกัน
+    pairs.sort((a, b) => a.rawId < b.rawId ? -1 : a.rawId > b.rawId ? 1 : 0);
+    const values = [];
+    for (let start = 0, index = 0; start < pairs.length; start += MULTICAST_BATCH_SIZE, index++) {
+      const chunk = pairs.slice(start, start + MULTICAST_BATCH_SIZE);
+      values.push({
+        id: generateId(),
+        broadcastId: id,
+        batchIndex: index,
+        recipientIds: chunk.map((p) => p.internalId),
+        recipientHashes: chunk.map((p) => recipientHash(p.rawId)),
+        retryKey: broadcastRetryKey(id, chunk.map((p) => p.rawId)),
+      });
+    }
+    if (values.length > 0) await db.insert(chatBroadcastBatches).values(values);
+  }
+
+  const rows = await db.select().from(chatBroadcastBatches).where(eq(chatBroadcastBatches.broadcastId, id));
+  return rows.sort((a, b) => a.batchIndex - b.batchIndex);
 }
 
 async function markFailed(db: DbOrTx, id: string, error: string, counts: { total: number; success: number; failed: number }, owner: string): Promise<SendBroadcastOutcome> {
@@ -157,123 +233,127 @@ async function markFailed(db: DbOrTx, id: string, error: string, counts: { total
   return { kind: 'failed', totalRecipients: counts.total, successCount: counts.success, failedCount: counts.failed, error };
 }
 
-async function deliverAll(
+async function recordFailedRecipients(db: DbOrTx, broadcastId: string, hashes: string[], attempts: number, error: string) {
+  if (hashes.length === 0) return;
+  // § upsert เป็น statement เดียว — 500 ผู้รับล้มต้องไม่แปลงเป็น 500 round trip ใน tx เดียว
+  await db
+    .insert(chatBroadcastFailedRecipients)
+    .values(hashes.map((recipientHash) => ({
+      id: generateId(),
+      broadcastId,
+      recipientHash,
+      attempts,
+      lastError: error.slice(0, 500),
+    })))
+    .onConflictDoUpdate({
+      target: [chatBroadcastFailedRecipients.broadcastId, chatBroadcastFailedRecipients.recipientHash],
+      set: { attempts, lastError: error.slice(0, 500), updatedAt: new Date() },
+    });
+}
+
+async function deliverPreparedBatches(
   db: Db,
   id: string,
   messages: LineOutgoingMessage[],
   owner: string,
+  batches: BatchRow[],
 ): Promise<SendBroadcastOutcome> {
-  // § path 'all' ไม่มีรายชื่อผู้รับ — ใช้ marker แยกจากชุดผู้รับเพื่อไม่ให้ key ไปทับ targeted
-  const retryKey = broadcastRetryKey(id, [RETRY_KEY_ALL_MARKER]);
-  let lastError: unknown = null;
-  try {
-    await sendWithRetry(retryKey, (key) => broadcastMessage(messages, key));
-  } catch (err) {
-    lastError = err;
-  }
+  const now = new Date();
+  let firstError: string | null = null;
+  const acceptedIds = new Set(batches.filter((b) => b.status === 'accepted').map((b) => b.id));
+  const attemptsById = new Map<string, number>();
+  const rejected: BatchRow[] = [];
 
-  if (lastError !== null) {
-    const error = lastError instanceof Error ? lastError.message : 'unknown';
-    return markFailed(db, id, error, { total: 0, success: 0, failed: 0 }, owner);
-  }
+  for (const batch of batches) {
+    if (acceptedIds.has(batch.id)) continue;
+    if (batch.nextAttemptAt && batch.nextAttemptAt > now) {
+      return { kind: 'deferred', nextAttemptAt: batch.nextAttemptAt };
+    }
 
-  // § path 'all' ไม่มีรายชื่อผู้รับ — total เป็นค่าประมาณจาก follower count ตอนส่งสำเร็จ
-  let total = 0;
-  try {
-    total = (await dryRunBroadcast()).estimatedRecipients;
-  } catch {
-    total = 0;
-  }
-  const rows = await db
-    .update(chatBroadcasts)
-    .set({ status: 'sent', sentAt: new Date(), totalRecipients: total, successCount: total, failedCount: 0, leaseOwner: null, updatedAt: new Date() })
-    .where(and(eq(chatBroadcasts.id, id), eq(chatBroadcasts.leaseOwner, owner)))
-    .returning({ id: chatBroadcasts.id });
-  if (rows.length === 0) return { kind: 'skipped-not-claimable' };
-  return { kind: 'sent', totalRecipients: total, successCount: total, failedCount: 0 };
-}
-
-async function recordFailedRecipients(db: DbOrTx, broadcastId: string, rawIds: string[], attempts: number, error: string) {
-  for (const rawId of rawIds) {
-    await db
-      .insert(chatBroadcastFailedRecipients)
-      .values({
-        id: generateId(),
-        broadcastId,
-        recipientHash: recipientHash(rawId),
-        attempts,
-        lastError: error.slice(0, 500),
-      })
-      .onConflictDoUpdate({
-        target: [chatBroadcastFailedRecipients.broadcastId, chatBroadcastFailedRecipients.recipientHash],
-        set: { attempts, lastError: error.slice(0, 500), updatedAt: new Date() },
-      });
-  }
-}
-
-async function deliverTargeted(
-  db: Db,
-  id: string,
-  messages: LineOutgoingMessage[],
-  internalIds: string[],
-  owner: string,
-): Promise<SendBroadcastOutcome> {
-  // raw id มีชีวิตเฉพาะในฟังก์ชันนี้ — ถอดจาก enc เพื่อยิง multicast แล้วทิ้ง ไม่ persist
-  const rows = await db
-    .select({ lineUserIdEnc: lineUsers.lineUserIdEnc })
-    .from(lineUsers)
-    .where(inArray(lineUsers.id, internalIds));
-  const rawIds: string[] = [];
-  for (const r of rows) {
-    if (!r.lineUserIdEnc) continue;
+    let result: { ok: true; attempts: number } | { ok: false; error: BroadcastSendError } | { deferred: BroadcastDeferredError };
     try {
-      rawIds.push(decryptLineId(r.lineUserIdEnc));
-    } catch {
+      if (batch.recipientIds === null) {
+        await sendWithRetry(batch.retryKey, (key) => broadcastMessage(messages, key));
+      } else {
+        const rows = await db
+          .select({ id: lineUsers.id, lineUserIdEnc: lineUsers.lineUserIdEnc })
+          .from(lineUsers)
+          .where(inArray(lineUsers.id, batch.recipientIds));
+        // § ใช้ลำดับ PK ที่ตรึงไว้ตอนเตรียมชุด — ผล query ตอนส่งอาจสลับลำดับได้
+        const rawByPk = new Map<string, string>();
+        for (const r of rows) {
+          if (r.lineUserIdEnc) {
+            try { rawByPk.set(r.id, decryptLineId(r.lineUserIdEnc)); } catch { /* ข้าม */ }
+          }
+        }
+        const rawIds = batch.recipientIds
+          .map((pk) => rawByPk.get(pk))
+          .filter((v): v is string => v !== undefined);
+        await sendWithRetry(batch.retryKey, (key) => multicast(rawIds, messages, key));
+      }
+      result = { ok: true, attempts: 1 };
+    } catch (err) {
+      if (err instanceof BroadcastDeferredError) {
+        result = { deferred: err };
+      } else if (err instanceof BroadcastSendError) {
+        result = { ok: false, error: err };
+      } else {
+        result = { ok: false, error: new BroadcastSendError(err, 1) };
+      }
+    }
+
+    if ('deferred' in result) {
+      const nextAttemptAt = new Date(Date.now() + result.deferred.delayMs);
+      await db.update(chatBroadcastBatches).set({ attempts: 1, nextAttemptAt, lastError: result.deferred.message, updatedAt: new Date() })
+        .where(eq(chatBroadcastBatches.id, batch.id));
+      // § คืน lease ให้ cron รอบอื่น — ไม่กิน time limit ของ function เดียว
+      await db.update(chatBroadcasts).set({ status: 'scheduled', scheduledAt: nextAttemptAt, leaseOwner: null, updatedAt: new Date() })
+        .where(and(eq(chatBroadcasts.id, id), eq(chatBroadcasts.leaseOwner, owner)));
+      return { kind: 'deferred', nextAttemptAt };
+    }
+
+    if (result.ok) {
+      // § checkpoint ทันทีที่ LINE รับ — interrupt หลังจุดนี้ต้องไม่ส่งชุดเดิมซ้ำ
+      await db.update(chatBroadcastBatches).set({ status: 'accepted', attempts: result.attempts, lastError: null, updatedAt: new Date(), nextAttemptAt: null })
+        .where(and(eq(chatBroadcastBatches.id, batch.id), eq(chatBroadcastBatches.status, 'pending')));
+      acceptedIds.add(batch.id);
+      attemptsById.set(batch.id, result.attempts);
       continue;
     }
+
+    const error = result.error.message;
+    firstError ??= error;
+    await db.update(chatBroadcastBatches).set({ attempts: result.error.attempts, lastError: error.slice(0, 500), updatedAt: new Date() })
+      .where(eq(chatBroadcastBatches.id, batch.id));
+    attemptsById.set(batch.id, result.error.attempts);
+    rejected.push(batch);
   }
-  // § inArray ไม่รับประกันลำดับ — sort ก่อนตัดชุดเพื่อให้สมาชิกแต่ละชุดคงที่แม้ replay ผล query สลับ
-  rawIds.sort();
-  const total = rawIds.length;
 
-  if (total === 0) {
-    return markFailed(db, id, 'ไม่พบผู้รับเป้าหมายในระบบ', { total: 0, success: 0, failed: 0 }, owner);
-  }
-
-  let success = 0;
-  let failed = 0;
-  let firstError: string | null = null;
-  const failures: { rawIds: string[]; error: string }[] = [];
-
-  for (let start = 0; start < rawIds.length; start += MULTICAST_BATCH_SIZE) {
-    const batch = rawIds.slice(start, start + MULTICAST_BATCH_SIZE);
-    // § key ต่อชุดผู้รับจริง — retry ในชุดใช้ key เดิม (LINE dedup ต่อผู้รับชุดเดียวกัน)
-    //   ผล query สลับลำดับไม่เปลี่ยน key แต่ชุดผู้รับเปลี่ยนแล้วต้องคนละ key
-    const retryKey = broadcastRetryKey(id, batch);
-    let lastError: unknown = null;
-    try {
-      await sendWithRetry(retryKey, (key) => multicast(batch, messages, key));
-    } catch (err) {
-      lastError = err;
+  const accepted = batches.filter((b) => acceptedIds.has(b.id));
+  let total: number;
+  let success: number;
+  if (batches[0]?.recipientIds === null) {
+    total = 0;
+    success = 0;
+    if (accepted.length > 0) {
+      // § path 'all' ไม่มีรายชื่อผู้รับ — total เป็นค่าประมาณจาก follower count ตอนส่งสำเร็จ
+      try { total = (await dryRunBroadcast()).estimatedRecipients; } catch { total = 0; }
+      success = total;
     }
-    if (lastError === null) {
-      success += batch.length;
-    } else {
-      failed += batch.length;
-      const error = lastError instanceof Error ? lastError.message : 'unknown';
-      firstError ??= error;
-      failures.push({ rawIds: batch, error });
-    }
+  } else {
+    total = batches.reduce((sum, b) => sum + b.recipientHashes.length, 0);
+    success = accepted.reduce((sum, b) => sum + b.recipientHashes.length, 0);
   }
+  const failed = Math.max(0, total - success);
 
-  if (failed > 0) {
+  if (rejected.length > 0) {
     // § สถานะ terminal และรายชื่อผู้รับที่ล้มต้องเขียนใน transaction เดียว — insert พังแล้ว broadcast ค้าง failed โดยไม่มีรายละเอียดจะกู้ไม่ได้
     return db.transaction(async (tx) => {
       const outcome = await markFailed(tx, id, firstError ?? 'ส่งบางชุดไม่สำเร็จ', { total, success, failed }, owner);
       // § เขียนเฉพาะผู้ชนะ lease — คนที่ถูก requeue ต้องไม่ทับผลของ worker ใหม่
       if (outcome.kind === 'failed') {
-        for (const failure of failures) {
-          await recordFailedRecipients(tx, id, failure.rawIds, MAX_ATTEMPTS, failure.error);
+        for (const batch of rejected) {
+          await recordFailedRecipients(tx, id, batch.recipientHashes, Math.max(1, attemptsById.get(batch.id) ?? 1), batch.lastError ?? firstError ?? 'unknown');
         }
       }
       return outcome;
@@ -319,7 +399,7 @@ export async function getDueScheduled(): Promise<{ id: string }[]> {
     .where(
       and(
         eq(chatBroadcasts.status, 'scheduled'),
-        sql`${chatBroadcasts.scheduledAt} <= NOW()`,
+        lte(chatBroadcasts.scheduledAt, sql`NOW()`),
       ),
     )
     .orderBy(chatBroadcasts.scheduledAt)

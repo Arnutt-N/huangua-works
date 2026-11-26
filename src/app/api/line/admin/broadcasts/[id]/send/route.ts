@@ -49,6 +49,12 @@ export async function POST(
   if (outcome.kind === 'skipped-not-claimable') {
     return NextResponse.json({ error: 'ส่งแล้วหรือกำลังส่ง' }, { status: 409 });
   }
+  if (outcome.kind === 'skipped-invalid-target') {
+    return NextResponse.json({ ok: false, error: 'เป้าหมาย broadcast ไม่ถูกต้อง' }, { status: 422 });
+  }
+  if (outcome.kind === 'deferred') {
+    return NextResponse.json({ ok: true, deferred: true, nextAttemptAt: outcome.nextAttemptAt });
+  }
   return NextResponse.json({
     ok: true,
     totalRecipients: outcome.totalRecipients,

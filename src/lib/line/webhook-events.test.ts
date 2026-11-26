@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const hoisted = vi.hoisted(() => ({
   mockGetDb: vi.fn(),
   mockLookupHash: vi.fn((id: string) => `h-${id.slice(1)}`),
-  mockResolveRaw: vi.fn(async (_db: unknown, _id: string) => 'U123'),
+  mockResolveRaw: vi.fn(async (_db: unknown, _id: string): Promise<string | null> => 'U123'),
+  mockEnsureLineUser: vi.fn(async (_db: unknown, _id: string) => ({ id: 'user-pk', botState: null })),
   mockGenerateId: vi.fn(() => 'event-1'),
 }));
 
@@ -12,13 +13,20 @@ vi.mock('@/lib/id', () => ({ generateId: hoisted.mockGenerateId }));
 vi.mock('./identity', () => ({
   lookupHash: hoisted.mockLookupHash,
   resolveRawLineId: hoisted.mockResolveRaw,
+  ensureLineUser: hoisted.mockEnsureLineUser,
 }));
 
 import {
+  claimNextWebhookEvent,
+  commitEffects,
   backoffMsFor,
   dedupKeyOf,
   enqueueWebhookEvent,
+  markDone,
   markFailed,
+  renewLease,
+  expireReply,
+  MissingLineIdentity,
   restoreEvent,
   sanitizeEvent,
 } from './webhook-events';
@@ -50,6 +58,27 @@ describe('webhook-events · payload', () => {
     } as WebhookEventRow;
     const restored = await restoreEvent(db as never, row);
     expect(restored.source.userId).toBe('U123');
+  });
+
+  it('restoreEvent ไม่มี canonical user → throw (ห้ามคืน hash ให้ engine สร้าง hash-of-hash)', async () => {
+    const db = { select: vi.fn(() => ({ from: () => ({ where: () => ({ limit: () => [] }) }) })) };
+    const row = {
+      id: 'event-x',
+      payload: sanitizeEvent(event('w1')),
+      lineUserIdHash: 'h-123',
+    } as WebhookEventRow;
+    await expect(restoreEvent(db as never, row)).rejects.toBeInstanceOf(MissingLineIdentity);
+  });
+
+  it('restoreEvent มี user แต่ถอด raw ไม่ได้ → throw (ไม่หลุดเป็น hash)', async () => {
+    const db = { select: vi.fn(() => ({ from: () => ({ where: () => ({ limit: () => [{ id: 'user-pk' }] }) }) })) };
+    hoisted.mockResolveRaw.mockResolvedValueOnce(null);
+    const row = {
+      id: 'event-y',
+      payload: sanitizeEvent(event('w1')),
+      lineUserIdHash: 'h-123',
+    } as WebhookEventRow;
+    await expect(restoreEvent(db as never, row)).rejects.toBeInstanceOf(MissingLineIdentity);
   });
 
   it('dedupKey ใช้ webhookEventId ก่อน message id', () => {
@@ -98,16 +127,74 @@ describe('webhook-events · backoff และ attempts', () => {
   });
 
   it('attempts >= 5 → failed ถาวร', async () => {
-    const set = vi.fn(() => ({ where: vi.fn() }));
+    const set = vi.fn(() => ({ where: vi.fn(() => ({ returning: vi.fn(async () => []) })) }));
     hoisted.mockGetDb.mockResolvedValue({ update: vi.fn(() => ({ set })) });
-    await markFailed('event-1', 5);
+    await markFailed('event-1', 5, 'owner-1');
     expect(set).toHaveBeenCalledWith(expect.objectContaining({ status: 'failed' }));
   });
 
   it('attempts < 5 → pending', async () => {
-    const set = vi.fn(() => ({ where: vi.fn() }));
+    const set = vi.fn(() => ({ where: vi.fn(() => ({ returning: vi.fn(async () => []) })) }));
     hoisted.mockGetDb.mockResolvedValue({ update: vi.fn(() => ({ set })) });
-    await markFailed('event-1', 1);
+    await markFailed('event-1', 1, 'owner-1');
     expect(set).toHaveBeenCalledWith(expect.objectContaining({ status: 'pending' }));
+  });
+
+  it('markDone ล้าง payload/replyToken/pendingReplies (คง dedupKey ผ่าน DB)', async () => {
+    const set = vi.fn((_patch: Record<string, unknown>) => ({ where: vi.fn(() => ({ returning: vi.fn(async () => []) })) }));
+    hoisted.mockGetDb.mockResolvedValue({ update: vi.fn(() => ({ set })) });
+
+    await markDone('event-1', 'owner-1');
+
+    expect(set).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'done',
+      replyToken: null,
+      pendingReplies: null,
+      payload: expect.not.objectContaining({ text: 'สวัสดี' }),
+    }));
+    const patch = set.mock.calls[0]![0];
+    expect(patch).not.toHaveProperty('dedupKey');
+    expect(JSON.stringify(patch)).not.toContain('สวัสดี');
+  });
+
+  it('markFailed terminal ล้าง payload/replyToken แต่ retry ยังเก็บไว้', async () => {
+    const set = vi.fn((_patch: Record<string, unknown>) => ({ where: vi.fn(() => ({ returning: vi.fn(async () => []) })) }));
+    hoisted.mockGetDb.mockResolvedValue({ update: vi.fn(() => ({ set })) });
+
+    await markFailed('event-1', 5, 'owner-1');
+    expect(set).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'failed',
+      replyToken: null,
+      pendingReplies: null,
+    }));
+    expect(JSON.stringify(set.mock.calls[0]![0])).not.toContain('สวัสดี');
+
+    set.mockClear();
+    await markFailed('event-1', 1, 'owner-1');
+    expect(set).toHaveBeenCalledWith(expect.not.objectContaining({ payload: expect.anything() }));
+    expect(set).toHaveBeenCalledWith(expect.objectContaining({ status: 'pending' }));
+  });
+});
+
+describe('webhook-events · lease ownership', () => {
+  it('markFailed ไม่เขียนแถวเมื่อ owner ไม่ตรง', async () => {
+    const where = vi.fn(() => ({ returning: vi.fn(async () => []) }));
+    const set = vi.fn(() => ({ where }));
+    hoisted.mockGetDb.mockResolvedValue({ update: vi.fn(() => ({ set })) });
+
+    const won = await markFailed('event-1', 2, 'stale-owner');
+    expect(won).toBe(false);
+  });
+
+  it('markDone/expireReply/ renewLease ส่ง owner ผ่าน where', async () => {
+    const returning = vi.fn(async () => [{ id: 'event-1' }]);
+    const where = vi.fn(() => ({ returning }));
+    const set = vi.fn(() => ({ where }));
+    hoisted.mockGetDb.mockResolvedValue({ update: vi.fn(() => ({ set })) });
+
+    expect(await markDone('event-1', 'owner-1', 'none')).toBe(true);
+    expect(set).toHaveBeenCalledWith(expect.objectContaining({ replyState: 'none' }));
+    expect(await expireReply('event-1', 'owner-1')).toBe(true);
+    expect(await renewLease('event-1', 'owner-1')).toBe(true);
   });
 });

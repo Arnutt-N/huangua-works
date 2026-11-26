@@ -1,0 +1,1 @@
+ALTER TABLE "line_webhook_events" ALTER COLUMN "event_timestamp" SET DATA TYPE bigint;

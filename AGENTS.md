@@ -156,6 +156,7 @@ The real gates are local plus Vercel:
 npx tsc --noEmit     # typecheck
 npx eslint .         # lint
 npx vitest run       # unit only — ไม่ต้องใช้ Docker
+npm run lint:ui      # ทั้งสอง gate ของ UI (lint:select + lint:clip) ในคำสั่งเดียว
 ```
 
 Plus the Vercel / Vercel Preview Comments checks on the PR.
