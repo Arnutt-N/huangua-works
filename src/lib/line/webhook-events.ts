@@ -301,6 +301,22 @@ export async function expireReply(id: string, owner: string): Promise<boolean> {
 /** § ถอด raw ไม่ได้ต้อง fail ชัดเจน — การคืน payload ที่ source.userId เป็น hash ทำให้ engine สร้าง hash-of-hash */
 export class MissingLineIdentity extends Error {}
 
+// § เก็บ inbox ไว้ 7 วันตามหน้าต่าง dedup/redelivery — terminal row ที่เก่ากว่าไม่มีประโยชน์
+// pending/processing ไม่มีทางถูกลบแม้เก่า (ต้องให้ worker retry ตาม backoff/lease ก่อน)
+export const WEBHOOK_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+
+export async function cleanupWebhookEvents(now: Date = new Date()): Promise<number> {
+  const db = await getDb();
+  const cutoff = new Date(now.getTime() - WEBHOOK_RETENTION_MS);
+  const result = await db
+    .delete(lineWebhookEvents)
+    .where(and(
+      inArray(lineWebhookEvents.status, ['done', 'failed']),
+      lt(lineWebhookEvents.updatedAt, cutoff),
+    ));
+  return result.count;
+}
+
 /** § payload เก็บ hash แทน raw id — ถอดกลับจาก canonical line_users ที่ ingress สร้างไว้ */
 export async function restoreEvent(db: DbOrTx, row: WebhookEventRow): Promise<LineWebhookEvent> {
   const payload = { ...row.payload } as LineWebhookEvent;
