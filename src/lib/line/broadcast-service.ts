@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { eq, and, sql, inArray, lt } from 'drizzle-orm';
-import { getDb } from '@/lib/db';
+import { getDb, type DbOrTx } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { chatBroadcasts, chatBroadcastFailedRecipients, lineUsers } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
@@ -138,7 +138,7 @@ async function deliverAndRecord(
   return deliverTargeted(db, id, messages, target.ids, owner);
 }
 
-async function markFailed(db: Db, id: string, error: string, counts: { total: number; success: number; failed: number }, owner: string): Promise<SendBroadcastOutcome> {
+async function markFailed(db: DbOrTx, id: string, error: string, counts: { total: number; success: number; failed: number }, owner: string): Promise<SendBroadcastOutcome> {
   // § เขียนผลได้เฉพาะ worker ที่ยังถือ lease — คนที่ถูก requeue แล้วต้องไม่ทับคนที่รับช่วงต่อ
   const rows = await db
     .update(chatBroadcasts)
@@ -193,7 +193,7 @@ async function deliverAll(
   return { kind: 'sent', totalRecipients: total, successCount: total, failedCount: 0 };
 }
 
-async function recordFailedRecipients(db: Db, broadcastId: string, rawIds: string[], attempts: number, error: string) {
+async function recordFailedRecipients(db: DbOrTx, broadcastId: string, rawIds: string[], attempts: number, error: string) {
   for (const rawId of rawIds) {
     await db
       .insert(chatBroadcastFailedRecipients)
@@ -243,6 +243,7 @@ async function deliverTargeted(
   let success = 0;
   let failed = 0;
   let firstError: string | null = null;
+  const failures: { rawIds: string[]; error: string }[] = [];
 
   for (let start = 0; start < rawIds.length; start += MULTICAST_BATCH_SIZE) {
     const batch = rawIds.slice(start, start + MULTICAST_BATCH_SIZE);
@@ -261,12 +262,22 @@ async function deliverTargeted(
       failed += batch.length;
       const error = lastError instanceof Error ? lastError.message : 'unknown';
       firstError ??= error;
-      await recordFailedRecipients(db, id, batch, MAX_ATTEMPTS, error);
+      failures.push({ rawIds: batch, error });
     }
   }
 
   if (failed > 0) {
-    return markFailed(db, id, firstError ?? 'ส่งบางชุดไม่สำเร็จ', { total, success, failed }, owner);
+    // § สถานะ terminal และรายชื่อผู้รับที่ล้มต้องเขียนใน transaction เดียว — insert พังแล้ว broadcast ค้าง failed โดยไม่มีรายละเอียดจะกู้ไม่ได้
+    return db.transaction(async (tx) => {
+      const outcome = await markFailed(tx, id, firstError ?? 'ส่งบางชุดไม่สำเร็จ', { total, success, failed }, owner);
+      // § เขียนเฉพาะผู้ชนะ lease — คนที่ถูก requeue ต้องไม่ทับผลของ worker ใหม่
+      if (outcome.kind === 'failed') {
+        for (const failure of failures) {
+          await recordFailedRecipients(tx, id, failure.rawIds, MAX_ATTEMPTS, failure.error);
+        }
+      }
+      return outcome;
+    });
   }
 
   const written = await db
