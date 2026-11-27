@@ -302,6 +302,13 @@
       "when": 1795684300000,
       "tag": "0042_reply_state",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1795769873101,
+      "tag": "0043_drop_redundant_dedup_hash_idx",
+      "breakpoints": true
     }
   ]
 }
