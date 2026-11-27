@@ -6,7 +6,7 @@ import { generateId } from '@/lib/id';
 import type { LineWebhookEvent, LineMessageEvent, LineFollowEvent, LinePostbackEvent, LineOutgoingMessage, LineProfile } from '../types';
 import type { ConversationMode } from '../chat-modes';
 import { matchFaq } from './faq-matcher';
-import { ingestLineMedia } from '../media-ingest';
+import { ingestLineMedia, type MediaIngestResult } from '../media-ingest';
 import { csatThankYou, parseCsatPostback, recordCsatResponse } from '../chat/csat';
 import { matchIntent } from './intent-matcher';
 import { ensureLineUser, findLineUserByRaw, lookupHash } from '../identity';
@@ -73,6 +73,7 @@ export interface PreparedExternalEffects {
   botEnabled: boolean;
   // § undefined = prepare แล้วแต่ LINE ไม่ตอบ/timeout — ห้ามกลับเข้า tx ไปดึงอีก (critical)
   profile: LineProfile | null | undefined;
+  media?: MediaIngestResult;
 }
 
 const EXTERNAL_TIMEOUT_MS = 5_000;
@@ -105,7 +106,15 @@ export async function prepareExternalEffects(
   const profile = event.source.userId
     ? await withTimeout(transport.getProfile(event.source.userId), 'getProfile')
     : undefined;
-  return { botEnabled, profile };
+  // § media download/upload เป็น I/O ภายนอกเช่นกัน — ทำก่อน tx แล้วส่งผลเข้า effects
+  const media = event.type === 'message' && ['image', 'file', 'video', 'audio'].includes(event.message.type)
+    ? await ingestLineMedia(
+        event.message.id,
+        undefined,
+        event.message.type === 'file' ? { knownSize: event.message.fileSize } : {},
+      )
+    : undefined;
+  return { botEnabled, profile, media };
 }
 
 /**
@@ -135,7 +144,7 @@ export async function runEventEffects(
 
   switch (event.type) {
     case 'message': {
-      return handleMessageEvent(db, event, lineUser.id, conversation.id, conversation.mode);
+      return handleMessageEvent(db, event, lineUser.id, conversation.id, conversation.mode, prepared?.media);
     }
     case 'follow':
       return handleFollowEvent(db, event, lineUser.id, conversation.id, transport, prepared);
@@ -341,6 +350,7 @@ async function handleMessageEvent(
   lineUserPk: string,
   conversationId: string,
   mode: ConversationMode,
+  preparedMedia?: MediaIngestResult,
 ): Promise<LineOutgoingMessage[]> {
   const msg = event.message;
   const messageType: InboundMessageType = msg.type === 'image' ? 'image'
@@ -384,8 +394,11 @@ async function handleMessageEvent(
   if (!isNew) return [];
 
   if (isMedia) {
-    const knownSize = msg.type === 'file' ? msg.fileSize : undefined;
-    const ingested = await ingestLineMedia(msg.id, undefined, { knownSize });
+    const ingested = preparedMedia ?? await ingestLineMedia(
+      msg.id,
+      undefined,
+      msg.type === 'file' ? { knownSize: msg.fileSize } : {},
+    );
     if (ingested.kind === 'stored') {
       await attachInboundMedia(db, messageId, conversationId, messageType, ingested.url, {
         contentType: ingested.contentType,
