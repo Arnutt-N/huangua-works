@@ -549,7 +549,7 @@ export const dedupHashes = pgTable(
     expiresAt: timestamp('expires_at', { mode: 'date' }).notNull(), // 7 วัน
   },
   (table) => ({
-    hashIdx: index('dedup_hashes_hash_idx').on(table.hash),
+    // § hash มี UNIQUE constraint อยู่แล้ว — index ซ้ำถูก drop ใน 0043
     expiresAtIdx: index('dedup_hashes_expires_at_idx').on(table.expiresAt),
   })
 );
