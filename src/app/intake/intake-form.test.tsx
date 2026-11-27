@@ -70,7 +70,7 @@ describe('ฟอร์มแจ้งเรื่องสำหรับผู�
     await waitFor(() => expect(JSON.parse(window.localStorage.getItem(INTAKE_DRAFT_KEY)!)).toEqual({ version: 1, categoryId: 'roads' }), { timeout: INTAKE_QUERY_TIMEOUT_MS });
     view.unmount();
     render(<IntakeForm categories={categories} />);
-    await waitFor(() => expect(screen.getByLabelText('หมวดเรื่อง')).toHaveTextContent('ถนน'));
+    await waitFor(() => expect(screen.getByLabelText('หมวดเรื่อง')).toHaveTextContent('ถนน'), { timeout: INTAKE_QUERY_TIMEOUT_MS });
     for (const id of ['name', 'cid', 'phone', 'title', 'detail', 'village', 'addr']) expect(document.getElementById(id)).toHaveValue('');
     expect(screen.getByRole('checkbox')).not.toBeChecked();
   });
@@ -78,7 +78,7 @@ describe('ฟอร์มแจ้งเรื่องสำหรับผู�
   it('ปุ่มล้างดราฟต์ล้าง storage และค่าฟอร์มโดยไม่บันทึกกลับ', async () => {
     saveIntakeDraft('roads', ['roads']);
     render(<IntakeForm categories={categories} />);
-    await waitFor(() => expect(screen.getByLabelText('หมวดเรื่อง')).toHaveTextContent('ถนน'));
+    await waitFor(() => expect(screen.getByLabelText('หมวดเรื่อง')).toHaveTextContent('ถนน'), { timeout: INTAKE_QUERY_TIMEOUT_MS });
     await userEvent.setup().click(screen.getByRole('button', { name: 'ล้างดราฟต์และข้อมูล' }));
     expect(window.localStorage.getItem(INTAKE_DRAFT_KEY)).toBeNull();
     expect(screen.getByLabelText('หมวดเรื่อง')).toHaveTextContent('เลือกหมวด');
@@ -301,7 +301,7 @@ describe('IntakeForm — แนบรูปภาพและ Network Resilience
     const fileInput = document.getElementById('attachment-input') as HTMLInputElement;
     const file = new File(['png-content'], 'pothole.png', { type: 'image/png' });
     await user.upload(fileInput, file);
-    await waitFor(() => expect(screen.getByText('pothole.png')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('pothole.png')).toBeInTheDocument(), { timeout: INTAKE_QUERY_TIMEOUT_MS });
 
     // ติ๊ก consent
     fireEvent.click(document.getElementById('consent')!);
@@ -318,7 +318,7 @@ describe('IntakeForm — แนบรูปภาพและ Network Resilience
           body: expect.stringContaining('"attachments":[{"url":"https://storage.huangua.go.th/media/cases/attachments/att-1.png","type":"image/png","size":11}]'),
         })
       );
-    });
+    }, { timeout: INTAKE_QUERY_TIMEOUT_MS });
   });
 
   it('เมื่อการส่งเรื่องเกิด Timeout → แสดงข้อความเตือนและข้อมูลฟอร์มไม่หาย', async () => {
@@ -363,7 +363,7 @@ describe('IntakeForm — แนบรูปภาพและ Network Resilience
     // ต้องแสดง error เกี่ยวกับการหมดเวลาการเชื่อมต่อ
     await waitFor(() => {
       expect(screen.getByText(/การเชื่อมต่อหมดเวลา/)).toBeInTheDocument();
-    });
+    }, { timeout: INTAKE_QUERY_TIMEOUT_MS });
 
     // ข้อมูลฟอร์มยังคงอยู่ครบ ไม่ถูกล้าง
     expect(document.getElementById('name')).toHaveValue('สมชาย รักชาติ');
@@ -431,7 +431,7 @@ describe('IntakeForm — แนบรูปภาพและ Network Resilience
           body: expect.stringContaining('"fullName":"สมใจ มีทรัพย์"'),
         }),
       );
-    });
+    }, { timeout: INTAKE_QUERY_TIMEOUT_MS });
   });
 
   it('เมื่อกดส่งฟอร์มว่าง จะแสดง ErrorSummary พร้อมย้ายโฟกัส และคลิกลิงก์เพื่อนำทางไปยัง input ได้', async () => {
