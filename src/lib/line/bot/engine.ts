@@ -3,7 +3,7 @@ import { getDb, type DbOrTx } from '@/lib/db';
 import { firstOrUndefined } from '@/lib/db/query-helpers';
 import { lineUsers, chatConversations, chatMessages, lineWebhookEvents } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
-import type { LineWebhookEvent, LineMessageEvent, LineFollowEvent, LinePostbackEvent, LineOutgoingMessage } from '../types';
+import type { LineWebhookEvent, LineMessageEvent, LineFollowEvent, LinePostbackEvent, LineOutgoingMessage, LineProfile } from '../types';
 import type { ConversationMode } from '../chat-modes';
 import { matchFaq } from './faq-matcher';
 import { ingestLineMedia } from '../media-ingest';
@@ -69,22 +69,68 @@ export async function handleEvent(event: LineWebhookEvent, transport: LineTransp
   if (replies.length > 0 && replyToken) await transport.reply(replyToken, replies.slice(0, 5));
 }
 
+export interface PreparedExternalEffects {
+  botEnabled: boolean;
+  // § undefined = prepare แล้วแต่ LINE ไม่ตอบ/timeout — ห้ามกลับเข้า tx ไปดึงอีก (critical)
+  profile: LineProfile | null | undefined;
+}
+
+const EXTERNAL_TIMEOUT_MS = 5_000;
+
+function withTimeout<T>(promise: Promise<T>, label: string): Promise<T | null> {
+  // § I/O ภายนอกต้องมีเพดาน — ถ้า LINE ค้างห้ามปล่อย transaction/lock เปิดรอไม่รู้จบ
+  return Promise.race([
+    promise,
+    new Promise<null>((resolve) => {
+      const timer = setTimeout(resolve, EXTERNAL_TIMEOUT_MS);
+      // § กัน timeout เองค้าง process ถ้า I/O ตอบเร็วกว่า
+      (timer as { unref?: () => void }).unref?.();
+    }),
+  ]).catch((error: unknown) => {
+    console.error(`[line] ${label} failed`, error);
+    return null;
+  });
+}
+
+/** เรียกก่อนเข้า effects transaction — ทุก network I/O อยู่ที่นี่ ไม่ใช่ใน lock */
+export async function prepareExternalEffects(
+  event: LineWebhookEvent,
+  transport: LineTransport,
+): Promise<PreparedExternalEffects> {
+  // § settings อ่านจาก DB ( cache ) ไม่ใช่ network — ไม่ต้อง timeout และห้าม fallback เป็น false
+  const botEnabled = await getChatSetting('bot_enabled');
+  if (botEnabled && event.type === 'message' && event.message.type !== 'sticker') {
+    await withTimeout(transport.showTyping(event.source.userId ?? ''), 'showTyping');
+  }
+  const profile = event.source.userId
+    ? await withTimeout(transport.getProfile(event.source.userId), 'getProfile')
+    : undefined;
+  return { botEnabled, profile };
+}
+
 /**
- * § all-inbound effects อยู่ใน transaction เดียว ภายใต้ lock ต่อ user — เฉพาะ reply
- * ที่ถูกส่งจริงเท่านั้นที่อยู่นอก transaction (LINE API ไม่ใช่ DB effect)
+ * § all-inbound DB effects อยู่ใน transaction เดียว ภายใต้ lock ต่อ user — external I/O
+ * ถูก prepare ล่วงหน้า (worker) หรือเกิดนอก tx (compatibility path) เท่านั้น
  */
-export async function runEventEffects(db: DbOrTx, event: LineWebhookEvent, transport: LineTransport = httpLineTransport) {
+export async function runEventEffects(
+  db: DbOrTx,
+  event: LineWebhookEvent,
+  transport: LineTransport = httpLineTransport,
+  prepared?: PreparedExternalEffects,
+) {
   const userId = event.source.userId;
   if (!userId) return [];
 
   // § bot ปิด → routeToStaffWhileBotDisabled ส่ง typing เอง — อย่าส่งซ้ำตรงนี้
-  // § transport effect อยู่นอก effects transaction — retry หลัง commit ต้องไม่ยิง typing ซ้ำ
-  const botEnabled = await getChatSetting('bot_enabled');
-  if (botEnabled && event.type === 'message' && event.message.type !== 'sticker') {
-    await transport.showTyping(userId);
+  // § compatibility path ไม่มี prepared — เรียกตรงได้เพราะไม่มี tx/lock ครองอยู่
+  if (!prepared) {
+    const botEnabled = await getChatSetting('bot_enabled');
+    if (botEnabled && event.type === 'message' && event.message.type !== 'sticker') {
+      await transport.showTyping(userId);
+    }
   }
 
-  const lineUser = await getOrCreateLineUser(db, userId, transport);
+  const lineUser = await getOrCreateLineUser(db, userId, transport, prepared);
   const conversation = await getOrCreateConversation(db, userId);
 
   switch (event.type) {
@@ -92,7 +138,7 @@ export async function runEventEffects(db: DbOrTx, event: LineWebhookEvent, trans
       return handleMessageEvent(db, event, lineUser.id, conversation.id, conversation.mode);
     }
     case 'follow':
-      return handleFollowEvent(db, event, lineUser.id, conversation.id, transport);
+      return handleFollowEvent(db, event, lineUser.id, conversation.id, transport, prepared);
     case 'postback':
       return handlePostbackEvent(db, event, conversation.id);
     case 'unfollow':
@@ -189,12 +235,15 @@ async function processOne(row: WebhookEventRow, owner: string, transport: LineTr
   // § ต่ออายุอีกครั้งหลัง network I/O ของ reply ก่อนเข้า effects transaction
   if (!await renewLease(row.id, owner)) return;
 
+  // § restore เป็น read-only — ทำนอก tx เพื่อเอา raw id ไป prepare I/O โดยไม่ครอง connection/lock
+  const restored = await restoreEvent(db, row);
+  const prepared = await prepareExternalEffects(restored, transport);
+  if (!await renewLease(row.id, owner)) return;
+
   let replies: LineOutgoingMessage[] = [];
   await db.transaction(async (tx) => {
-    // § payload เก็บ hash — ถอด raw จาก line_users.lineUserIdEnc ก่อนส่งเข้า engine
-    const restored = await restoreEvent(tx, row);
     const outcome = await commitEffects(tx, row, async () => {
-      const out = await runEventEffects(tx, restored, transport);
+      const out = await runEventEffects(tx, restored, transport, prepared);
       return { replies: out };
     });
     replies = outcome?.replies ?? [];
@@ -212,8 +261,17 @@ async function processOne(row: WebhookEventRow, owner: string, transport: LineTr
 
 const PROFILE_RETRY_MS = 24 * 60 * 60 * 1000; // ลองดึงโปรไฟล์ที่พลาดซ้ำได้วันละครั้ง
 
-async function getOrCreateLineUser(db: DbOrTx, lineUserId: string, transport: LineTransport) {
+async function getOrCreateLineUser(
+  db: DbOrTx,
+  lineUserId: string,
+  transport: LineTransport,
+  prepared?: PreparedExternalEffects,
+) {
   const existing = await findLineUserByRaw(db, lineUserId);
+  // § prepare แล้วต้องไม่ยิง LINE ซ้ำใน lock แม้ได้ null (timeout) — ใช้ prepared object แยก state
+  const getProfile = async () => prepared
+    ? prepared.profile ?? null
+    : await transport.getProfile(lineUserId).catch(() => null);
 
   if (existing) {
     // backfill โปรไฟล์ให้ user เก่าที่ยังไม่มีชื่อ (best-effort — พังไม่ล้ม flow)
@@ -222,7 +280,7 @@ async function getOrCreateLineUser(db: DbOrTx, lineUserId: string, transport: Li
     const lastCheck = meta?.profileCheckedAt ? Date.parse(meta.profileCheckedAt) : 0;
     const due = Date.now() - lastCheck > PROFILE_RETRY_MS;
     if (!existing.displayName && due) {
-      const profile = await transport.getProfile(lineUserId).catch(() => null);
+      const profile = await getProfile();
       await db
         .update(lineUsers)
         .set({
@@ -242,7 +300,7 @@ async function getOrCreateLineUser(db: DbOrTx, lineUserId: string, transport: Li
   const meta = (user.metadata as { profileCheckedAt?: string } | null) ?? null;
   const due = !user.displayName && Date.now() - (meta?.profileCheckedAt ? Date.parse(meta.profileCheckedAt) : 0) > PROFILE_RETRY_MS;
   if (due) {
-    const profile = await transport.getProfile(lineUserId).catch(() => null);
+    const profile = await getProfile();
     await db.update(lineUsers)
       .set({
         ...(profile ? { displayName: profile.displayName, pictureUrl: profile.pictureUrl ?? null } : {}),
@@ -470,12 +528,21 @@ async function updateBotState(db: DbOrTx, lineUserPk: string, state: CaseFlowSta
     .where(eq(lineUsers.id, lineUserPk));
 }
 
-async function handleFollowEvent(db: DbOrTx, event: LineFollowEvent, lineUserPk: string, conversationId: string, transport: LineTransport): Promise<LineOutgoingMessage[]> {
+async function handleFollowEvent(
+  db: DbOrTx,
+  event: LineFollowEvent,
+  lineUserPk: string,
+  conversationId: string,
+  transport: LineTransport,
+  prepared?: PreparedExternalEffects,
+): Promise<LineOutgoingMessage[]> {
   // § บันทึก friend event ก่อน (best-effort) เพื่อให้ {follow_count} รวมครั้งนี้ — พังห้ามล้ม welcome
   await recordFriendEvent(db, lineUserPk, 'follow', event.webhookEventId).catch(() => false);
   const followCount = await getFollowCount(db, lineUserPk).catch(() => null);
   // § โปรไฟล์ดึงแบบ best-effort — พังหรือไม่มียังต้องส่ง welcome ต่อ (display_name ว่าง)
-  const profile = await transport.getProfile(event.source.userId).catch(() => null);
+  const profile = prepared
+    ? prepared.profile ?? null
+    : await transport.getProfile(event.source.userId).catch(() => null);
   const replies = await getWelcomeMessages({ displayName: profile?.displayName ?? null, followCount });
 
   // คงพฤติกรรมเดิม: บันทึกแค่ข้อความแรกเป็น text

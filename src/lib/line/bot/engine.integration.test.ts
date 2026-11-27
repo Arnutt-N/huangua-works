@@ -11,6 +11,8 @@ import {
   enqueueWebhookEvent,
   markFailed,
   restoreEvent,
+  cleanupWebhookEvents,
+  WEBHOOK_RETENTION_MS,
 } from '../webhook-events';
 import { lookupHash } from '../identity';
 import { createRecordingTransport } from '../conversation/recording-transport';
@@ -89,6 +91,27 @@ async function rowOf(id: string) {
 }
 
 describe('durable LINE webhook events · integration', () => {
+  test('retention ลบเฉพาะ terminal row ที่เก่า — pending/recent อยู่รอด', async () => {
+    const old = new Date(Date.now() - WEBHOOK_RETENTION_MS - 60_000);
+    const oldDone = await insertRaw({ dedupKey: 'retire-done', lineUserIdHash: 'h-retire', status: 'done', updatedAt: old });
+    const oldPending = await insertRaw({ dedupKey: 'retire-pending', lineUserIdHash: 'h-retire', status: 'pending', updatedAt: old });
+    const recentFailed = await insertRaw({ dedupKey: 'retire-recent', lineUserIdHash: 'h-retire', status: 'failed', updatedAt: new Date() });
+
+    const deleted = await cleanupWebhookEvents();
+
+    expect(deleted).toBeGreaterThanOrEqual(1);
+    expect((await rowOf(oldDone.id))?.id).toBeUndefined();
+    expect((await rowOf(oldPending.id)).status).toBe('pending');
+    expect((await rowOf(recentFailed.id)).status).toBe('failed');
+
+    // § กัน fixture pending นี้ไปติด claim ของ test อื่นใน suite เดียวกัน
+    const db = await getDb();
+    await db.delete(lineWebhookEvents).where(inArray(lineWebhookEvents.id, [oldPending.id, recentFailed.id]));
+    OWNED_EVENT_IDS.splice(0, OWNED_EVENT_IDS.length, ...OWNED_EVENT_IDS.filter(
+      (id) => id !== oldPending.id && id !== recentFailed.id,
+    ));
+  });
+
   test('failure ก่อน inbound → แถวยัง pending และไม่มี effects committed', async () => {
     const event = messageEvent('U-before', 0);
     const { id } = await enqueueWebhookEvent(event);

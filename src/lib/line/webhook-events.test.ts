@@ -29,6 +29,8 @@ import {
   MissingLineIdentity,
   restoreEvent,
   sanitizeEvent,
+  cleanupWebhookEvents,
+  WEBHOOK_RETENTION_MS,
 } from './webhook-events';
 import type { WebhookEventRow } from './webhook-events';
 import type { LineWebhookEvent } from './types';
@@ -173,6 +175,20 @@ describe('webhook-events · backoff และ attempts', () => {
     await markFailed('event-1', 1, 'owner-1');
     expect(set).toHaveBeenCalledWith(expect.not.objectContaining({ payload: expect.anything() }));
     expect(set).toHaveBeenCalledWith(expect.objectContaining({ status: 'pending' }));
+  });
+});
+
+describe('webhook-events · bounded retention', () => {
+  it('ลบเฉพาะ row terminal ที่เก่าเกิน retention — pending กับ row ใหม่อยู่รอด', async () => {
+    const where = vi.fn(async () => ({ count: 3 }));
+    hoisted.mockGetDb.mockResolvedValue({ delete: vi.fn(() => ({ where })) });
+
+    const deleted = await cleanupWebhookEvents(new Date('2026-11-27T00:00:00Z'));
+
+    expect(deleted).toBe(3);
+    expect(where).toHaveBeenCalledTimes(1);
+    // § shape ของ predicate อยู่ใน integration test (SQL จริง) — unit ตรงนี้ตรงสัญญา count/cutoff เท่านั้น
+    expect(WEBHOOK_RETENTION_MS).toBe(7 * 24 * 60 * 60 * 1000);
   });
 });
 

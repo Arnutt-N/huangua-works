@@ -1,4 +1,4 @@
-import { count, eq, inArray, sql } from 'drizzle-orm';
+import { and, count, eq, inArray, sql } from 'drizzle-orm';
 import { NextRequest } from 'next/server';
 import { afterAll, describe, expect, it, test } from 'vitest';
 import { closeDb, getDb } from '@/lib/db';
@@ -14,7 +14,19 @@ import { GET } from './route';
  */
 
 const RUN = Date.now();
+
+// § กันลบ snapshot ที่มีอยู่ก่อนหน้า (route ใช้ upsert ตามวัน → id เดิมอยู่รอด)
+// ถ้า DB ไม่สะอาดให้หยุด suite แทนที่จะไปลบข้อมูลจริงตอน afterAll
+async function assertCleanSnapshotTarget(db: Awaited<ReturnType<typeof getDb>>, date: string) {
+  const existing = await db.select({ id: caseStatsDaily.id }).from(caseStatsDaily)
+    .where(eq(caseStatsDaily.date, date)).limit(1);
+  if (existing.length > 0) {
+    throw new Error('stats-refresh integration: snapshot ของวันนี้มีอยู่แล้ว — ใช้ disposable test database');
+  }
+}
+
 const createdCaseIds: string[] = [];
+const createdSnapshotIds: string[] = [];
 let createdSnapshotDate: string | null = null;
 
 afterAll(async () => {
@@ -23,7 +35,11 @@ afterAll(async () => {
     await db.delete(cases).where(inArray(cases.id, createdCaseIds));
   }
   if (createdSnapshotDate) {
-    await db.delete(caseStatsDaily).where(eq(caseStatsDaily.date, createdSnapshotDate));
+    // § ลบเฉพาะ snapshot ของ fixture นี้ กันลบ snapshot จริงของวันนั้นบน DB shared
+    await db.delete(caseStatsDaily).where(and(
+      eq(caseStatsDaily.date, createdSnapshotDate),
+      inArray(caseStatsDaily.id, createdSnapshotIds),
+    ));
   }
   await closeDb();
 });
@@ -79,6 +95,7 @@ describe('cron/stats-refresh · มาตรฐานสถานะ', () => {
       `,
     );
     const expectedRow = expected[0] as { arrivals: number; closures: number };
+    await assertCleanSnapshotTarget(db, today);
 
     const res = await GET(
       new NextRequest('http://localhost/api/cron/stats-refresh', {
@@ -95,6 +112,7 @@ describe('cron/stats-refresh · มาตรฐานสถานะ', () => {
     const snapshotDate = bangkokDateKey(new Date());
     createdSnapshotDate = snapshotDate;
     const [snapshot] = await db.select().from(caseStatsDaily).where(eq(caseStatsDaily.date, snapshotDate));
+    if (snapshot) createdSnapshotIds.push(snapshot.id);
     expect(snapshot?.totalReceived).toBe(body.stats.dailyArrivals);
     expect(snapshot?.totalClosed).toBe(body.stats.dailyClosures);
     expect(totalCasesFromSnapshot(snapshot!.metadata)).toBe(body.stats.totalCases);
@@ -102,6 +120,7 @@ describe('cron/stats-refresh · มาตรฐานสถานะ', () => {
   });
 
   test(' refresh พร้อมกันสองครั้ง → upsert เดียว ไม่ unique violation', async () => {
+    const db = await getDb();
     const secret = process.env.CRON_SECRET;
     expect(secret && secret.length >= 16).toBe(true);
     const req = () =>
@@ -115,7 +134,10 @@ describe('cron/stats-refresh · มาตรฐานสถานะ', () => {
     if (results[1]!.status === 'rejected') throw results[1]!.reason;
     expect(results[0]!.value.status).toBe(200);
     expect(results[1]!.value.status).toBe(200);
-    createdSnapshotDate = bangkokDateKey(new Date());
+    const snapshotDate = bangkokDateKey(new Date());
+    const [snapshot] = await db.select().from(caseStatsDaily).where(eq(caseStatsDaily.date, snapshotDate));
+    if (snapshot) createdSnapshotIds.push(snapshot.id);
+    createdSnapshotDate = snapshotDate;
   });
 
   it('นับทุกสถานะเป็นยอดรับทั้งหมด และเฉลี่ยจากแถวที่มีวันปิด', async () => {
@@ -185,10 +207,12 @@ describe('cron/stats-refresh · มาตรฐานสถานะ', () => {
     expect(body.stats.totalClosed).toBeGreaterThanOrEqual(1);
     expect(body.stats.avgResolutionDays).toBe(expectedAvg);
 
-    const today = new Date().toISOString().split('T')[0]!;
+    // § route เขียนวันตามกรุงเทพ — อ่านด้วยเขตเวลาเดียวกัน ไม่ใช้ UTC date
+    const today = bangkokDateKey(new Date());
     const [snapshot] = await db.select().from(caseStatsDaily).where(eq(caseStatsDaily.date, today));
     expect(snapshot).toBeDefined();
     expect(totalCasesFromSnapshot(snapshot!.metadata)).toBe(body.stats.totalCases);
+    if (snapshot) createdSnapshotIds.push(snapshot.id);
     createdSnapshotDate = today;
   });
 });
