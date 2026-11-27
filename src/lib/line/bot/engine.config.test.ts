@@ -24,6 +24,8 @@ vi.mock('../settings', () => ({
 }));
 vi.mock('./intent-matcher', () => ({ matchIntent: vi.fn(async () => null) }));
 vi.mock('./faq-matcher', () => ({ matchFaq: vi.fn(async () => null) }));
+const { mockIngest } = vi.hoisted(() => ({ mockIngest: vi.fn(async () => ({ kind: 'stored', url: 'https://media/x', contentType: 'image/png', sizeBytes: 4 }) as const) }));
+vi.mock('../media-ingest', () => ({ ingestLineMedia: mockIngest }));
 vi.mock('../sse/broadcaster', () => ({ broadcast: vi.fn() }));
 vi.mock('../messages/flex', () => ({
   caseStatusFlex: vi.fn(() => ({ type: 'flex', altText: 'สถานะ', contents: { type: 'bubble' } })),
@@ -133,6 +135,31 @@ describe('prepareExternalEffects — I/O อยู่นอก effects/lock', ()
     // § timeout ได้ profile=null ก็ต้องไม่กลับไปยิง LINE ใน tx
     await runEventEffects(mockDb, event, transport, { botEnabled: true, profile: undefined });
     expect(transport.calls.filter((c) => c.kind === 'profile')).toHaveLength(1);
+  });
+});
+
+describe('prepareExternalEffects — media I/O อยู่นอก effects transaction', () => {
+  it('เตรียม media ครั้งเดียวก่อน tx แล้ว effects ใช้ผลที่เตรียม', async () => {
+    const transport = createRecordingTransport();
+    const mediaEvent = {
+      type: 'message',
+      replyToken: 'reply-token',
+      timestamp: Date.now(),
+      mode: 'active',
+      webhookEventId: 'evt-img-1',
+      source: { type: 'user', userId: 'U123' },
+      message: { type: 'image', id: 'msg-img-1' },
+    } as never;
+    const prepared = await prepareExternalEffects(mediaEvent, transport);
+
+    expect(mockIngest).toHaveBeenCalledTimes(1);
+    expect(prepared.media).toMatchObject({ kind: 'stored', url: 'https://media/x' });
+
+    mockIngest.mockClear();
+    await runEventEffects(mockDb, mediaEvent, transport, prepared);
+
+    expect(mockIngest).not.toHaveBeenCalled();
+    expect((setMock.mock.calls as unknown as [Record<string, unknown>][]).some(([payload]) => 'mediaUrl' in payload)).toBe(true);
   });
 });
 
