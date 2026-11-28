@@ -107,9 +107,13 @@ export async function prepareExternalEffects(
   if (botEnabled && event.type === 'message' && event.message.type !== 'sticker') {
     await withTimeout(transport.showTyping(event.source.userId ?? ''), 'showTyping');
   }
-  const profile = event.source.userId
-    ? await withTimeout(transport.getProfile(event.source.userId), 'getProfile')
-    : undefined;
+  // § ดึง profile เฉพาะเมื่อจำเป็น — ผู้ใช้เดิมที่มีชื่อแล้วไม่ต้องยิง LINE API ทุกข้อความ
+  //   (ข้อ 11) follow ยังดึงเสมอเพราะข้อความต้อนรับใช้ชื่อ; ผู้ใช้ใหม่/ยังไม่มีชื่อดึงเพื่อ backfill
+  let profile: LineProfile | null | undefined;
+  const userId = event.source.userId;
+  if (userId && (event.type === 'follow' || await shouldFetchProfile(userId))) {
+    profile = await withTimeout(transport.getProfile(userId), 'getProfile');
+  }
   // § media download/upload เป็น I/O ภายนอกเช่นกัน — ทำก่อน tx แล้วส่งผลเข้า effects
   const media = event.type === 'message' && ['image', 'file', 'video', 'audio'].includes(event.message.type)
     ? await ingestLineMedia(
@@ -119,6 +123,23 @@ export async function prepareExternalEffects(
       )
     : undefined;
   return { botEnabled, profile, media };
+}
+
+/**
+ * § ต้องดึง profile ไหม — ผู้ใช้เดิมที่มี displayName แล้วไม่ต้อง (ประหยัด LINE API call
+ *   ต่อทุกข้อความ) ผู้ใช้ใหม่/ยังไม่มีชื่อต้องดึงเพื่อ backfill ตอนสร้าง (ข้อ 11)
+ */
+async function shouldFetchProfile(lineUserId: string): Promise<boolean> {
+  const db = await getDb();
+  const existing = await findLineUserByRaw(db, lineUserId);
+  // § ผู้ใช้ใหม่ → ดึง (ใช้ backfill ตอน ensureLineUser)
+  if (!existing) return true;
+  // § มีชื่อแล้ว → ไม่ต้องดึง ไม่ว่าครั้งไหน
+  if (existing.displayName) return false;
+  // § ยังไม่มีชื่อ → ดึงเฉพาะเมื่อพ้น cooldown 24 ชม. (กันยิงซ้ำเมื่อดึงไม่สำเร็จ)
+  const meta = (existing.metadata as { profileCheckedAt?: string } | null) ?? null;
+  const lastCheck = meta?.profileCheckedAt ? Date.parse(meta.profileCheckedAt) : 0;
+  return Date.now() - lastCheck > PROFILE_RETRY_MS;
 }
 
 /**

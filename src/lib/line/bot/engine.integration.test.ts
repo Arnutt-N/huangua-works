@@ -275,6 +275,42 @@ describe('durable LINE webhook events · integration', () => {
     expect((await rowOf(second.id!)).status).toBe('done');
   });
 
+  test('backoff ใน SQL: event ที่ยังไม่ครบกำหนดไม่ถูก claim, ครบแล้วได้', async () => {
+    const stamp = Date.now();
+    const row = await insertRaw({
+      dedupKey: `backoff-${stamp}`,
+      lineUserIdHash: `h-backoff-${stamp}`,
+      status: 'pending',
+      attempts: 1,
+      updatedAt: new Date(), // เพิ่งอัปเดต → ยังอยู่ใน backoff 2s (attempts=1)
+    });
+    const first = await claimNextWebhookEvent(10);
+    expect(first.find((r) => r.id === row.id)).toBeUndefined();
+
+    // เลื่อน updatedAt ให้พ้น backoff แล้วต้องถูก claim
+    const db = await getDb();
+    await db.update(lineWebhookEvents)
+      .set({ updatedAt: new Date(Date.now() - 5000) })
+      .where(eq(lineWebhookEvents.id, row.id));
+    const second = await claimNextWebhookEvent(10);
+    expect(second.find((r) => r.id === row.id)).toBeDefined();
+  });
+
+  test('profile: ผู้ใช้เดิมมีชื่อแล้ว → getProfile ไม่ถูกเรียก (0 ครั้ง)', async () => {
+    const raw = `${FIXTURE_PREFIX}U-named`;
+    const { id } = await enqueueWebhookEvent(messageEvent(raw, 0));
+    OWNED_EVENT_IDS.push(id!);
+    const db = await getDb();
+    await db.update(lineUsers).set({ displayName: 'มีชื่อแล้ว' })
+      .where(eq(lineUsers.lineUserIdHash, lookupHash(raw)));
+
+    const transport = createRecordingTransport();
+    await processWebhookEvents(50, transport);
+
+    expect(transport.calls.filter((c) => c.kind === 'profile')).toHaveLength(0);
+    expect((await rowOf(id!)).status).toBe('done');
+  });
+
   test('first-contact: sender ไม่มีใน line_users → ingress สร้าง identity เดียวกับที่ restore ใช้', async () => {
     const db = await getDb();
     const raw = `${FIXTURE_PREFIX}U-first`;
