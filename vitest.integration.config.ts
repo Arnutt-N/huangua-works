@@ -15,5 +15,9 @@ export default defineConfig({
     ...baseConfig.test,
     include: ['src/**/*.integration.test.ts'],
     exclude: ['**/node_modules/**'],
+    env: {
+      // § สัญญาณว่าเป็น integration run — vitest.setup โหลด .env.local เฉพาะเมื่อเห็นนี้
+      VITEST_INTEGRATION: 'true',
+    },
   },
 });

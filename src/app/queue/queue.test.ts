@@ -228,7 +228,25 @@ describe('queueDateRange / isBusinessDay', () => {
     expect(isBusinessDay('2026-10-12')).toBe(true);
   });
 
-  it('toLocalISODate คืน YYYY-MM-DD ตามเวลาท้องถิ่น', () => {
+  it('toLocalISODate คืน YYYY-MM-DD ตามเขตเวลากรุงเทพ', () => {
     expect(toLocalISODate(new Date(2026, 0, 5, 23, 59))).toBe('2026-01-05');
+  });
+
+  // § ข้อ 7 — timestamp เดียวกันต้องได้วันเดียวกันไม่ว่าเครื่องรันจะอยู่ timezone ไหน
+  //   ตรึงเวลา 2026-11-30T18:00:00Z = 01:00 น. กรุงเทพของวันที่ 1 ธ.ค.
+  it('วันเดียวกันทุก timezone: 18:00Z ของวันที่ 30 พ.ย. คือวันที่ 1 ธ.ค. กรุงเทพ', () => {
+    const instant = new Date('2026-11-30T18:00:00Z');
+    expect(toLocalISODate(instant)).toBe('2026-12-01');
+    // ขอบวันกรุงเทพ: 17:00Z ของวันก่อนหน้า ยังเป็นวันเดิม
+    expect(toLocalISODate(new Date('2026-11-30T16:59:59Z'))).toBe('2026-11-30');
+    expect(toLocalISODate(new Date('2026-11-30T17:00:00Z'))).toBe('2026-12-01');
+  });
+
+  it('queueDateRange และ isBusinessDay ยึดกรุงเทพไม่ขยับตามเครื่อง', () => {
+    const instant = new Date('2026-11-30T18:00:00Z'); // 01:00 น. 1 ธ.ค. กรุงเทพ
+    const range = queueDateRange(instant);
+    expect(range.min).toBe('2026-12-01');
+    // 1 ธ.ค. 2569 เป็นวันอังคาร → วันราชการ
+    expect(isBusinessDay('2026-12-01')).toBe(true);
   });
 });

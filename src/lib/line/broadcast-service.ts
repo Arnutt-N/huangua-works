@@ -262,6 +262,9 @@ async function deliverPreparedBatches(
   let firstError: string | null = null;
   const acceptedIds = new Set(batches.filter((b) => b.status === 'accepted').map((b) => b.id));
   const attemptsById = new Map<string, number>();
+  // § จำนวนผู้รับที่ส่งจริงต่อชุด — resolve ใหม่ทุกครั้งอาจได้น้อยกว่าที่ตรึงไว้
+  //   ห้ามนับ recipientHashes เป็นจำนวนส่ง (ข้อ 9) เก็บที่นี่แล้วใช้เป็น success
+  const resolvedCountById = new Map<string, number>();
   const rejected: BatchRow[] = [];
 
   for (const batch of batches) {
@@ -274,6 +277,7 @@ async function deliverPreparedBatches(
     try {
       if (batch.recipientIds === null) {
         await sendWithRetry(batch.retryKey, (key) => broadcastMessage(messages, key));
+        resolvedCountById.set(batch.id, 0); // path 'all' ไม่มีรายชื่อ — นับจาก dry-run ตอนท้าย
       } else {
         const rows = await db
           .select({ id: lineUsers.id, lineUserIdEnc: lineUsers.lineUserIdEnc })
@@ -290,6 +294,7 @@ async function deliverPreparedBatches(
           .map((pk) => rawByPk.get(pk))
           .filter((v): v is string => v !== undefined);
         await sendWithRetry(batch.retryKey, (key) => multicast(rawIds, messages, key));
+        resolvedCountById.set(batch.id, rawIds.length);
       }
       result = { ok: true, attempts: 1 };
     } catch (err) {
@@ -304,11 +309,15 @@ async function deliverPreparedBatches(
 
     if ('deferred' in result) {
       const nextAttemptAt = new Date(Date.now() + result.deferred.delayMs);
-      await db.update(chatBroadcastBatches).set({ attempts: 1, nextAttemptAt, lastError: result.deferred.message, updatedAt: new Date() })
-        .where(eq(chatBroadcastBatches.id, batch.id));
-      // § คืน lease ให้ cron รอบอื่น — ไม่กิน time limit ของ function เดียว
-      await db.update(chatBroadcasts).set({ status: 'scheduled', scheduledAt: nextAttemptAt, leaseOwner: null, updatedAt: new Date() })
-        .where(and(eq(chatBroadcasts.id, id), eq(chatBroadcasts.leaseOwner, owner)));
+      // § เขียนกำหนด retry ของ batch + คืน lease ของ broadcast ใน transaction เดียว —
+      //   เดิมแยกสองคำสั่ง worker หยุดตรงกลางทำให้ batch ถย้ายวันแต่ broadcast ยัง sending
+      //   แล้วรอบกู้คืนจะ claim ทับก่อน nextAttemptAt จนกว่าจะเก่า (ข้อ 8)
+      await db.transaction(async (tx) => {
+        await tx.update(chatBroadcastBatches).set({ attempts: 1, nextAttemptAt, lastError: result.deferred.message, updatedAt: new Date() })
+          .where(eq(chatBroadcastBatches.id, batch.id));
+        await tx.update(chatBroadcasts).set({ status: 'scheduled', scheduledAt: nextAttemptAt, leaseOwner: null, updatedAt: new Date() })
+          .where(and(eq(chatBroadcasts.id, id), eq(chatBroadcasts.leaseOwner, owner)));
+      });
       return { kind: 'deferred', nextAttemptAt };
     }
 
@@ -341,8 +350,10 @@ async function deliverPreparedBatches(
       success = total;
     }
   } else {
+    // § total = จำนวนที่ตรึงไว้ตอนเตรียมชุด (ผู้รับที่ตั้งใจ) — success = จำนวนที่ resolve
+    //   แล้วส่งจริง ส่วนที่หายไปถูกนับเป็น failed ไม่ใช่หายไปจากยอด (ข้อ 9)
     total = batches.reduce((sum, b) => sum + b.recipientHashes.length, 0);
-    success = accepted.reduce((sum, b) => sum + b.recipientHashes.length, 0);
+    success = accepted.reduce((sum, b) => sum + (resolvedCountById.get(b.id) ?? 0), 0);
   }
   const failed = Math.max(0, total - success);
 

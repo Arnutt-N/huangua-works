@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { isUniqueViolation } from '../db/errors';
 import { getDb, type DbOrTx } from '../db';
 import { firstOrUndefined } from '../db/query-helpers';
@@ -15,7 +15,12 @@ import {
   type CitizenIdentity,
   type IntakeConsentVia,
 } from './citizen-access';
-import { notifyNewCase } from '../notify';
+import { notifyNewCase, type NotifyDelivery } from '../notify';
+
+// § lease ครอบระหว่างส่ง — ถ้า worker หยุด รอบถัดไป re-claim เมื่อหมดเวลา (กัน stuck 'sending')
+const CLAIM_LEASE_MS = 60_000;
+// § ช่องทางล้มเหลวชั่วคราว (5xx/429/network) รอ delay ก่อน cron re-claim
+const RETRY_DELAY_MS = 5 * 60_000;
 
 export interface CaseIntakeInput {
   channel: 'web' | 'line';
@@ -65,7 +70,11 @@ export async function createCase(input: CaseIntakeInput): Promise<CaseIntakeResu
   } catch (error) {
     result = intakeFailureFrom(error);
   }
-  if (result.ok) await dispatchCaseNotification(result.caseId);
+  if (result.ok) {
+    // § ไม่รอ dispatch ในที่ path ของประชาชน — เคส+outbox commit แล้วจบ (201 ทันที)
+    // งานแจ้งเตือนส่งโดย cron worker; dispatch ที่ล้มเหลวหลัง commit ไม่พังคำตอบ (ข้อ 3)
+    void dispatchCaseNotification(result.caseId).catch(() => {});
+  }
   return result;
 }
 
@@ -264,61 +273,146 @@ function intakeFailureFrom(error: unknown): CaseIntakeResult {
 }
 
 /** § ส่งหลัง commit เท่านั้น — atomic claim ทำให้ web/LIFF/bot/Replay ส่งได้ครั้งเดียวต่อ case */
-export async function dispatchPendingCaseNotifications(limit = 20): Promise<{ sent: number; failed: number }> {
+export async function dispatchPendingCaseNotifications(limit = 20): Promise<{
+  sent: number;
+  skipped: number;
+  failed: number;
+  pending: number;
+}> {
   const db = await getDb();
-  const candidates = db
+  const now = new Date();
+  const owner = generateId();
+  const leaseUntil = new Date(now.getTime() + CLAIM_LEASE_MS);
+  // § re-claim งาน pending ที่ครบ nextAttemptAt (ล้มเหลวชั่วคราว) ก่อน แล้วค่อย 'sending'
+  //   ที่ lease หมด (worker หยุดกลางรอบ) — เงื่อนไข due ใน SQL + limit ที่ IN-list
+  //   ไม่ให้ claim เกิน batch ที่จะประมวลผลจริง (ข้อ 2)
+  const pendingIds = db
     .select({ id: caseNotifications.id })
     .from(caseNotifications)
-    .where(eq(caseNotifications.status, 'pending'))
+    .where(and(
+      eq(caseNotifications.status, 'pending'),
+      or(isNull(caseNotifications.nextAttemptAt), lte(caseNotifications.nextAttemptAt, now)),
+    ))
     .limit(limit);
   const claimed = await db
     .update(caseNotifications)
-    .set({ status: 'sending', updatedAt: new Date() })
-    .where(and(eq(caseNotifications.status, 'pending'), inArray(caseNotifications.id, candidates)))
+    .set({ status: 'sending', leaseOwner: owner, claimedUntil: leaseUntil, updatedAt: now })
+    // § ซ้ำเงื่อนไข status ใน UPDATE ด้วย — claim ต้อง atomic กันคำขออื่น (inline/cron) แย่งแถวเดียวกัน
+    .where(and(eq(caseNotifications.status, 'pending'), inArray(caseNotifications.id, pendingIds)))
     .returning();
-  return dispatchClaimed(db, claimed);
+  let rows = claimed;
+  if (rows.length < limit) {
+    const stuckIds = db
+      .select({ id: caseNotifications.id })
+      .from(caseNotifications)
+      .where(and(
+        eq(caseNotifications.status, 'sending'),
+        or(isNull(caseNotifications.claimedUntil), lt(caseNotifications.claimedUntil, now)),
+      ))
+      .limit(limit - rows.length);
+    const recovered = await db
+      .update(caseNotifications)
+      .set({ status: 'sending', leaseOwner: owner, claimedUntil: leaseUntil, updatedAt: now })
+      .where(and(
+        eq(caseNotifications.status, 'sending'),
+        // § ตรวจ lease ซ้ำใน UPDATE กันแย่งแถวที่ worker อื่นเพิ่ง claim (lease ยังไม่หมด)
+        or(isNull(caseNotifications.claimedUntil), lt(caseNotifications.claimedUntil, now)),
+        inArray(caseNotifications.id, stuckIds),
+      ))
+      .returning();
+    rows = [...rows, ...recovered];
+  }
+  return dispatchClaimed(db, rows);
 }
 
+/** § claim เฉพาะ caseId (inline หลัง commit) — atomic เหมือน dispatchPending */
 async function dispatchCaseNotification(caseId: string): Promise<void> {
   const db = await getDb();
+  const now = new Date();
+  const owner = generateId();
   const claimed = await db
     .update(caseNotifications)
-    .set({ status: 'sending', updatedAt: new Date() })
+    .set({ status: 'sending', leaseOwner: owner, claimedUntil: new Date(now.getTime() + CLAIM_LEASE_MS), updatedAt: now })
     .where(and(eq(caseNotifications.caseId, caseId), eq(caseNotifications.status, 'pending')))
     .returning();
   await dispatchClaimed(db, claimed);
 }
 
-async function dispatchClaimed(db: Awaited<ReturnType<typeof getDb>>, rows: (typeof caseNotifications.$inferSelect)[]): Promise<{ sent: number; failed: number }> {
-  let sent = 0;
-  let failed = 0;
-  // § notifyNewCase ไม่ throw อยู่แล้ว — try/catch กันของใหม่ในอนาคตเพราะเรื่อง commit ไปแล้ว
+/**
+ * § ตัดสินสถานะแถวจากผลต่อ channel ของ notifyNewCase:
+ *   - ทุกช่องทาง sent หรือ skipped (ตั้งใจปิดจาก config) → sent (งานจบ ไม่ต้อง retry)
+ *   - มีช่องทาง retryable ที่ยังไม่สำเร็จ → pending + nextAttemptAt (รอ cron re-claim)
+ *   - ล้มเหลวถาวรล้วน (4xx) → failed (หยุดพยายาม)
+ * ใช้ attempts เป็นเพดานกันวนซ้ำของช่องทางที่พังถาวรแต่ถูก classify ผิด
+ */
+function outcomeFromDeliveries(deliveries: NotifyDelivery[]): {
+  status: 'sent' | 'failed' | 'pending';
+  error?: string;
+  retry: boolean;
+} {
+  const retryable = deliveries.filter((d) => d.status === 'failed' && d.retryable);
+  if (retryable.length > 0) {
+    return { status: 'pending', retry: true, error: retryable.map((d) => `${d.channel}: ${d.error ?? 'retryable'}`).join('; ') };
+  }
+  const hardFailures = deliveries.filter((d) => d.status === 'failed');
+  if (hardFailures.length > 0) {
+    return { status: 'failed', retry: false, error: hardFailures.map((d) => `${d.channel}: ${d.error ?? 'failed'}`).join('; ') };
+  }
+  return { status: 'sent', retry: false };
+}
+
+async function dispatchClaimed(db: Awaited<ReturnType<typeof getDb>>, rows: (typeof caseNotifications.$inferSelect)[]): Promise<{
+  sent: number;
+  skipped: number;
+  failed: number;
+  pending: number;
+}> {
+  const tally = { sent: 0, skipped: 0, failed: 0, pending: 0 };
   for (const row of rows) {
     try {
-      await notifyNewCase({
+      const deliveries = await notifyNewCase({
         trackingCode: row.trackingCode,
         title: row.title,
         categoryName: row.categoryName,
         channel: row.channel as 'web' | 'line',
         location: row.location ?? undefined,
       });
-      await markNotification(db, row.id, 'sent');
-      sent++;
+      const outcome = outcomeFromDeliveries(deliveries);
+      await markNotification(db, row.id, row.leaseOwner, outcome.status, outcome.error, outcome.retry);
+      tally[outcome.status]++;
     } catch (error) {
-      await markNotification(db, row.id, 'failed', error instanceof Error ? error.message : String(error));
-      failed++;
+      // § notifyNewCase ไม่ควร throw — แต่ถ้ามี (ของใหม่ในอนาคต) ถือเป็น retryable
+      // เพราะเรื่อง commit ไปแล้ว งานไม่ควรหายไปจากคิว
+      await markNotification(db, row.id, row.leaseOwner, 'pending', error instanceof Error ? error.message : String(error), true);
+      tally.pending++;
     }
   }
-  return { sent, failed };
+  return tally;
 }
 
-async function markNotification(db: Awaited<ReturnType<typeof getDb>>, id: string, status: 'sent' | 'failed', error?: string): Promise<void> {
+async function markNotification(
+  db: Awaited<ReturnType<typeof getDb>>,
+  id: string,
+  owner: string | null,
+  status: 'sent' | 'failed' | 'pending',
+  error?: string,
+  retry = false,
+): Promise<void> {
+  const now = new Date();
   await db.update(caseNotifications).set({
     status,
     attempts: sql`${caseNotifications.attempts} + 1`,
     lastError: error?.slice(0, 500) ?? null,
-    updatedAt: new Date(),
-  }).where(eq(caseNotifications.id, id));
+    // § ปล่อย lease เสมอ; ถ้า retry ตั้งรอบลองใหม่ให้ครบ delay แล้ว cron re-claim
+    leaseOwner: null,
+    claimedUntil: null,
+    nextAttemptAt: retry ? new Date(now.getTime() + RETRY_DELAY_MS) : null,
+    updatedAt: now,
+  }).where(and(
+    eq(caseNotifications.id, id),
+    // § เขียนผลเฉพาะ worker ที่ยังถือ lease (owner เดิม) — คนที่ถูก re-claim แล้วห้ามทับ
+    owner === null ? isNull(caseNotifications.leaseOwner) : eq(caseNotifications.leaseOwner, owner),
+  ));
 }
 
 /**

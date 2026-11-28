@@ -18,10 +18,16 @@ export async function postJson(url: string, body: unknown): Promise<NotifyChanne
     });
     if (!res.ok) {
       const detail = await res.text().catch(() => '');
-      return { status: 'failed', error: `HTTP ${res.status}: ${detail.slice(0, 200)}` };
+      return { status: 'failed', retryable: isRetryableStatus(res.status), error: `HTTP ${res.status}: ${detail.slice(0, 200)}` };
     }
     return { status: 'sent' };
   } catch (error) {
-    return { status: 'failed', error: error instanceof Error ? error.message : String(error) };
+    // § fetch reject = network/timeout → ลองใหม่ได้เสมอ
+    return { status: 'failed', retryable: true, error: error instanceof Error ? error.message : String(error) };
   }
+}
+
+/** § 5xx/429 = ปลายทางรับพิษ/ล้น ลองใหม่ได้; 4xx อื่น = ถาวร (ข้อความผิด/ห้าม) ไม่ควรลอง */
+function isRetryableStatus(status: number): boolean {
+  return status === 429 || status >= 500;
 }

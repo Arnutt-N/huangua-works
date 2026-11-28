@@ -259,6 +259,22 @@ describe('durable LINE webhook events · integration', () => {
   });
 
 
+  test('สอง event ผู้ใช้เดียวใน batch เดียว → ทั้งคู่ถูกประมวลผล ไม่รอ cron', async () => {
+    // § ข้อ 5 — predecessor filter กัน event ที่สองของผู้ใช้เดิม ถ้า processWebhookEvents
+    //   หยุดที่ snapshot แรก event ที่สองจะค้างจนถึง cron ping 5 นาที เกินช่วง reply token
+    const raw = `${FIXTURE_PREFIX}U-same`;
+    const first = await enqueueWebhookEvent(messageEvent(raw, 0));
+    const second = await enqueueWebhookEvent(messageEvent(raw, 10));
+    OWNED_EVENT_IDS.push(first.id!, second.id!);
+
+    const transport = createRecordingTransport();
+    const outcome = await processWebhookEvents(50, transport);
+
+    expect(outcome.attempted).toBeGreaterThanOrEqual(2);
+    expect((await rowOf(first.id!)).status).toBe('done');
+    expect((await rowOf(second.id!)).status).toBe('done');
+  });
+
   test('first-contact: sender ไม่มีใน line_users → ingress สร้าง identity เดียวกับที่ restore ใช้', async () => {
     const db = await getDb();
     const raw = `${FIXTURE_PREFIX}U-first`;

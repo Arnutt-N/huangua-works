@@ -22,6 +22,8 @@ Excel ใช้สูตร `COUNTA(DATA!B4:B1047)` นับเลขเรื�
 
 ## การใช้งานในโค้ด
 
-`deriveStatusStats()` ใน `src/lib/cases/stats.ts` เป็นตัวคำนวณเดียวสำหรับ cron และ dashboard ฟิลด์ `totalReceived` ยังหมายถึง `count(status = 'received')` เพราะกราฟแนวโน้มใช้เป็นยอดตามสถานะ ส่วนยอดเรื่องทั้งหมดตาม Excel อยู่ในฟิลด์ `totalCases` ซึ่ง cron เขียนลง `metadata` ของ `case_stats_daily` เพื่อไม่ต้องเพิ่มคอลัมน์
+`deriveStatusStats()` ใน `src/lib/cases/stats.ts` เป็นตัวคำนวณเดียวสำหรับ cron และ dashboard ฟิลด์ `totalReceived` ใน `StatusStatsSnapshot` ยังหมายถึง `count(status = 'received')` เพราะกราฟแนวโน้มใช้เป็นยอดตามสถานะ ส่วนยอดเรื่องทั้งหมดตาม Excel อยู่ในฟิลด์ `totalCases` ซึ่ง cron เขียนลง `metadata` ของ `case_stats_daily` เพื่อไม่ต้องเพิ่มคอลัมน์
 
-`src/app/api/cron/stats-refresh/route.ts` เขียนค่าลง `case_stats_daily` ตามนิยามนี้ `src/app/admin/page.tsx` และ `src/components/landing/Stats.tsx` อ่าน `totalCases` จาก `metadata` แล้วใช้ `deriveStatusStats()` เป็น fallback เมื่อยังไม่มี snapshot
+**คอลัมน์ใน `case_stats_daily` แยกความหมายจาก snapshot รุ่นเก่า** — รุ่นใหม่ที่ cron เขียน เก็บ **ยอดรายวัน** (เข้าตามวัน Bangkok) ในคอลัมน์ `total_received`/`total_closed` และเก็บ **ยอดสะสม** ใน `metadata.statusCounts` แถวรุ่นเก่า (ไม่มี `metadata.statusCounts`) ใช้คอลัมน์เดิมเก็บยอดสะสม จึงตรวจด้วย `isDailySnapshot(metadata)` ก่อนนำไปเป็นกราฟรายวันเสมอ ไม่งั้นยอดสะสมจะถูกอ่านเป็นยอดของวันเดียว
+
+`src/app/api/cron/stats-refresh/route.ts` เขียนค่าลง `case_stats_daily` ตามนิยามนี้ และปิดยอดของวันก่อนหน้า (เขียนใหม่ให้ครบเมื่อรันวันถัดไป) `src/app/admin/page.tsx` และ `src/components/landing/Stats.tsx` อ่าน `totalCases` จาก `metadata` แล้วใช้ `deriveStatusStats()` เป็น fallback เมื่อยังไม่มี snapshot

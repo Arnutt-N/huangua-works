@@ -106,7 +106,9 @@ export default async function AuditPage({
     : await db.select({ c: count() }).from(auditLogs);
   const total = totalRows[0]?.c ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const offset = (page - 1) * PAGE_SIZE;
+  // § clamp หน้าให้อยู่ในช่วงจริง — ลิงก์เก่าหรือรายการที่ลดลงจะพาไปหน้าว่างไม่ได้ (เหมือน queue)
+  const safePage = Math.min(page, totalPages);
+  const offset = (safePage - 1) * PAGE_SIZE;
 
   // § fetch page
   const rows = await db
@@ -127,7 +129,8 @@ export default async function AuditPage({
     .from(auditLogs)
     .leftJoin(users, eq(auditLogs.userId, users.id))
     .where(where)
-    .orderBy(desc(auditLogs.createdAt))
+    // § id เป็นตัวตัดสินแถว timestamp เท่ากัน — ไม่งั้นลำดับไม่คงที่ระหว่างหน้า
+    .orderBy(desc(auditLogs.createdAt), desc(auditLogs.id))
     .limit(PAGE_SIZE)
     .offset(offset);
 
@@ -149,7 +152,7 @@ export default async function AuditPage({
 
         <p className="text-sm text-muted">
           ทั้งหมด <strong className="text-ink">{total.toLocaleString('th-TH')}</strong> รายการ
-          · หน้า {page}/{totalPages}
+          · หน้า {safePage}/{totalPages}
         </p>
 
         {rows.length === 0 ? (
@@ -237,7 +240,7 @@ export default async function AuditPage({
         )}
 
         <Pagination
-          currentPage={page}
+          currentPage={safePage}
           totalPages={totalPages}
           basePath="/admin/audit"
           searchParams={params as Record<string, string | string[] | undefined>}

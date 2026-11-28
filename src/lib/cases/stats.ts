@@ -91,6 +91,15 @@ function pickCounts(value: Record<string, unknown>): SnapshotStatusCounts | null
   return Object.keys(result).length ? result : null;
 }
 
+/**
+ * snapshot รุ่นใหม่ (มี metadata.statusCounts) เก็บยอดสะสมในคอลัมน์
+ * snapshot รุ่นเก่า (ไม่มี statusCounts) คอลัมน์ totalReceived/totalClosed คือยอดสะสมรุ่นเดิม
+ * ใช้แยกยอดรายวันกับยอดสะสมไม่ได้ — ต้องไม่ปนกับกราฟรายวัน (ข้อ 6)
+ */
+export function isDailySnapshot(metadata: unknown): boolean {
+  return statusCountsFromSnapshot(metadata) !== null;
+}
+
 /** ยอดรับ/ปิดรายวันของ snapshot แถวเดียว (คอลัมน์เดิมเปลี่ยนความหมายตามวันที่กรุงเทพ) */
 export function dailyCountsFromSnapshot(row: { totalReceived: unknown; totalClosed: unknown }): {
   arrivals: number;

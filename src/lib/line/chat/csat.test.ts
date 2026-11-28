@@ -20,14 +20,20 @@ describe('parseCsatPostback', () => {
     expect(parseCsatPostback('csat')).toBeNull();
     expect(parseCsatPostback('csat|')).toBeNull();
   });
-  it('wire เก่ามี id แนบ → รับช่วงเปลี่ยนผ่าน ใช้แค่ score', () => {
-    expect(parseCsatPostback('csat|conv-1|5')).toEqual({ score: 5 });
-    expect(parseCsatPostback('csat|conv-1|9')).toBeNull();
+  it('wire ใหม่มี roundRef แนบ → คืน roundRef + score', () => {
+    expect(parseCsatPostback('csat|2026-11-28T10:00:00.000Z|5')).toEqual({
+      roundRef: '2026-11-28T10:00:00.000Z',
+      score: 5,
+    });
+    expect(parseCsatPostback('csat|2026-11-28T10:00:00.000Z|9')).toBeNull();
+  });
+  it('wire เก่าไม่มี ref → รับช่วงเปลี่ยนผ่าน ใช้แค่ score', () => {
+    expect(parseCsatPostback('csat|3')).toEqual({ score: 3 });
   });
 });
 
 describe('buildCsatSurvey', () => {
-  it('มีปุ่ม 5-1 ครบพร้อม postback data มีแค่ score', () => {
+  it('มีปุ่ม 5-1 ครบ postback data มีแค่ score', () => {
     const survey = buildCsatSurvey();
     if (survey.type !== 'flex') throw new Error('survey ต้องเป็น flex');
     const footer = (survey.contents as { footer: { contents: unknown[] } }).footer.contents;
@@ -35,7 +41,12 @@ describe('buildCsatSurvey', () => {
     const data = JSON.stringify(footer);
     expect(data).toContain('csat|5');
     expect(data).toContain('csat|1');
-    expect(data).not.toContain('conv-');
+  });
+  it('มี roundRef → ปุ่มผูกกับรอบปิด', () => {
+    const survey = buildCsatSurvey('2026-11-28T10:00:00.000Z');
+    if (survey.type !== 'flex') throw new Error('survey ต้องเป็น flex');
+    const data = JSON.stringify((survey.contents as { footer: unknown }).footer);
+    expect(data).toContain('csat|2026-11-28T10:00:00.000Z|5');
   });
 });
 

@@ -251,7 +251,7 @@ The largest subsystem (`src/lib/line/`, `src/app/api/line/`, `src/app/admin/chat
 
 ### Cron
 
-**Not Vercel Cron** (Hobby tier allows only one run per day). An external scheduler (cron-job.org) calls `/api/cron/*` with `Authorization: Bearer $CRON_SECRET`. Seven jobs: `close-stale`, `cleanup-hashes`, `cleanup-audit-logs`, `stats-refresh`, `broadcast-send`, `rich-menu-display`, `ping`.
+**Not Vercel Cron** (Hobby tier allows only one run per day). An external scheduler (cron-job.org) calls `/api/cron/*` with `Authorization: Bearer $CRON_SECRET`. Eight jobs: `close-stale`, `cleanup-hashes`, `cleanup-audit-logs`, `stats-refresh`, `broadcast-send`, `case-notifications`, `rich-menu-display`, `ping`.
 
 ### Design tokens and the contrast gate
 

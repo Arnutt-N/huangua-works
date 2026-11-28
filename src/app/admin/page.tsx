@@ -23,6 +23,7 @@ import { formatThaiDateLong, THAI_MONTHS_SHORT } from '@/lib/thai-date';
 import {
   dailyCountsFromSnapshot,
   deriveStatusStats,
+  isDailySnapshot,
   statusCountsFromSnapshot,
   totalCasesFromSnapshot,
 } from '@/lib/cases/stats';
@@ -46,6 +47,7 @@ export default async function AdminDashboardPage() {
       totalReceived: caseStatsDaily.totalReceived,
       totalClosed: caseStatsDaily.totalClosed,
       totalInProgress: caseStatsDaily.totalInProgress,
+      metadata: caseStatsDaily.metadata,
     })
     .from(caseStatsDaily)
     .orderBy(desc(caseStatsDaily.date))
@@ -117,6 +119,9 @@ export default async function AdminDashboardPage() {
     trendPoints.push(
       ...dailyRows
         .filter((r) => r && typeof r.date === 'string' && r.date.length >= 8)
+        // § ข้าม snapshot รุ่นเก่า — คอลัมน์เดิมคือยอดสะสม ไม่ใช่ยอดรายวัน
+        //   ปนเป็นกราฟรายวันได้ทั้งกราฟและอัตราปิด (ข้อ 6)
+        .filter((r) => isDailySnapshot(r.metadata))
         .reverse()
         .map((r) => {
           const d = new Date(r.date);
