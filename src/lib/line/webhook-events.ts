@@ -114,28 +114,33 @@ export async function claimNextWebhookEvent(limit = 1): Promise<WebhookEventRow[
   const p = aliasedTable(lineWebhookEvents, 'p');
   // § กรอง eligibility + predecessor ใน SQL ก่อน loop/claim — แถวที่ถูกบล็อกห้ามบัง event
   //   ของ user อื่นที่พร้อมแล้ว (ต้องไม่ limit ก่อนกรอง)
+  // § กรอง eligibility + predecessor + backoff(due) ใน SQL ทั้งหมด ก่อน limit —
+  //   เลือกเฉพาะคอลัมน์ที่ใช้ใน loop (id/attempts/updatedAt) ไม่ลาก payload ของทุก candidate
+  //   ที่อาจถูกทิ้ง (ข้อ 11) payload โหลดเฉพาะตอนชนะ claim ผ่าน UPDATE..RETURNING
   const candidates = await db
-    .select()
+    .select({ id: e.id, attempts: e.attempts, updatedAt: e.updatedAt })
     .from(e)
     .where(and(
       or(
         eq(e.status, 'pending'),
         and(eq(e.status, 'processing'), lt(e.leaseUntil, now)),
       ),
+      // § backoff = min(2^attempts,60)s จาก updatedAt (ตอน claim ล่าสุด) คำนวณใน SQL
+      //   attempts=0 ไม่มี backoff — ตรงกับ backoffMsFor() แต่กรองได้ก่อนจำกัดจำนวนแถว
+      //   updated_at เป็น timestamp without tz (UTC wall clock) — ใช้ ::timestamp ทั้งสองข้าง
+      sql`(${e.attempts} = 0 OR ${e.updatedAt} <= ${now.toISOString()}::timestamp - make_interval(secs => least(power(2, ${e.attempts}), 60)))`,
       notExists(db.select({ one: sql`1` }).from(p).where(predecessorFilter(p, {
         id: sql`${e.id}`,
         lineUserIdHash: e.lineUserIdHash,
         eventTimestamp: e.eventTimestamp,
       }))),
     ))
-    .orderBy(asc(e.eventTimestamp), asc(e.id));
+    .orderBy(asc(e.eventTimestamp), asc(e.id))
+    .limit(limit);
   if (candidates.length === 0) return [];
 
   const claimed: WebhookEventRow[] = [];
   for (const row of candidates) {
-    // § backoff คำนวณจาก updatedAt (ตอน claim ล่าสุด) — ไม่ต้องพึ่ง Redis ที่อาจหายตอน restart
-    if (row.attempts > 0 && now.getTime() - row.updatedAt.getTime() < backoffMsFor(row.attempts)) continue;
-
     // § claim แบบ condition update — คู่แข่งที่ claim พร้อมกันมีแถวเดียวชนะ
     const leaseUntil = new Date(Date.now() + CLAIM_LEASE_MS);
     // § token ประจำ claim — worker เก่าที่ lease หมดแล้วห้ามมา markDone/renew ของ claim ใหม่
