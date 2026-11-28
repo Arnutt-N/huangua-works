@@ -120,7 +120,9 @@ export default async function CaseManagementPage({
     : await db.select({ c: count() }).from(cases);
   const total = totalRows[0]?.c ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const offset = (page - 1) * PAGE_SIZE;
+  // § clamp หน้าให้อยู่ในช่วงจริง — ลิงก์เก่าหรือรายการที่ลดลงจะพาไปหน้าว่างไม่ได้ (เหมือน queue)
+  const safePage = Math.min(page, totalPages);
+  const offset = (safePage - 1) * PAGE_SIZE;
 
   // § fetch page ปัจจุบัน
   const rows = await db
@@ -139,7 +141,8 @@ export default async function CaseManagementPage({
     .leftJoin(categories, eq(cases.categoryId, categories.id))
     .leftJoin(users, eq(cases.assignedTo, users.id))
     .where(where)
-    .orderBy(desc(cases.createdAt))
+    // § id เป็นตัวตัดสินแถว timestamp เท่ากัน — ไม่งั้นลำดับไม่คงที่ระหว่างหน้า
+    .orderBy(desc(cases.createdAt), desc(cases.id))
     .limit(PAGE_SIZE)
     .offset(offset);
 
@@ -219,7 +222,7 @@ export default async function CaseManagementPage({
           )}
           <span className="ml-auto text-sm">
             ทั้งหมด <strong className="text-ink">{total.toLocaleString('th-TH')}</strong>{' '}
-            เรื่อง · หน้า {page}/{totalPages}
+            เรื่อง · หน้า {safePage}/{totalPages}
           </span>
         </div>
 
@@ -360,7 +363,7 @@ export default async function CaseManagementPage({
         )}
 
         <Pagination
-          currentPage={page}
+          currentPage={safePage}
           totalPages={totalPages}
           basePath="/admin/reports"
           searchParams={params as Record<string, string | string[] | undefined>}

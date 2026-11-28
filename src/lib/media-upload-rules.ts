@@ -12,9 +12,11 @@ export const MEDIA_ALLOWED_MIME: Readonly<Record<string, string>> = {
   'image/webp': 'webp',
 };
 
-// § Vercel function request cap เริ่มต้น 4.5MB — ถ้าเกินนี้ request ถูกปฏิเสธก่อนถึง route
-// (vercel.json ไม่ได้เปิด opt-in 20MiB) จึงต้องจำกัดไฟล์ให้ต่ำกว่าเพดานที่ deployed ใช้จริง
-export const MEDIA_MAX_SIZE_MB = 4.5;
+// § Vercel function request cap เริ่มต้น 4.5MB และ multipart มี overhead (boundary/filename/
+//   Content-Type/CRLF) ทำให้ไฟล์ขนาด 4.5MB พอดีได้ body เกิน 4.5MB แล้วถูก 413 ก่อน route
+//   (ข้อ 14) จึงตั้งเพดานไฟล์ต่ำกว่า request cap พอให้ overhead จริงอยู่ใน
+//   วงเงิน — 4MB ไฟล์ + overhead ยังน้อยกว่า 4.5MB
+export const MEDIA_MAX_SIZE_MB = 4;
 export const MEDIA_MAX_SIZE_BYTES = MEDIA_MAX_SIZE_MB * 1024 * 1024;
 
 /** ค่าสำหรับ `<input accept>` */

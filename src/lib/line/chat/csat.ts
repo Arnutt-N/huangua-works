@@ -13,8 +13,13 @@ export type CsatRecordResult =
   | { kind: 'duplicate'; score: number }
   | { kind: 'invalid' };
 
-/** Flex สำรวจความพึงพอใจ 1-5 — ปุ่ม postback กลับมาเป็น csat|<score> เท่านั้น ไม่มี id ให้ปลอม */
-export function buildCsatSurvey(): LineOutgoingMessage {
+/**
+ * Flex สำรวจความพึงพอใจ 1-5 — ปุ่ม postback กลับมาเป็น csat|<roundRef>|<score>
+ *
+ * § ผูกปุ่มกับรอบปิด (roundRef = resolvedAt ISO) เพื่อให้กดปุ่มเก่าหลังเปิด-ปิดรอบใหม่
+ *   ไม่เขียนคะแนนให้รอบใหม่ (ข้อ 10) ปุ่มเดิมที่ไม่มี ref ยังรับได้แบบถอยหลัง
+ */
+export function buildCsatSurvey(roundRef?: string): LineOutgoingMessage {
   return {
     type: 'flex',
     altText: 'ประเมินความพึงพอใจ',
@@ -39,7 +44,7 @@ export function buildCsatSurvey(): LineOutgoingMessage {
           action: {
             type: 'postback',
             label: String(score),
-            data: `csat|${score}`,
+            data: roundRef ? `csat|${roundRef}|${score}` : `csat|${score}`,
             displayText: `ให้ ${score} คะแนน`,
           },
         })),
@@ -56,8 +61,9 @@ export async function sendCsatSurvey(
   conversationId: string,
   lineUserId: string,
   transport: LineTransport,
+  roundRef?: string,
 ): Promise<void> {
-  const survey = buildCsatSurvey();
+  const survey = buildCsatSurvey(roundRef);
   try {
     await transport.push(lineUserId, [survey]);
   } catch {
@@ -68,6 +74,8 @@ export async function sendCsatSurvey(
 
 /**
  * ส่งสำรวจให้ห้องเดียวจบ (lookup id + ส่ง) — route เรียกบรรทัดเดียว ไม่ต้อง import หลายสัญลักษณ์
+ *
+ * § ผูกปุ่มกับ resolvedAt ของห้องตอนส่ง เพื่อให้กดปุ่มเก่าไม่เขียนคะแนนให้รอบใหม่ (ข้อ 10)
  */
 export async function sendCsatSurveyForConversation(
   conversationId: string,
@@ -75,7 +83,13 @@ export async function sendCsatSurveyForConversation(
 ): Promise<void> {
   const lineUserId = await lineUserIdOfConversation(conversationId);
   if (!lineUserId) return;
-  await sendCsatSurvey(conversationId, lineUserId, transport);
+  const db = await getDb();
+  const [conv] = await db
+    .select({ resolvedAt: chatConversations.resolvedAt })
+    .from(chatConversations)
+    .where(eq(chatConversations.id, conversationId))
+    .limit(1);
+  await sendCsatSurvey(conversationId, lineUserId, transport, conv?.resolvedAt ? conv.resolvedAt.toISOString() : undefined);
 }
 
 /** ขอบคะแนน CSAT (ตรงกับ CHECK score 1-5 ใน migration 0024) — parse กับ record ใช้ค่านี้ตัวเดียว */
@@ -83,11 +97,13 @@ const CSAT_SCORE_MIN = 1;
 const CSAT_SCORE_MAX = 5;
 
 /** แยก postback csat ออกจาก postback อื่น — ผิดรูปคืน null แล้วผู้เรียก log จบ
- * wire ใหม่มีแค่ score; wire เก่า `csat|<id>|<score>` รับช่วงเปลี่ยนผ่าน (id ถูกเมิน ห้องใช้ของ session) */
-export function parseCsatPostback(data: string): { score: number } | null {
-  const match = /^csat\|(?:[^|]+\|)?([1-5])$/.exec(data);
-  if (!match) return null;
-  return { score: Number(match[1]) };
+ * wire ใหม่ `csat|<roundRef>|<score>` ผูกกับรอบปิด; wire เก่า `csat|<score>` ไม่มี ref (ถอยหลังได้) */
+export function parseCsatPostback(data: string): { score: number; roundRef?: string } | null {
+  const withRef = /^csat\|([^|]+)\|([1-5])$/.exec(data);
+  if (withRef) return { roundRef: withRef[1], score: Number(withRef[2]) };
+  const bare = /^csat\|([1-5])$/.exec(data);
+  if (bare) return { score: Number(bare[1]) };
+  return null;
 }
 
 const THANK_YOU: Record<number, string> = {

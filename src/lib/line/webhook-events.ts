@@ -173,6 +173,9 @@ export async function claimNextWebhookEvent(limit = 1): Promise<WebhookEventRow[
  */
 export class BarrierDeferred extends Error {}
 
+/** § เสีย lease ระหว่างรอ lock — ห้ามเขียน effects ทับ worker ที่รับช่วงไปแล้ว */
+export class LostLeaseError extends Error {}
+
 export async function commitEffects(
   tx: DbOrTx,
   row: WebhookEventRow,
@@ -182,12 +185,33 @@ export async function commitEffects(
 
   // § ได้ lock แล้วต้องอ่านแถวเดิมอีกครั้ง — claim เก่าอาจ commit effects ไปแล้วก่อนเราได้ lock
   // (row ใน memory ตอน claim เป็น snapshot) ถ้า commit แล้วข้าม effects ทันที ไม่สร้างซ้ำ
+  // § ต้องอ่าน pendingReplies ด้วยและคืนกลับไป — เดิมคืน [] ทำให้ worker ที่รับช่วงมาแล้วปิด
+  //   เป็น 'none' และเคลียร์คำตอบที่ worker เดิมเพิ่งเขียน (ข้อ 12)
   const [fresh] = await tx
-    .select({ effectsCommittedAt: lineWebhookEvents.effectsCommittedAt })
+    .select({
+      effectsCommittedAt: lineWebhookEvents.effectsCommittedAt,
+      pendingReplies: lineWebhookEvents.pendingReplies,
+    })
     .from(lineWebhookEvents)
     .where(eq(lineWebhookEvents.id, row.id))
     .limit(1);
-  if (fresh?.effectsCommittedAt) return { replies: [], state: undefined };
+  if (fresh?.effectsCommittedAt) return { replies: (fresh.pendingReplies as LineOutgoingMessage[] | null) ?? [], state: undefined };
+  // § ยังไม่มี owner ก็ไม่มีใครให้แย่ง — เคสเทสต์/งานที่ claim แบบไม่ระบุเจ้าของ ผ่านได้
+  if (row.leaseOwner === null || row.leaseOwner === undefined) {
+    // ข้ามการตรวจ owner ต่อไป
+  } else {
+
+  // § ตรวจ owner ปัจจุบันอีกครั้งหลังได้ lock — snapshot ตอน claim อาจเก่ากว่านี้
+  //   worker เดิมหมด lease ระหว่างที่เรารอ ห้ามเขียนทับ (ข้อ 12)
+  const [current] = await tx
+    .select({ status: lineWebhookEvents.status, leaseOwner: lineWebhookEvents.leaseOwner })
+    .from(lineWebhookEvents)
+    .where(eq(lineWebhookEvents.id, row.id))
+    .limit(1);
+  if (!current || current.status !== 'processing' || current.leaseOwner !== row.leaseOwner) {
+    throw new LostLeaseError('lease lost before effects commit');
+  }
+  }
 
   const p = aliasedTable(lineWebhookEvents, 'p');
   const earlier = await tx

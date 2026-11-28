@@ -309,6 +309,20 @@
       "when": 1795769873101,
       "tag": "0043_drop_redundant_dedup_hash_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1795853323615,
+      "tag": "0044_case_notifications_lease",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1795872279070,
+      "tag": "0045_reply_state_check_consistency",
+      "breakpoints": true
     }
   ]
 }

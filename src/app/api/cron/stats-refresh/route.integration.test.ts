@@ -84,13 +84,14 @@ describe('cron/stats-refresh · มาตรฐานสถานะ', () => {
     createdCaseIds.push(arrivalId, closureId);
 
     const expected = await db.execute<{ arrivals: number; closures: number }>(
-      // § ใช้ขอบเขตเดียวกับ cron — 23:00 UTC ของวันก่อนหน้าคือ 06:00 น. ในกรุงเทพ
+      // § ขอบวัน UTC ที่เขียนล่วงหน้าโดยอิสระ (ไม่ใช่ SQL เดียวกับ cron):
+      //   วันกรุงเทพ = UTC [วัน-1 17:00, วัน 17:00) — Bangkok UTC+7 ไม่มี DST
       sql`
         SELECT
-          count(*) FILTER (WHERE created_at >= ${today}::date AT TIME ZONE 'Asia/Bangkok'
-                             AND created_at < (${today}::date + 1) AT TIME ZONE 'Asia/Bangkok')::int AS arrivals,
-          count(*) FILTER (WHERE closed_at >= ${today}::date AT TIME ZONE 'Asia/Bangkok'
-                             AND closed_at < (${today}::date + 1) AT TIME ZONE 'Asia/Bangkok')::int AS closures
+          count(*) FILTER (WHERE created_at >= ${`${today} 00:00:00`}::timestamp - interval '7 hours'
+                             AND created_at < ${`${today} 00:00:00`}::timestamp + interval '17 hours')::int AS arrivals,
+          count(*) FILTER (WHERE closed_at >= ${`${today} 00:00:00`}::timestamp - interval '7 hours'
+                             AND closed_at < ${`${today} 00:00:00`}::timestamp + interval '17 hours')::int AS closures
         FROM cases
       `,
     );

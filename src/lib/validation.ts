@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ALL_STATUSES } from './cases/state-machine';
+import { bangkokDateKey } from './cases/stats';
 import { ALL_BUDGET_STATUSES } from './cases/budget';
 import { STAFF_ROLES } from './auth/roles';
 import { CONVERSATION_MODES } from './line/chat-modes';
@@ -610,12 +611,22 @@ export {
 /** จองล่วงหน้าได้ไม่เกิน 30 วัน — UI (min/max ของ date input) อ่านค่านี้ด้วย */
 export const QUEUE_BOOKING_WINDOW_DAYS = 30;
 
-/** แปลง Date → YYYY-MM-DD ตามเวลาท้องถิ่น (ห้ามใช้ toISOString — ได้วัน UTC ผิดวัน) */
+/**
+ * แปลง Date → YYYY-MM-DD ตามเขตเวลากรุงเทพ (ห้ามใช้ toISOString — ได้วัน UTC ผิดวัน)
+ *
+ * § ต้องยึด Asia/Bangkok เสมอ ไม่ใช่เวลาท้องถิ่นของเครื่องที่รัน: browser กับ server
+ * อยู่คนละ timezone ทำให้ 00:00–06:59 น. กรุงเทพ สองฝ่ายคำนวณ "วันนี้" ไม่ตรงกัน
+ * เกิด availability/ตัวกรองแอดมินคลาด (ข้อ 7) — เขตเวลาเดียวกันทั้งระบบคือคำตอบ
+ */
 export function toLocalISODate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  return bangkokDateKey(d);
+}
+
+/** § +N วันแบบปฏิทิน ไม่เลื่อนตาม DST/เขตเวลาเครื่อง (ใช้ UTC day arithmetic) */
+export function addCalendarDays(d: Date, days: number): Date {
+  const next = new Date(d);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
 }
 
 /**
@@ -638,13 +649,17 @@ export const queueBookingDateSchema = z
     (v) => {
       const today = toLocalISODate(new Date());
       // § เทียบสตริง YYYY-MM-DD ตรง ๆ ได้เพราะ zero-padded — ลำดับตัวอักษร = ลำดับวัน
-      const max = new Date();
-      max.setDate(max.getDate() + QUEUE_BOOKING_WINDOW_DAYS);
+      const max = addCalendarDays(new Date(), QUEUE_BOOKING_WINDOW_DAYS);
       return v >= today && v <= toLocalISODate(max);
     },
     { message: `จองได้ตั้งแต่วันนี้ถึงล่วงหน้า ${QUEUE_BOOKING_WINDOW_DAYS} วัน` },
   )
-  .refine((v) => new Date(`${v}T00:00:00`).getDay() >= 1 && new Date(`${v}T00:00:00`).getDay() <= 5, {
+  // § วันจันทร์–ศุกร์คำนวณจากตัวอักษร YYYY-MM-DD ด้วยปฏิทิน UTC (getUTCDay) —
+  //   getDay() ของเครื่องที่รันจะขยับวันในช่วง 00:00–06:59 น. กรุงเทพ
+  .refine((v) => {
+    const day = new Date(`${v}T00:00:00Z`).getUTCDay();
+    return day >= 1 && day <= 5;
+  }, {
     message: 'รับนัดเฉพาะวันจันทร์–ศุกร์ (วันราชการ)',
   });
 

@@ -1,56 +1,58 @@
 import { eq, inArray } from 'drizzle-orm';
-import { afterAll, describe, expect, test } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { closeDb, getDb } from '@/lib/db';
 import { chatConversations, chatCsatResponses } from '@/lib/db/schema';
 import { generateId } from '@/lib/id';
-import { pseudonymizeLineId } from '@/lib/line/identity';
 import { recordCsatResponse } from './csat';
 
-const created: string[] = [];
+/**
+ * Integration — ข้อ 10: กดปุ่มประเมินของรอบเก่าหลังเปิด-ปิดรอบใหม่
+ * ต้องไม่เขียนคะแนนให้รอบใหม่ (unique ต่อ (ห้อง, resolvedAt) + roundRef จากปุ่ม)
+ */
+const RUN = Date.now();
+const CONV_ID = `it-csat-${RUN}-conv`;
+const ROUND1 = new Date(Date.UTC(2026, 10, 27, 3)); // รอบปิดครั้งแรก
+const ROUND2 = new Date(Date.UTC(2026, 10, 28, 3)); // รอบปิดครั้งที่สอง
 
-async function createConv(): Promise<string> {
+beforeAll(async () => {
   const db = await getDb();
-  const id = generateId();
-  await db.insert(chatConversations).values({ id, lineUserIdHash: pseudonymizeLineId(`it-csat-${id}`).hash, mode: 'resolved' });
-  created.push(id);
-  return id;
-}
+  await db.insert(chatConversations).values({
+    id: CONV_ID,
+    lineUserIdHash: `it-csat-${RUN}-hash`,
+    resolvedAt: ROUND1,
+  }).onConflictDoNothing();
+});
 
 afterAll(async () => {
   const db = await getDb();
-  if (created.length > 0) {
-    await db.delete(chatCsatResponses).where(inArray(chatCsatResponses.conversationId, created));
-    await db.delete(chatConversations).where(inArray(chatConversations.id, created));
-  }
+  await db.delete(chatCsatResponses).where(eq(chatCsatResponses.conversationId, CONV_ID));
+  await db.delete(chatConversations).where(eq(chatConversations.id, CONV_ID));
   await closeDb();
 });
 
-describe('recordCsatResponse', () => {
-  test('บันทึกครั้งแรก → recorded', async () => {
-    const conv = await createConv();
-    const result = await recordCsatResponse(await getDb(), conv, 5, new Date('2026-10-17T10:00:00Z'));
-    expect(result).toEqual({ kind: 'recorded', score: 5 });
-  });
-
-  test('กดซ้ำรอบปิดเดิม → duplicate ไม่เพิ่มแถว', async () => {
-    const conv = await createConv();
-    const cycle = new Date('2026-10-17T10:00:00Z');
-    await recordCsatResponse(await getDb(), conv, 4, cycle);
-    const again = await recordCsatResponse(await getDb(), conv, 2, cycle);
-    expect(again).toEqual({ kind: 'duplicate', score: 4 });
-
+describe('recordCsatResponse · ผูกกับรอบปิด', () => {
+  it('ปุ่มรอบเก่า (roundRef=ROUND1) ไม่กินสิทธิ์ของรอบใหม่ (ROUND2)', async () => {
     const db = await getDb();
-    const rows = await db
-      .select()
-      .from(chatCsatResponses)
-      .where(eq(chatCsatResponses.conversationId, conv));
-    expect(rows).toHaveLength(1);
-  });
 
-  test('ปิดรอบใหม่ → โหวตใหม่ได้', async () => {
-    const conv = await createConv();
-    await recordCsatResponse(await getDb(), conv, 4, new Date('2026-10-17T10:00:00Z'));
-    const second = await recordCsatResponse(await getDb(), conv, 5, new Date('2026-10-17T11:00:00Z'));
-    expect(second).toEqual({ kind: 'recorded', score: 5 });
+    // รอบ 1: ให้คะแนน
+    const r1 = await recordCsatResponse(db, CONV_ID, 5, ROUND1);
+    expect(r1.kind).toBe('recorded');
+
+    // รอบ 2: ผู้ใช้ให้คะแนนใหม่
+    const r2 = await recordCsatResponse(db, CONV_ID, 2, ROUND2);
+    expect(r2).toMatchObject({ kind: 'recorded', score: 2 });
+
+    // กดปุ่มเก่าของรอบ 1 อีกครั้ง → ชนของรอบ 1 (duplicate) ไม่เขียนทับรอบ 2
+    const old = await recordCsatResponse(db, CONV_ID, 1, ROUND1);
+    expect(old).toMatchObject({ kind: 'duplicate', score: 5 });
+
+    const rows = await db
+      .select({ resolvedAt: chatCsatResponses.resolvedAt, score: chatCsatResponses.score })
+      .from(chatCsatResponses)
+      .where(inArray(chatCsatResponses.conversationId, [CONV_ID]));
+    expect(rows).toHaveLength(2);
+    const byRound = new Map(rows.map((r) => [r.resolvedAt!.getTime(), r.score]));
+    expect(byRound.get(ROUND1.getTime())).toBe(5);
+    expect(byRound.get(ROUND2.getTime())).toBe(2);
   });
 });

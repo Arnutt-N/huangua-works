@@ -115,6 +115,12 @@ describe('POST /api/cases/upload', () => {
     expect(body.error).toContain('ไม่พบไฟล์');
   });
 
+  it('เพดานไฟล์ต่ำกว่า Vercel request cap 4.5MB พอให้ multipart overhead อยู่', () => {
+    const VERCEL_REQUEST_CAP = 4.5 * 1024 * 1024;
+    // § ข้อ 14 — ไฟล์ที่เพดาน + overhead 4KB ต้องไม่เกิน request cap
+    expect(MEDIA_MAX_SIZE_BYTES + 4096).toBeLessThanOrEqual(VERCEL_REQUEST_CAP);
+  });
+
   it('ตอบกลับ 413 จาก Content-Length ก่อน parse multipart เมื่อ header เกินเพดาน', async () => {
     const req = new NextRequest('http://localhost:3000/api/cases/upload', {
       method: 'POST',

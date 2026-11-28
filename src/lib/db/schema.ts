@@ -661,6 +661,9 @@ export const lineWebhookEvents = pgTable(
       sql`${table.eventType} IN ('message', 'follow', 'unfollow', 'postback')`),
     statusCheck: check('line_webhook_events_status_check',
       sql`${table.status} IN ('pending', 'processing', 'done', 'failed')`),
+    // § ตรงกับ CHECK ใน migration 0042 — ประกาศใน schema ด้วย ไม่งั้น snapshot/diff เพี้ยน (ข้อ 13)
+    replyStateCheck: check('line_webhook_events_reply_state_check',
+      sql`${table.replyState} IN ('pending', 'none', 'expired')`),
     // § กัน worker สองตัวเลือก event เดียวกัน / กัน event เก่าของ user เดียวข้าม event ใหม่
     pendingByUserIdx: index('line_webhook_events_pending_by_user_idx')
       .on(table.lineUserIdHash, table.eventTimestamp, table.id)
@@ -1115,10 +1118,16 @@ export const caseNotifications = pgTable(
     status: text('status').notNull().default('pending'),
     attempts: integer('attempts').notNull().default(0),
     lastError: text('last_error'),
+    // § lease/รอบลองใหม่ — worker ที่หยุดกลางรอบทิ้ง 'sending' ไว้ รอบถัดไป re-claim เมื่อ lease หมด
+    leaseOwner: text('lease_owner'),
+    claimedUntil: timestamp('claimed_until', { mode: 'date' }),
+    nextAttemptAt: timestamp('next_attempt_at', { mode: 'date' }),
   },
   (table) => ({
     caseUnique: unique('case_notifications_case_uid').on(table.caseId),
     statusIdx: index('case_notifications_status_idx').on(table.status),
+    // § due index รองรับการ re-claim งานที่ครบ nextAttemptAt (ล้มเหลวชั่วคราวแล้วรอ retry)
+    dueIdx: index('case_notifications_due_idx').on(table.status, table.nextAttemptAt),
   })
 );
 

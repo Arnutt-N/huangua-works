@@ -37,6 +37,11 @@ export async function Stats() {
   const hasData = !!latest;
   // § snapshot ใหม่เก็บยอดสะสมใน metadata — คอลัมน์ totalClosed คือยอดปิด "วันนั้น" สำหรับกราฟ
   const cumulative = latest ? statusCountsFromSnapshot(latest.metadata) : null;
+  // § snapshot รุ่นเก่าไม่มียอดสะสม — ใช้ totalCases จาก metadata ถ้ามี
+  //   ไม่งั้น� %= totalReceived เดิมเป็นยอดสะสม ไม่ใช่รายวัน (ข้อ 6)
+  const totalCases = latest
+    ? totalCasesFromSnapshot(latest.metadata) ?? latest.totalReceived
+    : 0;
 
   const stats: StatItem[] = [
     {
@@ -60,7 +65,7 @@ export async function Stats() {
     },
     {
       label: 'เรื่องรับทั้งหมด',
-      value: hasData ? formatNumber(totalCasesFromSnapshot(latest!.metadata) ?? latest!.totalReceived) : '—',
+      value: hasData ? formatNumber(totalCases) : '—',
       change: null,
       icon: 'Users',
       colorClass: 'text-accent',

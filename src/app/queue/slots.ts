@@ -2,6 +2,7 @@ import {
   QUEUE_BOOKING_WINDOW_DAYS,
   QUEUE_SLOT_IDS,
   QUEUE_SLOT_LABELS,
+  addCalendarDays,
   toLocalISODate,
   type QueueSlotId,
 } from '@/lib/validation';
@@ -34,13 +35,12 @@ export function buildSlotAvailability(bookedSlots: Iterable<string>): QueueSlotA
  * รับ `today` ไว้เทส (default = วันนี้ตามเวลาท้องถิ่น)
  */
 export function queueDateRange(today: Date = new Date()): { min: string; max: string } {
-  const max = new Date(today);
-  max.setDate(max.getDate() + QUEUE_BOOKING_WINDOW_DAYS);
-  return { min: toLocalISODate(today), max: toLocalISODate(max) };
+  return { min: toLocalISODate(today), max: toLocalISODate(addCalendarDays(today, QUEUE_BOOKING_WINDOW_DAYS)) };
 }
 
 /** วันนี้เป็นวันราชการ (จันทร์–ศุกร์) หรือไม่ — ใช้เตือนใน UI (server ตรวจซ้ำเสมอ) */
 export function isBusinessDay(isoDate: string): boolean {
-  const day = new Date(`${isoDate}T00:00:00`).getDay();
+  // § UTC weekday ของตัวอักษร YYYY-MM-DD — ห้าม getDay() ที่เขตเวลาเครื่องรัน
+  const day = new Date(`${isoDate}T00:00:00Z`).getUTCDay();
   return day >= 1 && day <= 5;
 }

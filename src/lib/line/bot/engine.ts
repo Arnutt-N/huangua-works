@@ -30,6 +30,7 @@ import {
   renewLease,
   restoreEvent,
   BarrierDeferred,
+  LostLeaseError,
 } from '../webhook-events';
 import type { WebhookEventRow } from '../webhook-events';
 import {
@@ -77,6 +78,9 @@ export interface PreparedExternalEffects {
 }
 
 const EXTERNAL_TIMEOUT_MS = 5_000;
+// § เพดานรอบ claim ต่อ processWebhookEvents หนึ่งครั้ง — กันวนลูปไม่จบ
+//   ถ้า backlog ใหญ่กว่านี้คืนให้ cron/ping รอบถัดไปทำต่อ
+const MAX_CLAIM_ROUNDS = 5;
 
 function withTimeout<T>(promise: Promise<T>, label: string): Promise<T | null> {
   // § I/O ภายนอกต้องมีเพดาน — ถ้า LINE ค้างห้ามปล่อย transaction/lock เปิดรอไม่รู้จบ
@@ -175,8 +179,14 @@ export async function processWebhookEvents(
   transport: LineTransport = httpLineTransport,
 ): Promise<ProcessWebhookResult> {
   const result = { attempted: 0, done: 0, retried: 0, failed: 0, deferred: 0 };
-  const rows = await claimNextWebhookEvent(limit);
-  for (const row of rows) {
+  let claimed = await claimNextWebhookEvent(limit);
+  // § ดึงรอบถัดไปหลังทุก claim — webhook เดียวอาจมี event หลายตัวของผู้ใช้เดิม
+  //   predecessor filter กัน event ที่สองไว้ ถ้าหยุดที่ snapshot แรกจะรอ cron 5 นาที
+  //   เกินช่วง reply token 1 นาทีของ LINE (ข้อ 5) — วนจนหมดงานหรือถึงเพดาน
+  let rounds = 0;
+  while (claimed.length > 0 && rounds < MAX_CLAIM_ROUNDS) {
+    rounds++;
+    for (const row of claimed) {
     result.attempted++;
     // § claim ต้องมี owner — ไม่มี owner ห้ามแตะแถวหรือเปลี่ยนสถานะใด ๆ
     if (!row.leaseOwner) {
@@ -194,6 +204,9 @@ export async function processWebhookEvents(
         // § event เก่ายังไม่ commit — คืน pending โดยไม่เพิ่ม attempts (cron รอบหน้าลองใหม่)
         result.deferred++;
         await releaseLease(row.id, row.leaseOwner);
+      } else if (error instanceof LostLeaseError) {
+        // § หมด lease ระหว่างรอ lock — คนอื่นรับช่วงไปแล้ว ห้ามแตะแถวนี้
+        result.deferred++;
       } else {
         console.error('[line-webhook] event failed', { id: row.id, error });
         await markFailed(row.id, row.attempts, row.leaseOwner);
@@ -201,6 +214,8 @@ export async function processWebhookEvents(
         else result.retried++;
       }
     }
+    }
+    claimed = await claimNextWebhookEvent(limit);
   }
   return result;
 }
@@ -584,14 +599,25 @@ async function handlePostbackEvent(db: DbOrTx, event: LinePostbackEvent, convers
   // ต้องไม่ record postback (log) ก่อน — commitEffects จะ throw BarrierDeferred และ rollback transaction
   const csatData = parseCsatPostback(event.postback.data);
   if (csatData) {
-    // § ให้คะแนนห้องของคนกดเท่านั้น — wire มีแค่ score ห้องใช้ของ session นี้ (ไม่มี id ให้ปลอม)
-    // รอบปิดอ่านจากห้องตอนแตะ: reopen แล้วปิดใหม่ถือเป็นรอบใหม่ โหวตได้อีก
+    // § ให้คะแนนห้องของคนกดเท่านั้น — conversationId มาจาก session ของผู้กด
+    // § ผูกกับรอบปิดที่ปุ่มออกให้ (roundRef) — กดปุ่มเก่าหลังเปิด-ปิดรอบใหม่จึงเขียน
+    //   ให้รอบเดิมของปุ่ม ไม่ใช่รอบล่าสุด (ข้อ 10) ปุ่มเดิมไม่มี ref → ใช้ resolvedAt ปัจจุบัน
     const [conv] = await db
       .select({ resolvedAt: chatConversations.resolvedAt })
       .from(chatConversations)
       .where(eq(chatConversations.id, conversationId))
       .limit(1);
-    const recorded = await recordCsatResponse(db, conversationId, csatData.score, conv?.resolvedAt ?? null);
+    let resolvedAt: Date | null = conv?.resolvedAt ?? null;
+    if (csatData.roundRef) {
+      const parsed = new Date(csatData.roundRef);
+      // § ref ต้อง parse ได้, ไม่อยู่ในอนาคต และไม่ล้ำหน้า resolvedAt ล่าสุดของห้อง
+      //   (= รอบจริงที่ห้องเคยปิด) กันค่าปลอมสร้างแถวขยะให้รอบที่ไม่มีจริง
+      const valid = !Number.isNaN(parsed.getTime())
+        && parsed.getTime() <= Date.now()
+        && (resolvedAt === null || parsed.getTime() <= resolvedAt.getTime());
+      resolvedAt = valid ? parsed : null;
+    }
+    const recorded = await recordCsatResponse(db, conversationId, csatData.score, resolvedAt);
     // § กดซ้ำไม่ตอบขอบคุณซ้ำ — คะแนนแถวแรกชนะแล้ว thank-you มีในประวัติแล้ว
     if (recorded.kind === 'recorded') {
       const thanks: LineOutgoingMessage[] = [{ type: 'text', text: csatThankYou(recorded.score) }];

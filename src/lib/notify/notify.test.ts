@@ -62,7 +62,7 @@ describe('sendTelegram', () => {
     expect(JSON.parse(init.body as string)).toEqual({ chat_id: 'CHAT1', text: 'สวัสดี' });
   });
 
-  it('HTTP 500 → failed ไม่ throw', async () => {
+  it('HTTP 500 → failed retryable ไม่ throw', async () => {
     vi.stubEnv('TELEGRAM_BOT_TOKEN', 'TEST_TOKEN');
     vi.stubEnv('TELEGRAM_CHAT_ID', 'CHAT1');
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('boom', { status: 500 })));
@@ -70,7 +70,19 @@ describe('sendTelegram', () => {
     const result = await sendTelegram('สวัสดี');
 
     expect(result.status).toBe('failed');
+    expect(result.retryable).toBe(true);
     expect(result.error).toContain('500');
+  });
+
+  it('HTTP 400 → failed ถาวร (retryable false)', async () => {
+    vi.stubEnv('TELEGRAM_BOT_TOKEN', 'TEST_TOKEN');
+    vi.stubEnv('TELEGRAM_CHAT_ID', 'CHAT1');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('bad', { status: 400 })));
+
+    const result = await sendTelegram('สวัสดี');
+
+    expect(result.status).toBe('failed');
+    expect(result.retryable).toBe(false);
   });
 
   it('ตัดข้อความเกิน 4000 ตัวอักษร', async () => {
@@ -118,6 +130,7 @@ describe('sendDiscord', () => {
     const result = await sendDiscord('สวัสดี');
 
     expect(result.status).toBe('failed');
+    expect(result.retryable).toBe(true);
   });
 
   it('ตัด content เกิน 2000 ตัวอักษร', async () => {
@@ -228,8 +241,8 @@ describe('notifyNewCase', () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('network down')));
 
     await expect(notifyNewCase(notice)).resolves.toEqual([
-      { channel: 'telegram', status: 'failed', error: 'network down' },
-      { channel: 'discord', status: 'failed', error: 'network down' },
+      { channel: 'telegram', status: 'failed', retryable: true, error: 'network down' },
+      { channel: 'discord', status: 'failed', retryable: true, error: 'network down' },
     ]);
   });
 });
